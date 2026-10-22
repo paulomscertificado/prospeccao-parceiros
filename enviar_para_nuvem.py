@@ -125,7 +125,7 @@ def esvaziar(destino) -> None:
 
 def main() -> int:
     print("Enviar a Prospecção de Parceiros para a nuvem (Vercel)\n")
-    url_publica = input("Endereço do site (ex.: https://parceiros.mscertificados.com.br): ").strip().rstrip("/")
+    url_publica = input("Endereço do site (o .vercel.app, ex.: https://prospeccao-parceiros.vercel.app): ").strip().rstrip("/")
     if not url_publica.startswith("https://"):
         print("O endereço precisa começar com https://. Nada foi feito.")
         return 1

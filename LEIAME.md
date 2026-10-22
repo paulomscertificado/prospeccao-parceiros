@@ -23,7 +23,7 @@ Quer conhecer o sistema com dados de exemplo? Depois de criar o administrador, d
 Configurações > LGPD e dados > **Apagar dados de demonstração**.
 
 ### Sistema na internet (Vercel)
-Quando o sistema estiver publicado (ex.: `https://parceiros.mscertificados.com.br`), é só abrir esse endereço
+Quando o sistema estiver publicado (ex.: `https://prospeccao-parceiros.vercel.app`), é só abrir esse endereço
 no navegador, de qualquer lugar: não precisa do `iniciar.bat`. O passo a passo da publicação está em
 [`docs/deploy-vercel.md`](docs/deploy-vercel.md) (dois cliques em **`enviar_para_nuvem.bat`** levam seus dados).
 - **WhatsApp:** o computador com o **WhatsApp Leads** precisa ficar **ligado e aberto**. Ele é ligado ao site

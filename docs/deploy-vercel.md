@@ -1,6 +1,6 @@
 # Publicar na Vercel (sistema na nuvem)
 
-Endereço sugerido: `https://parceiros.mscertificados.com.br`. O sistema roda na Vercel, os dados ficam num
+Endereço: o domínio gratuito da Vercel (`https://<projeto>.vercel.app`, escolha da Maria; domínio próprio é opcional). O sistema roda na Vercel, os dados ficam num
 **PostgreSQL** (Neon, pelo Marketplace da Vercel) e o **WhatsApp continua no computador da MS** (WhatsApp Leads).
 
 ## O que muda na nuvem (e por quê)
@@ -77,11 +77,12 @@ No mesmo `enviar_para_nuvem.bat`, cole o endereço de conexão do Neon (*Storage
 Na Vercel: *Add New > Project* > importar o repositório > *Deploy*. Teste em `https://<projeto>.vercel.app`:
 login com o mesmo e-mail e senha, painel, uma busca pequena.
 
-### 6. Domínio
-*Settings > Domains* > `parceiros.mscertificados.com.br`. A Vercel mostra o registro **CNAME** para criar no
-DNS do domínio (quem cuida do DNS do mscertificados.com.br). Depois disso o descadastro de 1 clique dos
-e-mails passa a funcionar (`URL_PUBLICA` com https). Aproveite o acesso ao DNS para o **DKIM** e o **DMARC**
-(ver `configuracao.md`, seção 5).
+### 6. Endereço do site
+Usamos o endereço gratuito da Vercel (*Settings > Domains* mostra o `.vercel.app`). A variável `URL_PUBLICA`
+precisa ser **exatamente** esse endereço (com https), senão o link de descadastro dos e-mails aponta para o lugar
+errado: ao mudar, faça *Redeploy*. Domínio próprio (ex.: `parceiros.mscertificados.com.br`) é opcional: *Settings >
+Domains* + registro CNAME no DNS, e trocar a `URL_PUBLICA`.
+O **DKIM** e o **DMARC** do e-mail continuam precisando do DNS do mscertificados.com.br (ver `configuracao.md`, seção 5).
 
 ### 7. WhatsApp
 No computador do WhatsApp Leads: dois cliques em **`ligar_nuvem.bat`** (pasta `whatsapp-leads`) → endereço do
