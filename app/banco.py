@@ -22,7 +22,8 @@ if config.DATABASE_URL.startswith("sqlite"):
 
 else:
     # Na nuvem cada cópia do sistema abre poucas conexões (use o endereço "pooled" do Neon/Supabase).
-    _opcoes.update(pool_size=3, max_overflow=5, pool_recycle=300)
+    # Sem "prepared statements": o pooler do Supabase (porta 6543, modo transação) não aceita.
+    _opcoes.update(pool_size=3, max_overflow=5, pool_recycle=300, connect_args={"prepare_threshold": None})
 
 motor = create_engine(config.DATABASE_URL, pool_pre_ping=True, **_opcoes)
 

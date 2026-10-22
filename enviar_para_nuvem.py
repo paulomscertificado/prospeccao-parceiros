@@ -142,7 +142,8 @@ def main() -> int:
         print("Cópia pulada.")
         return 0
     try:
-        destino = create_engine(endereco_postgres(texto), pool_pre_ping=True)
+        destino = create_engine(endereco_postgres(texto), pool_pre_ping=True,
+                                connect_args={"prepare_threshold": None})  # pooler do Supabase (porta 6543)
         with destino.connect() as d:
             d.execute(text("SELECT 1"))
     except Exception as erro:  # noqa: BLE001
@@ -158,7 +159,8 @@ def main() -> int:
             if resposta != "SIM":
                 print("Nada foi copiado.")
                 return 0
-            esvaziar(destino)
+        # Sem usuários lá, só há os dados iniciais criados no primeiro acesso ao site: apaga sem perguntar.
+        esvaziar(destino)
     origem = create_engine(config.DATABASE_URL)
     print("\nCopiando (a base da Receita é grande: pode levar uns 10 a 20 minutos; não feche esta janela)...")
     inicio = time.time()
