@@ -16,7 +16,7 @@ prospeccao-parceiros/
 │   ├── cadencias.py       aplica uma cadência → tarefas na agenda
 │   ├── vendas_servico.py  calculadora de comissão, registrar venda (+ certificado), alertas de vencimento
 │   ├── prospeccao.py      busca (Receita, OSM, Google), leitura de sites, BrasilAPI; busca em etapas (trabalhos)
-│   ├── base_receita.py    importação dos .zip de CNPJ da Receita (só contabilidade) e busca por cidade
+│   ├── base_receita.py    importação dos .zip da Receita (categorias de parceiros; sócio-admin e Simples/MEI) e busca por cidade
 │   ├── ia.py              camada de IA (abordagem, próximo passo, objeções, templates, perguntas) + regras sem IA
 │   ├── metricas.py        indicadores, séries de gráficos, rankings, perguntas prontas da IA Comercial
 │   ├── planilhas.py       leitura CSV/Excel, validação, geração de CSV/Excel/PDF

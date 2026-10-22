@@ -60,7 +60,7 @@ Definido em `app/modelos.py` e `app/base_receita.py`.
 | `certificados` | Controle de vencimentos | data_vencimento, status, ultimo_alerta, parceiro_id |
 | `logs` | Auditoria | usuário, ação, entidade, IP |
 | `configuracoes` | Regras alteráveis na tela | chave/valor (pesos do score, limites, textos) |
-| `base_receita` | Escritórios de contabilidade da base aberta da Receita | cnpj, nome, CNAE, UF, município, endereço, telefones, e-mail |
+| `base_receita` | Escritórios de contabilidade da base aberta da Receita | cnpj, nome, CNAE, UF, município, endereço, telefones, e-mail, porte, socio_admin/socio_cargo/socios_qtd, regime (MEI/Simples) |
 
 ## Lead scoring (IA SDR)
 

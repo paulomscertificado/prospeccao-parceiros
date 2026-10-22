@@ -5,7 +5,7 @@ de dados (DPO) da MS.
 
 | Exigência | Como o sistema atende |
 |---|---|
-| Minimização | Campos voltados a dados **empresariais** públicos (escritório, CNPJ, site, telefone comercial). Sócios só a partir de dados públicos da Receita. A IA não recebe telefone nem e-mail |
+| Minimização | Campos voltados a dados **empresariais** públicos (escritório, CNPJ, site, telefone comercial). Sócios só a partir de dados públicos da Receita: da base importada fica só o nome e o cargo do responsável (sócio-administrador ou equivalente) e a quantidade de sócios, sem CPF, idade nem os demais sócios. A IA não recebe telefone nem e-mail |
 | Origem e base legal | Cada lead grava **origem**, **fonte (URL)** e **base legal** (padrão: legítimo interesse em contato B2B; editável) |
 | Consentimento | Indicações do portal exigem confirmação de que o cliente autorizou o contato |
 | Opt-out | Um clique na ficha/agenda; automático com "SAIR" no WhatsApp oficial; e-mails com rodapé e `List-Unsubscribe`. Opt-out cancela tarefas e bloqueia novas mensagens e campanhas |

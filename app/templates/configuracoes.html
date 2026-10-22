@@ -129,7 +129,7 @@
   {% else %}<p>A base ainda não foi importada. Ela é a melhor fonte para "Encontrar novos parceiros": traz <b>todos</b> os escritórios de contabilidade ativos do Brasil, com CNPJ, endereço, telefone e e-mail informados à Receita.</p>{% endif %}
   {% if receita.status %}<div class="aviso {{ 'aviso-erro' if receita.status.startswith('Erro') else 'aviso-info' }}">{{ receita.status }}{% if not receita.status.startswith('Erro') %} <a href="?aba=integracoes">Atualizar</a>{% endif %}</div>{% endif %}
   <ol style="padding-left:18px">
-    <li>Baixe da Receita (dados abertos do CNPJ, mês mais recente) os arquivos <b>Estabelecimentos0.zip</b> a <b>Estabelecimentos9.zip</b>, <b>Municipios.zip</b> e, se quiser a razão social e o porte, <b>Empresas0.zip</b> a <b>Empresas9.zip</b>. São cerca de 6 GB.</li>
+    <li>Baixe da Receita (dados abertos do CNPJ, mês mais recente) os arquivos <b>Estabelecimentos0.zip</b> a <b>Estabelecimentos9.zip</b>, <b>Municipios.zip</b> e, se quiser a razão social e o porte, <b>Empresas0.zip</b> a <b>Empresas9.zip</b>. Opcionais: <b>Socios0.zip</b> a <b>Socios9.zip</b> (responsável = sócio-administrador) e <b>Simples.zip</b> (MEI / Simples Nacional). São cerca de 7 GB.</li>
     <li>Coloque todos numa pasta (ex.: <code>C:\Receita\2026-10</code>).</li>
     <li>Cole o caminho da pasta abaixo e clique em Importar. O sistema guarda só os escritórios de contabilidade ativos (atividade 6920-6/01 e 6920-6/02). Depois você pode apagar os .zip.</li>
   </ol>

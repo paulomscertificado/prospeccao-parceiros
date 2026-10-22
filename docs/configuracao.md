@@ -124,7 +124,8 @@ e `outlook.office365.com`; Hostinger: `smtp.hostinger.com:465` e `imap.hostinger
 1. Abra <https://arquivos.receitafederal.gov.br> e entre em **Dados > Cadastros > CNPJ > (mês mais recente,
    ex.: 2026-10)**. A Receita publica um mês novo por volta do dia 15.
 2. Baixe `Estabelecimentos0.zip` … `Estabelecimentos9.zip` (≈ 5,4 GB), `Municipios.zip` e, para razão social
-   e porte, `Empresas0.zip` … `Empresas9.zip` (≈ 1,4 GB). O servidor da Receita às vezes fica lento ou bloqueia
+   e porte, `Empresas0.zip` … `Empresas9.zip` (≈ 1,4 GB). Opcionais: `Socios0.zip` … `Socios9.zip` (≈ 0,7 GB) e
+   `Simples.zip` (≈ 0,3 GB), que trazem o **responsável** (sócio-administrador) e o **regime** (MEI / Simples Nacional). O servidor da Receita às vezes fica lento ou bloqueia
    quem abre muitas conexões: baixe **um arquivo por vez**.
 3. Coloque tudo numa pasta (na MS: `D:\Base de dados`).
 4. Configurações > Integrações > **Importar base** (cole o caminho da pasta) — ou dois cliques em
@@ -134,6 +135,11 @@ e `outlook.office365.com`; Hostinger: `smtp.hostinger.com:465` e `imap.hostinger
 Como a Receita não informa o site, a busca testa o domínio do e-mail do escritório (ex.: `fiscal@wcont.com.br` →
 `www.wcont.com.br`) e só aceita o site se ele responder **e** o nome do domínio combinar com o nome do escritório
 (ou a página mostrar o CNPJ). E-mails de Gmail, Hotmail, provedores etc. nunca viram site.
+Dos sócios, o sistema guarda **só o nome e o cargo de uma pessoa** por empresa (sócio-administrador; na falta,
+administrador, titular, empresário, sócio-gerente, presidente, diretor ou responsável, sempre pessoa física) e a
+**quantidade** de sócios. CPF, idade e os demais sócios não são guardados (LGPD). O responsável vira o
+"Responsável" do lead; o regime aparece na ficha ("Regime (Receita)"). Leads que já existiam são completados na
+importação (só campos vazios; o regime é atualizado), com registro no histórico.
 5. Atualize uma vez por mês. A busca passa a oferecer a fonte "Base da Receita Federal".
 
 Obs.: desde julho/2026 os CNPJs novos podem ser **alfanuméricos**; o sistema já aceita esse formato.

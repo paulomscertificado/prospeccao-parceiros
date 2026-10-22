@@ -12,7 +12,7 @@ from .modelos import Historico, Lead, Parceiro, Tarefa, Usuario
 
 CAMPOS_TEXTO = ["empresa", "cnpj", "responsavel", "cargo", "telefone", "whatsapp", "email", "site",
                 "instagram", "linkedin", "cidade", "estado", "endereco", "especialidade", "tipo_empresa",
-                "socios", "porte", "origem", "fonte_url", "observacoes", "base_legal"]
+                "socios", "porte", "regime", "origem", "fonte_url", "observacoes", "base_legal"]
 CAMPOS_NUMERO = ["qtd_clientes_estimada", "funcionarios"]
 CAMPOS_MARCA = ["equipe_comercial", "multiplos_socios", "atende_empresas", "presenca_digital_forte",
                 "demonstrou_interesse"]

@@ -15,6 +15,8 @@
   <div class="largo"><label>Endereço comercial</label><input type="text" name="endereco" value="{{ lead.endereco or '' }}"></div>
   <div><label>Clientes (estimativa)</label><input type="number" min="0" name="qtd_clientes_estimada" value="{{ lead.qtd_clientes_estimada if lead.qtd_clientes_estimada is not none else '' }}"></div>
   <div><label>Funcionários</label><input type="number" min="0" name="funcionarios" value="{{ lead.funcionarios if lead.funcionarios is not none else '' }}"></div>
+  <div><label>Porte</label><input type="text" name="porte" value="{{ lead.porte or '' }}"></div>
+  <div><label>Regime (Receita)</label><select name="regime">{% for r in ["", "MEI", "Simples Nacional", "Fora do Simples"] %}<option value="{{ r }}" {{ 'selected' if (lead.regime or '') == r }}>{{ r or '—' }}</option>{% endfor %}</select></div>
   <div><label>Especialidade</label><input type="text" name="especialidade" value="{{ lead.especialidade or '' }}" list="lista-especialidades"></div>
   <div><label>Categoria de parceiro</label><select name="categoria_id"><option value="">—</option>{% for c in categorias or [] %}<option value="{{ c.id }}" {{ 'selected' if lead.categoria_id == c.id }}>{{ c.nome }}</option>{% endfor %}</select></div>
   <div><label>Origem do lead</label><input type="text" name="origem" value="{{ lead.origem or '' }}"></div>

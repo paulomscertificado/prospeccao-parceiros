@@ -1,12 +1,16 @@
 """Base de CNPJs da Receita Federal (dados abertos), só com as empresas das CATEGORIAS de parceiros.
 
 A Receita publica todo mês os arquivos "Estabelecimentos0.zip" ... "Estabelecimentos9.zip",
-"Empresas0.zip" ... e "Municipios.zip" (ver docs/configuracao.md). Esta rotina lê os arquivos
+"Empresas0.zip" ..., "Socios0.zip" ..., "Simples.zip" e "Municipios.zip" (ver docs/configuracao.md). Esta rotina lê os arquivos
 direto do .zip, sem descompactar, e guarda só os estabelecimentos ATIVOS cuja atividade principal
 (CNAE) combina com alguma categoria cadastrada (Configurações > Categorias):
   - CNAE na lista "cnaes" da categoria → entra;
   - CNAE na lista "cnaes_com_palavra" → só entra se o nome fantasia tiver uma das palavras-chave.
 São dados públicos e oficiais (CNPJ, nome, endereço, telefone e e-mail informados à Receita).
+
+LGPD (minimização): dos arquivos de sócios guardamos só o NOME e o cargo de UMA pessoa (o sócio-administrador
+ou equivalente, que é o contato natural da empresa) e a QUANTIDADE de sócios. CPF, idade, data de entrada e
+os demais sócios não são guardados. Do Simples, só o regime atual (MEI / Simples Nacional / fora do Simples).
 """
 
 import csv
@@ -27,6 +31,10 @@ from .banco import Base, gravar_config, ler_config, sessao
 
 log = logging.getLogger(__name__)
 
+# Qualificações (tabela Qualificacoes.zip) aceitas como responsável, da mais para a menos indicada.
+CARGOS_RESPONSAVEL = {"49": "Sócio-administrador", "05": "Administrador", "65": "Titular", "50": "Empresário",
+                      "28": "Sócio-gerente", "16": "Presidente", "10": "Diretor", "43": "Responsável"}
+ORDEM_CARGO = {codigo: i for i, codigo in enumerate(CARGOS_RESPONSAVEL)}
 PORTES = {"01": "Micro empresa", "03": "Empresa de pequeno porte", "05": "Demais", "00": "Não informado"}
 LOTE = 5000
 csv.field_size_limit(10_000_000)
@@ -52,6 +60,10 @@ class EmpresaReceita(Base):
     inicio_atividade: Mapped[datetime | None] = mapped_column(Date, nullable=True)
     matriz: Mapped[int] = mapped_column(Integer, default=1)
     porte: Mapped[str] = mapped_column(String(40), default="")
+    socio_admin: Mapped[str] = mapped_column(String(120), default="")  # nome do responsável (pessoa física)
+    socio_cargo: Mapped[str] = mapped_column(String(40), default="")
+    socios_qtd: Mapped[int] = mapped_column(Integer, default=0)
+    regime: Mapped[str] = mapped_column(String(30), default="")
     atualizado_em: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
 
 
@@ -211,12 +223,97 @@ def importar_pasta(pasta: str) -> int:
             with sessao() as db:
                 db.execute(text("UPDATE base_receita SET razao_social = :r, porte = :p WHERE cnpj_basico = :b"),
                            dados[i:i + LOTE])
+    _importar_socios(pasta_p, basicos)
+    _importar_simples(pasta_p, basicos)
+    log.info("Leads completados com responsável/regime da Receita: %s", completar_leads())
     with sessao() as db:
         gravar_config(db, "receita_status", "")
         gravar_config(db, "receita_atualizada_em", agora.strftime("%d/%m/%Y %H:%M"))
         gravar_config(db, "receita_total", str(total))
         gravar_config(db, "receita_por_categoria", por_categoria)
     log.info("Base da Receita importada: %s empresas %s", total, por_categoria)
+    return total
+
+
+def _importar_socios(pasta: Path, basicos: set[str]) -> int:
+    """Socios*.zip (opcionais): o responsável (sócio-administrador ou equivalente, pessoa física) e quantos sócios
+    a empresa tem. Colunas: cnpj_basico; tipo (1 PJ, 2 PF, 3 estrangeiro); nome; CPF mascarado; qualificação; ..."""
+    arquivos = _arquivos(pasta, "socio")
+    if not arquivos:
+        return 0
+    escolhido: dict[str, tuple] = {}  # basico -> (ordem, data_entrada, nome, cargo)
+    quantidade: dict[str, int] = {}
+    for n, arq in enumerate(arquivos, start=1):
+        _anotar(f"Lendo responsáveis em {arq.name} ({n} de {len(arquivos)})...")
+        for c in _linhas_do_zip(arq, lambda linha: linha[1:9] in basicos):
+            if len(c) < 6 or c[0] not in basicos:
+                continue
+            quantidade[c[0]] = quantidade.get(c[0], 0) + 1
+            if c[1] != "2" or c[4] not in ORDEM_CARGO or not c[2].strip():
+                continue  # só pessoa física com cargo de gestão
+            candidato = (ORDEM_CARGO[c[4]], c[5] or "99999999", _titulo(c[2])[:120], CARGOS_RESPONSAVEL[c[4]])
+            if c[0] not in escolhido or candidato < escolhido[c[0]]:
+                escolhido[c[0]] = candidato  # cargo mais indicado; empate: quem entrou primeiro
+    dados = [{"b": b, "n": escolhido[b][2] if b in escolhido else "", "c": escolhido[b][3] if b in escolhido else "",
+              "q": q} for b, q in quantidade.items()]
+    for i in range(0, len(dados), LOTE):
+        with sessao() as db:
+            db.execute(text("UPDATE base_receita SET socio_admin = :n, socio_cargo = :c, socios_qtd = :q "
+                            "WHERE cnpj_basico = :b"), dados[i:i + LOTE])
+    log.info("Responsáveis da Receita: %s empresas com responsável, %s com sócios", len(escolhido), len(quantidade))
+    return len(escolhido)
+
+
+def completar_leads() -> int:
+    """Leads que já existiam e estão na base: preenche responsável/cargo (se vazios) e o regime."""
+    from . import score
+    from .leads_servico import historico
+    from .modelos import Lead
+
+    total = 0
+    with sessao() as db:
+        for lead in db.execute(select(Lead).where(Lead.cnpj != "")).scalars():
+            e = db.get(EmpresaReceita, util.normalizar_cnpj(lead.cnpj))
+            if e is None:
+                continue
+            mudou = []
+            if not lead.responsavel and e.socio_admin:
+                lead.responsavel, lead.cargo = e.socio_admin, lead.cargo or e.socio_cargo
+                mudou.append(f"responsável ({e.socio_cargo.lower()})")
+            if e.regime and lead.regime != e.regime:
+                lead.regime = e.regime
+                mudou.append(f"regime: {e.regime}")
+            if (e.socios_qtd or 0) > 1 and not lead.multiplos_socios:
+                lead.multiplos_socios = True
+                mudou.append("mais de um sócio")
+            if mudou:
+                score.atualizar(db, lead)
+                historico(db, lead.id, "sistema", "Dados públicos da Receita: " + ", ".join(mudou) + ".", None)
+                total += 1
+    return total
+
+
+def regime_simples(opcao_simples: str, opcao_mei: str) -> str:
+    if opcao_mei.strip().upper() == "S":
+        return "MEI"
+    if opcao_simples.strip().upper() == "S":
+        return "Simples Nacional"
+    return "Fora do Simples"
+
+
+def _importar_simples(pasta: Path, basicos: set[str]) -> int:
+    """Simples.zip (opcional): cnpj_basico; opção Simples (S/N); datas; opção MEI (S/N); datas."""
+    arquivos = _arquivos(pasta, "simples")
+    total = 0
+    for arq in arquivos:
+        _anotar(f"Lendo Simples Nacional / MEI em {arq.name}...")
+        dados = [{"b": c[0], "r": regime_simples(c[1], c[4])}
+                 for c in _linhas_do_zip(arq, lambda linha: linha[1:9] in basicos)
+                 if len(c) >= 5 and c[0] in basicos]
+        for i in range(0, len(dados), LOTE):
+            with sessao() as db:
+                db.execute(text("UPDATE base_receita SET regime = :r WHERE cnpj_basico = :b"), dados[i:i + LOTE])
+        total += len(dados)
     return total
 
 
@@ -313,6 +410,9 @@ def buscar(db, cidade: str, uf: str, limite: int, categorias: list[str] | None =
             "whatsapp": "",  # celular informado à Receita não garante WhatsApp: o vendedor confirma
             "email": e.email, "endereco": ", ".join(x for x in (e.endereco, e.bairro, e.cep) if x),
             "cidade": e.municipio, "estado": e.uf, "porte": e.porte, "categoria": e.categoria or "outros",
+            # Responsável e regime vêm do quadro de sócios e do Simples (dados públicos da Receita)
+            "responsavel": e.socio_admin, "cargo": e.socio_cargo, "regime": e.regime,
+            "multiplos_socios": (e.socios_qtd or 0) > 1,
             "observacoes": (f"Celular informado à Receita: {util.formatar_telefone(celular)} (confirmar se é WhatsApp). "
                             if celular else "") + (f"Em atividade desde {e.inicio_atividade:%Y}." if e.inicio_atividade else ""),
             "fonte_url": f"https://brasilapi.com.br/api/cnpj/v1/{e.cnpj}",

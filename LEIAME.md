@@ -106,6 +106,7 @@ Crie usuários em **Configurações > Usuários**.
 | Esqueci a senha | Outro administrador cria uma senha nova em Configurações > Usuários, ou rode `redefinir_senha.bat` |
 | "Muitas tentativas erradas" | Espere 15 minutos e tente de novo |
 | "O formulário expirou" | Recarregue a página (F5) e repita |
+| Lead da base sem responsável | A Receita não tem sócio-administrador pessoa física para essa empresa: preencha à mão |
 | A busca acha poucos escritórios | Importe a **base da Receita Federal** (Configurações > Integrações) |
 | "O Google recusou a senha" | Use a **senha de app** (16 letras) da conta de envio, não a senha normal (Configurações > E-mail mostra o passo a passo) |
 | E-mails caindo no spam | Configurações > E-mail mostra o que falta no DNS (DKIM e DMARC); comece com poucos e-mails por dia |

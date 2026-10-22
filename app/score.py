@@ -60,7 +60,7 @@ def criterios_atendidos(lead) -> dict[str, float]:
         "atende_empresas": 1.0 if lead.atende_empresas or perfil.get("atende_empresas") else 0.0,
         "clientes": 1.0 if clientes > 100 else 0.0,
         "tamanho": 1.0 if (lead.funcionarios or 0) > 5 or "pequeno porte" in porte or "demais" in porte
-        or len(socios) > 2 else 0.0,
+        or len(socios) > 2 or lead.multiplos_socios else 0.0,
         "presenca_digital": 1.0 if lead.site and (lead.instagram or lead.linkedin) else (0.5 if lead.site else 0.0),
         "indicacao": 1.0 if lead.possibilidade_indicacao else 0.0,
         "programa_parceiros": 1.0 if lead.programa_parceiros else 0.0,

@@ -145,6 +145,7 @@ class Lead(Base):
     tipo_empresa: Mapped[str] = mapped_column(String(80), default="")
     socios: Mapped[str] = mapped_column(Text, default="")  # um por linha (dados públicos da Receita)
     porte: Mapped[str] = mapped_column(String(60), default="")
+    regime: Mapped[str] = mapped_column(String(30), default="")  # MEI, Simples Nacional, Fora do Simples (Receita)
     categoria_id: Mapped[int | None] = mapped_column(ForeignKey("categorias.id"), nullable=True, index=True)
     # Pesquisa da IA SDR (perfil do parceiro, só com informações encontradas)
     perfil: Mapped[str] = mapped_column(Text, default="")              # JSON
