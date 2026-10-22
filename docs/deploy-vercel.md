@@ -29,6 +29,10 @@ O modo nuvem liga sozinho quando a variável `VERCEL` existe (a Vercel cria) ou 
   ([limites](https://vercel.com/docs/functions/limitations)). Cada chamada do agendador trabalha até
   `SEGUNDOS_POR_RODADA` (240 s) e para; o resto continua no minuto seguinte.
 - **Disco**: apagado a toda hora, só `/tmp` aceita gravação. Nada importante é gravado em arquivo.
+- **Preset "Other"**: a Vercel reconhece o FastAPI no `requirements.txt` e sugere o preset *FastAPI*; com ele a
+  pasta `api/` deixa de virar função e o build **falha** (`The pattern "api/index.py" defined in functions doesn't
+  match any Serverless Functions`) ([documentação](https://vercel.com/docs/functions/runtimes/python/api-directory)).
+  O `"framework": null` do `vercel.json` força o *Other* (`api/index.py` + `rewrites`), seja qual for a escolha no painel.
 
 ### Trabalhos em etapas (`app/trabalhos.py`)
 Tabela `trabalhos` (tipo, ref_id, status, estado em JSON). Cada tipo registra `etapa(ref_id, usuario_id, estado,
@@ -74,7 +78,8 @@ No mesmo `enviar_para_nuvem.bat`, cole o endereço de conexão do Neon (*Storage
 (10 a 20 minutos). Rodar de novo pergunta antes de apagar o que estiver lá (digitar `SIM`).
 
 ### 5. Publicar
-Na Vercel: *Add New > Project* > importar o repositório > *Deploy*. Teste em `https://<projeto>.vercel.app`:
+Na Vercel: *Add New > Project* > importar o repositório > *Deploy* (o *Framework Preset* fica *Other* pelo
+`vercel.json`; se o painel mostrar *FastAPI*, troque para *Other*). Teste em `https://<projeto>.vercel.app`:
 login com o mesmo e-mail e senha, painel, uma busca pequena.
 
 ### 6. Endereço do site
