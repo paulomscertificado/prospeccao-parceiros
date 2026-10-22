@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block titulo %}Vencimentos{% endblock %}
+{% block conteudo %}
+<div class="cabecalho"><h1>Vencimentos da minha carteira</h1></div>
+<div class="cartao" style="padding:0"><div class="tabela-rolagem"><table><tr><th>Cliente</th><th>Certificado</th><th>Vencimento</th><th>Situação</th></tr>
+  {% for c in certs %}{% set dias = (c.data_vencimento - hoje).days %}<tr><td>{{ c.cliente_nome }}</td><td>{{ c.tipo }}</td><td>{{ c.data_vencimento|data }} {% if c.status in ['Ativo','Em renovação'] and dias <= 30 %}<span class="selo selo-alerta">{{ dias }} dias</span>{% endif %}</td><td><span class="selo">{{ c.status }}</span></td></tr>
+  {% else %}<tr><td colspan="4" class="vazio">Nenhum certificado na sua carteira ainda.</td></tr>{% endfor %}</table></div></div>
+{% endblock %}

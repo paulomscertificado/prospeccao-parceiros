@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block titulo %}Primeiro acesso{% endblock %}
+{% block publico %}
+<div class="login">
+  <form class="cartao" method="post" action="/primeiro-acesso">
+    <h1 style="margin-bottom:6px">Bem-vinda!</h1>
+    <p class="suave">Crie a conta do <b>administrador</b> do sistema. Depois você cadastra os vendedores em Configurações.</p>
+    {% if erro %}<div class="aviso aviso-erro">{{ erro }}</div>{% endif %}
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="campo"><label>Seu nome</label><input type="text" name="nome" value="{{ nome or '' }}" required></div>
+    <div class="campo"><label>E-mail</label><input type="email" name="email" value="{{ email or '' }}" required></div>
+    <div class="campo"><label>Senha (mínimo 8, com letras e números)</label><input type="password" name="senha" required minlength="8"></div>
+    <div class="campo"><label>Repita a senha</label><input type="password" name="senha2" required minlength="8"></div>
+    <button class="btn btn-primario" style="width:100%;justify-content:center">Criar conta e entrar</button>
+  </form>
+</div>
+{% endblock %}

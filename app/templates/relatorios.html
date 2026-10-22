@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block titulo %}Relatórios{% endblock %}
+{% macro tabela_grupo(linhas, titulo) %}
+<table><tr><th>{{ titulo }}</th><th class="num">Leads</th><th class="num">Contatados</th><th class="num">Responderam</th><th class="num">Parceiros</th><th class="num">Resposta</th><th class="num">Conversão</th></tr>
+{% for g in linhas %}<tr><td>{{ g.nome }}</td><td class="num">{{ g.leads }}</td><td class="num">{{ g.contatados }}</td><td class="num">{{ g.responderam }}</td><td class="num">{{ g.parceiros }}</td><td class="num">{{ g.taxa_resposta|pct }}</td><td class="num">{{ g.taxa_conversao|pct }}</td></tr>
+{% else %}<tr><td colspan="7" class="vazio">Sem dados no período.</td></tr>{% endfor %}</table>
+{% endmacro %}
+{% block conteudo %}
+<div class="cabecalho">
+  <div><h1>Relatórios comerciais</h1><div class="suave">{{ p.nome }} · {{ p.inicio|data }} a {{ p.fim|data }}</div></div>
+  <div class="acoes">
+    <form method="get"><select name="periodo" onchange="this.form.submit()" aria-label="Período">{% for c, n in [("7d","Últimos 7 dias"),("30d","Últimos 30 dias"),("90d","Últimos 90 dias"),("12m","Últimos 12 meses"),("tudo","Todo o período")] %}<option value="{{ c }}" {{ 'selected' if periodo == c }}>{{ n }}</option>{% endfor %}</select></form>
+    <a class="btn" href="/relatorios/exportar.pdf?periodo={{ periodo }}">PDF</a>
+    <a class="btn" href="/relatorios/exportar.xlsx?periodo={{ periodo }}">Excel</a>
+    <a class="btn" href="/relatorios/exportar.csv?periodo={{ periodo }}">CSV</a>
+  </div>
+</div>
+
+<div class="grade-2">
+  <div class="cartao"><h2>Métricas importantes</h2>
+    <table>{% for nome, valor in metricas %}<tr><td>{{ nome }}</td><td class="num"><b>{{ valor }}</b></td></tr>{% endfor %}</table>
+    <p class="ajuda">Custo por lead/parceiro usa o "custo mensal da prospecção" de Configurações. LTV = lucro bruto médio já gerado por parceiro.</p>
+  </div>
+  <div>
+    <div class="cartao"><h2>Funil</h2>
+      {% set topo = funil[0][1] or 1 %}
+      {% for nome, valor in funil %}<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between" class="pequeno"><span>{{ nome }}</span><b>{{ valor }}</b></div><div class="barra"><span style="width:{{ (100 * valor / topo)|round(1) }}%"></span></div></div>{% endfor %}
+    </div>
+    {% if vendedores %}<div class="cartao"><h2>Por vendedor</h2><div class="tabela-rolagem"><table><tr><th>Vendedor</th><th class="num">Leads</th><th class="num">Resposta</th><th class="num">Parceiros</th><th class="num">Conversão</th><th class="num">Receita</th></tr>
+      {% for g in vendedores %}<tr><td>{{ g.nome }}</td><td class="num">{{ g.leads }}</td><td class="num">{{ g.taxa_resposta|pct }}</td><td class="num">{{ g.parceiros }}</td><td class="num">{{ g.taxa_conversao|pct }}</td><td class="num">{{ g.receita|moeda }}</td></tr>{% endfor %}</table></div></div>{% endif %}
+  </div>
+</div>
+
+<div class="grade-2">
+  <div class="cartao"><h2>Por estado</h2><div class="tabela-rolagem">{{ tabela_grupo(estados, 'UF') }}</div></div>
+  <div class="cartao"><h2>Por cidade (top 20)</h2><div class="tabela-rolagem">{{ tabela_grupo(cidades, 'Cidade') }}</div></div>
+  <div class="cartao"><h2>Por origem do lead</h2><div class="tabela-rolagem">{{ tabela_grupo(origens, 'Origem') }}</div></div>
+  <div class="cartao"><h2>Por especialidade (tipo de escritório)</h2><div class="tabela-rolagem">{{ tabela_grupo(especialidades, 'Especialidade') }}</div></div>
+</div>
+
+<div class="cartao"><h2>Parceiros no período</h2><div class="tabela-rolagem">
+  <table><tr><th>Parceiro</th><th class="num">Indicados</th><th class="num">Certificados</th><th class="num">Faturamento</th><th class="num">Comissão</th><th>Última venda</th></tr>
+  {% for r in ranking %}<tr><td><a href="/parceiros/{{ r.id }}">{{ r.nome }}</a></td><td class="num">{{ r.indicados }}</td><td class="num">{{ r.certificados }}</td><td class="num">{{ r.faturamento|moeda }}</td><td class="num">{{ r.comissao|moeda }}</td><td>{{ r.ultima_venda|data or '—' }}</td></tr>
+  {% else %}<tr><td colspan="6" class="vazio">Sem parceiros.</td></tr>{% endfor %}</table></div>
+  {% if parados %}<div class="aviso aviso-alerta" style="margin:12px 0 0">{{ parados|length }} parceiros sem venda recente: {% for r in parados[:10] %}{{ r.nome }}{{ ', ' if not loop.last }}{% endfor %}{{ '…' if parados|length > 10 }}</div>{% endif %}
+</div>
+
+<div class="cartao"><h2>Exportar dados</h2>
+  <table>{% for tipo, nome in [("leads","Leads"),("parceiros","Parceiros"),("clientes","Clientes"),("vendas","Vendas"),("comissoes","Comissões"),("vencimentos","Vencimentos")] %}
+  <tr><td>{{ nome }}</td><td class="grupo-btn"><a class="btn btn-pequeno" href="/exportar/{{ tipo }}.csv">CSV</a><a class="btn btn-pequeno" href="/exportar/{{ tipo }}.xlsx">Excel</a><a class="btn btn-pequeno" href="/exportar/{{ tipo }}.pdf">PDF</a></td></tr>{% endfor %}</table>
+</div>
+{% endblock %}

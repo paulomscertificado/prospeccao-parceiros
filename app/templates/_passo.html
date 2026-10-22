@@ -1,0 +1,8 @@
+<tr>
+  <td style="width:80px"><input type="number" name="dia" min="1" value="{{ p.dia if p else '' }}" aria-label="Dia"></td>
+  <td><select name="canal" aria-label="Canal">{% for c, n in CANAIS.items() %}<option value="{{ c }}" {{ 'selected' if p and p.canal == c }}>{{ n }}</option>{% endfor %}</select></td>
+  <td><input type="text" name="acao" value="{{ p.acao if p else '' }}" aria-label="Ação"></td>
+  <td><select name="template_id" aria-label="Template"><option value="">(padrão do canal)</option>{% for t in templates %}<option value="{{ t.id }}" {{ 'selected' if p and p.template_id == t.id }}>{{ CANAIS.get(t.canal, t.canal) }} · {{ t.nome }}</option>{% endfor %}</select></td>
+  <td style="width:110px"><input type="time" name="hora" value="{{ p.hora if p else '09:00' }}" aria-label="Horário"></td>
+  <td><button type="button" class="btn btn-pequeno btn-perigo remover-passo">Remover</button></td>
+</tr>

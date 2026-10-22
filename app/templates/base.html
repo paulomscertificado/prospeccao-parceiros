@@ -1,0 +1,60 @@
+{%- set ICONES = {
+ "grafico": "M3 3v18h18M7 15l4-4 3 3 5-6",
+ "lupa": "M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14zM21 21l-5-5",
+ "pessoas": "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8",
+ "fluxo": "M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9",
+ "agenda": "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z",
+ "aperto": "M11 17l2 2a1 1 0 1 0 3-3M14 14l2.5 2.5a1 1 0 1 0 3-3l-3.9-3.9a3 3 0 0 0-4.2 0l-.9.9a1 1 0 1 1-3-3l2.8-2.8a5 5 0 0 1 7.1 0L21 7M3 7l3.5-3.5L9 6M3 7l6 6",
+ "predio": "M3 21h18M5 21V5l7-3 7 3v16M9 9h1M14 9h1M9 13h1M14 13h1M9 17h1M14 17h1",
+ "relogio": "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2",
+ "carrinho": "M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0",
+ "moeda": "M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6",
+ "documento": "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h8",
+ "brilho": "M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2zM19 3v4M21 5h-4",
+ "fogo": "M12 22c4 0 7-3 7-7 0-4-3-6-4-10-2 2-3 4-3 6-1-1-2-2-2-4-2 2-5 5-5 8 0 4 3 7 7 7z",
+ "megafone": "M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1zM15 8a5 5 0 0 1 0 8M18 5a9 9 0 0 1 0 14",
+ "alvo": "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
+ "engrenagem": "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"
+} -%}
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf" content="{{ csrf }}">
+  <title>{% block titulo %}Prospecção{% endblock %} · MS Parceiros</title>
+  <link rel="stylesheet" href="/static/estilo.css?v=4">
+</head>
+<body>
+{% if usuario %}
+<div class="topo-celular"><button id="abrir-menu" aria-label="Abrir menu">☰</button><b>MS Parceiros</b></div>
+<div class="estrutura">
+  <nav class="menu">
+    <div class="marca"><span class="logo">MS</span><span><b>Parceiros</b><small>Prospecção B2B</small></span></div>
+    {% for link, nome, icone in menu %}
+      <a class="item {{ 'ativo' if (caminho == link or (link not in ['/', '/portal'] and caminho.startswith(link))) }}" href="{{ link }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ ICONES[icone] }}"/></svg>{{ nome }}{% if link == '/oportunidades' and avisos_novos %}<span class="contador">{{ avisos_novos }}</span>{% endif %}</a>
+    {% endfor %}
+    <div class="rodape">
+      {% if usuario.perfil != 'parceiro' %}
+      <div style="margin-bottom:8px"><a href="{{ config.WHATSAPP_LEADS_URL }}/whatsapp" target="_blank" rel="noopener" title="Abrir o WhatsApp Leads">
+        <span class="ponto {{ 'verde' if wl.conectado else ('amarelo' if wl.disponivel else 'vermelho') }}"></span>
+        WhatsApp {{ 'conectado' if wl.conectado else ('desconectado' if wl.disponivel else 'fechado') }}{{ ' (teste)' if wl.conectado and wl.tipo == 'teste' }}</a></div>
+      {% endif %}
+      <div><b>{{ usuario.nome }}</b></div>
+      <div class="suave" style="color:#9fb3c8">{{ usuario.perfil_nome }}</div>
+      <div style="margin-top:6px"><a href="/notificacoes">Avisos{{ ' (' ~ avisos_novos ~ ')' if avisos_novos }}</a> · <a href="/minha-conta">Minha conta</a> · <a href="/sair">Sair</a></div>
+    </div>
+  </nav>
+  <main class="conteudo">
+    {% for tipo, texto in avisos %}<div class="aviso aviso-{{ tipo }}">{{ texto }}</div>{% endfor %}
+    {% block conteudo %}{% endblock %}
+  </main>
+</div>
+{% else %}
+  {% block publico %}{% endblock %}
+{% endif %}
+<script src="/static/app.js?v=1"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

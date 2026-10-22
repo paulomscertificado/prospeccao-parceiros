@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block titulo %}{{ c.nome }}{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <div><h1>{{ c.nome }}</h1><div class="suave">{{ c.cidade }}/{{ c.estado }} · {{ c.objetivo }} · tom {{ config.TONS.get(c.tom, c.tom) }}{% if c.pedido %} · pedido: "{{ c.pedido }}"{% endif %}</div></div>
+  <a class="btn" href="/campanhas">Voltar</a>
+</div>
+
+{% if rodando %}
+<div class="aviso aviso-info"><b>Montando a campanha...</b> {{ c.etapa }} Esta página se atualiza sozinha.</div>
+{% elif c.status == 'erro' %}
+<div class="aviso aviso-erro">{{ c.etapa }} {{ c.erro }}</div>
+{% elif c.status == 'aguardando_aprovacao' %}
+<div class="faixa" style="background:#8a5a10"><b>APROVAÇÃO NECESSÁRIA</b> <span>{{ c.etapa }}</span></div>
+{% elif c.status in ('ativa', 'concluida', 'pausada') %}
+<div class="aviso aviso-ok">Campanha {{ c.status }}{% if aprovador %} · aprovada por {{ aprovador.nome }} em {{ c.aprovado_em|datahora }}{% endif %}.</div>
+{% elif c.status == 'cancelada' %}<div class="aviso aviso-alerta">Campanha cancelada.</div>{% endif %}
+
+{% if not rodando %}
+<div class="grade">
+  <div class="kpi destaque"><div class="rotulo">Quantidade de leads</div><div class="valor">{{ resumo.leads }}</div></div>
+  <div class="kpi"><div class="rotulo">Contatos programados</div><div class="valor">{{ resumo.contatos_estimados }}</div></div>
+  {% for canal, n in resumo.por_canal.items() %}<div class="kpi"><div class="rotulo">{{ CANAIS.get(canal, canal) }}</div><div class="valor">{{ n }}</div>
+    <div class="detalhe">{{ ('envio automático pela fila' if resumo.email_automatico else 'envio assistido (SMTP não configurado)') if canal == 'email' else ('envio com 1 clique pelo WhatsApp conectado (Agenda)' if wl.conectado else 'envio com 1 clique na Agenda') }}</div></div>{% endfor %}
+</div>
+<div class="grade-2">
+  <div class="cartao"><h2>Segmentos</h2><table>{% for nome, n in resumo.por_categoria.items() %}<tr><td>{{ nome }}</td><td class="num">{{ n }}</td></tr>{% endfor %}</table></div>
+  <div class="cartao"><h2>Canais e cadência</h2>
+    <p>Canais permitidos: {{ c.canais.replace(',', ', ') }} (a IA usa a ordem de prioridade de Configurações).</p>
+    <p>Cadência: {{ c.cadencia.nome if c.cadencia else 'IA SDR' }}. Cada toque tem um ângulo diferente; depois do último sem resposta o lead vira "Sem resposta".</p>
+    <p class="pequeno suave">Limites: por contato, por dia, por hora, por campanha e por domínio (Configurações).</p>
+    {% if c.status == 'aguardando_aprovacao' and pode_aprovar %}
+    <div class="grupo-btn">
+      <form method="post" action="/campanhas/{{ c.id }}/aprovar" data-confirmar="Aprovar e iniciar a campanha?"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-verde">APROVAR CAMPANHA</button></form>
+      <a class="btn" href="#mensagens">EDITAR</a>
+      <form method="post" action="/campanhas/{{ c.id }}/cancelar" data-confirmar="Cancelar a campanha? Nada será enviado."><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-perigo">CANCELAR</button></form>
+    </div>
+    {% elif c.status == 'aguardando_aprovacao' %}<div class="aviso aviso-alerta">Aguardando aprovação de um administrador ou gestor.</div>
+    {% elif c.status == 'ativa' and pode_aprovar %}
+    <div class="grupo-btn"><form method="post" action="/campanhas/{{ c.id }}/pausar"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">Pausar</button></form>
+      <form method="post" action="/campanhas/{{ c.id }}/cancelar" data-confirmar="Cancelar a campanha?"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-perigo">Cancelar</button></form></div>
+    {% elif c.status == 'pausada' and pode_aprovar %}
+    <form method="post" action="/campanhas/{{ c.id }}/retomar"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-primario">Retomar</button></form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="cartao" id="mensagens"><h2>Mensagens ({{ resumo.tarefas|length }})</h2>
+  <p class="suave">Cada empresa tem mensagens próprias. Você pode editar qualquer texto ou tirar uma empresa da campanha antes de aprovar.</p>
+  {% set ns = namespace(lead=None) %}
+  {% for t in resumo.tarefas %}
+    {% if t.lead_id != ns.lead %}{% set ns.lead = t.lead_id %}
+      <hr><h3><a href="/leads/{{ t.lead.id }}">{{ t.lead.empresa }}</a> <span class="pequeno suave">{{ t.lead.categoria.nome if t.lead.categoria else '' }} · score {{ t.lead.score }} · {{ t.lead.fit }}</span>
+        {% if t.status in ('rascunho', 'pendente') %}<form class="inline" method="post" action="/campanhas/{{ c.id }}/remover-lead"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="lead_id" value="{{ t.lead_id }}"><button class="btn btn-pequeno btn-perigo">Tirar da campanha</button></form>{% endif %}</h3>
+      {% if t.lead.motivo_potencial %}<p class="pequeno suave">Motivo: {{ t.lead.motivo_potencial }}</p>{% endif %}
+    {% endif %}
+    <details {{ 'open' if loop.first }}><summary>{{ t.data|data }} · {{ CANAIS.get(t.canal, t.canal) }} · {{ config.ANGULOS.get(t.angulo, t.acao) }} <span class="selo">{{ t.status }}</span></summary>
+      <form method="post" action="/campanhas/{{ c.id }}/editar-mensagem" style="margin:6px 0 10px">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="tarefa_id" value="{{ t.id }}">
+        {% if t.canal == 'email' %}<input type="text" name="assunto" value="{{ t.assunto }}" aria-label="Assunto" style="margin-bottom:4px">{% endif %}
+        <textarea name="mensagem" style="min-height:120px" aria-label="Mensagem">{{ t.mensagem }}</textarea>
+        {% if t.status in ('rascunho', 'pendente') %}<button class="btn btn-pequeno" style="margin-top:4px">Salvar texto</button>{% endif %}
+      </form></details>
+  {% else %}<p class="vazio">Nenhuma mensagem.</p>{% endfor %}
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}{% if rodando %}<script>setTimeout(() => location.reload(), 3000);</script>{% endif %}{% endblock %}

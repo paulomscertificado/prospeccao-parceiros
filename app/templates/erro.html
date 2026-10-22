@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block titulo %}{{ titulo }}{% endblock %}
+{% block conteudo %}
+<div class="cartao" style="max-width:560px"><h1 style="margin-bottom:8px">{{ titulo }}</h1><p>{{ mensagem }}</p><a class="btn" href="/">Voltar ao início</a></div>
+{% endblock %}
+{% block publico %}
+<div class="login"><div class="cartao"><h1 style="margin-bottom:8px">{{ titulo }}</h1><p>{{ mensagem }}</p><a class="btn btn-primario" href="/login">Entrar</a></div></div>
+{% endblock %}

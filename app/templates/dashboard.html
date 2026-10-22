@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block titulo %}Dashboard{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <div><h1>Dashboard</h1><div class="suave">{{ p.nome }} · {{ p.inicio|data }} a {{ p.fim|data }}</div></div>
+  <form class="filtros" method="get" style="margin:0">
+    <select name="periodo" onchange="this.form.submit()">
+      {% for c, n in [("7d","Últimos 7 dias"),("30d","Últimos 30 dias"),("90d","Últimos 90 dias"),("12m","Últimos 12 meses"),("tudo","Todo o período")] %}
+      <option value="{{ c }}" {{ 'selected' if periodo == c }}>{{ n }}</option>{% endfor %}
+    </select>
+    {% if vendedores %}
+    <select name="vendedor" onchange="this.form.submit()">
+      <option value="">Toda a equipe</option>
+      {% for v in vendedores %}<option value="{{ v.id }}" {{ 'selected' if vendedor_sel == v.id }}>{{ v.nome }}</option>{% endfor %}
+    </select>{% endif %}
+  </form>
+</div>
+
+<form class="faixa" method="get" action="/campanhas/nova" style="background:var(--roxo)">
+  <b>IA SDR</b>
+  <div class="pedido">
+    <input type="text" name="pedido" placeholder="Ex.: Quero novos parceiros entre contadores e administradoras em Recife" aria-label="Pedido para a IA SDR">
+    <button class="btn btn-verde">Criar campanha</button>
+  </div>
+  <a class="btn" href="/oportunidades">🔥 Oportunidades</a>
+</form>
+
+<form class="faixa" method="get" action="/prospeccao">
+  <div class="pedido">
+    <input type="text" name="pedido" placeholder="Ex.: Quero encontrar 100 escritórios contábeis de alto potencial em São Paulo" aria-label="O que você quer encontrar?">
+    <button class="btn btn-verde">Encontrar</button>
+  </div>
+  <a class="btn" href="/agenda"><b>{{ followups }}</b>&nbsp;follow-ups pendentes hoje</a>
+</form>
+
+<div class="grade">
+  <div class="kpi destaque"><div class="rotulo">Leads encontrados</div><div class="valor">{{ ind.leads_encontrados }}</div><div class="detalhe">{{ ind.leads_novos }} ainda novos</div></div>
+  <div class="kpi"><div class="rotulo">Contatados</div><div class="valor">{{ ind.leads_contatados }}</div><div class="detalhe">taxa de contato {{ ind.taxa_contato|pct }}</div></div>
+  <div class="kpi"><div class="rotulo">Responderam</div><div class="valor">{{ ind.leads_responderam }}</div><div class="detalhe">taxa de resposta {{ ind.taxa_resposta|pct }}</div></div>
+  <div class="kpi"><div class="rotulo">Interessados</div><div class="valor">{{ ind.leads_interessados }}</div><div class="detalhe">taxa de interesse {{ ind.taxa_interesse|pct }}</div></div>
+  <div class="kpi"><div class="rotulo">Reuniões agendadas</div><div class="valor">{{ ind.reunioes_agendadas }}</div><div class="detalhe">{{ ind.reunioes_periodo }} no período</div></div>
+  <div class="kpi"><div class="rotulo">Propostas enviadas</div><div class="valor">{{ ind.propostas_enviadas }}</div></div>
+  <div class="kpi"><div class="rotulo">Taxa de conversão</div><div class="valor">{{ ind.taxa_conversao|pct }}</div><div class="detalhe">{{ ind.parceiros_convertidos }} novos parceiros</div></div>
+  <div class="kpi"><div class="rotulo">Parceiros cadastrados</div><div class="valor">{{ ind.parceiros_cadastrados }}</div><div class="detalhe">{{ ind.parceiros_ativacao }} em ativação</div></div>
+  <div class="kpi"><div class="rotulo">Parceiros ativos</div><div class="valor">{{ ind.parceiros_ativos }}</div><div class="detalhe">{{ ind.parceiros_inativos }} inativos/bloqueados</div></div>
+  <div class="kpi"><div class="rotulo">Certificados vendidos</div><div class="valor">{{ ind.certificados_vendidos }}</div><div class="detalhe">ticket médio {{ ind.ticket_medio|moeda }}</div></div>
+  <div class="kpi"><div class="rotulo">Receita gerada</div><div class="valor">{{ ind.receita|moeda }}</div><div class="detalhe">lucro bruto {{ ind.lucro_bruto|moeda }}</div></div>
+  <div class="kpi"><div class="rotulo">Comissão gerada</div><div class="valor">{{ ind.comissao|moeda }}</div><div class="detalhe">média {{ ind.comissao_media|moeda }}</div></div>
+</div>
+
+<div class="grade-2">
+  <div class="cartao"><h2>Leads cadastrados
+    <span class="grupo-btn"><button class="btn btn-pequeno" data-serie="dia">Dia</button><button class="btn btn-pequeno" data-serie="semana">Semana</button><button class="btn btn-pequeno" data-serie="mes">Mês</button></span></h2>
+    <div class="grafico"><canvas id="g-tempo"></canvas></div></div>
+  <div class="cartao"><h2>Conversão do funil</h2><div class="grafico"><canvas id="g-funil"></canvas></div></div>
+</div>
+
+<div class="grade-3">
+  <div class="cartao"><h2>Parceiros</h2><div class="grafico baixo"><canvas id="g-parceiros"></canvas></div></div>
+  <div class="cartao"><h2>Certificados por parceiro</h2><div class="grafico baixo"><canvas id="g-certificados"></canvas></div></div>
+  <div class="cartao"><h2>Receita por parceiro</h2><div class="grafico baixo"><canvas id="g-receita"></canvas></div></div>
+</div>
+
+<div class="grade-2">
+  <div class="cartao"><h2>Performance por região (UF)</h2>
+    <div class="grafico baixo"><canvas id="g-regioes"></canvas></div>
+    <div class="tabela-rolagem"><table><tr><th>UF</th><th class="num">Leads</th><th class="num">Responderam</th><th class="num">Parceiros</th><th class="num">Conversão</th></tr>
+    {% for g in regioes %}<tr><td>{{ g.nome }}</td><td class="num">{{ g.leads }}</td><td class="num">{{ g.responderam }}</td><td class="num">{{ g.parceiros }}</td><td class="num">{{ g.taxa_conversao|pct }}</td></tr>
+    {% else %}<tr><td colspan="5" class="vazio">Sem leads no período.</td></tr>{% endfor %}</table></div>
+  </div>
+  <div class="cartao"><h2>Performance por vendedor</h2>
+    {% if vendedores_perf %}
+    <div class="grafico baixo"><canvas id="g-vendedores"></canvas></div>
+    <div class="tabela-rolagem"><table><tr><th>Vendedor</th><th class="num">Leads</th><th class="num">Resposta</th><th class="num">Parceiros</th><th class="num">Conversão</th></tr>
+    {% for g in vendedores_perf %}<tr><td>{{ g.nome }}</td><td class="num">{{ g.leads }}</td><td class="num">{{ g.taxa_resposta|pct }}</td><td class="num">{{ g.parceiros }}</td><td class="num">{{ g.taxa_conversao|pct }}</td></tr>{% endfor %}</table></div>
+    {% else %}<p class="vazio">Disponível para administrador e gestor (ou sem dados no período).</p>{% endif %}
+  </div>
+</div>
+
+<div class="grade-2">
+  <div class="cartao"><h2>Ranking dos parceiros <a class="btn btn-pequeno" href="/parceiros?aba=ranking">Ver ranking</a></h2>
+    <table><tr><th>Parceiro</th><th class="num">Certificados</th><th class="num">Faturamento</th><th class="num">Comissão</th></tr>
+    {% for r in ranking if r.certificados %}<tr><td><a href="/parceiros/{{ r.id }}">{{ r.nome }}</a></td><td class="num">{{ r.certificados }}</td><td class="num">{{ r.faturamento|moeda }}</td><td class="num">{{ r.comissao|moeda }}</td></tr>
+    {% else %}<tr><td colspan="4" class="vazio">Nenhuma venda de parceiro no período.</td></tr>{% endfor %}</table>
+    {% if parados %}<div class="aviso aviso-alerta" style="margin:12px 0 0">{{ parados|length }} parceiros não geraram nenhuma venda nos últimos 30 dias. <a href="/parceiros?aba=parados">Ver quais</a></div>{% endif %}
+  </div>
+  <div class="cartao"><h2>Certificados vencendo nos próximos 30 dias <a class="btn btn-pequeno" href="/vencimentos">Ver todos</a></h2>
+    <table><tr><th>Cliente</th><th>Vencimento</th><th>Parceiro</th></tr>
+    {% for c in vencendo %}<tr><td>{{ c.cliente_nome }}</td><td class="nowrap">{{ c.data_vencimento|data }} <span class="selo {{ 'selo-erro' if (c.data_vencimento - hoje).days <= 7 else 'selo-alerta' }}">{{ (c.data_vencimento - hoje).days }} dias</span></td><td>{{ c.parceiro.escritorio if c.parceiro else '-' }}</td></tr>
+    {% else %}<tr><td colspan="3" class="vazio">Nenhum certificado vencendo.</td></tr>{% endfor %}</table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+const G = {{ graficos|json }};
+const AZUL = '#0f3a64', VERDE = '#1fa463', ROXO = '#6b46c1', CINZA = '#cbd5e1';
+if (window.Chart) {
+  Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+  Chart.defaults.color = '#637083';
+  Chart.defaults.plugins.legend.labels.boxWidth = 12;
+  const semGrade = { grid: { display: false } };
+  const base = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } };
+  const tempo = new Chart(document.getElementById('g-tempo'), { type: 'bar',
+    data: { labels: G.tempo.dia.rotulos, datasets: [{ data: G.tempo.dia.valores, backgroundColor: AZUL, borderRadius: 4 }] },
+    options: { ...base, scales: { x: semGrade, y: { beginAtZero: true, ticks: { precision: 0 } } } } });
+  document.querySelectorAll('[data-serie]').forEach(b => b.addEventListener('click', () => {
+    const s = G.tempo[b.dataset.serie]; tempo.data.labels = s.rotulos; tempo.data.datasets[0].data = s.valores; tempo.update();
+  }));
+  new Chart(document.getElementById('g-funil'), { type: 'bar',
+    data: { labels: G.funil.map(x => x[0]), datasets: [{ data: G.funil.map(x => x[1]), backgroundColor: G.funil.map((_, i) => i === G.funil.length - 1 ? VERDE : AZUL), borderRadius: 4 }] },
+    options: { ...base, indexAxis: 'y', scales: { x: { beginAtZero: true, ticks: { precision: 0 } }, y: semGrade } } });
+  new Chart(document.getElementById('g-parceiros'), { type: 'doughnut',
+    data: { labels: G.parceiros.map(x => x[0]), datasets: [{ data: G.parceiros.map(x => x[1]), backgroundColor: [VERDE, '#e0a72e', CINZA] }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } } });
+  const barras = (id, dados, cor, moeda) => new Chart(document.getElementById(id), { type: 'bar',
+    data: { labels: dados.map(x => x[0]), datasets: [{ data: dados.map(x => x[1]), backgroundColor: cor, borderRadius: 4 }] },
+    options: { ...base, indexAxis: 'y', scales: { x: { beginAtZero: true, ticks: moeda ? { callback: v => 'R$ ' + v.toLocaleString('pt-BR') } : { precision: 0 } }, y: semGrade } } });
+  barras('g-certificados', G.certificados, AZUL, false);
+  barras('g-receita', G.receita, VERDE, true);
+  new Chart(document.getElementById('g-regioes'), { type: 'bar',
+    data: { labels: G.regioes.map(x => x[0]), datasets: [
+      { label: 'Leads', data: G.regioes.map(x => x[1]), backgroundColor: AZUL, borderRadius: 4 },
+      { label: 'Parceiros', data: G.regioes.map(x => x[2]), backgroundColor: VERDE, borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { x: semGrade, y: { beginAtZero: true, ticks: { precision: 0 } } } } });
+  const gv = document.getElementById('g-vendedores');
+  if (gv) new Chart(gv, { type: 'bar',
+    data: { labels: G.vendedores.map(x => x[0]), datasets: [
+      { label: 'Taxa de resposta (%)', data: G.vendedores.map(x => x[1]), backgroundColor: AZUL, borderRadius: 4 },
+      { label: 'Conversão (%)', data: G.vendedores.map(x => x[2]), backgroundColor: VERDE, borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { x: semGrade, y: { beginAtZero: true } } } });
+}
+</script>
+{% endblock %}

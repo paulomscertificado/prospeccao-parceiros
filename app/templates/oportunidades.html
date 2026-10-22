@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block titulo %}Novas oportunidades{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <div><h1>Novas oportunidades</h1><div class="suave">Leads que responderam: a IA parou e entregou para o time humano.</div></div>
+  <div class="acoes"><a class="btn {{ 'btn-primario' if ver == 'novas' }}" href="?ver=novas">Novas</a><a class="btn {{ 'btn-primario' if ver != 'novas' }}" href="?ver=tratadas">Assumidas/descartadas</a></div>
+</div>
+<div class="passos-ia"><span>A IA encontra</span><span>pesquisa</span><span>qualifica</span><span>faz o 1º contato</span><span>identifica a resposta</span><span>→ você conversa, negocia e fecha</span></div>
+
+{% for o in oportunidades %}{% set l = o.lead %}{% set r = resumos[o.id] %}
+<div class="cartao op-card {{ o.temperatura }}" id="op-{{ o.id }}">
+  <h2>{{ '🔥 NOVO LEAD QUENTE' if o.temperatura == 'quente' else 'Resposta para analisar' }} · {{ l.empresa }}
+    <span class="pequeno suave">{{ o.criado_em|datahora }}{{ ' · assumido por ' ~ o.responsavel.nome if o.responsavel }}</span></h2>
+  <div class="grade-2">
+    <dl class="ficha">
+      <dt>Empresa</dt><dd><a href="/leads/{{ l.id }}">{{ l.empresa }}</a></dd>
+      <dt>Responsável</dt><dd>{{ r.responsavel }}</dd>
+      <dt>Score</dt><dd><b>{{ l.score }}</b> · {{ l.fit }}</dd>
+      <dt>Categoria</dt><dd>{{ r.categoria }}</dd>
+      <dt>Cidade</dt><dd>{{ r.cidade }}</dd>
+      <dt>Site</dt><dd>{{ r.site }}</dd>
+      <dt>Classificação</dt><dd><span class="selo {{ 'selo-erro' if o.temperatura == 'quente' else 'selo-alerta' }}">{{ o.classificacao }}</span> · interesse {{ o.interesse }}</dd>
+      {% if o.objecoes %}<dt>Objeções</dt><dd>{{ o.objecoes }}</dd>{% endif %}
+    </dl>
+    <div>
+      <p><b>Resumo:</b> {{ o.resumo or '—' }}</p>
+      <p><b>Resposta do lead:</b></p><div class="mensagem">{{ o.resposta }}</div>
+      {% if o.mensagem_enviada %}<details style="margin-top:6px"><summary class="pequeno">Mensagem que a SDR enviou</summary><div class="mensagem">{{ o.mensagem_enviada }}</div></details>{% endif %}
+      <p style="margin-top:8px"><b>Próxima ação:</b> <span class="selo selo-azul">{{ o.proximo_passo|upper }}</span></p>
+      <p class="pequeno suave">Motivo do contato: {{ r.motivo }}</p>
+    </div>
+  </div>
+  {% if o.status == 'nova' %}
+  <div class="grupo-btn" style="margin-top:10px">
+    <form class="inline" method="post" action="/leads/{{ l.id }}/assumir"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar_para" value="/leads/{{ l.id }}#handoff"><button class="btn btn-verde">ASSUMIR LEAD</button></form>
+    <a class="btn btn-primario" href="/leads/{{ l.id }}/agendar">AGENDAR REUNIÃO</a>
+    {% if l.whatsapp %}<a class="btn" href="{{ l.whatsapp|whats }}" target="_blank" rel="noopener">INICIAR WHATSAPP</a>{% endif %}
+    {% if l.telefone or l.whatsapp %}<a class="btn" href="tel:{{ l.telefone or l.whatsapp }}">INICIAR LIGAÇÃO {{ l.telefone or l.whatsapp }}</a>{% endif %}
+    <form class="inline" method="post" action="/oportunidades/{{ o.id }}/descartar" data-confirmar="Descartar esta oportunidade?"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-perigo">Descartar</button></form>
+  </div>
+  {% endif %}
+</div>
+{% else %}
+<div class="cartao vazio">Nenhuma oportunidade {{ 'nova' if ver == 'novas' else 'tratada' }}. Quando um lead responder com interesse, ele aparece aqui na hora (e você recebe um aviso).</div>
+{% endfor %}
+{% endblock %}

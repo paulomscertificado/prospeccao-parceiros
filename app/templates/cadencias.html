@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block titulo %}Cadências{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <div><h1>Cadências e mensagens</h1><div class="suave">Sequências de contato, templates com variáveis e campanhas.</div></div>
+  {% if usuario.perfil in ['admin','gestor'] %}<div class="acoes"><a class="btn" href="/templates/0">+ Template</a><a class="btn btn-primario" href="/cadencias/0">+ Cadência</a></div>{% endif %}
+</div>
+
+<div class="grade-2">
+  {% for c in cadencias %}
+  <div class="cartao">
+    <h2>{{ c.nome }} {% if not c.ativa %}<span class="selo">desativada</span>{% endif %}<a class="btn btn-pequeno" href="/cadencias/{{ c.id }}">Editar</a></h2>
+    <p class="suave">{{ c.descricao }}</p>
+    <table>{% for p in c.passos %}<tr><td class="nowrap"><b>Dia {{ p.dia }}</b></td><td>{{ CANAIS.get(p.canal, p.canal) }}</td><td>{{ p.acao }}</td><td class="pequeno suave">{{ p.template.nome if p.template else '' }}</td></tr>{% endfor %}</table>
+  </div>
+  {% endfor %}
+</div>
+<p class="ajuda">Para usar: em Leads ou no resultado de uma busca, marque os leads e escolha "Iniciar cadência". As tarefas aparecem na Agenda. Quando o lead responde, as próximas tentativas são canceladas sozinhas.</p>
+
+<div class="cartao">
+  <h2>Campanhas</h2>
+  <div class="tabela-rolagem"><table>
+    <tr><th>Campanha</th><th>Cadência</th><th>Criada</th><th class="num">Leads</th><th class="num">Tarefas feitas</th><th class="num">Pendentes</th><th class="num">Responderam</th><th class="num">Interessados</th><th>IA</th></tr>
+    {% for c in campanhas %}{% set r = resumo[c.id] %}
+    <tr><td>{{ c.nome }}</td><td>{{ c.cadencia.nome if c.cadencia else '-' }}</td><td>{{ c.criado_em|data }}</td><td class="num">{{ r.leads }}</td><td class="num">{{ r.feitas }}</td><td class="num">{{ r.pendentes }}</td><td class="num">{{ r.responderam }}</td><td class="num">{{ r.interessados }}</td><td class="pequeno">{{ c.status_ia }}</td></tr>
+    {% else %}<tr><td colspan="9" class="vazio">Nenhuma campanha ainda.</td></tr>{% endfor %}
+  </table></div>
+</div>
+
+<div class="cartao" id="templates">
+  <h2>Templates de mensagem</h2>
+  <p class="suave">Variáveis: {% for v, d in variaveis.items() %}<code>{{ '{{' ~ v ~ '}}' }}</code> {{ d|lower }}{{ ', ' if not loop.last }}{% endfor %}.</p>
+  <table>
+    <tr><th>Nome</th><th>Canal</th><th>Assunto</th><th>Template Meta</th><th></th></tr>
+    {% for t in templates %}<tr><td>{{ t.nome }} {% if not t.ativo %}<span class="selo">inativo</span>{% endif %}</td><td>{{ CANAIS.get(t.canal, t.canal) }}</td><td class="pequeno">{{ t.assunto }}</td><td class="pequeno">{{ t.nome_meta or '—' }}</td><td><a class="btn btn-pequeno" href="/templates/{{ t.id }}">Abrir</a></td></tr>{% endfor %}
+  </table>
+  {% if usuario.perfil in ['admin','gestor'] %}
+  <form method="post" action="/templates/criar-com-ia" class="filtros" style="margin-top:14px">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <select name="canal">{% for c in ['whatsapp','email','linkedin','ligacao'] %}<option value="{{ c }}">{{ CANAIS[c] }}</option>{% endfor %}</select>
+    <input type="text" name="objetivo" required placeholder="Objetivo da campanha. Ex.: reativar escritórios que não responderam há 60 dias" style="flex:1;min-width:260px">
+    <button class="btn btn-ia" {{ 'disabled title="Configure a IA no .env"' if not ia_ligada }}>Criar template com IA</button>
+  </form>{% endif %}
+</div>
+{% endblock %}

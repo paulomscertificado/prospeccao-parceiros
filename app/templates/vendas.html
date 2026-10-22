@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block titulo %}Vendas{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <div><h1>Vendas</h1><div class="suave">{{ p.nome }}</div></div>
+  <div class="acoes">
+    <form method="get"><select name="periodo" onchange="this.form.submit()" aria-label="Período">{% for c, n in [("30d","Últimos 30 dias"),("90d","Últimos 90 dias"),("12m","Últimos 12 meses"),("tudo","Todo o período")] %}<option value="{{ c }}" {{ 'selected' if periodo == c }}>{{ n }}</option>{% endfor %}</select></form>
+    <a class="btn" href="/exportar/vendas.xlsx">Exportar</a>
+  </div>
+</div>
+<div class="grade">
+  <div class="kpi"><div class="rotulo">Certificados</div><div class="valor">{{ totais.qtd }}</div></div>
+  <div class="kpi"><div class="rotulo">Receita</div><div class="valor">{{ totais.receita|moeda }}</div></div>
+  <div class="kpi"><div class="rotulo">Comissões</div><div class="valor">{{ totais.comissao|moeda }}</div></div>
+  <div class="kpi destaque"><div class="rotulo">Lucro bruto</div><div class="valor">{{ totais.lucro|moeda }}</div></div>
+</div>
+<div class="grade-lead">
+<div class="cartao" style="padding:0"><div class="tabela-rolagem"><table>
+  <tr><th>Data</th><th>Cliente</th><th>Produto</th><th>Parceiro</th><th class="num">Valor</th><th class="num">Comissão</th><th class="num">Lucro</th>{% if usuario.perfil == 'admin' %}<th></th>{% endif %}</tr>
+  {% for v in vendas %}<tr><td class="nowrap">{{ v.data|data }}</td><td>{{ v.cliente.nome }}</td><td>{{ v.produto.nome if v.produto else '' }}{% if v.tipo == 'renovacao' %} <span class="selo selo-ok">renovação</span>{% endif %}</td>
+    <td>{{ v.parceiro.escritorio if v.parceiro else 'Direta' }}</td><td class="num">{{ v.valor|moeda }}</td><td class="num">{{ v.comissao|moeda }}</td><td class="num">{{ (v.valor - v.custo - v.comissao)|moeda }}</td>
+    {% if usuario.perfil == 'admin' %}<td><form method="post" action="/vendas/{{ v.id }}/excluir" data-confirmar="Excluir esta venda?"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-pequeno btn-perigo">Excluir</button></form></td>{% endif %}</tr>
+  {% else %}<tr><td colspan="8" class="vazio">Nenhuma venda no período.</td></tr>{% endfor %}
+</table></div></div>
+
+<form class="cartao" method="post" action="/vendas/nova" id="nova-venda">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>{{ 'Registrar renovação' if renovar else 'Registrar venda' }}</h2>
+  {% if renovar %}<input type="hidden" name="certificado_id" value="{{ renovar.id }}"><input type="hidden" name="tipo" value="renovacao">
+  <div class="aviso aviso-info">Renovação do certificado de <b>{{ renovar.cliente_nome }}</b> ({{ renovar.tipo }}, vence {{ renovar.data_vencimento|data }}).{% if renovar.parceiro %} Parceiro: {{ renovar.parceiro.escritorio }}.{% endif %}</div>{% endif %}
+  <div class="campo"><label>Cliente</label><select name="cliente_id"><option value="">— Cliente novo (preencha abaixo) —</option>
+    {% for c in clientes %}<option value="{{ c.id }}" {{ 'selected' if (cliente_sel == c.id) or (renovar and renovar.cliente_id == c.id) }}>{{ c.nome }}{{ ' · ' ~ c.cnpj if c.cnpj }}</option>{% endfor %}</select></div>
+  <div class="campos"><div><label>Nome do cliente novo</label><input type="text" name="cliente_nome"></div><div><label>CNPJ/CPF</label><input type="text" name="cliente_cnpj"></div><div><label>Telefone</label><input type="text" name="cliente_telefone"></div></div>
+  <div class="campo" style="margin-top:10px"><label>Parceiro que indicou</label><select name="parceiro_id"><option value="">(o do cliente, ou venda direta)</option>{% for pa in parceiros %}<option value="{{ pa.id }}" {{ 'selected' if parceiro == pa.id or (renovar and renovar.parceiro_id == pa.id) }}>{{ pa.escritorio }}</option>{% endfor %}</select></div>
+  <div class="campo"><label>Produto</label><select name="produto_id" id="produto">{% for pr in produtos %}<option value="{{ pr.id }}" data-preco="{{ pr.preco }}" {{ 'selected' if renovar and renovar.tipo == pr.nome }}>{{ pr.nome }} · {{ pr.preco|moeda }}</option>{% endfor %}</select></div>
+  <div class="campos">
+    <div><label>Valor cobrado (R$)</label><input type="text" name="valor" id="valor" placeholder="preço da tabela"></div>
+    <div><label>Data</label><input type="date" name="data" value="{{ hoje.isoformat() }}"></div>
+    {% if not renovar %}<div><label>Tipo</label><select name="tipo"><option value="nova">Nova emissão</option><option value="renovacao">Renovação</option></select></div>{% endif %}
+    {% if usuario.perfil in ['admin','gestor'] %}<div><label>Vendedor</label><select name="vendedor_id">{% for v in vendedores %}<option value="{{ v.id }}" {{ 'selected' if v.id == usuario.id }}>{{ v.nome }}</option>{% endfor %}</select></div>{% endif %}
+  </div>
+  <div class="campo" style="margin-top:10px"><label>Observações</label><input type="text" name="observacoes"></div>
+  <button class="btn btn-primario">Salvar venda</button>
+  <p class="ajuda">A comissão é calculada pela regra do parceiro (ou do produto) e o certificado entra no controle de vencimentos.</p>
+</form>
+</div>
+{% endblock %}

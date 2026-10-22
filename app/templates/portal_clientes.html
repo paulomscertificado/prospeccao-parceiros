@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block titulo %}Minha carteira{% endblock %}
+{% block conteudo %}
+<div class="cabecalho"><h1>Minha carteira</h1><a class="btn btn-verde" href="/portal/indicar">+ Indicar cliente</a></div>
+<div class="cartao"><h2>Indicações</h2><div class="tabela-rolagem"><table><tr><th>Cliente</th><th>Contato</th><th>Situação</th><th>Indicado em</th></tr>
+  {% for c in clientes %}<tr><td>{{ c.nome }}<div class="pequeno suave">{{ c.cnpj }}</div></td><td class="pequeno">{{ c.contato }} {{ c.telefone }}</td><td><span class="selo {{ 'selo-ok' if c.status == 'Emitido' else '' }}">{{ c.status }}</span></td><td>{{ c.criado_em|data }}</td></tr>
+  {% else %}<tr><td colspan="4" class="vazio">Nenhuma indicação ainda.</td></tr>{% endfor %}</table></div></div>
+<div class="cartao"><h2>Vendas e comissões</h2><div class="tabela-rolagem"><table><tr><th>Data</th><th>Cliente</th><th>Certificado</th><th class="num">Valor</th><th class="num">Comissão</th><th>Situação</th></tr>
+  {% for v in vendas %}<tr><td>{{ v.data|data }}</td><td>{{ v.cliente.nome }}</td><td>{{ v.produto.nome if v.produto else '' }}{{ ' (renovação)' if v.tipo == 'renovacao' }}</td><td class="num">{{ v.valor|moeda }}</td><td class="num">{{ v.comissao|moeda }}</td><td>{{ 'paga em ' ~ (v.comissao_paga_em|data) if v.comissao_paga else 'a receber' }}</td></tr>
+  {% else %}<tr><td colspan="6" class="vazio">Nenhuma venda ainda.</td></tr>{% endfor %}</table></div></div>
+{% endblock %}

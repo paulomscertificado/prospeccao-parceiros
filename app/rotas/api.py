@@ -1,0 +1,163 @@
+"""API externa: webhook do WhatsApp Cloud API (respostas, status e opt-out automático).
+
+Protegida por: token de verificação, assinatura HMAC da Meta (X-Hub-Signature-256) e limite de pedidos.
+"""
+
+import hmac
+import json
+import logging
+import time
+
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse, PlainTextResponse
+from sqlalchemy import or_, select
+
+from .. import config, sdr, trabalhos, util
+from ..rotinas import responder_automaticamente, rodada
+from ..banco import agora, gravar_config, ler_config_int, sessao
+from ..integracoes import whatsapp_cloud
+from ..modelos import Lead, Mensagem, PonteWhatsApp
+from ..seguranca import ip_de, limite_api
+
+rotas = APIRouter(prefix="/api")
+log = logging.getLogger(__name__)
+
+
+@rotas.get("/saude")
+def saude():
+    return {"ok": True}
+
+
+@rotas.get("/webhooks/whatsapp")
+def webhook_verificar(request: Request):
+    p = request.query_params
+    if (p.get("hub.mode") == "subscribe" and config.WHATSAPP_VERIFY_TOKEN
+            and p.get("hub.verify_token") == config.WHATSAPP_VERIFY_TOKEN):
+        return PlainTextResponse(p.get("hub.challenge", ""))
+    return PlainTextResponse("token inválido", status_code=403)
+
+
+@rotas.post("/webhooks/whatsapp")
+async def webhook_receber(request: Request):
+    if not limite_api.registrar(ip_de(request)):
+        return JSONResponse({"erro": "muitos pedidos"}, status_code=429)
+    corpo = await request.body()
+    if not whatsapp_cloud.assinatura_valida(corpo, request.headers.get("x-hub-signature-256", "")):
+        return JSONResponse({"erro": "assinatura inválida"}, status_code=403)
+    try:
+        dados = json.loads(corpo)
+    except json.JSONDecodeError:
+        return JSONResponse({"erro": "json inválido"}, status_code=400)
+    recebidas, status = whatsapp_cloud.ler_webhook(dados)
+    with sessao() as db:
+        for s in status:
+            msg = db.execute(select(Mensagem).where(Mensagem.id_externo == s["id"])).scalars().first()
+            if msg and s["status"] in ("delivered", "read", "failed"):
+                msg.status = {"delivered": "entregue", "read": "lida", "failed": "falhou"}[s["status"]]
+        for r in recebidas:
+            telefone = util.normalizar_telefone(r["de"])
+            if not telefone:
+                continue
+            lead = db.execute(select(Lead).where(or_(Lead.chave_whatsapp == telefone, Lead.chave_telefone == telefone))
+                              .limit(1)).scalars().first()
+            if not lead:
+                continue
+            analise = sdr.processar_resposta(db, lead, r["texto"], "whatsapp")
+            responder_automaticamente(db, lead, "whatsapp", analise)
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- Agendador (sistema na nuvem)
+
+def _senha_confere(recebida: str, esperada: str) -> bool:
+    return bool(esperada) and hmac.compare_digest(recebida.encode(), esperada.encode())
+
+
+@rotas.get("/cron")
+def cron(request: Request):
+    """Chamado a cada minuto pela Vercel Cron (ou cron-job.org) com "Authorization: Bearer CRON_SECRET".
+    Faz a rodada do relógio (fila de e-mail, respostas, rotinas de hora em hora) e anda os trabalhos longos."""
+    if not config.CRON_SECRET:
+        return JSONResponse({"erro": "Falta CRON_SECRET nas variáveis do sistema."}, status_code=503)
+    if not _senha_confere(request.headers.get("authorization", "").removeprefix("Bearer ").strip(), config.CRON_SECRET):
+        return JSONResponse({"erro": "senha inválida"}, status_code=403)
+    prazo = time.monotonic() + config.SEGUNDOS_POR_RODADA
+    resultado = {"rodada": False, "etapas": 0}
+    if trabalhos.pegar_trava("rodada", 170):  # duas chamadas ao mesmo tempo não podem enviar o mesmo e-mail
+        try:
+            rodada(None)
+            resultado["rodada"] = True
+        finally:
+            trabalhos.soltar_trava("rodada")
+    resultado["etapas"] = trabalhos.rodar_pendentes(prazo)
+    return resultado
+
+
+# ---------------------------------------------------------------- Ponte com o WhatsApp Leads (sistema na nuvem)
+
+def _ponte_autorizada(request: Request) -> bool:
+    return config.WHATSAPP_PONTE and _senha_confere(request.headers.get("x-token", ""), config.WHATSAPP_PONTE_TOKEN)
+
+
+@rotas.get("/ponte/teste")
+def ponte_teste(request: Request):
+    """Usado pelo ligar_nuvem.bat do WhatsApp Leads para conferir endereço e token."""
+    if not _ponte_autorizada(request):
+        return JSONResponse({"erro": "token inválido"}, status_code=403)
+    return {"ok": True}
+
+
+@rotas.post("/ponte/troca")
+async def ponte_troca(request: Request):
+    """O computador com o WhatsApp Leads avisa o status e leva as mensagens que estão esperando."""
+    if not _ponte_autorizada(request):
+        return JSONResponse({"erro": "token inválido"}, status_code=403)
+    try:
+        dados = await request.json()
+    except ValueError:
+        return JSONResponse({"erro": "json inválido"}, status_code=400)
+    status = {k: dados.get("status", {}).get(k) for k in
+              ("conectado", "tipo", "estado", "numero", "enviadas_hoje", "limite_diario", "dentro_do_horario", "horario")}
+    status["visto_em"] = agora().isoformat()
+    with sessao() as db:
+        gravar_config(db, "wl_status", status)
+        envios = []
+        # "retirada" antes de devolver: se a resposta se perder, a mensagem NÃO é enviada duas vezes.
+        for item in db.execute(select(PonteWhatsApp).where(PonteWhatsApp.status == "aguardando")
+                               .order_by(PonteWhatsApp.id).limit(50)).scalars():
+            item.status = "retirada"
+            envios.append({"id": item.id, "telefone": item.telefone, "nome": item.nome, "texto": item.texto,
+                           "resposta": item.resposta})
+        desde = ler_config_int(db, "wl_ultimo_id", 0)
+    return {"desde": desde, "envios": envios}
+
+
+@rotas.post("/ponte/retorno")
+async def ponte_retorno(request: Request):
+    """O computador devolve o id de cada mensagem na fila de lá e as novidades (respostas, status, quem saiu)."""
+    if not _ponte_autorizada(request):
+        return JSONResponse({"erro": "token inválido"}, status_code=403)
+    try:
+        dados = await request.json()
+    except ValueError:
+        return JSONResponse({"erro": "json inválido"}, status_code=400)
+    with sessao() as db:
+        for c in dados.get("confirmados", []):
+            item = db.get(PonteWhatsApp, int(c.get("id", 0)))
+            if item is None:
+                continue
+            msg = db.execute(select(Mensagem).where(Mensagem.modo == "whatsapp-leads",
+                                                    Mensagem.id_externo == f"p{item.id}")).scalars().first()
+            if c.get("erro"):
+                item.status, item.erro = "erro", str(c["erro"])[:500]
+                if msg:
+                    msg.status, msg.erro = "falhou", item.erro
+            else:
+                item.status, item.id_wl = "na_fila", str(c.get("id_wl", ""))
+                if msg:
+                    msg.id_externo = item.id_wl
+        novidades = dados.get("novidades") or {}
+        resultado = sdr.aplicar_novidades_whatsapp(db, novidades) if novidades else {}
+        if "ultimo_id" in novidades:
+            gravar_config(db, "wl_ultimo_id", str(int(novidades["ultimo_id"])))
+    return {"ok": True, **resultado}

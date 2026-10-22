@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+{% block titulo %}{{ lead.empresa }}{% endblock %}
+{% block conteudo %}
+{% set analise = request.session.pop('analise_resposta', None) %}
+<div class="cabecalho">
+  <div>
+    <h1>{{ lead.empresa }}</h1>
+    <div class="suave">{{ lead.cidade }}{{ '/' ~ lead.estado if lead.estado }} · <span class="selo selo-azul">{{ lead.status }}</span>
+      · Score <b>{{ lead.score }}</b> <span class="selo {{ lead.potencial|selo }}">{{ lead.potencial }}</span>
+      {% if lead.fit %}<span class="selo {{ lead.fit|selo }}">{{ lead.fit }}</span>{% endif %}
+      {% if lead.categoria %} · {{ lead.categoria.nome }}{% endif %}
+      {% if lead.opt_out %}<span class="selo selo-erro">Opt-out em {{ lead.opt_out_em|data }}</span>{% endif %}
+      {% if lead.automacao_pausada %}<span class="selo selo-alerta">Automação parada{{ ' · com ' ~ lead.humano.nome if lead.humano }}</span>{% endif %}</div>
+  </div>
+  <div class="acoes">
+    <form class="inline" method="post" action="/leads/{{ lead.id }}/pesquisar"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">Pesquisar empresa</button></form>
+    <form class="inline" method="post" action="/leads/{{ lead.id }}/qualificar"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-primario">Qualificar lead</button></form>
+    <form class="inline" method="post" action="/leads/{{ lead.id }}/abordagem-sdr"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-ia" {{ 'title="Sem a chave da IA, as mensagens usam os modelos da categoria"' if not ia_ligada }}>Gerar abordagem com IA</button></form>
+    <form class="inline" method="post" action="/leads/{{ lead.id }}/proximo-passo"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-ia">Qual é o próximo melhor passo?</button></form>
+    {% if not lead.humano_id %}<form class="inline" method="post" action="/leads/{{ lead.id }}/assumir" data-confirmar="Assumir este lead? A automação dele para na hora."><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-verde">Assumir lead</button></form>{% endif %}
+    <a class="btn" href="/leads/{{ lead.id }}/agendar">Agendar reunião</a>
+  </div>
+</div>
+{% if not ia_ligada %}<div class="aviso aviso-info">A IA não está configurada: qualificação e mensagens usam as regras e templates do sistema. Para textos escritos pela IA, veja docs/configuracao.md.</div>{% endif %}
+
+<div class="grade-lead">
+<div>
+  {% if handoff %}
+  <div class="cartao op-card {{ 'quente' if lead.demonstrou_interesse }}" id="handoff">
+    <h2>Resumo para o time humano {% if lead.humano %}<span class="pequeno suave">assumido por {{ lead.humano.nome }} em {{ lead.assumido_em|datahora }}</span>{% endif %}</h2>
+    <dl class="ficha">
+      <dt>Nome</dt><dd>{{ handoff.nome }}</dd><dt>Empresa</dt><dd>{{ handoff.empresa }}</dd>
+      <dt>Categoria</dt><dd>{{ handoff.categoria }}</dd><dt>Site</dt><dd>{{ handoff.site }}</dd>
+      <dt>Cidade</dt><dd>{{ handoff.cidade }}</dd><dt>Score</dt><dd>{{ handoff.score }} · {{ handoff.fit }}</dd>
+      <dt>Motivo do contato</dt><dd>{{ handoff.motivo }}</dd>
+      <dt>Mensagem enviada</dt><dd style="white-space:pre-wrap">{{ handoff.mensagem_enviada or '—' }}</dd>
+      <dt>Resposta recebida</dt><dd style="white-space:pre-wrap">{{ handoff.resposta or '—' }}</dd>
+      <dt>Classificação</dt><dd>{{ handoff.classificacao or '—' }}</dd>
+      <dt>Resumo</dt><dd>{{ handoff.resumo or '—' }}</dd><dt>Objeções</dt><dd>{{ handoff.objecoes or 'nenhuma' }}</dd>
+      <dt>Interesse</dt><dd>{{ handoff.interesse or '—' }}</dd><dt>Próximo passo</dt><dd><b>{{ handoff.proximo_passo or '—' }}</b></dd>
+    </dl>
+  </div>
+  {% endif %}
+
+  {% if perfil %}
+  <div class="cartao" id="perfil">
+    <h2>Perfil do parceiro <span class="pequeno suave">{{ perfil.pesquisado_em }} · {{ 'IA' if perfil.fonte == 'ia' else 'regras' }}</span></h2>
+    <dl class="ficha">
+      <dt>Empresa</dt><dd>{{ lead.empresa }}</dd>
+      <dt>Categoria</dt><dd>{{ lead.categoria.nome if lead.categoria else 'não definida' }}</dd>
+      <dt>Cidade</dt><dd>{{ lead.cidade }}{{ '/' ~ lead.estado if lead.estado }}</dd>
+      <dt>Site</dt><dd>{% if lead.site %}<a href="{{ lead.site }}" target="_blank" rel="noopener">{{ lead.site }}</a>{% else %}não encontrado{% endif %}</dd>
+      <dt>Responsável</dt><dd>{{ lead.responsavel or ((perfil.responsaveis or [])|join(', ')) or 'não identificado' }}</dd>
+      <dt>Segmento</dt><dd>{{ perfil.segmento or 'não identificado' }}</dd>
+      <dt>Público</dt><dd>{{ perfil.publico or 'não identificado' }}</dd>
+      {% if perfil.produtos %}<dt>Produtos</dt><dd>{{ perfil.produtos|join(', ') }}</dd>{% endif %}
+      {% if perfil.servicos %}<dt>Serviços</dt><dd>{{ perfil.servicos|join(', ') }}</dd>{% endif %}
+      <dt>Clientes</dt><dd>{{ perfil.clientes_estimados or 'não informado' }}{% if perfil.evidencia_clientes %} <span class="suave">("{{ perfil.evidencia_clientes }}")</span>{% endif %}</dd>
+      {% if perfil.integracoes %}<dt>Integrações</dt><dd>{{ perfil.integracoes|join(', ') }}</dd>{% endif %}
+      <dt>Programa de parceiros</dt><dd>{{ 'sim' if lead.programa_parceiros else 'não identificado' }}</dd>
+      <dt>Potencial</dt><dd><span class="selo {{ lead.fit|selo }}">{{ lead.fit }}</span> · score {{ lead.score }}</dd>
+      <dt>Motivo do potencial</dt><dd>{{ lead.motivo_potencial }}</dd>
+    </dl>
+    <p class="ajuda">Fontes: {{ (perfil.fontes or ['dados cadastrados'])|join('; ') }}. Só entra no perfil o que foi encontrado; o resto aparece como "não identificado".</p>
+  </div>
+  {% endif %}
+
+  {% if sdr_msgs %}
+  <div class="cartao" id="sdr">
+    <h2>Abordagem SDR <span class="pequeno suave">{{ sdr_msgs.em }} · canal sugerido: {{ CANAIS.get(sdr_msgs.canal, sdr_msgs.canal) }}</span></h2>
+    {% for angulo, nome in config.ANGULOS.items() %}{% set m = sdr_msgs.mensagens[angulo] %}
+      <h3 style="margin-top:12px">{{ loop.index }}. {{ nome }} <span class="pequeno suave">({{ 'IA' if m.fonte == 'ia' else 'modelo da categoria' }})</span></h3>
+      <div class="mensagem" id="sdr-{{ angulo }}">{{ m.whatsapp }}</div>
+      <div class="grupo-btn" style="margin-top:6px">
+        <button class="btn btn-pequeno" data-copiar="1" data-alvo="sdr-{{ angulo }}" data-lead="{{ lead.id }}" data-canal="whatsapp" {{ 'disabled' if lead.opt_out }}>Copiar</button>
+        {% if (lead.whatsapp or lead.telefone) and not lead.opt_out and wl.conectado %}
+        <form class="inline" method="post" action="/leads/{{ lead.id }}/enviar-whatsapp"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="texto" value="{{ m.whatsapp }}"><input type="hidden" name="angulo" value="{{ angulo }}"><button class="btn btn-pequeno btn-verde">Enviar pelo WhatsApp conectado</button></form>{% endif %}
+        {% if lead.whatsapp and not lead.opt_out %}<button class="btn btn-pequeno" data-whatsapp="{{ lead.whatsapp|whats }}" data-alvo="sdr-{{ angulo }}" data-lead="{{ lead.id }}" data-canal="whatsapp">Abrir no WhatsApp</button>{% endif %}
+        <details style="display:inline-block"><summary class="btn btn-pequeno">Ver e-mail</summary><p class="pequeno"><b>Assunto:</b> {{ m.assunto }}</p><div class="mensagem" id="sdre-{{ angulo }}">{{ m.email }}</div>
+          <button class="btn btn-pequeno" style="margin-top:4px" data-copiar="1" data-alvo="sdre-{{ angulo }}" data-lead="{{ lead.id }}" data-canal="email" data-assunto="{{ m.assunto }}">Copiar e-mail</button></details>
+      </div>
+    {% endfor %}
+    <p class="ajuda">Para enviar em sequência com aprovação e limites, inclua este lead numa <a href="/campanhas/nova">campanha</a>.</p>
+  </div>
+  {% endif %}
+
+  {% if qualificacao and qualificacao.motivos %}
+  <div class="cartao" id="qualificacao">
+    <h2>Qualificação <span class="pequeno suave">{{ qualificacao.em }} · {{ 'escrita pela IA' if qualificacao.fonte == 'ia' else 'pelas regras do sistema' }}</span></h2>
+    <p><b>Score:</b> {{ qualificacao.score }} · <b>Potencial:</b> <span class="selo {{ qualificacao.potencial|selo }}">{{ qualificacao.potencial }}</span>
+       · <b>Canal recomendado:</b> {{ CANAIS.get(qualificacao.canal_recomendado, qualificacao.canal_recomendado) }}</p>
+    <p><b>Motivos:</b></p><ul style="margin-top:0">{% for m in qualificacao.motivos %}<li>{{ m }}</li>{% endfor %}</ul>
+    <p><b>Melhor abordagem:</b> {{ qualificacao.melhor_abordagem }}</p>
+    <label>Mensagem sugerida (WhatsApp)</label>
+    <div class="mensagem" id="q-whats">{{ qualificacao.mensagem_whatsapp }}</div>
+    <div class="grupo-btn" style="margin:8px 0 12px">
+      <button class="btn btn-pequeno" data-copiar="1" data-alvo="q-whats" data-lead="{{ lead.id }}" data-canal="whatsapp" {{ 'disabled' if bloqueio_whatsapp and lead.opt_out }}>Copiar mensagem</button>
+      {% if lead.whatsapp and not lead.opt_out %}<button class="btn btn-pequeno btn-verde" data-whatsapp="{{ lead.whatsapp|whats }}" data-alvo="q-whats" data-lead="{{ lead.id }}" data-canal="whatsapp">Abrir no WhatsApp</button>{% endif %}
+    </div>
+    <label>E-mail sugerido: {{ qualificacao.assunto_email }}</label>
+    <div class="mensagem" id="q-email">{{ qualificacao.mensagem_email }}</div>
+    <div class="grupo-btn" style="margin-top:8px"><button class="btn btn-pequeno" data-copiar="1" data-alvo="q-email" data-lead="{{ lead.id }}" data-canal="email" data-assunto="{{ qualificacao.assunto_email }}">Copiar e-mail</button></div>
+  </div>
+  {% endif %}
+
+  {% if analise %}
+  <div class="cartao" id="resposta">
+    <h2>Análise da resposta <span class="pequeno suave">{{ 'pela IA' if analise.fonte == 'ia' else 'pelas regras' }}</span></h2>
+    <p><b>Classificação:</b> <span class="selo {{ 'selo-ok' if analise.classe in config.CLASSES_QUENTES else 'selo-alerta' }}">{{ analise.classe }}</span>
+       · <b>Interesse:</b> {{ analise.interesse }}</p>
+    {% if analise.resumo %}<p><b>Resumo:</b> {{ analise.resumo }}</p>{% endif %}
+    <p><b>Objeções:</b> {{ analise.objecoes|join(', ') or 'nenhuma identificada' }} · <b>Próximo passo:</b> {{ analise.proximo_passo }}</p>
+    <label>Resposta da SDR (não negocia: interesse vai para o time humano)</label><div class="mensagem" id="r-sugerida">{{ analise.resposta_sugerida }}</div>
+    <div class="grupo-btn" style="margin-top:8px">
+      <button class="btn btn-pequeno" data-copiar="1" data-alvo="r-sugerida" data-lead="{{ lead.id }}" data-canal="whatsapp">Copiar resposta</button>
+      {% if analise.classe in config.CLASSES_QUENTES %}<a class="btn btn-pequeno btn-primario" href="/oportunidades">Ver em Novas oportunidades</a>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="cartao">
+    <h2>Mensagens prontas</h2>
+    {% if bloqueio_whatsapp %}<div class="aviso aviso-alerta">{{ bloqueio_whatsapp }}</div>{% endif %}
+    <select id="escolha-msg" aria-label="Template">{% for m in mensagens %}<option value="{{ loop.index0 }}">{{ CANAIS.get(m.canal, m.canal) }} · {{ m.nome }}</option>{% endfor %}</select>
+    {% for m in mensagens %}
+    <div class="msg-pronta {{ '' if loop.first else 'oculto' }}" data-indice="{{ loop.index0 }}" style="margin-top:10px">
+      {% if m.assunto %}<div class="pequeno"><b>Assunto:</b> {{ m.assunto }}</div>{% endif %}
+      <div class="mensagem" id="msg-{{ m.id }}">{{ m.corpo }}</div>
+      <div class="grupo-btn" style="margin-top:8px">
+        <button class="btn btn-pequeno" data-copiar="1" data-alvo="msg-{{ m.id }}" data-lead="{{ lead.id }}" data-canal="{{ m.canal }}" data-assunto="{{ m.assunto }}" {{ 'disabled' if lead.opt_out }}>Copiar mensagem</button>
+        {% if m.canal == 'whatsapp' and (lead.whatsapp or lead.telefone) and not lead.opt_out and wl.conectado %}
+          <form class="inline" method="post" action="/leads/{{ lead.id }}/enviar-whatsapp"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="texto" value="{{ m.corpo }}"><button class="btn btn-pequeno btn-verde">Enviar pelo WhatsApp conectado</button></form>{% endif %}
+        {% if m.canal == 'whatsapp' and lead.whatsapp and not lead.opt_out %}
+          <button class="btn btn-pequeno" data-whatsapp="{{ lead.whatsapp|whats }}" data-alvo="msg-{{ m.id }}" data-lead="{{ lead.id }}" data-canal="whatsapp">Abrir no WhatsApp</button>{% endif %}
+        {% if m.canal == 'email' and lead.email and not lead.opt_out %}
+          <a class="btn btn-pequeno" href="mailto:{{ lead.email }}?subject={{ m.assunto|urlencode }}&amp;body={{ m.corpo|urlencode }}">Abrir no e-mail</a>{% endif %}
+        {% if (m.canal == 'whatsapp' and whatsapp_api and m.nome_meta and lead.whatsapp) or (m.canal == 'email' and email_api and lead.email) %}
+          <form class="inline" method="post" action="/leads/{{ lead.id }}/enviar" data-confirmar="Enviar esta mensagem agora pela integração oficial?">
+            <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="canal" value="{{ m.canal }}"><input type="hidden" name="template_id" value="{{ m.id }}">
+            <button class="btn btn-pequeno btn-primario" {{ 'disabled' if (m.canal == 'whatsapp' and bloqueio_whatsapp) or (m.canal == 'email' and bloqueio_email) }}>Enviar pela API</button></form>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+    <p class="ajuda">"Copiar mensagem" registra o contato no histórico e conta no limite diário. Nenhuma mensagem é enviada sozinha.</p>
+  </div>
+
+  <div class="cartao">
+    <h2>Registrar</h2>
+    <div class="grade-2">
+      <form method="post" action="/leads/{{ lead.id }}/contato">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>Contato feito</label>
+        <select name="canal">{% for c, n in CANAIS.items() %}<option value="{{ c }}">{{ n }}</option>{% endfor %}</select>
+        <textarea name="descricao" placeholder="O que foi feito / combinado" style="min-height:60px;margin-top:6px"></textarea>
+        <button class="btn btn-pequeno" style="margin-top:6px">Registrar contato</button>
+      </form>
+      <form method="post" action="/leads/{{ lead.id }}/resposta">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>O lead respondeu</label>
+        <select name="canal">{% for c, n in CANAIS.items() %}<option value="{{ c }}">{{ n }}</option>{% endfor %}</select>
+        <textarea name="texto" placeholder="Cole aqui a resposta: o sistema identifica objeções e sugere a resposta" style="min-height:60px;margin-top:6px"></textarea>
+        <button class="btn btn-pequeno btn-verde" style="margin-top:6px">Registrar resposta</button>
+      </form>
+    </div>
+    <hr>
+    <form method="post" action="/leads/{{ lead.id }}/tarefa" class="campos">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div><label>Agendar</label><select name="tipo"><option value="followup">Follow-up</option><option value="reuniao">Reunião</option></select></div>
+      <div><label>Canal</label><select name="canal">{% for c, n in CANAIS.items() %}<option value="{{ c }}">{{ n }}</option>{% endfor %}</select></div>
+      <div><label>Data</label><input type="date" name="data" required value="{{ hoje.isoformat() }}"></div>
+      <div><label>Horário</label><input type="time" name="hora" value="09:00"></div>
+      <div class="largo"><label>Ação / pauta</label><input type="text" name="acao" placeholder="Ex.: Apresentar programa de parceria por vídeo"></div>
+      <div><button class="btn btn-pequeno btn-primario">Agendar</button></div>
+    </form>
+    <hr>
+    <form method="post" action="/leads/{{ lead.id }}/nota"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Anotação</label><div style="display:flex;gap:6px"><input type="text" name="texto" required placeholder="Ex.: Prefere contato depois das 14h"><button class="btn btn-pequeno">Anotar</button></div></form>
+  </div>
+
+  <div class="cartao" id="historico">
+    <h2>Histórico</h2>
+    <ul class="tempo">
+      {% for h in historico %}<li class="{{ h.tipo }}"><div class="quando">{{ h.criado_em|datahora }} · {{ h.tipo }}{{ ' · ' ~ CANAIS.get(h.canal, h.canal) if h.canal }}{{ ' · ' ~ h.usuario.nome if h.usuario }}</div>{{ h.descricao }}</li>
+      {% else %}<li>Sem histórico ainda.</li>{% endfor %}
+    </ul>
+  </div>
+</div>
+
+<div>
+  <div class="cartao">
+    <h2>Score {{ lead.score }}</h2>
+    <ul class="pontos">{% for nome, pontos, ok in detalhes_score %}<li class="{{ '' if ok else 'nao' }}"><span>{{ '✓' if ok else '·' }} {{ nome }}</span><b>{{ '+' ~ pontos if ok else pontos }}</b></li>{% endfor %}</ul>
+    <p class="ajuda">Pesos alteráveis em Configurações &gt; Score.</p>
+  </div>
+
+  <div class="cartao">
+    <h2>Contatos</h2>
+    <p>{% if lead.whatsapp %}WhatsApp: <a href="{{ lead.whatsapp|whats }}" target="_blank" rel="noopener">{{ lead.whatsapp }}</a><br>{% endif %}
+       {% if lead.telefone %}Telefone: <a href="tel:{{ lead.telefone }}">{{ lead.telefone }}</a><br>{% endif %}
+       {% if lead.email %}E-mail: {{ lead.email }}<br>{% endif %}
+       {% if lead.site %}Site: <a href="{{ lead.site }}" target="_blank" rel="noopener">{{ lead.site }}</a><br>{% endif %}
+       {% if lead.instagram %}Instagram: <a href="{{ lead.instagram|insta }}" target="_blank" rel="noopener">{{ lead.instagram }}</a><br>{% endif %}
+       {% if lead.linkedin %}LinkedIn: <a href="{{ lead.linkedin }}" target="_blank" rel="noopener">abrir perfil</a><br>{% endif %}</p>
+    <form method="post" action="/leads/{{ lead.id }}/enriquecer"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-pequeno">Buscar dados públicos (site e CNPJ)</button></form>
+    <p class="ajuda">Lê o site do escritório e os dados abertos da Receita (BrasilAPI). Só preenche campos vazios.</p>
+  </div>
+
+  <div class="cartao">
+    <h2>Tarefas</h2>
+    <table>{% for t in tarefas %}<tr><td class="nowrap">{{ t.data|data }} {{ t.hora }}</td><td>{{ CANAIS.get(t.canal, t.canal) }} · {{ t.acao }}</td><td><span class="selo {{ 'selo-ok' if t.status=='feita' else ('selo-alerta' if t.status=='pendente' else '') }}">{{ t.status }}</span></td></tr>
+    {% else %}<tr><td class="vazio">Nenhuma tarefa.</td></tr>{% endfor %}</table>
+    {% if not lead.opt_out and lead.etapa < 2 and not lead.perdido %}
+    <form method="post" action="/leads/acoes" style="margin-top:10px" class="grupo-btn">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ids" value="{{ lead.id }}"><input type="hidden" name="acao" value="cadencia"><input type="hidden" name="voltar" value="/leads/{{ lead.id }}">
+      <select name="cadencia_id" aria-label="Cadência">{% for c in cadencias %}<option value="{{ c.id }}">{{ c.nome }}</option>{% endfor %}</select>
+      <button class="btn btn-pequeno">Iniciar cadência</button>
+    </form>{% endif %}
+  </div>
+
+  <div class="cartao">
+    <h2>Dados do lead</h2>
+    <form method="post" action="/leads/{{ lead.id }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="campos">
+        <div><label>Status</label><select name="status">{% for s in config.STATUS_LEAD %}<option {{ 'selected' if lead.status == s }}>{{ s }}</option>{% endfor %}</select></div>
+        <div><label>Motivo (se perdido)</label><select name="motivo_perda"><option value=""></option>{% for m in config.MOTIVOS_PERDA %}<option {{ 'selected' if lead.motivo_perda == m }}>{{ m }}</option>{% endfor %}</select></div>
+      </div>
+      {% include "_campos_lead.html" %}
+      <div style="margin-top:12px"><button class="btn btn-primario">Salvar alterações</button></div>
+    </form>
+  </div>
+
+  <div class="cartao">
+    <h2>Parceria e LGPD</h2>
+    {% if lead.parceiro_id %}<p>Este lead já é parceiro. <a class="btn btn-pequeno" href="/parceiros/{{ lead.parceiro_id }}">Abrir parceiro</a></p>
+    {% else %}<form method="post" action="/leads/{{ lead.id }}/converter" data-confirmar="Converter este lead em parceiro?"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-verde">Converter em parceiro</button></form>{% endif %}
+    <hr>
+    <p class="pequeno"><b>Origem:</b> {{ lead.origem }}{% if lead.fonte_url %} · <a href="{{ lead.fonte_url }}" target="_blank" rel="noopener">ver fonte</a>{% endif %}<br>
+      <b>Cadastro:</b> {{ lead.criado_em|datahora }} · <b>Base legal:</b> {{ lead.base_legal }}</p>
+    <div class="grupo-btn">
+    {% if lead.opt_out %}
+      {% if usuario.perfil in ['admin','gestor'] %}<form method="post" action="/leads/{{ lead.id }}/opt-out" data-confirmar="O contato autorizou receber mensagens de novo?"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="desfazer" value="1"><button class="btn btn-pequeno">Desfazer opt-out</button></form>{% endif %}
+    {% else %}
+      <form method="post" action="/leads/{{ lead.id }}/opt-out" data-confirmar="Registrar que este contato não quer mais receber mensagens?"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-pequeno btn-perigo">Registrar opt-out</button></form>
+    {% endif %}
+    {% if usuario.perfil in ['admin','gestor'] %}
+      <form method="post" action="/leads/{{ lead.id }}/excluir" data-confirmar="Excluir os dados deste lead (pedido LGPD)? Isso não pode ser desfeito."><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-pequeno btn-perigo">Excluir dados (LGPD)</button></form>
+    {% endif %}
+    </div>
+  </div>
+</div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const escolha = document.getElementById('escolha-msg');
+if (escolha) escolha.addEventListener('change', () => {
+  document.querySelectorAll('.msg-pronta').forEach(el => el.classList.toggle('oculto', el.dataset.indice !== escolha.value));
+});
+</script>
+{% endblock %}

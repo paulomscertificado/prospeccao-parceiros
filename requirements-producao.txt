@@ -1,0 +1,2 @@
+# Igual ao requirements.txt (o driver do PostgreSQL já está lá)
+-r requirements.txt

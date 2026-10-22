@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block titulo %}Parceiros{% endblock %}
+{% macro tabela_ranking(linhas, medida) %}
+<table><tr><th>#</th><th>Parceiro</th><th class="num">Certificados</th><th class="num">Indicados</th><th class="num">Faturamento</th><th class="num">Comissão</th><th>Última venda</th></tr>
+{% for r in linhas %}<tr><td>{{ loop.index }}</td><td><a href="/parceiros/{{ r.id }}">{{ r.nome }}</a></td><td class="num">{{ r.certificados }}</td><td class="num">{{ r.indicados }}</td><td class="num">{{ r.faturamento|moeda }}</td><td class="num">{{ r.comissao|moeda }}</td><td>{{ r.ultima_venda|data or '—' }}</td></tr>
+{% else %}<tr><td colspan="7" class="vazio">Ainda sem dados.</td></tr>{% endfor %}</table>
+{% endmacro %}
+{% block conteudo %}
+<div class="cabecalho">
+  <div><h1>Parceiros</h1><div class="suave">Escritórios que indicam clientes para a MS.</div></div>
+  <div class="acoes"><a class="btn" href="/exportar/parceiros.xlsx">Exportar</a><a class="btn btn-primario" href="/parceiros/0">+ Parceiro</a></div>
+</div>
+{% if parados %}<div class="aviso aviso-alerta">{{ parados|length }} parceiro{{ 's' if parados|length != 1 }} não gerou nenhuma venda nos últimos {{ dias_parado }} dias. <a href="?aba=parados">Ver quais</a></div>{% endif %}
+<div class="abas">
+  {% for c, n in [("lista","Todos"),("ranking","Ranking"),("parados","Parados")] %}<a class="{{ 'ativa' if aba == c }}" href="?aba={{ c }}">{{ n }}</a>{% endfor %}
+</div>
+
+{% if aba == 'ranking' %}
+<div class="cartao"><h2 class="ranking-titulo">🥇 Parceiros que mais venderam</h2>{{ tabela_ranking(mais_venderam) }}</div>
+<div class="cartao"><h2 class="ranking-titulo">🥈 Parceiros que mais indicaram</h2>{{ tabela_ranking(mais_indicaram) }}</div>
+<div class="cartao"><h2 class="ranking-titulo">🥉 Parceiros com maior faturamento</h2>{{ tabela_ranking(maior_faturamento) }}</div>
+{% elif aba == 'parados' %}
+<div class="cartao"><h2>Parceiros sem venda nos últimos {{ dias_parado }} dias</h2>
+  <table><tr><th>Parceiro</th><th>Status</th><th>Entrada</th><th>Última venda</th><th class="num">Certificados</th><th>Contato</th></tr>
+  {% for r in parados %}<tr><td><a href="/parceiros/{{ r.id }}">{{ r.nome }}</a></td><td>{{ r.status }}</td><td>{{ r.parceiro.data_entrada|data }}</td><td>{{ r.ultima_venda|data or 'nunca vendeu' }}</td><td class="num">{{ r.certificados }}</td><td>{{ r.parceiro.telefone }}</td></tr>
+  {% else %}<tr><td colspan="6" class="vazio">Nenhum parceiro parado. 🎉</td></tr>{% endfor %}</table>
+  <p class="ajuda">Sugestão: ligue para entender o motivo e ofereça ajuda (material para os clientes, lista de vencimentos da carteira).</p>
+</div>
+{% else %}
+<form class="filtros" method="get"><input type="hidden" name="aba" value="lista">
+  <input type="search" name="q" value="{{ q }}" placeholder="Nome ou cidade">
+  <select name="status"><option value="">Todos os status</option>{% for s in config.STATUS_PARCEIRO %}<option {{ 'selected' if status == s }}>{{ s }}</option>{% endfor %}</select>
+  <button class="btn">Filtrar</button></form>
+<div class="cartao" style="padding:0"><div class="tabela-rolagem"><table>
+  <tr><th>Escritório</th><th>Cidade</th><th>Status</th><th class="num">Indicados</th><th class="num">Vendidos</th><th class="num">Receita</th><th class="num">Comissão acumulada</th><th>Última venda</th></tr>
+  {% for r in linhas %}<tr><td><a href="/parceiros/{{ r.id }}"><b>{{ r.nome }}</b></a><div class="pequeno suave">{{ r.parceiro.responsavel }}</div></td><td>{{ r.cidade }}{{ '/' ~ r.estado if r.estado }}</td>
+    <td><span class="selo {{ {'ATIVO':'selo-ok','EM ATIVAÇÃO':'selo-alerta','BLOQUEADO':'selo-erro'}.get(r.status, '') }}">{{ r.status }}</span></td>
+    <td class="num">{{ r.indicados }}</td><td class="num">{{ r.certificados }}</td><td class="num">{{ r.faturamento|moeda }}</td><td class="num">{{ r.comissao|moeda }}</td><td>{{ r.ultima_venda|data or '—' }}</td></tr>
+  {% else %}<tr><td colspan="8" class="vazio">Nenhum parceiro. Converta um lead em parceiro ou cadastre em "+ Parceiro".</td></tr>{% endfor %}
+</table></div></div>
+{% endif %}
+{% endblock %}

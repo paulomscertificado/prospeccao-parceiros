@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block titulo %}Descadastrar{% endblock %}
+{% block publico %}
+<div class="login"><form class="cartao" method="post" action="{{ caminho_form }}">
+  <h1 style="margin-bottom:8px">Não receber mais mensagens</h1>
+  <p>Confirme para não receber mais mensagens da MS Certificação Digital.</p>
+  <button class="btn btn-primario">Confirmar descadastro</button>
+</form></div>
+{% endblock %}
+{% block conteudo %}
+<form class="cartao" method="post" action="{{ caminho_form }}" style="max-width:520px">
+  <h1 style="margin-bottom:8px">Não receber mais mensagens</h1>
+  <button class="btn btn-primario">Confirmar descadastro</button>
+</form>
+{% endblock %}

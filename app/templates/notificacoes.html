@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block titulo %}Avisos{% endblock %}
+{% block conteudo %}
+<div class="cabecalho"><h1>Avisos</h1></div>
+<div class="cartao" style="padding:0"><table>
+  {% for n in lista %}<tr><td class="nowrap pequeno suave">{{ n.criado_em|datahora }}</td><td>{% if n.link %}<a href="{{ n.link }}">{{ n.texto }}</a>{% else %}{{ n.texto }}{% endif %}{% if not n.lida %} <span class="selo selo-erro">novo</span>{% endif %}</td></tr>
+  {% else %}<tr><td class="vazio">Nenhum aviso.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

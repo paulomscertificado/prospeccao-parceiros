@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block titulo %}Campanhas{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <div><h1>IA SDR · Campanhas</h1><div class="suave">Toda campanha passa por aprovação antes de qualquer contato.</div></div>
+  <a class="btn btn-primario" href="/campanhas/nova">+ Criar campanha</a>
+</div>
+<form class="faixa" method="get" action="/campanhas/nova">
+  <div class="pedido"><input type="text" name="pedido" placeholder="Ex.: Quero encontrar parceiros entre empresas que atendem pequenas e médias empresas em São Paulo" aria-label="Pedido">
+  <button class="btn btn-verde">Criar com a IA</button></div>
+</form>
+<div class="cartao" style="padding:0"><div class="tabela-rolagem"><table>
+  <tr><th>Campanha</th><th>Segmentos</th><th>Região</th><th>Situação</th><th class="num">Rascunho</th><th class="num">Pendentes</th><th class="num">Feitas</th><th>Criada</th></tr>
+  {% for c in campanhas %}{% set n = contagens[c.id] %}
+  <tr><td><a href="/campanhas/{{ c.id }}"><b>{{ c.nome }}</b></a><div class="pequeno suave">{{ c.etapa }}</div></td>
+    <td class="pequeno">{{ c.categorias.replace(',', ', ') or '—' }}</td><td>{{ c.cidade }}{{ '/' ~ c.estado if c.estado }}</td>
+    <td><span class="selo {{ {'aguardando_aprovacao':'selo-alerta','ativa':'selo-ok','erro':'selo-erro','cancelada':'','gerando':'selo-azul'}.get(c.status, '') }}">{{ {'aguardando_aprovacao':'APROVAÇÃO NECESSÁRIA','gerando':'montando...'}.get(c.status, c.status) }}</span></td>
+    <td class="num">{{ n.get('rascunho', 0) }}</td><td class="num">{{ n.get('pendente', 0) }}</td><td class="num">{{ n.get('feita', 0) }}</td><td>{{ c.criado_em|data }}</td></tr>
+  {% else %}<tr><td colspan="8" class="vazio">Nenhuma campanha. Escreva o que procura na caixa acima.</td></tr>{% endfor %}
+</table></div></div>
+{% endblock %}

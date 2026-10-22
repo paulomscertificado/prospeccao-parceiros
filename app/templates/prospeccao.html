@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block titulo %}Prospecção{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <div><h1>Encontrar novos parceiros</h1><div class="suave">Busca escritórios contábeis em fontes públicas, elimina duplicados, qualifica e ordena por potencial.</div></div>
+  <div class="acoes"><a class="btn" href="/leads/importar">Importar planilha</a><a class="btn" href="/leads/novo">Cadastrar manualmente</a></div>
+</div>
+
+<form class="faixa" method="get" action="/prospeccao">
+  <div class="pedido"><input type="text" name="pedido" value="{{ pedido }}" placeholder="Escreva o que procura. Ex.: Quero encontrar 100 escritórios contábeis de alto potencial em São Paulo" aria-label="Pedido">
+  <button class="btn btn-verde">Preencher</button></div>
+</form>
+{% if pedido and pre %}<div class="aviso aviso-info">Preenchi o formulário com o seu pedido. Confira a cidade e o estado e clique em "Buscar".</div>{% endif %}
+
+<div class="grade-2">
+<form class="cartao" method="post" action="/prospeccao/buscar">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>Critérios</h2>
+  <div class="campos">
+    <div><label>Cidade *</label><input type="text" name="cidade" value="{{ pre.cidade or '' }}" required placeholder="São Paulo"></div>
+    <div><label>Estado *</label><select name="estado" required><option value=""></option>{% for u in config.UFS %}<option {{ 'selected' if pre.estado == u }}>{{ u }}</option>{% endfor %}</select></div>
+    <div><label>Raio (km)</label><input type="number" name="raio_km" min="1" max="50" value="10"></div>
+    <div><label>Quantidade de leads</label><input type="number" name="quantidade" min="1" max="500" value="{{ pre.quantidade or 100 }}"></div>
+    <div class="largo"><label>Tipo de empresa (categoria de parceiro)</label><select name="categoria">{% for c in categorias %}<option value="{{ c.codigo }}" {{ 'selected' if c.codigo == 'contabil' }}>{{ c.nome }}</option>{% endfor %}</select></div>
+    <div><label>Tamanho mínimo (funcionários)</label><input type="number" name="tamanho_min" min="0"></div>
+    <div><label>Tamanho máximo (funcionários)</label><input type="number" name="tamanho_max" min="0"></div>
+  </div>
+  <p class="ajuda">As fontes públicas raramente informam o número de funcionários. O filtro de tamanho só descarta quem tem tamanho conhecido fora da faixa.</p>
+  <label style="margin-top:10px">Fontes de dados</label>
+  {% for codigo, nome, ok in fontes %}<label class="marcar"><input type="checkbox" name="fontes" value="{{ codigo }}" {{ 'checked' if ok else 'disabled' }}> {{ nome }}</label>{% endfor %}
+  {% if not fontes[0][2] %}<div class="aviso aviso-alerta" style="margin:6px 0">Para achar escritórios em qualquer cidade, importe a base da Receita Federal (gratuita) em <a href="/configuracoes?aba=integracoes#receita">Configurações &gt; Integrações</a>{% if usuario.perfil != 'admin' %} (peça ao administrador){% endif %}. O OpenStreetMap tem poucos escritórios cadastrados no Brasil.</div>{% endif %}
+  <label class="marcar"><input type="checkbox" name="enriquecer" checked> Completar com dados públicos do site e do CNPJ (mais lento, recomendado)</label>
+  <div style="margin-top:12px"><button class="btn btn-primario">Buscar escritórios</button></div>
+</form>
+
+<div class="cartao">
+  <h2>Como funciona</h2>
+  <ol style="padding-left:18px;margin:0">
+    <li>O sistema procura escritórios de contabilidade perto da cidade nas fontes marcadas.</li>
+    <li>Elimina quem já está cadastrado (mesmo CNPJ, site, telefone ou e-mail), inclusive quem pediu opt-out.</li>
+    <li>Visita o site de cada escritório para achar e-mail, Instagram, LinkedIn, WhatsApp e CNPJ publicados lá.</li>
+    <li>Com o CNPJ, busca sócios e atividade nos dados abertos da Receita Federal.</li>
+    <li>Calcula o score e mostra os melhores primeiro. Daí é só marcar e iniciar a campanha.</li>
+  </ol>
+  <div class="aviso aviso-alerta" style="margin:12px 0 0">Nada é inventado: se a fonte não traz telefone ou e-mail, o lead fica sem. A fonte de cada lead fica gravada (LGPD).</div>
+</div>
+</div>
+
+<div class="cartao">
+  <h2>Buscas recentes</h2>
+  <div class="tabela-rolagem"><table>
+    <tr><th>Quando</th><th>Local</th><th>Tipo</th><th class="num">Encontrados</th><th class="num">Novos</th><th class="num">Duplicados</th><th>Situação</th></tr>
+    {% for b in buscas %}<tr><td><a href="/prospeccao/busca/{{ b.id }}">{{ b.criado_em|datahora }}</a></td><td>{{ b.cidade }}/{{ b.estado }} ({{ b.raio_km }} km)</td><td>{{ b.tipo_empresa }}</td>
+      <td class="num">{{ b.encontrados }}</td><td class="num">{{ b.novos }}</td><td class="num">{{ b.duplicados }}</td>
+      <td><span class="selo {{ 'selo-ok' if b.status == 'concluida' else ('selo-erro' if b.status == 'erro' else 'selo-alerta') }}">{{ b.status }}</span></td></tr>
+    {% else %}<tr><td colspan="7" class="vazio">Nenhuma busca ainda.</td></tr>{% endfor %}
+  </table></div>
+</div>
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block titulo %}Inteligência de Prospecção{% endblock %}
+{% macro taxa_ou_traco(v) %}{{ v|pct if v is not none else '—' }}{% endmacro %}
+{% block conteudo %}
+<div class="cabecalho">
+  <div><h1>Inteligência de Prospecção</h1><div class="suave">{{ p.nome }} · o que funciona para a MS: segmento, mensagem, canal e abordagem.</div></div>
+  <form method="get"><input type="hidden" name="uf" value="{{ uf }}"><input type="hidden" name="cidade" value="{{ cidade }}">
+    <select name="periodo" onchange="this.form.submit()" aria-label="Período">{% for c, n in [("30d","Últimos 30 dias"),("90d","Últimos 90 dias"),("12m","Últimos 12 meses"),("tudo","Todo o período")] %}<option value="{{ c }}" {{ 'selected' if periodo == c }}>{{ n }}</option>{% endfor %}</select></form>
+</div>
+
+<div class="grade">
+  <div class="kpi destaque"><div class="rotulo">Leads encontrados</div><div class="valor">{{ ind.leads_encontrados }}</div></div>
+  <div class="kpi"><div class="rotulo">Leads qualificados</div><div class="valor">{{ ind.leads_qualificados }}</div><div class="detalhe">alto e muito alto potencial</div></div>
+  <div class="kpi"><div class="rotulo">Leads contatados</div><div class="valor">{{ ind.leads_contatados }}</div></div>
+  <div class="kpi"><div class="rotulo">Mensagens enviadas</div><div class="valor">{{ ind.mensagens_enviadas }}</div></div>
+  <div class="kpi"><div class="rotulo">Taxa de entrega</div><div class="valor">{{ taxa_ou_traco(ind.taxa_entrega) }}</div><div class="detalhe">envios pela API/fila</div></div>
+  <div class="kpi"><div class="rotulo">Taxa de resposta</div><div class="valor">{{ ind.taxa_resposta|pct }}</div></div>
+  <div class="kpi"><div class="rotulo">Taxa de interesse</div><div class="valor">{{ ind.taxa_interesse|pct }}</div></div>
+  <div class="kpi"><div class="rotulo">Reuniões</div><div class="valor">{{ ind.reunioes }}</div></div>
+  <div class="kpi"><div class="rotulo">Oportunidades quentes</div><div class="valor">{{ ind.oportunidades_quentes }}</div></div>
+  <div class="kpi"><div class="rotulo">Parceiros conquistados</div><div class="valor">{{ ind.parceiros }}</div></div>
+  <div class="kpi"><div class="rotulo">Conversão</div><div class="valor">{{ ind.conversao|pct }}</div></div>
+  <div class="kpi"><div class="rotulo">Receita gerada</div><div class="valor">{{ ind.receita|moeda }}</div></div>
+</div>
+
+<div class="cartao" id="sugestoes"><h2>O que os dados dizem</h2>
+  <ul>{% for s in sugestoes %}<li>{{ s }}</li>{% endfor %}</ul>
+  {% if usuario.perfil in ['admin','gestor'] %}
+  <form method="post" action="/inteligencia/sugerir-categorias"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-ia" {{ 'disabled title="Configure a IA no .env"' if not ia_ligada }}>IA: sugerir novas categorias de parceiros</button></form>{% endif %}
+  {% if sugestoes_ia %}
+  <table style="margin-top:10px"><tr><th>Categoria sugerida</th><th>Motivo</th><th>Potencial</th><th>Estratégia</th><th></th></tr>
+  {% for s in sugestoes_ia %}<tr><td><b>{{ s.nome }}</b></td><td class="pequeno">{{ s.motivo }}</td><td>{{ s.potencial }}</td><td class="pequeno">{{ s.estrategia }}</td>
+    <td><a class="btn btn-pequeno" href="/categorias?nova={{ s.nome|urlencode }}&amp;motivo={{ s.motivo|urlencode }}&amp;palavras={{ s.palavras_chave|urlencode }}&amp;estrategia={{ s.estrategia|urlencode }}#nova">Criar</a></td></tr>{% endfor %}</table>
+  <p class="ajuda">Sugestões da IA: confira antes de criar. Para buscar empresas, a categoria precisa dos CNAEs (atividades) certos.</p>{% endif %}
+</div>
+
+<div class="cartao"><h2>Ranking de segmentos</h2>
+  <div class="grade">
+    {% for chave, titulo, campo in [("resposta","Melhor segmento por taxa de resposta","taxa_resposta"),("reunioes","Melhor segmento por reuniões","reunioes"),("parceiros","Melhor segmento por parceiros","parceiros"),("receita","Melhor segmento por receita","receita")] %}
+    <div class="kpi"><div class="rotulo">🥇 {{ titulo }}</div>
+      {% if rankings[chave] %}<div class="valor" style="font-size:1.05rem">{{ rankings[chave].nome }}</div>
+        <div class="detalhe">{{ rankings[chave][campo]|pct if campo == 'taxa_resposta' else (rankings[chave][campo]|moeda if campo == 'receita' else rankings[chave][campo]) }}</div>
+      {% else %}<div class="detalhe">Ainda sem dados suficientes</div>{% endif %}</div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="cartao"><h2>Por segmento</h2><div class="tabela-rolagem"><table>
+  <tr><th>Segmento</th><th class="num">Leads</th><th class="num">Contatados</th><th class="num">Resposta</th><th class="num">Interesse</th><th class="num">Reuniões</th><th class="num">Parceiros</th><th class="num">Conversão</th><th class="num">Receita</th><th class="num">LTV</th><th class="num">Score médio</th></tr>
+  {% for s in segmentos %}<tr><td>{{ s.nome }}</td><td class="num">{{ s.leads }}</td><td class="num">{{ s.contatados }}</td><td class="num">{{ s.taxa_resposta|pct }}</td><td class="num">{{ s.taxa_interesse|pct }}</td><td class="num">{{ s.reunioes }}</td><td class="num">{{ s.parceiros }}</td><td class="num">{{ s.conversao|pct }}</td><td class="num">{{ s.receita|moeda }}</td><td class="num">{{ s.ltv|moeda }}</td><td class="num">{{ s.score_medio }}</td></tr>
+  {% else %}<tr><td colspan="11" class="vazio">Sem leads no período.</td></tr>{% endfor %}
+</table></div></div>
+
+<div class="grade-3">
+  {% for titulo, linhas in [("Por canal", por_canal), ("Por abordagem (ângulo)", por_angulo), ("Por campanha", por_campanha)] %}
+  <div class="cartao"><h2>{{ titulo }}</h2><table><tr><th></th><th class="num">Enviadas</th><th class="num">Respondidas</th><th class="num">Taxa</th></tr>
+    {% for l in linhas %}<tr><td>{{ l.nome }}</td><td class="num">{{ l.enviadas }}</td><td class="num">{{ l.respondidas }}</td><td class="num">{{ l.taxa_resposta|pct }}</td></tr>
+    {% else %}<tr><td colspan="4" class="vazio">Sem mensagens.</td></tr>{% endfor %}</table></div>
+  {% endfor %}
+</div>
+
+<div class="cartao" id="novas"><h2>Encontrar novas oportunidades de parceria</h2>
+  <form class="filtros" method="get"><input type="hidden" name="periodo" value="{{ periodo }}">
+    <input type="text" name="cidade" value="{{ cidade }}" placeholder="Cidade (opcional)"><select name="uf"><option value="">Brasil</option>{% for u in config.UFS %}<option {{ 'selected' if uf == u }}>{{ u }}</option>{% endfor %}</select>
+    <button class="btn btn-primario">Encontrar novas oportunidades de parceria</button></form>
+  <div class="tabela-rolagem"><table><tr><th>Categoria</th><th>Motivo</th><th>Potencial</th><th class="num">Empresas ativas</th><th>Estratégia sugerida</th><th></th></tr>
+  {% for o in oportunidades %}<tr><td><b>{{ o.categoria.nome }}</b></td><td class="pequeno">{{ o.motivo }}</td><td><span class="selo {{ 'selo-alto' if o.potencial == 'Alto' else ('selo-medio' if o.potencial == 'Médio' else 'selo-baixo') }}">{{ o.potencial }}</span></td>
+    <td class="num">{{ '{:,}'.format(o.quantidade).replace(',', '.') }}</td><td class="pequeno">{{ o.estrategia }}</td>
+    <td><a class="btn btn-pequeno" href="/campanhas/nova?pedido={{ ('Parceiros ' ~ o.categoria.nome ~ (' em ' ~ cidade if cidade else '') ~ (' ' ~ uf if uf else ''))|urlencode }}">Criar campanha</a></td></tr>{% endfor %}</table></div>
+  <p class="ajuda">Quantidade: empresas ativas (matrizes) na base da Receita importada. Sem a base importada, aparece 0.</p>
+</div>
+{% endblock %}

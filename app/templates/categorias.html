@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block titulo %}Categorias de parceiros{% endblock %}
+{% macro formulario(c, novo=False) %}
+<form method="post" action="/categorias/{{ c.id if not novo else 0 }}" class="campos" style="margin:8px 0 4px">
+  <input type="hidden" name="csrf" value="{{ csrf }}">{% if novo %}<input type="hidden" name="sugerida" value="{{ '1' if nova else '' }}">{% endif %}
+  <div><label>Nome</label><input type="text" name="nome" value="{{ c.nome or '' }}" required></div>
+  <div><label>Prioridade (menor = primeiro)</label><input type="number" name="prioridade" value="{{ c.prioridade or 50 }}"></div>
+  <div><label>Aderência ao certificado (0–25)</label><input type="number" min="0" max="25" name="aderencia" value="{{ c.aderencia or 10 }}"></div>
+  <div><label class="marcar" style="margin-top:22px"><input type="checkbox" name="recorrente" {{ 'checked' if c.recorrente }}> Relacionamento recorrente</label>
+       <label class="marcar"><input type="checkbox" name="ativa" {{ 'checked' if c.ativa or novo }}> Ativa</label></div>
+  <div class="largo"><label>CNAEs (todas as empresas com esta atividade principal)</label><input type="text" name="cnaes" value="{{ c.cnaes or '' }}" placeholder="6920601,6920602"></div>
+  <div class="largo"><label>CNAEs que só entram se o nome tiver as palavras-chave</label><input type="text" name="cnaes_com_palavra" value="{{ c.cnaes_com_palavra or '' }}"></div>
+  <div class="largo"><label>Palavras-chave no nome</label><input type="text" name="palavras_chave" value="{{ c.palavras_chave or '' }}" placeholder="condom, bpo, cowork"></div>
+  <div class="largo"><label>Por que pode ser parceira (motivo)</label><textarea name="motivo" style="min-height:50px">{{ c.motivo or '' }}</textarea></div>
+  <div class="largo"><label>Estratégia sugerida</label><textarea name="estrategia" style="min-height:50px">{{ c.estrategia or '' }}</textarea></div>
+  <div class="largo"><label>Abertura da mensagem (use {{ '{{empresa}}' }} e {{ '{{cidade}}' }})</label><input type="text" name="abertura" value="{{ c.abertura or '' }}"></div>
+  <div class="largo"><label>Gancho da parceria</label><input type="text" name="gancho" value="{{ c.gancho or '' }}"></div>
+  {% if usuario.perfil == 'admin' %}<div><button class="btn btn-primario">Salvar</button></div>{% endif %}
+</form>
+{% endmacro %}
+{% block conteudo %}
+<div class="cabecalho"><div><h1>Categorias de parceiros</h1><div class="suave">Definem onde a IA procura (atividades da Receita) e como aborda cada tipo de empresa.</div></div>
+  <a class="btn" href="/inteligencia#novas">Ver oportunidades por categoria</a></div>
+<div class="cartao" style="padding:0"><div class="tabela-rolagem"><table>
+  <tr><th>Categoria</th><th class="num">Prioridade</th><th class="num">Aderência</th><th>Recorrente</th><th>CNAEs</th><th class="num">Empresas na base</th><th></th></tr>
+  {% for c in categorias %}<tr><td><b>{{ c.nome }}</b>{% if not c.ativa %} <span class="selo">inativa</span>{% endif %}{% if c.sugerida_pela_ia %} <span class="selo selo-maxima">sugerida pela IA</span>{% endif %}</td>
+    <td class="num">{{ c.prioridade }}</td><td class="num">{{ c.aderencia }}</td><td>{{ 'sim' if c.recorrente else 'não' }}</td>
+    <td class="pequeno">{{ c.cnaes }}{% if c.cnaes_com_palavra %}<br>com palavra: {{ c.cnaes_com_palavra }} ({{ c.palavras_chave }}){% endif %}</td>
+    <td class="num">{{ '{:,}'.format(contagem.get(c.codigo, 0)).replace(',', '.') }}</td>
+    <td><details><summary class="btn btn-pequeno">Editar</summary>{{ formulario(c) }}</details></td></tr>{% endfor %}
+</table></div></div>
+{% if usuario.perfil == 'admin' %}
+<div class="cartao" id="nova"><h2>Nova categoria</h2>
+  {{ formulario({'nome': nova, 'motivo': motivo_novo, 'palavras_chave': palavras_novas, 'estrategia': estrategia_nova, 'prioridade': 50, 'aderencia': 10, 'ativa': True}, True) }}
+  <p class="ajuda">Depois de criar ou mudar CNAEs, importe a base da Receita de novo para trazer as empresas da categoria.</p></div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block titulo %}Cadência{% endblock %}
+{% block conteudo %}
+<div class="cabecalho"><h1>{{ cad.nome or 'Nova cadência' }}</h1><a class="btn" href="/cadencias">Voltar</a></div>
+<form class="cartao" method="post" action="/cadencias/{{ cad.id or 0 }}" style="max-width:980px">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div class="campos">
+    <div class="largo"><label>Nome</label><input type="text" name="nome" value="{{ cad.nome }}" required></div>
+    <div class="largo"><label>Descrição</label><input type="text" name="descricao" value="{{ cad.descricao }}"></div>
+    <label class="marcar"><input type="checkbox" name="ativa" {{ 'checked' if cad.ativa or not cad.id }}> Ativa</label>
+  </div>
+  <h2 style="margin-top:16px">Passos</h2>
+  <div class="tabela-rolagem"><table id="passos">
+    <tr><th>Dia</th><th>Canal</th><th>Ação</th><th>Template</th><th>Horário</th><th></th></tr>
+    {% set lista = cad.passos if cad.passos else [] %}
+    {% for p in lista %}{% include "_passo.html" %}{% endfor %}
+    {% if not lista %}{% set p = none %}{% include "_passo.html" %}{% endif %}
+  </table></div>
+  <div class="grupo-btn" style="margin-top:10px">
+    <button type="button" class="btn" id="mais-passo">+ Adicionar passo</button>
+    {% if usuario.perfil in ['admin','gestor'] %}<button class="btn btn-primario">Salvar cadência</button>{% else %}<span class="suave">Só administrador e gestor alteram cadências.</span>{% endif %}
+  </div>
+  <p class="ajuda">Dia 1 = data de início da campanha. Sábados e domingos são pulados (ajuste em Configurações).</p>
+  <template id="modelo-passo">{% set p = none %}{% include "_passo.html" %}</template>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('mais-passo').addEventListener('click', () => {
+  const t = document.getElementById('modelo-passo').content.cloneNode(true);
+  document.querySelector('#passos tbody, #passos').appendChild(t);
+});
+document.addEventListener('click', e => { if (e.target.matches('.remover-passo')) e.target.closest('tr').remove(); });
+</script>
+{% endblock %}

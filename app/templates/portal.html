@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block titulo %}Meu painel{% endblock %}
+{% block conteudo %}
+<div class="cabecalho"><div><h1>{{ p.escritorio }}</h1><div class="suave">Parceiro MS Certificação Digital desde {{ p.data_entrada|data }}</div></div>
+  <a class="btn btn-verde" href="/portal/indicar">+ Indicar cliente</a></div>
+<div class="grade">
+  <div class="kpi"><div class="rotulo">Clientes indicados</div><div class="valor">{{ totais.indicados }}</div></div>
+  <div class="kpi"><div class="rotulo">Certificados emitidos</div><div class="valor">{{ totais.vendidos }}</div></div>
+  <div class="kpi destaque"><div class="rotulo">Comissão a receber</div><div class="valor">{{ totais.a_receber|moeda }}</div></div>
+  <div class="kpi"><div class="rotulo">Comissão recebida</div><div class="valor">{{ totais.recebida|moeda }}</div></div>
+  <div class="kpi"><div class="rotulo">Comissão neste mês</div><div class="valor">{{ totais.mes|moeda }}</div></div>
+</div>
+<p class="suave">Sua comissão: {{ regra }}.</p>
+<div class="grade-2">
+  <div class="cartao"><h2>Últimas vendas</h2><table><tr><th>Data</th><th>Cliente</th><th>Certificado</th><th class="num">Comissão</th><th></th></tr>
+    {% for v in vendas %}<tr><td>{{ v.data|data }}</td><td>{{ v.cliente.nome }}</td><td>{{ v.produto.nome if v.produto else '' }}</td><td class="num">{{ v.comissao|moeda }}</td><td>{{ 'paga' if v.comissao_paga else 'a receber' }}</td></tr>
+    {% else %}<tr><td colspan="5" class="vazio">Nenhuma venda ainda. Que tal indicar seu primeiro cliente?</td></tr>{% endfor %}</table></div>
+  <div class="cartao"><h2>Clientes da sua carteira vencendo (60 dias)</h2><table><tr><th>Cliente</th><th>Vencimento</th></tr>
+    {% for c in vencendo %}<tr><td>{{ c.cliente_nome }}<div class="pequeno suave">{{ c.tipo }}</div></td><td>{{ c.data_vencimento|data }}</td></tr>
+    {% else %}<tr><td colspan="2" class="vazio">Nenhum vencimento próximo.</td></tr>{% endfor %}</table>
+    <p class="ajuda">A MS entra em contato com esses clientes para renovar, e a renovação também gera comissão para você.</p></div>
+</div>
+{% endblock %}

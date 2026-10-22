@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block titulo %}Vencimentos{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <div><h1>Vencimentos</h1><div class="suave">Controle de renovação: a MS renova e o contador continua parceiro.</div></div>
+  <div class="acoes"><a class="btn" href="/exportar/vencimentos.xlsx">Exportar</a><a class="btn" href="/agenda?tipo=renovacao">Tarefas de renovação</a></div>
+</div>
+<div class="grade">
+  {% for dias, qtd in faixas.items() %}<a class="kpi {{ 'destaque' if janela == dias|string }}" href="?janela={{ dias }}" style="text-decoration:none;color:inherit"><div class="rotulo">Vencem em até {{ dias }} dias</div><div class="valor">{{ qtd }}</div></a>{% endfor %}
+</div>
+<div class="abas">
+  {% for c, n in [("30","Próximos 30 dias"),("90","Próximos 90 dias"),("vencidos","Vencidos"),("todos","Todos")] %}<a class="{{ 'ativa' if janela == c }}" href="?janela={{ c }}{{ '&parceiro=' ~ parceiro if parceiro }}">{{ n }}</a>{% endfor %}
+</div>
+<form class="filtros" method="get"><input type="hidden" name="janela" value="{{ janela }}">
+  <select name="parceiro" onchange="this.form.submit()" aria-label="Parceiro"><option value="">Todos os parceiros</option>{% for p in parceiros %}<option value="{{ p.id }}" {{ 'selected' if parceiro == p.id }}>{{ p.escritorio }}</option>{% endfor %}</select></form>
+<div class="cartao" style="padding:0"><div class="tabela-rolagem"><table>
+  <tr><th>Cliente</th><th>Tipo</th><th>Emissão</th><th>Vencimento</th><th>Parceiro responsável</th><th>Status</th><th>Ação</th></tr>
+  {% for c in certs %}{% set dias = (c.data_vencimento - hoje).days %}
+  <tr><td><b>{{ c.cliente_nome }}</b><div class="pequeno suave">{{ c.cnpj }}</div></td><td>{{ c.tipo }}</td><td>{{ c.data_emissao|data }}</td>
+    <td class="nowrap">{{ c.data_vencimento|data }}<br><span class="selo {{ 'selo-erro' if dias <= 7 else ('selo-alerta' if dias <= 30 else '') }}">{{ dias ~ ' dias' if dias >= 0 else 'vencido há ' ~ (-dias) ~ ' dias' }}</span></td>
+    <td>{% if c.parceiro %}<a href="/parceiros/{{ c.parceiro.id }}">{{ c.parceiro.escritorio }}</a>{% else %}—{% endif %}</td>
+    <td><span class="selo">{{ c.status }}</span>{% if tarefas.get(c.id) %}<div class="pequeno suave">tarefa para {{ tarefas[c.id].usuario.nome if tarefas[c.id].usuario else 'equipe' }}</div>{% endif %}</td>
+    <td class="grupo-btn">{% if c.status in ['Ativo','Em renovação','Vencido'] %}
+      <a class="btn btn-pequeno btn-primario" href="/vendas?renovar={{ c.id }}">Renovar</a>
+      <form method="post" action="/vencimentos/{{ c.id }}/status"><input type="hidden" name="csrf" value="{{ csrf }}"><select name="status" onchange="this.form.submit()" aria-label="Status"><option value="">Mudar status…</option>{% for s in config.STATUS_CERTIFICADO %}<option>{{ s }}</option>{% endfor %}</select></form>{% endif %}</td></tr>
+  {% else %}<tr><td colspan="7" class="vazio">Nenhum certificado nesta lista.</td></tr>{% endfor %}
+</table></div></div>
+
+{% if usuario.perfil in ['admin','gestor'] %}
+<form class="cartao" method="post" action="/vencimentos/importar" enctype="multipart/form-data" style="max-width:720px">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>Importar certificados (CSV ou Excel)</h2>
+  <p class="suave">Colunas: <b>Cliente</b>, CNPJ, Tipo, Emissão, <b>Vencimento</b> (dd/mm/aaaa), Parceiro (nome ou CNPJ do escritório), Telefone, Email.</p>
+  <input type="file" name="arquivo" accept=".csv,.xlsx" required aria-label="Arquivo">
+  <button class="btn btn-primario" style="margin-top:10px">Importar</button>
+  <p class="ajuda">Alertas automáticos: 90, 60, 30, 15 e 7 dias antes (ajuste em Configurações). Cada alerta vira uma tarefa "CONTATAR CLIENTE" na agenda.</p>
+</form>{% endif %}
+{% endblock %}

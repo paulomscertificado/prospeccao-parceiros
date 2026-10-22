@@ -1,0 +1,15 @@
+fastapi==0.159.1
+uvicorn==0.54.0
+jinja2==3.1.6
+python-multipart==0.0.32
+itsdangerous==2.2.0
+SQLAlchemy==2.1.6
+httpx==0.28.1
+anthropic==2.1.0
+openpyxl==3.1.5
+fpdf2==2.8.9
+python-dotenv==1.2.4
+cryptography==50.0.2
+# Banco PostgreSQL (sistema na nuvem)
+psycopg[binary]==3.2.10
+pytest==9.1.1

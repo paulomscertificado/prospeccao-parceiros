@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block titulo %}IA Comercial{% endblock %}
+{% block conteudo %}
+<div class="cabecalho"><div><h1>IA Comercial</h1><div class="suave">Pergunte sobre seus leads, parceiros, vendas e renovações.</div></div></div>
+<div class="grade-lead">
+<div>
+  <form class="cartao" method="post" action="/ia">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Sua pergunta</label>
+    <div style="display:flex;gap:8px"><input type="text" name="texto" value="{{ texto or '' }}" required placeholder="Ex.: Em qual cidade devo focar a prospecção no próximo mês?">
+    <button class="btn btn-ia" {{ 'disabled' if not ia_ligada }}>Perguntar</button></div>
+    {% if not ia_ligada %}<p class="ajuda">Perguntas livres precisam da IA configurada (ANTHROPIC_API_KEY no .env). As perguntas prontas ao lado funcionam sempre.</p>{% endif %}
+  </form>
+  {% if erro_ia %}<div class="aviso aviso-erro">{{ erro_ia }}</div>{% endif %}
+  {% if resposta_ia %}<div class="cartao"><h2>Resposta da IA</h2><div style="white-space:pre-wrap">{{ resposta_ia }}</div>
+    <p class="ajuda">A IA responde só com os dados do sistema. Confira os números antes de decisões importantes.</p></div>{% endif %}
+  {% if resposta %}
+  <div class="cartao"><h2>{{ titulo_pergunta }}</h2>
+    <p>{{ resposta.texto }}</p>
+    {% if resposta.colunas %}<div class="tabela-rolagem"><table><tr>{% for c in resposta.colunas %}<th>{{ c }}</th>{% endfor %}</tr>
+      {% for linha in resposta.linhas %}{% set i = loop.index0 %}<tr>{% for v in linha %}<td>{% if loop.first and resposta.links %}<a href="{{ resposta.links[i] }}">{{ v }}</a>{% else %}{{ v }}{% endif %}</td>{% endfor %}</tr>{% else %}<tr><td class="vazio" colspan="{{ resposta.colunas|length }}">Nada encontrado.</td></tr>{% endfor %}</table></div>{% endif %}
+  </div>
+  {% endif %}
+</div>
+<div class="cartao">
+  <h2>Perguntas prontas</h2>
+  {% for codigo, pergunta in perguntas %}<a class="btn {{ 'btn-primario' if pergunta_sel == codigo }}" style="display:flex;margin-bottom:6px;white-space:normal" href="/ia?pergunta={{ codigo }}">{{ pergunta }}</a>{% endfor %}
+</div>
+</div>
+{% endblock %}

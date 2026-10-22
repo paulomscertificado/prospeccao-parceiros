@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block titulo %}Minha conta{% endblock %}
+{% block conteudo %}
+<div class="cabecalho"><h1>Minha conta</h1></div>
+<div class="cartao" style="max-width:520px">
+  <p><b>{{ usuario.nome }}</b> · {{ usuario.email }} · {{ usuario.perfil_nome }}</p>
+  <h2>Trocar senha</h2>
+  <form method="post" action="/minha-conta/senha">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="campo"><label>Senha atual</label><input type="password" name="atual" required></div>
+    <div class="campo"><label>Senha nova</label><input type="password" name="nova" required minlength="8"></div>
+    <div class="campo"><label>Repita a senha nova</label><input type="password" name="nova2" required minlength="8"></div>
+    <button class="btn btn-primario">Trocar senha</button>
+  </form>
+</div>
+{% endblock %}

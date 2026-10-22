@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block titulo %}Resultado da busca{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <div><h1>{{ busca.cidade }}/{{ busca.estado }} · {{ busca.tipo_empresa }}</h1>
+    <div class="suave">Busca de {{ busca.criado_em|datahora }} · raio {{ busca.raio_km }} km · até {{ busca.quantidade }} leads</div></div>
+  <a class="btn" href="/prospeccao">Nova busca</a>
+</div>
+
+{% if rodando %}
+<div class="aviso aviso-info"><b>Trabalhando...</b> {{ busca.etapa }} Esta página se atualiza sozinha.</div>
+{% elif busca.status == 'erro' %}
+<div class="aviso aviso-erro">{{ busca.erro }}</div>
+{% endif %}
+
+<div class="grade">
+  <div class="kpi"><div class="rotulo">Encontrados nas fontes</div><div class="valor">{{ busca.encontrados }}</div></div>
+  <div class="kpi"><div class="rotulo">Duplicados eliminados</div><div class="valor">{{ busca.duplicados }}</div></div>
+  <div class="kpi destaque"><div class="rotulo">Leads novos</div><div class="valor">{{ busca.novos }}</div></div>
+  <div class="kpi"><div class="rotulo">Fora do tamanho</div><div class="valor">{{ busca.fora_do_tamanho }}</div></div>
+</div>
+
+{% if not rodando %}
+<form method="post" action="/leads/acoes" class="cartao" style="padding:0">
+  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="acao" value="cadencia"><input type="hidden" name="busca_id" value="{{ busca.id }}">
+  <input type="hidden" name="voltar" value="/prospeccao/busca/{{ busca.id }}">
+  <div style="padding:14px 16px 0">
+    <h2>Os melhores primeiro <span class="grupo-btn">
+      <a class="btn btn-pequeno {{ 'btn-primario' if not potencial }}" href="?">Todos</a>
+      {% for p in potenciais|reverse %}<a class="btn btn-pequeno {{ 'btn-primario' if potencial == p }}" href="?potencial={{ p|urlencode }}">{{ p }}</a>{% endfor %}</span></h2>
+    <div class="filtros">
+      <div><label>Nome da campanha</label><input type="text" name="campanha" value="Prospecção {{ busca.cidade }} {{ hoje.strftime('%d/%m') }}"></div>
+      <div><label>Cadência</label><select name="cadencia_id">{% for c in cadencias %}<option value="{{ c.id }}">{{ c.nome }}</option>{% endfor %}</select></div>
+      <div><label>Início</label><input type="date" name="inicio" value="{{ hoje.isoformat() }}"></div>
+      {% if ia_ligada %}<label class="marcar"><input type="checkbox" name="personalizar_ia" checked> Personalizar a 1ª mensagem com IA</label>{% endif %}
+      <button class="btn btn-verde">Iniciar campanha com os marcados</button>
+    </div>
+    <p class="ajuda">A campanha cria as tarefas na sua agenda com as mensagens já personalizadas. Você envia uma a uma (copiar ou abrir no WhatsApp): nada é disparado automaticamente.</p>
+  </div>
+  <div class="tabela-rolagem"><table>
+    <tr><th><input type="checkbox" data-marcar-todos=".marca-lead" checked aria-label="Marcar todos"></th><th>Escritório</th><th>Contatos encontrados</th><th class="num">Score</th><th>Status</th><th>Fonte</th></tr>
+    {% for l in leads %}
+    <tr>
+      <td><input type="checkbox" class="marca-lead" name="ids" value="{{ l.id }}" {{ 'checked' if not l.perdido and not l.opt_out }}></td>
+      <td><a href="/leads/{{ l.id }}"><b>{{ l.empresa }}</b></a><div class="pequeno suave">{{ l.endereco or l.cidade }}</div></td>
+      <td class="pequeno">{% if l.whatsapp %}WhatsApp · {% endif %}{% if l.telefone %}{{ l.telefone }} · {% endif %}{% if l.email %}{{ l.email }} · {% endif %}{% if l.site %}site · {% endif %}{% if l.instagram %}Instagram · {% endif %}{% if l.linkedin %}LinkedIn · {% endif %}{% if l.cnpj %}CNPJ{% endif %}</td>
+      <td class="num"><span class="score">{{ l.score }}</span><br><span class="selo {{ l.potencial|selo }}">{{ l.potencial }}</span></td>
+      <td><span class="selo selo-azul">{{ l.status }}</span></td>
+      <td class="pequeno">{% if l.fonte_url %}<a href="{{ l.fonte_url }}" target="_blank" rel="noopener">{{ l.origem.replace('Prospecção: ', '') }}</a>{% else %}{{ l.origem }}{% endif %}</td>
+    </tr>
+    {% else %}<tr><td colspan="6" class="vazio">Nenhum escritório novo nesta busca. Tente aumentar o raio, outra cidade ou outra fonte.</td></tr>{% endfor %}
+  </table></div>
+</form>
+{% endif %}
+{% endblock %}
+{% block scripts %}{% if rodando %}<script>setTimeout(() => location.reload(), 3000);</script>{% endif %}{% endblock %}

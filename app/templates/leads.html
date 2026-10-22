@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block titulo %}Leads{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <div><h1>Leads</h1><div class="suave">{{ total }} escritórios no banco de leads</div></div>
+  <div class="acoes">
+    <a class="btn" href="/leads/pipeline">Pipeline (Kanban)</a>
+    <a class="btn" href="/leads/importar">Importar CSV/Excel</a>
+    <a class="btn" href="/exportar/leads.xlsx">Exportar</a>
+    <a class="btn btn-primario" href="/leads/novo">+ Novo lead</a>
+  </div>
+</div>
+
+<form class="filtros cartao" method="get">
+  <input type="search" name="q" value="{{ filtros.q }}" placeholder="Buscar nome, CNPJ, telefone, e-mail">
+  <select name="status"><option value="">Todos os status</option><option value="abertos" {{ 'selected' if filtros.status=='abertos' }}>Em aberto</option>
+    {% for s in config.STATUS_LEAD %}<option {{ 'selected' if filtros.status==s }}>{{ s }}</option>{% endfor %}</select>
+  <select name="potencial"><option value="">Todo potencial</option>{% for p in potenciais %}<option {{ 'selected' if filtros.potencial==p }}>{{ p }}</option>{% endfor %}</select>
+  <select name="uf"><option value="">UF</option>{% for u in config.UFS %}<option {{ 'selected' if filtros.uf==u }}>{{ u }}</option>{% endfor %}</select>
+  <input type="text" name="cidade" value="{{ filtros.cidade }}" placeholder="Cidade" style="min-width:110px">
+  {% if usuario.perfil in ['admin','gestor'] %}
+  <select name="vendedor"><option value="">Todos os vendedores</option><option value="sem" {{ 'selected' if filtros.vendedor=='sem' }}>Sem vendedor</option>
+    {% for v in vendedores %}<option value="{{ v.id }}" {{ 'selected' if filtros.vendedor==v.id|string }}>{{ v.nome }}</option>{% endfor %}</select>{% endif %}
+  <select name="origem"><option value="">Toda origem</option>{% for o in origens %}<option {{ 'selected' if filtros.origem==o }}>{{ o }}</option>{% endfor %}</select>
+  <select name="ordem">{% for c,n in [("score","Maior score"),("recentes","Mais recentes"),("proximo","Próximo contato"),("nome","Nome")] %}<option value="{{ c }}" {{ 'selected' if filtros.ordem==c }}>{{ n }}</option>{% endfor %}</select>
+  <button class="btn btn-primario">Filtrar</button> <a class="btn" href="/leads">Limpar</a>
+</form>
+
+<form method="post" action="/leads/acoes" class="cartao" style="padding:0">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div class="filtros" style="padding:12px 14px 0">
+    <select name="acao">
+      <option value="cadencia">Iniciar cadência (campanha)</option>
+      {% if usuario.perfil in ['admin','gestor'] %}<option value="vendedor">Atribuir vendedor</option>{% endif %}
+      <option value="status">Mudar status</option>
+      <option value="recalcular">Recalcular score</option>
+    </select>
+    <select name="cadencia_id" title="Cadência">{% for c in cadencias %}<option value="{{ c.id }}">{{ c.nome }}</option>{% endfor %}</select>
+    <input type="date" name="inicio" value="{{ hoje.isoformat() }}" title="Início da cadência">
+    {% if usuario.perfil in ['admin','gestor'] %}<select name="vendedor_id" title="Vendedor"><option value="">(vendedor)</option>{% for v in vendedores %}<option value="{{ v.id }}">{{ v.nome }}</option>{% endfor %}</select>{% endif %}
+    <select name="status" title="Status"><option value="">(status)</option>{% for s in config.STATUS_LEAD %}<option>{{ s }}</option>{% endfor %}</select>
+    <button class="btn">Aplicar aos marcados</button>
+  </div>
+  <div class="tabela-rolagem">
+  <table>
+    <tr><th><input type="checkbox" data-marcar-todos=".marca-lead" aria-label="Marcar todos"></th><th>Escritório</th><th>Cidade</th><th>Canais</th><th class="num">Score</th><th>Status</th><th>Próximo contato</th><th>Vendedor</th></tr>
+    {% for l in leads %}
+    <tr>
+      <td><input type="checkbox" class="marca-lead" name="ids" value="{{ l.id }}"></td>
+      <td><a href="/leads/{{ l.id }}"><b>{{ l.empresa }}</b></a>{% if l.opt_out %} <span class="selo selo-erro">opt-out</span>{% endif %}
+        <div class="pequeno suave">{{ l.responsavel or '' }}{{ ' · ' if l.responsavel and l.especialidade }}{{ l.especialidade or '' }}</div></td>
+      <td class="nowrap">{{ l.cidade }}{{ '/' ~ l.estado if l.estado }}</td>
+      <td class="pequeno">{% if l.whatsapp %}WhatsApp {% endif %}{% if l.telefone %}Tel {% endif %}{% if l.email %}E-mail {% endif %}{% if l.linkedin %}LinkedIn{% endif %}</td>
+      <td class="num"><span class="score">{{ l.score }}</span><br><span class="selo {{ l.potencial|selo }}">{{ l.potencial }}</span></td>
+      <td><span class="selo selo-azul">{{ l.status }}</span></td>
+      <td class="nowrap">{{ l.proximo_contato|data }}</td>
+      <td class="pequeno">{{ l.vendedor.nome if l.vendedor else '—' }}</td>
+    </tr>
+    {% else %}<tr><td colspan="8" class="vazio">Nenhum lead encontrado. Use <a href="/prospeccao">Encontrar novos parceiros</a> ou <a href="/leads/importar">importe uma planilha</a>.</td></tr>{% endfor %}
+  </table>
+  </div>
+</form>
+{% if paginas > 1 %}
+<div class="grupo-btn">{% for n in range(1, paginas + 1) %}{% if n <= 30 %}<a class="btn btn-pequeno {{ 'btn-primario' if n == pagina }}" href="?{% for k, v in filtros.items() if v %}{{ k }}={{ v|urlencode }}&amp;{% endfor %}pagina={{ n }}">{{ n }}</a>{% endif %}{% endfor %}</div>
+{% endif %}
+{% endblock %}

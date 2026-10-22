@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block titulo %}Novo lead{% endblock %}
+{% block conteudo %}
+<div class="cabecalho"><h1>Novo lead</h1><a class="btn" href="/leads">Voltar</a></div>
+<form class="cartao" method="post" action="/leads/novo" style="max-width:960px">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <p class="suave">Cadastre só dados empresariais e públicos. O sistema avisa se o escritório já existe (mesmo CNPJ, site, telefone ou e-mail).</p>
+  {% include "_campos_lead.html" %}
+  <div style="margin-top:14px"><button class="btn btn-primario">Salvar lead</button></div>
+</form>
+{% endblock %}

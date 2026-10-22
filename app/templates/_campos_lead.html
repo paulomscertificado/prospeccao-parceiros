@@ -1,0 +1,37 @@
+{# Campos do cadastro do lead (usado no "Novo lead" e na ficha do lead). #}
+<div class="campos">
+  <div class="largo"><label>Nome da empresa *</label><input type="text" name="empresa" value="{{ lead.empresa or '' }}" required></div>
+  <div><label>CNPJ</label><input type="text" name="cnpj" value="{{ lead.cnpj or '' }}" inputmode="numeric"></div>
+  <div><label>Responsável</label><input type="text" name="responsavel" value="{{ lead.responsavel or '' }}"></div>
+  <div><label>Cargo</label><input type="text" name="cargo" value="{{ lead.cargo or '' }}"></div>
+  <div><label>Telefone</label><input type="text" name="telefone" value="{{ lead.telefone or '' }}" inputmode="tel"></div>
+  <div><label>WhatsApp</label><input type="text" name="whatsapp" value="{{ lead.whatsapp or '' }}" inputmode="tel"></div>
+  <div><label>E-mail</label><input type="email" name="email" value="{{ lead.email or '' }}"></div>
+  <div><label>Site</label><input type="text" name="site" value="{{ lead.site or '' }}" placeholder="www.escritorio.com.br"></div>
+  <div><label>Instagram</label><input type="text" name="instagram" value="{{ lead.instagram or '' }}" placeholder="@escritorio"></div>
+  <div><label>LinkedIn</label><input type="text" name="linkedin" value="{{ lead.linkedin or '' }}"></div>
+  <div><label>Cidade</label><input type="text" name="cidade" value="{{ lead.cidade or '' }}"></div>
+  <div><label>Estado</label><select name="estado"><option value=""></option>{% for u in config.UFS %}<option {{ 'selected' if lead.estado == u }}>{{ u }}</option>{% endfor %}</select></div>
+  <div class="largo"><label>Endereço comercial</label><input type="text" name="endereco" value="{{ lead.endereco or '' }}"></div>
+  <div><label>Clientes (estimativa)</label><input type="number" min="0" name="qtd_clientes_estimada" value="{{ lead.qtd_clientes_estimada if lead.qtd_clientes_estimada is not none else '' }}"></div>
+  <div><label>Funcionários</label><input type="number" min="0" name="funcionarios" value="{{ lead.funcionarios if lead.funcionarios is not none else '' }}"></div>
+  <div><label>Especialidade</label><input type="text" name="especialidade" value="{{ lead.especialidade or '' }}" list="lista-especialidades"></div>
+  <div><label>Categoria de parceiro</label><select name="categoria_id"><option value="">—</option>{% for c in categorias or [] %}<option value="{{ c.id }}" {{ 'selected' if lead.categoria_id == c.id }}>{{ c.nome }}</option>{% endfor %}</select></div>
+  <div><label>Origem do lead</label><input type="text" name="origem" value="{{ lead.origem or '' }}"></div>
+  {% if usuario.perfil in ['admin','gestor'] %}
+  <div><label>Vendedor responsável</label><select name="vendedor_id"><option value="">—</option>{% for v in vendedores %}<option value="{{ v.id }}" {{ 'selected' if lead.vendedor_id == v.id }}>{{ v.nome }}</option>{% endfor %}</select></div>
+  {% endif %}
+  <div><label>Próximo contato</label><input type="date" name="proximo_contato" value="{{ lead.proximo_contato.isoformat() if lead.proximo_contato else '' }}"></div>
+  <div class="largo"><label>Sócios / responsáveis (dados públicos, um por linha)</label><textarea name="socios" style="min-height:60px">{{ lead.socios or '' }}</textarea></div>
+  <div class="largo">
+    <label>Critérios observados (entram no score)</label>
+    <div class="campos" style="gap:2px 12px">
+      {% for campo, nome in [("atende_empresas","Atende empresas"),("equipe_comercial","Possui equipe comercial"),("multiplos_socios","Tem mais de um sócio"),("presenca_digital_forte","Presença digital forte"),("demonstrou_interesse","Demonstrou interesse na parceria")] %}
+      <label class="marcar"><input type="checkbox" name="{{ campo }}" {{ 'checked' if lead[campo] }}> {{ nome }}</label>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="largo"><label>Observações</label><textarea name="observacoes">{{ lead.observacoes or '' }}</textarea></div>
+  <div class="largo"><label>Base legal (LGPD)</label><input type="text" name="base_legal" value="{{ lead.base_legal or 'Legítimo interesse (contato B2B)' }}"></div>
+</div>
+<datalist id="lista-especialidades">{% for e in config.ESPECIALIDADES %}<option>{{ e }}</option>{% endfor %}</datalist>

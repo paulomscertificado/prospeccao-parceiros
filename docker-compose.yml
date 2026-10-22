@@ -1,0 +1,34 @@
+# Produção: sistema + PostgreSQL. Uso: docker compose up -d  (ver docs/deploy.md)
+services:
+  banco:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: prospeccao
+      POSTGRES_USER: prospeccao
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+    volumes:
+      - banco:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prospeccao"]
+      interval: 10s
+      retries: 5
+
+  sistema:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://prospeccao:${POSTGRES_PASSWORD}@banco:5432/prospeccao
+      AMBIENTE: producao
+    depends_on:
+      banco:
+        condition: service_healthy
+    volumes:
+      - dados:/dados
+    ports:
+      - "127.0.0.1:8001:8001"   # publique pela internet só através de um proxy com HTTPS (Caddy/Nginx)
+
+volumes:
+  banco:
+  dados:

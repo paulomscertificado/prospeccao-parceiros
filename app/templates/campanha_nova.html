@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block titulo %}Nova campanha{% endblock %}
+{% block conteudo %}
+{% set e = entendido or {} %}
+{% set cidade_inicial = e.cidade or ultima_cidade or 'Recife' %}
+{% set uf_inicial = e.estado or ultima_uf or 'PE' %}
+{% set marcadas = e.categorias or ['contabil'] %}
+<div class="cabecalho"><div><h1>Nova campanha</h1><div class="suave">Escolha 3 coisas e clique em Pesquisar. A IA faz o resto e só envia depois da sua aprovação.</div></div>
+  <a class="btn" href="/campanhas">Voltar</a></div>
+
+<form method="post" action="/campanhas/nova" id="assistente">
+  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="pedido" value="{{ pedido }}">
+
+  <div class="cartao">
+    <h2 class="passo-titulo"><span class="numero-passo">1</span> O que você procura?</h2>
+    <div class="cartoes-escolha">
+      {% for c in categorias|sort(attribute='aderencia', reverse=True) if c.codigo != 'outros' %}
+      <label class="escolha">
+        <input type="checkbox" name="categorias" value="{{ c.codigo }}" {{ 'checked' if c.codigo in marcadas }}>
+        <span class="escolha-corpo">
+          <b>{{ c.nome }}</b>
+          <span class="escolha-qtd" data-categoria="{{ c.codigo }}">{{ contagem.get(c.codigo, '') if contagem else '' }}</span>
+        </span>
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="cartao">
+    <h2 class="passo-titulo"><span class="numero-passo">2</span> Onde?</h2>
+    <div class="campos" style="max-width:520px;grid-template-columns:1fr 120px">
+      <div><label for="cidade">Cidade</label><input id="cidade" type="text" name="cidade" value="{{ cidade_inicial }}" required></div>
+      <div><label for="estado">Estado</label><select id="estado" name="estado" required>{% for u in config.UFS %}<option {{ 'selected' if uf_inicial == u }}>{{ u }}</option>{% endfor %}</select></div>
+    </div>
+    <p class="ajuda" id="total-cidade"></p>
+  </div>
+
+  <div class="cartao">
+    <h2 class="passo-titulo"><span class="numero-passo">3</span> Quantas empresas?</h2>
+    <div class="grupo-btn">
+      {% for n in [20, 50, 100] %}<label class="chip"><input type="radio" name="quantidade" value="{{ n }}" {{ 'checked' if n == (e.quantidade or 20) or (e.quantidade and e.quantidade not in [20,50,100] and n == 20) }}> {{ n }}</label>{% endfor %}
+    </div>
+    <p class="ajuda">A IA pesquisa o dobro e fica com as melhores.</p>
+  </div>
+
+  <button class="btn btn-verde btn-grande">Pesquisar empresas</button>
+
+  <details class="cartao" style="margin-top:16px">
+    <summary><b>Opções avançadas</b> <span class="suave pequeno">(não precisa mexer)</span></summary>
+    <div class="campos" style="margin-top:12px">
+      <div class="largo"><label>Nome da campanha</label><input type="text" name="nome" placeholder="Automático (segmento + cidade)"></div>
+      <div><label>Canais</label>
+        {% for c in ['whatsapp', 'email', 'linkedin'] %}<label class="marcar"><input type="checkbox" name="canais" value="{{ c }}" {{ 'checked' if c != 'linkedin' }}> {{ CANAIS[c] }}</label>{% endfor %}</div>
+      <div><label>Tom</label><select name="tom">{% for k, v in config.TONS.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
+      <div><label>Cadência</label><select name="cadencia_id">{% for c in cadencias %}<option value="{{ c.id }}" {{ 'selected' if cadencia_sdr and c.id == cadencia_sdr.id }}>{{ c.nome }}</option>{% endfor %}</select></div>
+      <div><label>Início</label><input type="date" name="inicio" value="{{ hoje.isoformat() }}"></div>
+      <div class="largo"><label>Pergunta final (CTA)</label><select name="cta"><option value="">A IA escolhe a mais natural para cada empresa</option>{% for c in config.CTAS %}<option>{{ c }}</option>{% endfor %}</select>
+        <input type="text" name="cta_livre" placeholder="ou escreva a sua" style="margin-top:6px"></div>
+      <div><label>Objetivo</label><input type="text" name="objetivo" value="Encontrar parceiros"></div>
+    </div>
+  </details>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+// Atualiza a quantidade de empresas de cada tipo conforme a cidade
+const cidade = document.getElementById('cidade'), estado = document.getElementById('estado');
+let espera;
+async function atualizar() {
+  if (!cidade.value.trim()) return;
+  try {
+    const r = await fetch('/api/contagem?cidade=' + encodeURIComponent(cidade.value) + '&uf=' + estado.value);
+    const dados = await r.json();
+    let total = 0;
+    document.querySelectorAll('.escolha-qtd').forEach(el => {
+      const n = dados[el.dataset.categoria] || 0; total += n;
+      el.textContent = n.toLocaleString('pt-BR') + ' na cidade';
+      el.closest('.escolha').classList.toggle('vazia', n === 0);
+    });
+    document.getElementById('total-cidade').textContent = total
+      ? total.toLocaleString('pt-BR') + ' empresas encontradas na base da Receita em ' + cidade.value + '/' + estado.value + '.'
+      : 'Nenhuma empresa encontrada nessa cidade. Confira o nome e o estado.';
+  } catch (e) { /* sem contagem, segue normal */ }
+}
+cidade.addEventListener('input', () => { clearTimeout(espera); espera = setTimeout(atualizar, 400); });
+estado.addEventListener('change', atualizar);
+atualizar();
+document.getElementById('assistente').addEventListener('submit', ev => {
+  if (!document.querySelector('input[name="categorias"]:checked')) { ev.preventDefault(); aviso('Escolha pelo menos um tipo de empresa.'); }
+});
+</script>
+{% endblock %}

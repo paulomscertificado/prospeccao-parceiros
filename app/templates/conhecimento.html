@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block titulo %}Base de conhecimento{% endblock %}
+{% block conteudo %}
+<div class="cabecalho"><div><h1>Base de conhecimento da IA SDR</h1>
+  <div class="suave">O que a SDR pode responder sozinha. Preço, comissão, desconto, exclusividade, contrato e fechamento são sempre do time humano.</div></div></div>
+{% for k in itens %}
+<form class="cartao" method="post" action="/conhecimento/{{ k.id }}"><input type="hidden" name="csrf" value="{{ csrf }}">
+  <div class="campo"><label>Pergunta</label><input type="text" name="pergunta" value="{{ k.pergunta }}" required></div>
+  <div class="campo"><label>Resposta</label><textarea name="resposta" required>{{ k.resposta }}</textarea></div>
+  {% if usuario.perfil in ['admin','gestor'] %}<div class="grupo-btn"><label class="marcar"><input type="checkbox" name="ativa" {{ 'checked' if k.ativa }}> Ativa</label>
+    <button class="btn btn-pequeno btn-primario">Salvar</button><button class="btn btn-pequeno btn-perigo" name="excluir" value="1" data-confirmar="Excluir este item?">Excluir</button></div>{% endif %}
+</form>
+{% endfor %}
+{% if usuario.perfil in ['admin','gestor'] %}
+<form class="cartao" method="post" action="/conhecimento/0"><input type="hidden" name="csrf" value="{{ csrf }}"><h2>Novo item</h2>
+  <div class="campo"><label>Pergunta</label><input type="text" name="pergunta" required placeholder="Ex.: Vocês atendem fora de Recife?"></div>
+  <div class="campo"><label>Resposta</label><textarea name="resposta" required></textarea></div>
+  <button class="btn btn-primario">Adicionar</button></form>
+{% endif %}
+{% endblock %}

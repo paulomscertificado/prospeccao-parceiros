@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block titulo %}Pipeline{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <div><h1>Pipeline</h1><div class="suave">Arraste os cards entre as colunas. Cada mudança fica registrada no histórico do lead.</div></div>
+  <div class="acoes">
+    {% if usuario.perfil in ['admin','gestor'] %}
+    <form method="get"><select name="vendedor" onchange="this.form.submit()" aria-label="Vendedor"><option value="">Toda a equipe</option>{% for v in vendedores %}<option value="{{ v.id }}" {{ 'selected' if vendedor==v.id|string }}>{{ v.nome }}</option>{% endfor %}</select></form>{% endif %}
+    <a class="btn" href="/leads">Ver em lista</a>
+  </div>
+</div>
+<div class="kanban">
+  {% for c in colunas %}
+  <div class="coluna" data-status="{{ c.status[0] }}" data-codigo="{{ c.codigo }}">
+    <h3><span>{{ c.nome }}</span><span class="contagem">{{ c.total }}</span></h3>
+    <div class="lista">
+      {% for l in c.leads %}
+      <div class="card {{ l.potencial|selo }}" draggable="true" data-id="{{ l.id }}">
+        <a href="/leads/{{ l.id }}"><b>{{ l.empresa }}</b></a>
+        <div class="linha"><span>{{ l.cidade }}{{ '/' ~ l.estado if l.estado }}</span><span class="score">{{ l.score }}</span></div>
+        {% if l.perdido %}<div class="linha"><span>{{ l.motivo_perda }}</span></div>{% endif %}
+      </div>
+      {% endfor %}
+      {% if c.total > c.leads|length %}<div class="pequeno suave centro">+ {{ c.total - c.leads|length }} (veja na lista)</div>{% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+<dialog id="perda">
+  <form method="dialog">
+    <h2>Por que o lead foi perdido?</h2>
+    <select id="motivo-status">{% for s in config.MOTIVOS_PERDA %}<option>{{ s }}</option>{% endfor %}</select>
+    <div class="campo" style="margin-top:10px"><label for="motivo-texto">Observação (opcional)</label><input type="text" id="motivo-texto"></div>
+    <div class="grupo-btn"><button class="btn btn-primario" value="ok">Encerrar</button><button class="btn" value="cancelar">Cancelar</button></div>
+  </form>
+</dialog>
+{% endblock %}
+{% block scripts %}
+<script>
+let arrastado = null;
+document.querySelectorAll('.card').forEach(card => {
+  card.addEventListener('dragstart', () => { arrastado = card; card.classList.add('arrastando'); });
+  card.addEventListener('dragend', () => { card.classList.remove('arrastando'); });
+});
+function perguntarMotivo() {
+  const d = document.getElementById('perda');
+  return new Promise(resolve => {
+    d.addEventListener('close', () => resolve(d.returnValue === 'ok' ? { status: 'Perdido', motivo: [document.getElementById('motivo-status').value, document.getElementById('motivo-texto').value].filter(Boolean).join(' – ') } : null), { once: true });
+    d.showModal();
+  });
+}
+document.querySelectorAll('.coluna').forEach(col => {
+  col.addEventListener('dragover', e => { e.preventDefault(); col.classList.add('sobre'); });
+  col.addEventListener('dragleave', () => col.classList.remove('sobre'));
+  col.addEventListener('drop', async e => {
+    e.preventDefault(); col.classList.remove('sobre');
+    if (!arrastado || arrastado.closest('.coluna') === col) return;
+    let dados = { status: col.dataset.status };
+    if (col.dataset.status === 'Perdido') { dados = await perguntarMotivo(); if (!dados) return; }
+    const origem = arrastado.closest('.coluna');
+    try {
+      await postarJSON('/api/leads/' + arrastado.dataset.id + '/status', dados);
+      col.querySelector('.lista').prepend(arrastado);
+      [origem, col].forEach(c => { const n = c.querySelector('.contagem'); n.textContent = Math.max(0, parseInt(n.textContent, 10) + (c === col ? 1 : -1)); });
+      aviso('Movido para ' + dados.status + '.' + (dados.status === 'Parceiro' ? ' Cadastro de parceiro criado.' : ''));
+    } catch (erro) { aviso(erro.message); }
+  });
+});
+</script>
+{% endblock %}

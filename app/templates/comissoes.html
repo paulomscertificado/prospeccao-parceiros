@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block titulo %}Comissões{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <div><h1>Comissões</h1></div>
+  <div class="acoes"><a class="btn" href="/exportar/comissoes.xlsx">Exportar</a><a class="btn" href="/exportar/comissoes.pdf">PDF</a></div>
+</div>
+
+<div class="grade-2">
+<div class="cartao">
+  <h2>Calculadora de comissão</h2>
+  <div class="campos">
+    <div><label>Preço de venda (R$)</label><input type="number" step="0.01" id="c-preco" value="100"></div>
+    <div><label>Custo (R$)</label><input type="number" step="0.01" id="c-custo" value="40"></div>
+    <div><label>Comissão</label><select id="c-tipo"><option value="fixo">Valor fixo (R$)</option><option value="percentual">% do preço</option></select></div>
+    <div><label>Valor da comissão</label><input type="number" step="0.01" id="c-comissao" value="20"></div>
+  </div>
+  <table style="margin-top:12px">
+    <tr><td>Receita</td><td class="num" id="r-receita"></td></tr>
+    <tr><td>Custo</td><td class="num" id="r-custo"></td></tr>
+    <tr><td>Comissão do parceiro</td><td class="num" id="r-comissao"></td></tr>
+    <tr><td><b>Lucro bruto</b></td><td class="num"><b id="r-lucro"></b></td></tr>
+    <tr><td><b>Margem</b></td><td class="num"><b id="r-margem"></b></td></tr>
+  </table>
+</div>
+<div class="cartao">
+  <h2>A pagar por parceiro</h2>
+  <table><tr><th>Parceiro</th><th class="num">Vendas</th><th class="num">Comissão</th></tr>
+  {% for item in por_parceiro %}<tr><td>{% if item.parceiro %}<a href="/comissoes?situacao={{ situacao }}&amp;parceiro={{ item.parceiro.id }}">{{ item.parceiro.escritorio }}</a>{% else %}—{% endif %}</td><td class="num">{{ item.qtd }}</td><td class="num">{{ item.total|moeda }}</td></tr>
+  {% else %}<tr><td colspan="3" class="vazio">Nada nesta seleção.</td></tr>{% endfor %}
+  <tr><th>Total</th><th></th><th class="num">{{ total|moeda }}</th></tr></table>
+  {% if regras_especiais %}<p class="ajuda" style="margin-top:10px">Parceiros com regra própria: {% for p in regras_especiais %}{{ p.escritorio }} ({{ descrever_regra(p.comissao_tipo, p.comissao_valor) }}){{ ', ' if not loop.last }}{% endfor %}.</p>{% endif %}
+</div>
+</div>
+
+<form class="filtros" method="get">
+  <select name="situacao" onchange="this.form.submit()">{% for c, n in [("a_pagar","A pagar"),("pagas","Pagas"),("todas","Todas")] %}<option value="{{ c }}" {{ 'selected' if situacao == c }}>{{ n }}</option>{% endfor %}</select>
+  <select name="parceiro" onchange="this.form.submit()"><option value="">Todos os parceiros</option>{% for p in parceiros %}<option value="{{ p.id }}" {{ 'selected' if parceiro == p.id }}>{{ p.escritorio }}</option>{% endfor %}</select>
+</form>
+<form class="cartao" style="padding:0" method="post" action="/comissoes/pagar" data-confirmar="Marcar as comissões selecionadas como pagas?">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div class="tabela-rolagem"><table>
+    <tr>{% if usuario.perfil == 'admin' %}<th><input type="checkbox" data-marcar-todos=".marca-com" aria-label="Marcar todas"></th>{% endif %}<th>Data</th><th>Parceiro</th><th>Cliente</th><th>Produto</th><th class="num">Venda</th><th class="num">Comissão</th><th>Situação</th></tr>
+    {% for v in vendas %}<tr>{% if usuario.perfil == 'admin' %}<td>{% if not v.comissao_paga %}<input type="checkbox" class="marca-com" name="ids" value="{{ v.id }}">{% endif %}</td>{% endif %}
+      <td>{{ v.data|data }}</td><td>{{ v.parceiro.escritorio if v.parceiro else '' }}</td><td>{{ v.cliente.nome }}</td><td>{{ v.produto.nome if v.produto else '' }}</td><td class="num">{{ v.valor|moeda }}</td><td class="num">{{ v.comissao|moeda }}</td>
+      <td>{% if v.comissao_paga %}<span class="selo selo-ok">paga {{ v.comissao_paga_em|data }}</span>{% else %}<span class="selo selo-alerta">a pagar</span>{% endif %}</td></tr>
+    {% else %}<tr><td colspan="8" class="vazio">Nenhuma comissão.</td></tr>{% endfor %}
+  </table></div>
+  {% if usuario.perfil == 'admin' and vendas %}<div style="padding:12px 14px"><button class="btn btn-primario">Marcar selecionadas como pagas</button></div>{% endif %}
+</form>
+
+<div class="cartao" id="produtos">
+  <h2>Produtos, preços e regra de comissão padrão</h2>
+  <div class="tabela-rolagem"><table>
+    <tr><th>Produto</th><th>Preço</th><th>Custo</th><th>Comissão</th><th>Valor</th><th>Validade (meses)</th><th>Ativo</th><th class="num">Comissão R$</th><th class="num">Lucro</th><th class="num">Margem</th>{% if usuario.perfil == 'admin' %}<th></th>{% endif %}</tr>
+    {% for pr in produtos %}{% set c = calculos[pr.id] %}
+    <tr>
+      <td><input form="prod-{{ pr.id }}" type="text" name="nome" value="{{ pr.nome }}" style="min-width:180px" aria-label="Nome"></td>
+      <td><input form="prod-{{ pr.id }}" type="text" name="preco" value="{{ '%.2f'|format(pr.preco) }}" style="width:90px" aria-label="Preço"></td>
+      <td><input form="prod-{{ pr.id }}" type="text" name="custo" value="{{ '%.2f'|format(pr.custo) }}" style="width:90px" aria-label="Custo"></td>
+      <td><select form="prod-{{ pr.id }}" name="comissao_tipo" aria-label="Tipo de comissão"><option value="percentual" {{ 'selected' if pr.comissao_tipo == 'percentual' }}>%</option><option value="fixo" {{ 'selected' if pr.comissao_tipo == 'fixo' }}>R$</option></select></td>
+      <td><input form="prod-{{ pr.id }}" type="text" name="comissao_valor" value="{{ '%.2f'|format(pr.comissao_valor) }}" style="width:80px" aria-label="Valor da comissão"></td>
+      <td><input form="prod-{{ pr.id }}" type="number" name="validade_meses" value="{{ pr.validade_meses }}" style="width:70px" aria-label="Validade"></td>
+      <td><input form="prod-{{ pr.id }}" type="checkbox" name="ativo" {{ 'checked' if pr.ativo }} aria-label="Ativo"></td>
+      <td class="num">{{ c.comissao|moeda }}</td><td class="num">{{ c.lucro_bruto|moeda }}</td><td class="num">{{ c.margem|pct }}</td>
+      {% if usuario.perfil == 'admin' %}<td><button form="prod-{{ pr.id }}" class="btn btn-pequeno">Salvar</button></td>{% endif %}
+    </tr>{% endfor %}
+    {% if usuario.perfil == 'admin' %}
+    <tr>
+      <td><input form="prod-novo" type="text" name="nome" placeholder="Novo produto" required aria-label="Nome"></td><td><input form="prod-novo" type="text" name="preco" style="width:90px" aria-label="Preço"></td><td><input form="prod-novo" type="text" name="custo" style="width:90px" aria-label="Custo"></td>
+      <td><select form="prod-novo" name="comissao_tipo" aria-label="Tipo"><option value="percentual">%</option><option value="fixo">R$</option></select></td><td><input form="prod-novo" type="text" name="comissao_valor" style="width:80px" aria-label="Comissão"></td>
+      <td><input form="prod-novo" type="number" name="validade_meses" value="12" style="width:70px" aria-label="Validade"></td><td><input form="prod-novo" type="checkbox" name="ativo" checked aria-label="Ativo"></td><td colspan="3"></td><td><button form="prod-novo" class="btn btn-pequeno btn-primario">Adicionar</button></td>
+    </tr>{% endif %}
+  </table></div>
+  {% for pr in produtos %}<form id="prod-{{ pr.id }}" method="post" action="/produtos/{{ pr.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"></form>{% endfor %}
+  <form id="prod-novo" method="post" action="/produtos/0"><input type="hidden" name="csrf" value="{{ csrf }}"></form>
+  <p class="ajuda">Preços iniciais da tabela MS (outubro/2026). Informe o <b>custo</b> de cada produto para o lucro e a margem ficarem certos. Regras diferentes por parceiro: na ficha do parceiro.</p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const moeda = v => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+function calcular() {
+  const preco = parseFloat(document.getElementById('c-preco').value) || 0;
+  const custo = parseFloat(document.getElementById('c-custo').value) || 0;
+  const valor = parseFloat(document.getElementById('c-comissao').value) || 0;
+  const comissao = document.getElementById('c-tipo').value === 'percentual' ? preco * valor / 100 : valor;
+  const lucro = preco - custo - comissao;
+  document.getElementById('r-receita').textContent = moeda(preco);
+  document.getElementById('r-custo').textContent = moeda(custo);
+  document.getElementById('r-comissao').textContent = moeda(comissao);
+  document.getElementById('r-lucro').textContent = moeda(lucro);
+  document.getElementById('r-margem').textContent = (preco ? (100 * lucro / preco) : 0).toFixed(1).replace('.', ',') + '%';
+}
+['c-preco', 'c-custo', 'c-tipo', 'c-comissao'].forEach(id => document.getElementById(id).addEventListener('input', calcular));
+calcular();
+</script>
+{% endblock %}

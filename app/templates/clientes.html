@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block titulo %}Clientes{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <div><h1>Clientes</h1><div class="suave">Quem compra o certificado (normalmente indicado por um parceiro).</div></div>
+  <div class="acoes"><a class="btn" href="/exportar/clientes.xlsx">Exportar</a></div>
+</div>
+<form class="filtros" method="get">
+  <input type="search" name="q" value="{{ q }}" placeholder="Nome ou CNPJ/CPF">
+  <select name="parceiro"><option value="">Todos os parceiros</option>{% for p in parceiros %}<option value="{{ p.id }}" {{ 'selected' if parceiro == p.id }}>{{ p.escritorio }}</option>{% endfor %}</select>
+  <select name="status"><option value="">Todos os status</option>{% for s in config.STATUS_CLIENTE %}<option {{ 'selected' if status == s }}>{{ s }}</option>{% endfor %}</select>
+  <button class="btn">Filtrar</button>
+</form>
+<div class="grade-lead">
+<div class="cartao" style="padding:0"><div class="tabela-rolagem"><table>
+  <tr><th>Cliente</th><th>Contato</th><th>Parceiro</th><th>Status</th><th>Cadastro</th><th></th></tr>
+  {% for c in clientes %}<tr><td><b>{{ c.nome }}</b><div class="pequeno suave">{{ c.cnpj }}</div></td><td class="pequeno">{{ c.contato }} {{ c.telefone }}<br>{{ c.email }}</td>
+    <td>{% if c.parceiro %}<a href="/parceiros/{{ c.parceiro.id }}">{{ c.parceiro.escritorio }}</a>{% else %}Direto{% endif %}</td>
+    <td><span class="selo">{{ c.status }}</span></td><td>{{ c.criado_em|data }}</td>
+    <td><a class="btn btn-pequeno" href="/vendas?cliente={{ c.id }}">Registrar venda</a></td></tr>
+  {% else %}<tr><td colspan="6" class="vazio">Nenhum cliente.</td></tr>{% endfor %}
+</table></div></div>
+<form class="cartao" method="post" action="/clientes/0">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>Novo cliente / indicação</h2>
+  <div class="campo"><label>Nome *</label><input type="text" name="nome" required></div>
+  <div class="campo"><label>CNPJ ou CPF</label><input type="text" name="cnpj"></div>
+  <div class="campo"><label>Pessoa de contato</label><input type="text" name="contato"></div>
+  <div class="campo"><label>Telefone</label><input type="text" name="telefone"></div>
+  <div class="campo"><label>E-mail</label><input type="email" name="email"></div>
+  <div class="campo"><label>Parceiro que indicou</label><select name="parceiro_id"><option value="">Venda direta</option>{% for p in parceiros %}<option value="{{ p.id }}">{{ p.escritorio }}</option>{% endfor %}</select></div>
+  <div class="campo"><label>Status</label><select name="status">{% for s in config.STATUS_CLIENTE %}<option>{{ s }}</option>{% endfor %}</select></div>
+  <button class="btn btn-primario">Salvar cliente</button>
+</form>
+</div>
+{% endblock %}

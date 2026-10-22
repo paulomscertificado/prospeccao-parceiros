@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block titulo %}Agenda{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <div><h1>Minha agenda de prospecção</h1></div>
+  <div class="acoes"><a class="btn" href="/cadencias">Cadências</a></div>
+</div>
+
+{% if not wl.conectado %}<div class="aviso aviso-info">Para enviar com 1 clique pelo seu número, abra o <b>WhatsApp Leads</b> e conecte o WhatsApp ({{ wl.erro or 'está desconectado' }}). Enquanto isso, use "Abrir no WhatsApp".</div>{% endif %}
+<div class="faixa"><b>Hoje você possui {{ pendentes_hoje }} follow-up{{ 's' if pendentes_hoje != 1 }} pendente{{ 's' if pendentes_hoje != 1 }}.</b>
+  <span class="pequeno" style="color:#c9d9ea">WhatsApp hoje: {{ limites.whatsapp[0] }} de {{ limites.whatsapp[1] or '∞' }} · E-mails hoje: {{ limites.email[0] }} de {{ limites.email[1] or '∞' }}</span></div>
+
+<div class="abas">
+  {% for c, n in [("hoje","Hoje e atrasadas"),("semana","Próximos 7 dias"),("proximas","Futuras"),("feitas","Concluídas")] %}
+  <a class="{{ 'ativa' if ver == c }}" href="?ver={{ c }}&amp;canal={{ canal }}&amp;tipo={{ tipo }}{{ '&responsavel=' ~ responsavel if responsavel }}">{{ n }}</a>{% endfor %}
+</div>
+<form class="filtros" method="get">
+  <input type="hidden" name="ver" value="{{ ver }}">
+  <select name="canal" onchange="this.form.submit()" aria-label="Canal"><option value="">Todos os canais</option>{% for c, n in CANAIS.items() %}<option value="{{ c }}" {{ 'selected' if canal == c }}>{{ n }}</option>{% endfor %}</select>
+  <select name="tipo" onchange="this.form.submit()" aria-label="Tipo"><option value="">Todos os tipos</option>{% for c, n in [("prospeccao","Cadência"),("followup","Follow-up"),("reuniao","Reunião"),("renovacao","Renovação"),("indicacao","Indicação de parceiro")] %}<option value="{{ c }}" {{ 'selected' if tipo == c }}>{{ n }}</option>{% endfor %}</select>
+  {% if usuarios %}<select name="responsavel" onchange="this.form.submit()" aria-label="Responsável"><option value="">Toda a equipe</option>{% for u in usuarios %}<option value="{{ u.id }}" {{ 'selected' if responsavel == u.id }}>{{ u.nome }}</option>{% endfor %}</select>{% endif %}
+</form>
+
+{% for t in tarefas %}
+{% set atrasada = t.status == 'pendente' and t.data < hoje %}
+<div class="cartao" style="padding:12px 14px">
+  <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+    <div>
+      <b>{{ t.data|data }} {{ t.hora }}</b> {% if atrasada %}<span class="selo selo-erro">atrasada</span>{% endif %}
+      <span class="selo selo-azul">{{ CANAIS.get(t.canal, t.canal) }}</span>
+      <span class="selo">{{ {"prospeccao":"Cadência","followup":"Follow-up","reuniao":"Reunião","renovacao":"Renovação","indicacao":"Indicação"}.get(t.tipo, t.tipo) }}</span>
+      {% if t.status != 'pendente' %}<span class="selo {{ 'selo-ok' if t.status == 'feita' else '' }}">{{ t.status }}</span>{% endif %}
+      <div style="margin-top:4px">
+        {% if t.lead %}<a href="/leads/{{ t.lead.id }}"><b>{{ t.lead.empresa }}</b></a> <span class="suave pequeno">{{ t.lead.responsavel }} · {{ t.lead.status }}</span>
+        {% elif t.cliente %}<b>{{ t.cliente.nome }}</b> <span class="suave pequeno">{{ t.cliente.telefone }}</span>{% endif %}
+        {% if t.parceiro %}<span class="pequeno"> · Parceiro responsável: <a href="/parceiros/{{ t.parceiro.id }}">{{ t.parceiro.escritorio }}</a></span>{% endif %}
+      </div>
+      <div><b>Ação:</b> {{ t.acao }}</div>
+      {% if t.resultado %}<div class="pequeno suave">Resultado: {{ t.resultado }}</div>{% endif %}
+    </div>
+    <div class="pequeno suave">{{ t.usuario.nome if t.usuario else '' }}</div>
+  </div>
+  {% if t.mensagem %}
+  {% if t.assunto %}<div class="pequeno" style="margin-top:8px"><b>Assunto:</b> {{ t.assunto }}</div>{% endif %}
+  <div class="mensagem" id="t-{{ t.id }}" style="margin-top:6px">{{ t.mensagem }}</div>{% endif %}
+  {% if t.status == 'pendente' %}
+  {% set bloqueio = bloqueios.get(t.id, '') %}
+  {% if bloqueio %}<div class="aviso aviso-alerta" style="margin:8px 0 0">{{ bloqueio }}</div>{% endif %}
+  <div class="grupo-btn" style="margin-top:8px">
+    {% set telefone = (t.lead.whatsapp if t.lead else (t.cliente.telefone if t.cliente else '')) %}
+    {% if t.mensagem %}<button class="btn btn-pequeno" data-copiar="1" data-alvo="t-{{ t.id }}" data-lead="{{ t.lead_id or '' }}" data-tarefa="{{ t.id }}" data-canal="{{ t.canal }}" data-assunto="{{ t.assunto }}">Copiar mensagem</button>{% endif %}
+    {% if t.canal == 'whatsapp' and telefone and t.mensagem and wl.conectado %}
+      <form class="inline" method="post" action="/agenda/{{ t.id }}/enviar-whatsapp"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar_para" value="{{ request.url.path }}?{{ request.url.query }}"><button class="btn btn-pequeno btn-verde" {{ 'disabled' if bloqueio }}>Enviar pelo WhatsApp conectado</button></form>{% endif %}
+    {% if t.canal == 'whatsapp' and telefone and t.mensagem %}<button class="btn btn-pequeno {{ '' if wl.conectado else 'btn-verde' }}" data-whatsapp="{{ telefone|whats }}" data-alvo="t-{{ t.id }}" data-lead="{{ t.lead_id or '' }}" data-tarefa="{{ t.id }}" data-canal="whatsapp">Abrir no WhatsApp</button>{% endif %}
+    {% if t.canal == 'ligacao' and (t.lead and (t.lead.telefone or t.lead.whatsapp)) %}<a class="btn btn-pequeno" href="tel:{{ t.lead.telefone or t.lead.whatsapp }}">Ligar {{ t.lead.telefone or t.lead.whatsapp }}</a>{% endif %}
+    {% if t.canal == 'linkedin' and t.lead and t.lead.linkedin %}<a class="btn btn-pequeno" href="{{ t.lead.linkedin }}" target="_blank" rel="noopener">Abrir LinkedIn</a>{% endif %}
+    {% if t.tipo == 'renovacao' and t.certificado %}<a class="btn btn-pequeno btn-primario" href="/vendas?renovar={{ t.certificado.id }}">Registrar renovação</a>{% endif %}
+    <form class="inline" method="post" action="/agenda/{{ t.id }}/feita"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar_para" value="{{ request.url.path }}?{{ request.url.query }}"><button class="btn btn-pequeno btn-primario">Feito</button></form>
+    {% if t.lead %}
+    <details class="inline" style="display:inline-block"><summary class="btn btn-pequeno btn-verde">Respondeu</summary>
+      <form method="post" action="/agenda/{{ t.id }}/respondeu" style="margin-top:6px;min-width:280px"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <textarea name="resultado" placeholder="Cole a resposta (opcional)" style="min-height:60px"></textarea><button class="btn btn-pequeno btn-verde" style="margin-top:4px">Registrar resposta</button></form></details>
+    {% endif %}
+    <details style="display:inline-block"><summary class="btn btn-pequeno">Remarcar</summary>
+      <form method="post" action="/agenda/{{ t.id }}/remarcar" class="grupo-btn" style="margin-top:6px"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="date" name="data" required style="width:auto"><input type="time" name="hora" value="{{ t.hora }}" style="width:auto"><button class="btn btn-pequeno">OK</button></form></details>
+    <form class="inline" method="post" action="/agenda/{{ t.id }}/pular"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-pequeno">Pular</button></form>
+    {% if t.lead %}
+    <form class="inline" method="post" action="/agenda/{{ t.id }}/invalido" data-confirmar="Marcar o número como inválido?"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-pequeno">Número inválido</button></form>
+    <form class="inline" method="post" action="/agenda/{{ t.id }}/opt-out" data-confirmar="O contato pediu para não receber mais mensagens?"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-pequeno btn-perigo">Pediu para sair</button></form>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% else %}
+<div class="cartao vazio">Nada por aqui. {% if ver == 'hoje' %}Comece uma campanha em <a href="/prospeccao">Prospecção</a> ou em <a href="/leads">Leads</a>.{% endif %}</div>
+{% endfor %}
+{% endblock %}

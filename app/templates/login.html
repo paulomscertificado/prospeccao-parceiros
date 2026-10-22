@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block titulo %}Entrar{% endblock %}
+{% block publico %}
+<div class="login">
+  <form class="cartao" method="post" action="/login">
+    <div class="marca" style="color:var(--azul);padding:0 0 14px"><span class="logo" style="background:var(--azul);color:#fff">MS</span><span><b>Parceiros MS</b><small style="color:var(--suave);opacity:1">Prospecção de escritórios contábeis</small></span></div>
+    {% for tipo, texto in avisos %}<div class="aviso aviso-{{ tipo }}">{{ texto }}</div>{% endfor %}
+    {% if erro %}<div class="aviso aviso-erro">{{ erro }}</div>{% endif %}
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="campo"><label>E-mail</label><input type="email" name="email" value="{{ email or '' }}" required autofocus autocomplete="username"></div>
+    <div class="campo"><label>Senha</label><input type="password" name="senha" required autocomplete="current-password"></div>
+    <button class="btn btn-primario" style="width:100%;justify-content:center">Entrar</button>
+    <p class="ajuda" style="margin-top:12px">Esqueceu a senha? Peça ao administrador para criar uma nova em Configurações &gt; Usuários.</p>
+  </form>
+</div>
+{% endblock %}

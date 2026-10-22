@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block titulo %}Indicar cliente{% endblock %}
+{% block conteudo %}
+<div class="cabecalho"><h1>Indicar cliente</h1></div>
+<form class="cartao" method="post" action="/portal/indicar" style="max-width:640px">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <p class="suave">Informe quem precisa emitir ou renovar o certificado. Nossa equipe entra em contato e cuida de tudo.</p>
+  <div class="campo"><label>Nome do cliente (empresa ou pessoa) *</label><input type="text" name="nome" required></div>
+  <div class="campos">
+    <div><label>CNPJ ou CPF</label><input type="text" name="cnpj"></div>
+    <div><label>Pessoa de contato</label><input type="text" name="contato"></div>
+    <div><label>Telefone / WhatsApp</label><input type="text" name="telefone"></div>
+    <div><label>E-mail</label><input type="email" name="email"></div>
+    <div class="largo"><label>Certificado que precisa</label><input type="text" name="produto" placeholder="Ex.: e-CNPJ A1, e-CPF A3 token"></div>
+    <div class="largo"><label>Observações</label><textarea name="observacoes" style="min-height:60px"></textarea></div>
+  </div>
+  <label class="marcar" style="margin-top:10px"><input type="checkbox" name="autorizou" required> O cliente autorizou ser contatado pela MS Certificação Digital.</label>
+  <button class="btn btn-verde" style="margin-top:10px">Enviar indicação</button>
+</form>
+{% endblock %}

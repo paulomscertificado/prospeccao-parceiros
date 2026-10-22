@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block titulo %}{{ p.escritorio or 'Novo parceiro' }}{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <div><h1>{{ p.escritorio or 'Novo parceiro' }}</h1>
+    {% if not novo %}<div class="suave">Parceiro desde {{ p.data_entrada|data }} · <span class="selo {{ {'ATIVO':'selo-ok','EM ATIVAÇÃO':'selo-alerta','BLOQUEADO':'selo-erro'}.get(p.status, '') }}">{{ p.status }}</span>
+    {% if lead %} · <a href="/leads/{{ lead.id }}">ver histórico da prospecção</a>{% endif %}</div>{% endif %}</div>
+  <a class="btn" href="/parceiros">Voltar</a>
+</div>
+
+{% if not novo %}
+<div class="grade">
+  <div class="kpi"><div class="rotulo">Certificados indicados</div><div class="valor">{{ totais.indicados }}</div></div>
+  <div class="kpi"><div class="rotulo">Certificados vendidos</div><div class="valor">{{ totais.vendidos }}</div></div>
+  <div class="kpi"><div class="rotulo">Receita gerada</div><div class="valor">{{ totais.receita|moeda }}</div></div>
+  <div class="kpi"><div class="rotulo">Comissão acumulada</div><div class="valor">{{ totais.comissao|moeda }}</div><div class="detalhe">{{ totais.a_pagar|moeda }} a pagar</div></div>
+  <div class="kpi"><div class="rotulo">Última venda</div><div class="valor" style="font-size:1.1rem">{{ totais.ultima_venda|data or '—' }}</div></div>
+</div>
+{% endif %}
+
+<div class="grade-lead">
+<div>
+  <form class="cartao" method="post" action="/parceiros/{{ p.id or 0 }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <h2>Cadastro</h2>
+    <div class="campos">
+      <div class="largo"><label>Escritório *</label><input type="text" name="escritorio" value="{{ p.escritorio }}" required></div>
+      <div><label>Responsável</label><input type="text" name="responsavel" value="{{ p.responsavel or '' }}"></div>
+      <div><label>CNPJ</label><input type="text" name="cnpj" value="{{ p.cnpj or '' }}"></div>
+      <div><label>Telefone</label><input type="text" name="telefone" value="{{ p.telefone or '' }}"></div>
+      <div><label>E-mail</label><input type="email" name="email" value="{{ p.email or '' }}"></div>
+      <div><label>Cidade</label><input type="text" name="cidade" value="{{ p.cidade or '' }}"></div>
+      <div><label>Estado</label><select name="estado"><option value=""></option>{% for u in config.UFS %}<option {{ 'selected' if p.estado == u }}>{{ u }}</option>{% endfor %}</select></div>
+      <div><label>Data de entrada</label><input type="date" name="data_entrada" value="{{ p.data_entrada.isoformat() if p.data_entrada else '' }}"></div>
+      <div><label>Status</label><select name="status">{% for s in config.STATUS_PARCEIRO %}<option {{ 'selected' if p.status == s }}>{{ s }}</option>{% endfor %}</select></div>
+      {% if usuario.perfil in ['admin','gestor'] %}
+      <div><label>Vendedor responsável</label><select name="vendedor_id"><option value="">—</option>{% for v in vendedores %}<option value="{{ v.id }}" {{ 'selected' if p.vendedor_id == v.id }}>{{ v.nome }}</option>{% endfor %}</select></div>
+      <div><label>Comissão própria</label><select name="comissao_tipo"><option value="" {{ 'selected' if not p.comissao_tipo }}>Usar regra de cada produto</option><option value="percentual" {{ 'selected' if p.comissao_tipo == 'percentual' }}>% do valor da venda</option><option value="fixo" {{ 'selected' if p.comissao_tipo == 'fixo' }}>Valor fixo por certificado (R$)</option></select></div>
+      <div><label>Valor da comissão</label><input type="text" name="comissao_valor" value="{{ (p.comissao_valor|string).replace('.', ',') if p.comissao_tipo else '' }}"></div>
+      <div class="largo"><label>Chave Pix para pagar comissão (guardada criptografada)</label><input type="text" name="chave_pix" value="{{ chave_pix or '' }}" autocomplete="off"></div>
+      {% endif %}
+      <div class="largo"><label>Observações</label><textarea name="observacoes">{{ p.observacoes or '' }}</textarea></div>
+    </div>
+    <button class="btn btn-primario" style="margin-top:12px">Salvar</button>
+    {% if not novo %}<p class="ajuda">Comissão atual: {{ regra }}.</p>{% endif %}
+  </form>
+
+  {% if not novo %}
+  <div class="cartao"><h2>Vendas <a class="btn btn-pequeno" href="/vendas?parceiro={{ p.id }}">Registrar venda</a></h2>
+    <div class="tabela-rolagem"><table><tr><th>Data</th><th>Cliente</th><th>Produto</th><th class="num">Valor</th><th class="num">Comissão</th><th>Paga</th></tr>
+    {% for v in vendas %}<tr><td>{{ v.data|data }}</td><td>{{ v.cliente.nome }}</td><td>{{ v.produto.nome if v.produto else '' }}{{ ' (renovação)' if v.tipo == 'renovacao' }}</td><td class="num">{{ v.valor|moeda }}</td><td class="num">{{ v.comissao|moeda }}</td><td>{{ 'Sim' if v.comissao_paga else 'Não' }}</td></tr>
+    {% else %}<tr><td colspan="6" class="vazio">Nenhuma venda ainda.</td></tr>{% endfor %}</table></div>
+  </div>
+  {% endif %}
+</div>
+
+{% if not novo %}
+<div>
+  <div class="cartao"><h2>Clientes indicados</h2>
+    <table>{% for c in clientes %}<tr><td>{{ c.nome }}<div class="pequeno suave">{{ c.telefone }} {{ c.email }}</div></td><td><span class="selo">{{ c.status }}</span></td></tr>
+    {% else %}<tr><td class="vazio">Nenhum cliente indicado.</td></tr>{% endfor %}</table>
+    <form method="post" action="/clientes/0" style="margin-top:12px"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="parceiro_id" value="{{ p.id }}"><input type="hidden" name="voltar_para" value="/parceiros/{{ p.id }}">
+      <label>Registrar indicação</label>
+      <div class="campos"><input type="text" name="nome" placeholder="Nome do cliente" required><input type="text" name="telefone" placeholder="Telefone"><input type="text" name="cnpj" placeholder="CNPJ/CPF"></div>
+      <button class="btn btn-pequeno" style="margin-top:6px">Adicionar</button></form>
+  </div>
+  <div class="cartao"><h2>Vencimentos da carteira</h2>
+    <table>{% for c in certificados if c.status in ['Ativo','Em renovação','Vencido'] %}<tr><td>{{ c.cliente_nome }}<div class="pequeno suave">{{ c.tipo }}</div></td><td class="nowrap">{{ c.data_vencimento|data }}</td><td><span class="selo {{ 'selo-erro' if c.status == 'Vencido' else '' }}">{{ c.status }}</span></td></tr>
+    {% else %}<tr><td class="vazio">Nenhum certificado.</td></tr>{% endfor %}</table>
+  </div>
+  <div class="cartao"><h2>Acesso ao portal</h2>
+    {% if acesso %}<p>{{ acesso.nome }} ({{ acesso.email }}) {{ '' if acesso.ativo else '— desativado' }}</p>
+    {% else %}<p class="suave">Este parceiro ainda não tem login. O administrador cria em Configurações &gt; Usuários (perfil Parceiro). No portal ele indica clientes e acompanha vendas e comissões.</p>{% endif %}
+  </div>
+</div>
+{% endif %}
+</div>
+{% endblock %}

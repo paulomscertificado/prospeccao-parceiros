@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block titulo %}Configurações{% endblock %}
+{% block conteudo %}
+<div class="cabecalho"><h1>Configurações</h1>
+  <div class="acoes"><a class="btn" href="/categorias">Categorias de parceiros</a><a class="btn" href="/conhecimento">Base de conhecimento da IA</a></div></div>
+<div class="abas">
+  {% for c, n in [("geral","Geral"),("score","Score"),("usuarios","Usuários"),("email","E-mail"),("integracoes","Integrações"),("lgpd","LGPD e dados"),("logs","Registro de atividades")] %}<a class="{{ 'ativa' if aba == c }}" href="?aba={{ c }}">{{ n }}</a>{% endfor %}
+</div>
+
+{% if aba == 'geral' %}
+<form class="cartao" method="post" action="/configuracoes/geral" style="max-width:860px">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  {% for chave, nome, tipo, valor in campos %}
+  <div class="campo"><label for="c-{{ chave }}">{{ nome }}</label>
+    {% if tipo == 'area' %}<textarea id="c-{{ chave }}" name="{{ chave }}">{{ valor }}</textarea>
+    {% else %}<input id="c-{{ chave }}" type="text" name="{{ chave }}" value="{{ valor }}">{% endif %}</div>
+  {% endfor %}
+  <button class="btn btn-primario">Salvar</button>
+</form>
+
+{% elif aba == 'score' %}
+<form class="cartao" method="post" action="/configuracoes/score" style="max-width:720px">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>Pesos do lead scoring</h2>
+  <table>{% for chave, nome, padrao in criterios %}<tr><td>{{ nome }}</td><td style="width:120px"><input type="number" name="peso_{{ chave }}" value="{{ pesos[chave] }}" aria-label="{{ nome }}"></td><td class="pequeno suave">padrão {{ padrao }}</td></tr>{% endfor %}</table>
+  <h2 style="margin-top:16px">Faixas de potencial</h2>
+  <div class="campos">
+    <div><label>Médio potencial a partir de</label><input type="number" name="faixa_medio" value="{{ faixas.medio }}"></div>
+    <div><label>Alto potencial a partir de</label><input type="number" name="faixa_alto" value="{{ faixas.alto }}"></div>
+    <div><label>Prioridade máxima a partir de</label><input type="number" name="faixa_maxima" value="{{ faixas.maxima }}"></div>
+  </div>
+  <p class="ajuda">Abaixo de "médio" = baixo potencial. Ao salvar, o score de todos os leads é recalculado.</p>
+  <button class="btn btn-primario">Salvar e recalcular</button>
+</form>
+
+{% elif aba == 'usuarios' %}
+<div class="cartao"><h2>Usuários</h2>
+  <p class="suave">Administrador: acesso total · Gestor: equipe e indicadores · Vendedor: só os próprios leads · Parceiro: só a própria carteira (portal).</p>
+  <div class="tabela-rolagem"><table>
+    <tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Parceiro</th><th>Expediente (reuniões)</th><th>Ativo</th><th>Nova senha</th><th></th></tr>
+    {% for u in usuarios %}
+    <tr>
+      <td><input form="u-{{ u.id }}" type="text" name="nome" value="{{ u.nome }}" aria-label="Nome"></td>
+      <td><input form="u-{{ u.id }}" type="email" name="email" value="{{ u.email }}" aria-label="E-mail"></td>
+      <td><select form="u-{{ u.id }}" name="perfil" aria-label="Perfil">{% for c, n in PERFIS.items() %}<option value="{{ c }}" {{ 'selected' if u.perfil == c }}>{{ n }}</option>{% endfor %}</select></td>
+      <td><select form="u-{{ u.id }}" name="parceiro_id" aria-label="Parceiro"><option value="">—</option>{% for p in parceiros %}<option value="{{ p.id }}" {{ 'selected' if u.parceiro_id == p.id }}>{{ p.escritorio }}</option>{% endfor %}</select></td>
+      <td><input form="u-{{ u.id }}" type="text" name="expediente" value="{{ u.expediente }}" aria-label="Expediente" style="min-width:210px">
+        <input form="u-{{ u.id }}" type="number" name="duracao_reuniao" value="{{ u.duracao_reuniao }}" aria-label="Duração da reunião (min)" style="width:70px" title="minutos por reunião"></td>
+      <td><input form="u-{{ u.id }}" type="checkbox" name="ativo" {{ 'checked' if u.ativo }} aria-label="Ativo"></td>
+      <td><input form="u-{{ u.id }}" type="password" name="senha" placeholder="(manter)" autocomplete="new-password" aria-label="Nova senha"></td>
+      <td><button form="u-{{ u.id }}" class="btn btn-pequeno">Salvar</button><div class="pequeno suave">{{ 'último acesso ' ~ (u.ultimo_login|datahora) if u.ultimo_login else 'nunca entrou' }}</div></td>
+    </tr>{% endfor %}
+    <tr>
+      <td><input form="u-0" type="text" name="nome" placeholder="Nome" required aria-label="Nome"></td>
+      <td><input form="u-0" type="email" name="email" placeholder="email@empresa.com.br" required aria-label="E-mail"></td>
+      <td><select form="u-0" name="perfil" aria-label="Perfil">{% for c, n in PERFIS.items() %}<option value="{{ c }}" {{ 'selected' if c == 'vendedor' }}>{{ n }}</option>{% endfor %}</select></td>
+      <td><select form="u-0" name="parceiro_id" aria-label="Parceiro"><option value="">—</option>{% for p in parceiros %}<option value="{{ p.id }}">{{ p.escritorio }}</option>{% endfor %}</select></td>
+      <td><input form="u-0" type="text" name="expediente" value="seg-sex 09:00-12:00,14:00-18:00" aria-label="Expediente" style="min-width:210px"></td>
+      <td><input form="u-0" type="checkbox" name="ativo" checked aria-label="Ativo"></td>
+      <td><input form="u-0" type="password" name="senha" placeholder="Senha inicial" required autocomplete="new-password" aria-label="Senha"></td>
+      <td><button form="u-0" class="btn btn-pequeno btn-primario">Criar</button></td>
+    </tr>
+  </table></div>
+  {% for u in usuarios %}<form id="u-{{ u.id }}" method="post" action="/configuracoes/usuarios/{{ u.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"></form>{% endfor %}
+  <form id="u-0" method="post" action="/configuracoes/usuarios/0"><input type="hidden" name="csrf" value="{{ csrf }}"></form>
+</div>
+
+{% elif aba == 'email' %}
+<div class="grade-2">
+<form class="cartao" method="post" action="/configuracoes/email">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>E-mail de envio das campanhas</h2>
+  <p class="suave">As campanhas saem deste e-mail. Ele precisa ser do domínio <b>@{{ email.dominio }}</b>.</p>
+  <div class="campo"><label for="e-end">E-mail de envio</label><input id="e-end" type="email" name="endereco" value="{{ email.endereco }}" placeholder="parcerias@{{ email.dominio }}" required></div>
+  <div class="campo"><label for="e-nome">Nome que aparece para quem recebe</label><input id="e-nome" type="text" name="nome" value="{{ email.nome or 'MS Certificação Digital' }}"></div>
+  <div class="campo"><label for="e-senha">Senha de app {% if email.tem_senha %}<span class="suave">(já salva — deixe vazio para manter)</span>{% endif %}</label>
+    <input id="e-senha" type="password" name="senha" autocomplete="new-password" placeholder="16 letras, ex.: abcd efgh ijkl mnop"></div>
+  <div class="campo"><label>Provedor</label>
+    <label class="marcar"><input type="radio" name="provedor" value="google" {{ 'checked' if not email.host or 'gmail' in email.host }}> Google Workspace / Gmail (é o do {{ email.dominio }})</label>
+    <label class="marcar"><input type="radio" name="provedor" value="outro" {{ 'checked' if email.host and 'gmail' not in email.host }}> Outro servidor</label></div>
+  <details {{ 'open' if email.host and 'gmail' not in email.host }}><summary class="pequeno">Dados de outro servidor</summary>
+    <div class="campos" style="margin-top:8px">
+      <div><label>Servidor de envio (SMTP)</label><input type="text" name="host" value="{{ email.host if 'gmail' not in email.host else '' }}"></div>
+      <div><label>Porta</label><input type="text" name="porta" value="{{ email.porta }}"></div>
+      <div><label>Servidor de leitura (IMAP)</label><input type="text" name="imap_host" value="{{ email.imap_host if 'gmail' not in email.imap_host else '' }}"></div>
+    </div></details>
+  <div class="campo" style="margin-top:10px"><label for="e-resp">Respostas vão para (opcional)</label><input id="e-resp" type="email" name="responder_para" value="{{ email.responder_para }}" placeholder="vazio = o próprio e-mail de envio"></div>
+  <label class="marcar"><input type="checkbox" name="ler_respostas" {{ 'checked' if email.imap or not email.host }}> A IA SDR lê as respostas desta caixa (a cada 5 minutos)</label>
+  <button class="btn btn-primario" style="margin-top:10px">Salvar</button>
+  <p class="ajuda">A senha fica só no arquivo .env deste computador (nunca no banco de dados).</p>
+</form>
+<div>
+  <div class="cartao"><h2>Testar</h2>
+    {% if email.host %}
+    <form method="post" action="/configuracoes/email/testar" class="filtros"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="email" name="para" placeholder="para (vazio = {{ usuario.email }})" aria-label="Enviar teste para"><button class="btn btn-verde">Enviar e-mail de teste</button></form>
+    {% if email.imap %}<form method="post" action="/configuracoes/email/testar-leitura"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">Testar leitura das respostas</button></form>{% endif %}
+    {% else %}<p class="suave">Salve o e-mail primeiro.</p>{% endif %}
+  </div>
+  <div class="cartao"><h2>Como criar a senha de app (Google)</h2>
+    <ol style="padding-left:18px;margin:0">
+      <li>Crie o e-mail no Google Admin (ex.: <b>parcerias@{{ email.dominio }}</b>).</li>
+      <li>Entre nessa conta e ligue a <b>verificação em duas etapas</b> (myaccount.google.com/security).</li>
+      <li>Abra <b>myaccount.google.com/apppasswords</b>, crie uma senha com o nome "Prospecção" e copie as 16 letras.</li>
+      <li>Cole aqui em "Senha de app" e salve. Depois clique em "Enviar e-mail de teste".</li>
+    </ol>
+    <p class="ajuda">Se a página de senhas de app não aparecer, o administrador do Google Workspace precisa permitir a verificação em duas etapas para os usuários.</p>
+  </div>
+</div>
+</div>
+{% if dns %}
+<div class="cartao"><h2>O domínio {{ email.dominio }} está pronto para não cair no spam?</h2>
+  <p class="suave">Provedor de e-mail: <b>{{ dns.provedor }}</b></p>
+  <table>{% for nome, ok, detalhe, como in dns.itens %}
+    <tr><td style="width:90px"><b>{{ nome }}</b></td><td style="width:120px"><span class="selo {{ 'selo-ok' if ok else 'selo-erro' }}">{{ 'OK' if ok else 'Falta configurar' }}</span></td>
+      <td class="pequeno">{{ detalhe }}{% if not ok %}<div style="margin-top:4px"><b>Como resolver:</b> {{ como }}</div>{% endif %}</td></tr>{% endfor %}</table>
+  <p class="ajuda">Sem DKIM e DMARC, o Gmail e o Outlook tendem a mandar e-mails de prospecção para o spam. Quem mexe no DNS do domínio (registro.br, Cloudflare...) faz isso em poucos minutos. Comece com poucos e-mails por dia e vá aumentando aos poucos.</p>
+</div>
+{% endif %}
+
+{% elif aba == 'integracoes' %}
+<div class="cartao" style="max-width:860px"><h2>Integrações</h2>
+  <table>{% for nome, ok, detalhe in integracoes %}<tr><td><b>{{ nome }}</b></td><td><span class="selo {{ 'selo-ok' if ok else 'selo-alerta' }}">{{ 'Configurada' if ok else 'Não configurada' }}</span></td><td class="pequeno suave">{{ detalhe }}</td></tr>{% endfor %}</table>
+  <p class="ajuda" style="margin-top:12px">As chaves ficam no arquivo <code>.env</code> da pasta do sistema (nunca na tela nem no banco). Passo a passo em <code>docs/configuracao.md</code>. Depois de mudar o .env, feche e abra o sistema de novo.</p>
+  <p class="ajuda">Webhook do WhatsApp (para receber respostas e "SAIR" automaticamente): <code>{{ config.URL_PUBLICA }}/api/webhooks/whatsapp</code></p>
+</div>
+<div class="cartao" style="max-width:860px" id="receita"><h2>Base de CNPJs da Receita Federal</h2>
+  {% if receita.total %}<p><b>{{ receita.total }}</b> escritórios de contabilidade ativos na base local · atualizada em {{ receita.atualizada_em }}.</p>
+  {% else %}<p>A base ainda não foi importada. Ela é a melhor fonte para "Encontrar novos parceiros": traz <b>todos</b> os escritórios de contabilidade ativos do Brasil, com CNPJ, endereço, telefone e e-mail informados à Receita.</p>{% endif %}
+  {% if receita.status %}<div class="aviso {{ 'aviso-erro' if receita.status.startswith('Erro') else 'aviso-info' }}">{{ receita.status }}{% if not receita.status.startswith('Erro') %} <a href="?aba=integracoes">Atualizar</a>{% endif %}</div>{% endif %}
+  <ol style="padding-left:18px">
+    <li>Baixe da Receita (dados abertos do CNPJ, mês mais recente) os arquivos <b>Estabelecimentos0.zip</b> a <b>Estabelecimentos9.zip</b>, <b>Municipios.zip</b> e, se quiser a razão social e o porte, <b>Empresas0.zip</b> a <b>Empresas9.zip</b>. São cerca de 6 GB.</li>
+    <li>Coloque todos numa pasta (ex.: <code>C:\Receita\2026-10</code>).</li>
+    <li>Cole o caminho da pasta abaixo e clique em Importar. O sistema guarda só os escritórios de contabilidade ativos (atividade 6920-6/01 e 6920-6/02). Depois você pode apagar os .zip.</li>
+  </ol>
+  <form method="post" action="/configuracoes/receita" class="filtros"><input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="text" name="pasta" required placeholder="C:\Receita\2026-10" style="flex:1;min-width:260px" aria-label="Pasta">
+    <button class="btn btn-primario">Importar base</button></form>
+  <p class="ajuda">Atualize uma vez por mês. Passo a passo com o link de download em docs/configuracao.md.</p>
+</div>
+
+{% elif aba == 'lgpd' %}
+<div class="grade-2">
+  <div class="cartao"><h2>Política de retenção</h2>
+    <p>Leads encerrados ou com opt-out sem movimento há mais de <b>{{ campos|selectattr(0, 'equalto', 'dias_retencao_perdidos')|map(attribute=3)|first }}</b> dias têm os dados pessoais apagados (anonimização). Quem pediu opt-out fica só com o mínimo para não ser contatado de novo.</p>
+    <form method="post" action="/configuracoes/retencao" data-confirmar="Anonimizar agora os leads que passaram do prazo de retenção?"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-perigo">Aplicar retenção agora</button></form>
+  </div>
+  <div class="cartao"><h2>Como o sistema protege os dados</h2>
+    <ul style="padding-left:18px;margin:0">
+      <li>Prioriza dados empresariais públicos e grava a fonte e a base legal de cada lead.</li>
+      <li>Opt-out em um clique (e automático pela palavra SAIR no WhatsApp oficial).</li>
+      <li>Histórico de tratamento por lead e registro de atividades (quem fez o quê).</li>
+      <li>Senhas com hash, chave Pix criptografada, sessão com expiração, proteção CSRF e limite de tentativas.</li>
+      <li>Sem disparo em massa: limite diário e intervalo mínimo entre contatos.</li>
+    </ul>
+  </div>
+  {% if demo %}<div class="cartao"><h2>Dados de demonstração</h2><p>Há dados fictícios de demonstração no sistema.</p>
+    <form method="post" action="/configuracoes/apagar-demo" data-confirmar="Apagar todos os dados de demonstração?"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-perigo">Apagar dados de demonstração</button></form></div>{% endif %}
+</div>
+
+{% elif aba == 'logs' %}
+<div class="cartao" style="padding:0"><div class="tabela-rolagem"><table>
+  <tr><th>Quando</th><th>Usuário</th><th>Ação</th><th>Registro</th><th>Detalhes</th><th>IP</th></tr>
+  {% for l in logs %}<tr><td class="nowrap">{{ l.criado_em|datahora }}</td><td>{{ l.usuario_nome }}</td><td>{{ l.acao }}</td><td>{{ l.entidade }}{{ ' #' ~ l.entidade_id if l.entidade_id }}</td><td class="pequeno">{{ l.detalhes }}</td><td class="pequeno">{{ l.ip }}</td></tr>
+  {% else %}<tr><td colspan="6" class="vazio">Sem registros.</td></tr>{% endfor %}
+</table></div></div>
+{% endif %}
+{% endblock %}
