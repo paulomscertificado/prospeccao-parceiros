@@ -30,7 +30,7 @@
     <input type="text" name="pedido" placeholder="Ex.: Quero encontrar 100 escritórios contábeis de alto potencial em São Paulo" aria-label="O que você quer encontrar?">
     <button class="btn btn-verde">Encontrar</button>
   </div>
-  <a class="btn" href="/agenda"><b>{{ followups }}</b>&nbsp;follow-ups pendentes hoje</a>
+  {% if mostrar_agenda %}<a class="btn" href="/agenda"><b>{{ followups }}</b>&nbsp;follow-ups pendentes hoje</a>{% endif %}
 </form>
 
 <div class="grade">

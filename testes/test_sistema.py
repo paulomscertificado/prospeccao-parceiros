@@ -382,3 +382,16 @@ def test_vendas_vencimentos_comissoes_ocultos_por_padrao(cliente):
     finally:
         with sessao() as db:
             gravar_config(db, "mostrar_vendas", "0")
+
+
+def test_agenda_oculta_por_padrao(cliente):
+    from app.banco import gravar_config, sessao
+
+    assert 'href="/agenda"' not in cliente.get("/").text
+    with sessao() as db:
+        gravar_config(db, "mostrar_agenda", "1")
+    try:
+        assert 'href="/agenda"' in cliente.get("/").text
+    finally:
+        with sessao() as db:
+            gravar_config(db, "mostrar_agenda", "0")

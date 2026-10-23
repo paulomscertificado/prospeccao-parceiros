@@ -213,7 +213,8 @@ NOMES_UF = {
 # Configurações que o administrador altera na tela (guardadas no banco).
 CONFIG_PADRAO = {
     "enviar_whatsapp_automatico": "1",  # só para quem já conversou/autorizou (campanhas.whatsapp_liberado)
-    "mostrar_vendas": "0",  # Vendas, Vencimentos e Comissões ocultos no menu e no Dashboard (pedido da MS)
+    "mostrar_vendas": "0",
+    "mostrar_agenda": "0",  # Agenda (follow-ups) oculta no menu e no Dashboard (pedido da MS)  # Vendas, Vencimentos e Comissões ocultos no menu e no Dashboard (pedido da MS)
     "empresa_nome": "MS Certificação Digital",
     "link_parceria": "https://mscertificados.com.br",
     "texto_comissao": "comissão por cada certificado emitido",

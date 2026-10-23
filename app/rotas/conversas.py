@@ -85,8 +85,18 @@ def lista(busca: str = "", usuario: Usuario = Depends(equipe), db: Session = Dep
                                     .order_by(MensagemWhatsApp.id.desc()).limit(1)).scalar() or ""
         resultado.append({"telefone": m.telefone, "telefone_formatado": util.formatar_telefone(m.telefone),
                           "nome": nome, "ultima": m.texto[:120], "ultima_direcao": m.direcao,
-                          "quando": m.criado_em.strftime("%d/%m %H:%M"), "nao_lidas": int(nao_lidas or 0)})
+                          "quando": _quando_curto(m.criado_em), "nao_lidas": int(nao_lidas or 0)})
     return JSONResponse({"conversas": resultado, "situacao": _situacao()})
+
+
+def _quando_curto(momento) -> str:
+    """Como no WhatsApp: hora (hoje), "Ontem" ou a data."""
+    hoje = agora().date()
+    if momento.date() == hoje:
+        return momento.strftime("%H:%M")
+    if (hoje - momento.date()).days == 1:
+        return "Ontem"
+    return momento.strftime("%d/%m/%y")
 
 
 def _situacao() -> dict:
@@ -114,8 +124,10 @@ def conversa(telefone: str, usuario: Usuario = Depends(equipe), db: Session = De
     return JSONResponse({
         "telefone": chave, "telefone_formatado": util.formatar_telefone(chave), "nome": nome,
         "mensagens": [{"direcao": m.direcao, "texto": m.texto, "status": m.status, "erro": m.erro, "origem": m.origem,
-                       "quando": m.criado_em.strftime("%d/%m %H:%M")} for m in mensagens],
-        "enviando": [{"texto": p.texto, "quando": p.criado_em.strftime("%d/%m %H:%M")} for p in pendentes
+                       "quando": m.criado_em.strftime("%d/%m %H:%M"), "dia": m.criado_em.strftime("%Y-%m-%d"),
+                       "hora": m.criado_em.strftime("%H:%M")} for m in mensagens],
+        "enviando": [{"texto": p.texto, "quando": p.criado_em.strftime("%d/%m %H:%M"),
+                      "dia": p.criado_em.strftime("%Y-%m-%d"), "hora": p.criado_em.strftime("%H:%M")} for p in pendentes
                      if _chave(p.telefone) == chave],
         "lead": {"id": lead.id, "empresa": lead.empresa, "status": lead.status, "opt_out": lead.opt_out} if lead else None,
         "situacao": _situacao(),

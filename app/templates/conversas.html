@@ -2,23 +2,79 @@
 {% block titulo %}Conversas{% endblock %}
 {% block conteudo %}
 <style>
-  .caixa-conversas { display: grid; grid-template-columns: 320px 1fr; gap: 12px; height: calc(100vh - 170px); min-height: 460px; }
-  .caixa-conversas .cartao { margin: 0; display: flex; flex-direction: column; min-height: 0; }
-  .lista-conversas { overflow-y: auto; flex: 1; margin: 8px -12px 0; }
-  .item-conversa { display: block; padding: 10px 12px; border-top: 1px solid var(--borda); cursor: pointer; color: inherit; }
-  .item-conversa:hover, .item-conversa.ativa { background: #eef4fb; text-decoration: none; }
-  .item-conversa .linha1 { display: flex; justify-content: space-between; gap: 8px; }
-  .item-conversa .previa { color: #637083; font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .bolha-qtd { background: #1fa463; color: #fff; border-radius: 10px; padding: 0 7px; font-size: .75rem; }
-  .mensagens { flex: 1; overflow-y: auto; padding: 8px 4px; background: #f6f8fb; border-radius: 8px; margin: 8px 0; }
-  .msg { max-width: 75%; margin: 6px 0; padding: 7px 10px; border-radius: 10px; white-space: pre-wrap; word-wrap: break-word; }
-  .msg.entrada { background: #fff; border: 1px solid var(--borda); }
-  .msg.saida { background: #dcf8c6; margin-left: auto; }
-  .msg .rodape-msg { font-size: .72rem; color: #637083; margin-top: 3px; text-align: right; }
-  .msg.erro { background: #fde2e1; }
-  .escrever { display: flex; gap: 8px; }
-  .escrever textarea { flex: 1; min-height: 44px; max-height: 140px; }
-  @media (max-width: 800px) { .caixa-conversas { grid-template-columns: 1fr; height: auto; } .mensagens { max-height: 60vh; } }
+  /* Caixa de conversas no visual da MS: lista à esquerda, conversa à direita (como um WhatsApp da marca) */
+  .chat { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); height: calc(100vh - 150px); min-height: 480px;
+          background: #fff; border: 1px solid var(--borda); border-radius: 14px; overflow: hidden; box-shadow: var(--sombra); }
+  .chat-lista { display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--borda); min-height: 0; background: #fbfcfe; }
+  .chat-lista .topo { padding: 14px; border-bottom: 1px solid var(--borda); }
+  .chat-busca { position: relative; }
+  .chat-busca input { width: 100%; padding: 9px 12px 9px 34px; border-radius: 999px; background: #fff; }
+  .chat-busca svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: #98a4b3; }
+  .chat-itens { flex: 1; overflow-y: auto; }
+  .chat-item { display: flex; gap: 11px; align-items: center; padding: 11px 14px; cursor: pointer; color: inherit;
+               border-bottom: 1px solid #eef1f5; position: relative; }
+  .chat-item:hover { background: #f1f5fa; text-decoration: none; }
+  .chat-item.ativa { background: #eaf2fa; }
+  .chat-item.ativa::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--verde-marca); }
+  .chat-item .info { flex: 1; min-width: 0; }
+  .chat-item .linha { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .chat-item .nome { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chat-item .hora { font-size: .72rem; color: #8a96a6; flex-shrink: 0; }
+  .chat-item.nao-lida .hora { color: var(--verde); font-weight: 600; }
+  .chat-item .previa { font-size: .84rem; color: #6b7686; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chat-item.nao-lida .previa { color: var(--texto); font-weight: 500; }
+  .qtd { background: var(--verde-marca); color: #fff; border-radius: 999px; min-width: 20px; height: 20px; padding: 0 6px;
+         font-size: .72rem; font-weight: 700; display: inline-grid; place-items: center; flex-shrink: 0; }
+  .avatar { width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center;
+            font-weight: 700; font-size: .9rem; color: #fff; background: var(--azul); letter-spacing: .02em; }
+  .avatar.pequeno { width: 38px; height: 38px; font-size: .82rem; }
+
+  .chat-conversa { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+  .chat-topo { display: flex; align-items: center; gap: 12px; padding: 11px 18px; border-bottom: 1px solid var(--borda); background: #fff; min-height: 64px; }
+  .chat-topo .titulo { flex: 1; min-width: 0; }
+  .chat-topo .titulo b { font-size: 1rem; }
+  .chat-topo .sub { font-size: .8rem; color: #6b7686; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .botao-icone { border: 0; background: transparent; color: #6b7686; border-radius: 8px; padding: 6px 8px; cursor: pointer; font: inherit; font-size: .8rem; }
+  .botao-icone:hover { background: #f1f5fa; color: var(--azul); }
+  .chat-topo form { display: flex; gap: 6px; align-items: center; flex: 1; }
+  .chat-topo form input { max-width: 300px; }
+
+  .chat-mensagens { flex: 1; overflow-y: auto; padding: 18px 6% 12px;
+                    background: #f4f7fb radial-gradient(rgba(13, 59, 102, .05) 1px, transparent 1px) 0 0 / 18px 18px; }
+  .dia { text-align: center; margin: 14px 0 10px; }
+  .dia span { font-family: var(--fonte-mono); font-size: .66rem; letter-spacing: .12em; text-transform: uppercase;
+              background: #fff; color: #6b7686; padding: 4px 12px; border-radius: 999px; box-shadow: 0 1px 2px rgba(16, 24, 40, .08); }
+  .bolha { max-width: min(560px, 78%); width: fit-content; margin: 3px 0; padding: 7px 11px 6px; border-radius: 12px;
+           box-shadow: 0 1px 1px rgba(16, 24, 40, .08); line-height: 1.4; }
+  .bolha .texto { white-space: pre-wrap; word-wrap: break-word; overflow-wrap: anywhere; }
+  .bolha .meta { float: right; margin: 6px 0 -3px 12px; font-size: .68rem; color: #8a96a6; white-space: nowrap; }
+  .bolha.entrada { background: #fff; border-top-left-radius: 4px; }
+  .bolha.saida { background: #e1f5ea; margin-left: auto; border-top-right-radius: 4px; }
+  .bolha.saida .meta .ok { color: var(--verde); }
+  .bolha.erro { background: #fde8e6; }
+  .bolha.enviando { opacity: .7; }
+  .bolha .midia { font-style: italic; color: #4b5a6b; }
+  .seguida { margin-top: 1px; }
+
+  .chat-escrever { border-top: 1px solid var(--borda); padding: 10px 14px; background: #fff; }
+  .chat-escrever form { display: flex; gap: 10px; align-items: flex-end; }
+  .chat-escrever textarea { flex: 1; resize: none; min-height: 42px; max-height: 140px; border-radius: 22px; padding: 10px 16px; line-height: 1.4; }
+  .enviar { width: 42px; height: 42px; border-radius: 50%; border: 0; background: var(--verde); color: #fff; cursor: pointer;
+            display: grid; place-items: center; flex-shrink: 0; }
+  .enviar:hover { background: #188a4f; }
+  .enviar[disabled] { opacity: .5; }
+  .enviar svg { width: 18px; height: 18px; margin-left: 2px; }
+  .nova-campos { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+  .nova-campos > div { flex: 1; min-width: 180px; }
+  .vazio-chat { margin: auto; text-align: center; color: #6b7686; max-width: 320px; }
+  .vazio-chat .icone { width: 64px; height: 64px; border-radius: 50%; background: var(--azul-claro); color: var(--azul);
+                       display: grid; place-items: center; margin: 0 auto 12px; }
+  .vazio-chat .icone svg { width: 30px; height: 30px; }
+  @media (max-width: 860px) {
+    .chat { grid-template-columns: minmax(0, 1fr); height: auto; }
+    .chat-lista { max-height: 300px; border-right: 0; border-bottom: 1px solid var(--borda); }
+    .chat-mensagens { max-height: 60vh; padding: 14px; }
+  }
 </style>
 <div class="cabecalho"><div><h1>Conversas</h1><div class="suave">Mensagens do WhatsApp conectado. O que você escreve aqui sai na hora pelo número da MS.</div></div>
   <div><button class="btn btn-primario" id="nova">+ Nova mensagem</button></div></div>
@@ -28,35 +84,51 @@
 {% endif %}
 <div id="aviso-situacao" class="aviso aviso-alerta" style="display:none"></div>
 
-<div class="caixa-conversas">
-  <div class="cartao">
-    <input type="search" id="busca" placeholder="Buscar por nome ou telefone" aria-label="Buscar conversa">
-    <div class="lista-conversas" id="lista"><p class="vazio" style="padding:12px">Carregando...</p></div>
-  </div>
-  <div class="cartao">
-    <div id="sem-conversa" class="vazio" style="margin:auto;text-align:center">Escolha uma conversa ao lado ou clique em <b>+ Nova mensagem</b>.</div>
-    <div id="area-conversa" style="display:none;flex:1;flex-direction:column;min-height:0">
-      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
-        <div id="area-nome"><b id="c-nome"></b> <span class="suave" id="c-telefone"></span>
-          <button type="button" class="btn btn-pequeno" id="editar-nome" title="Editar o nome do contato">✏️ Editar nome</button></div>
-        <form id="form-nome" style="display:none;gap:6px;align-items:center">
-          <input type="text" id="campo-nome" maxlength="200" aria-label="Nome do contato" style="min-width:220px">
-          <button class="btn btn-pequeno btn-primario">Salvar</button>
-          <button type="button" class="btn btn-pequeno" id="cancelar-nome">Cancelar</button></form>
-        <div id="c-lead" class="pequeno"></div>
-      </div>
-      <div id="c-optout" class="aviso aviso-erro" style="display:none;margin:6px 0 0">Este contato pediu para não receber mensagens (opt-out).</div>
-      <div class="mensagens" id="mensagens"></div>
-      <div id="nova-campos" class="campos" style="display:none;margin-bottom:8px">
-        <div><label>Celular (com DDD)</label><input type="tel" id="novo-telefone" placeholder="(81) 99999-0000"></div>
-        <div><label>Nome (opcional)</label><input type="text" id="novo-nome"></div>
-      </div>
-      <form class="escrever" id="form-enviar">
-        <textarea id="texto" placeholder="Escreva a mensagem (Enter envia, Shift+Enter pula linha)" aria-label="Mensagem"></textarea>
-        <button class="btn btn-verde" id="botao-enviar">Enviar</button>
-      </form>
+<div class="chat">
+  <aside class="chat-lista">
+    <div class="topo"><div class="chat-busca">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14zM21 21l-5-5"/></svg>
+      <input type="search" id="busca" placeholder="Buscar por nome ou telefone" aria-label="Buscar conversa"></div></div>
+    <div class="chat-itens" id="lista"><p class="vazio" style="padding:16px">Carregando...</p></div>
+  </aside>
+
+  <section class="chat-conversa">
+    <div id="sem-conversa" class="vazio-chat">
+      <div class="icone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-3.8-.9L3 21l1.9-5.2A8.4 8.4 0 0 1 3.6 11.5 8.5 8.5 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z"/></svg></div>
+      <b>Suas conversas do WhatsApp</b>
+      <p class="pequeno" style="margin-top:6px">Escolha uma conversa ao lado ou clique em <b>+ Nova mensagem</b> para falar com outro número.</p>
     </div>
-  </div>
+
+    <div id="area-conversa" style="display:none;flex:1;flex-direction:column;min-height:0">
+      <div class="chat-topo">
+        <div class="avatar pequeno" id="c-avatar"></div>
+        <div class="titulo" id="area-nome">
+          <b id="c-nome"></b>
+          <div class="sub"><span id="c-telefone"></span><span id="c-lead"></span></div>
+        </div>
+        <form id="form-nome" style="display:none">
+          <input type="text" id="campo-nome" maxlength="200" aria-label="Nome do contato" placeholder="Nome do contato">
+          <button class="btn btn-pequeno btn-primario">Salvar</button>
+          <button type="button" class="btn btn-pequeno" id="cancelar-nome">Cancelar</button>
+        </form>
+        <button type="button" class="botao-icone" id="editar-nome" title="Editar o nome do contato">✏️ Editar nome</button>
+      </div>
+      <div id="c-optout" class="aviso aviso-erro" style="display:none;margin:0;border-radius:0">Este contato pediu para não receber mensagens (opt-out).</div>
+      <div class="chat-mensagens" id="mensagens"></div>
+      <div class="chat-escrever">
+        <div id="nova-campos" class="nova-campos" style="display:none">
+          <div><label>Celular (com DDD)</label><input type="tel" id="novo-telefone" placeholder="(81) 99999-0000"></div>
+          <div><label>Nome (opcional)</label><input type="text" id="novo-nome" placeholder="Como o contato vai aparecer"></div>
+        </div>
+        <form id="form-enviar">
+          <textarea id="texto" rows="1" placeholder="Escreva uma mensagem" aria-label="Mensagem"></textarea>
+          <button class="enviar" id="botao-enviar" title="Enviar (Enter)" aria-label="Enviar">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.4 20.4l17.4-7.5a1 1 0 0 0 0-1.8L3.4 3.6a1 1 0 0 0-1.4 1.2L4.5 12l-2.5 7.2a1 1 0 0 0 1.4 1.2z"/></svg></button>
+        </form>
+        <div class="pequeno suave" style="margin:6px 4px 0">Enter envia · Shift+Enter pula linha</div>
+      </div>
+    </div>
+  </section>
 </div>
 {% endblock %}
 
@@ -64,9 +136,32 @@
 <script>
 let atual = {{ telefone_inicial|json }} || '';
 let modoNovo = false;
+let assinatura = '';
 const el = id => document.getElementById(id);
 const escapar = t => (t || '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
-const STATUS = { na_fila: 'na fila', enviada: '✓ enviada', erro: 'não saiu', cancelada: 'cancelada', recebida: '' };
+const STATUS = { na_fila: '🕓', enviada: '<span class="ok">✓</span>', erro: '⚠️ não saiu', cancelada: 'cancelada', recebida: '' };
+const CORES = ['#0d3b66', '#1e5f96', '#1f9d5c', '#12456f', '#2d6394', '#167a6b', '#3b5b86'];
+
+function iniciais(nome, tel) {
+  const p = (nome || '').replace(/[^\p{L}\s]/gu, ' ').trim().split(/\s+/).filter(Boolean);
+  if (p.length) return (p[0][0] + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase();
+  return (tel || '').replace(/\D/g, '').slice(-2) || '?';
+}
+function cor(chave) { let h = 0; for (const c of chave || '') h = (h * 31 + c.charCodeAt(0)) >>> 0; return CORES[h % CORES.length]; }
+function avatar(elem, nome, tel) { elem.textContent = iniciais(nome, tel); elem.style.background = cor(tel); }
+function textoMensagem(t) {
+  const m = (t || '').match(/^\[(áudio|imagem|vídeo|documento|figurinha|contato|localização)\]\s*(.*)$/s);
+  if (!m) return escapar(t);
+  const icone = { 'áudio': '🎤', imagem: '📷', 'vídeo': '🎬', documento: '📄', figurinha: '🏷️', contato: '👤', 'localização': '📍' }[m[1]];
+  return `<span class="midia">${icone} ${m[1][0].toUpperCase() + m[1].slice(1)}</span>${m[2] ? '<br>' + escapar(m[2]) : ''}`;
+}
+function rotuloDia(dia) {
+  const hoje = new Date(); const d = new Date(dia + 'T12:00:00');
+  const dif = Math.round((new Date(hoje.toDateString()) - new Date(d.toDateString())) / 86400000);
+  if (dif === 0) return 'Hoje';
+  if (dif === 1) return 'Ontem';
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: d.getFullYear() === hoje.getFullYear() ? undefined : 'numeric' });
+}
 
 function mostrarSituacao(s) {
   const a = el('aviso-situacao');
@@ -81,11 +176,14 @@ async function carregarLista() {
   try { d = await (await fetch('/conversas/api/lista?busca=' + encodeURIComponent(el('busca').value))).json(); } catch (e) { return; }
   mostrarSituacao(d.situacao);
   el('lista').innerHTML = d.conversas.length ? d.conversas.map(c => `
-    <a class="item-conversa ${c.telefone === atual && !modoNovo ? 'ativa' : ''}" data-tel="${c.telefone}">
-      <div class="linha1"><b>${escapar(c.nome || c.telefone_formatado)}</b><span class="pequeno suave">${c.quando}</span></div>
-      <div class="linha1"><span class="previa">${c.ultima_direcao === 'saida' ? 'Você: ' : ''}${escapar(c.ultima)}</span>
-        ${c.nao_lidas ? `<span class="bolha-qtd">${c.nao_lidas}</span>` : ''}</div>
-    </a>`).join('') : '<p class="vazio" style="padding:12px">Nenhuma conversa ainda. As mensagens do número conectado aparecem aqui.</p>';
+    <a class="chat-item ${c.telefone === atual && !modoNovo ? 'ativa' : ''} ${c.nao_lidas ? 'nao-lida' : ''}" data-tel="${c.telefone}">
+      <div class="avatar" style="background:${cor(c.telefone)}">${escapar(iniciais(c.nome, c.telefone))}</div>
+      <div class="info">
+        <div class="linha"><span class="nome">${escapar(c.nome || c.telefone_formatado)}</span><span class="hora">${c.quando}</span></div>
+        <div class="linha"><span class="previa">${c.ultima_direcao === 'saida' ? 'Você: ' : ''}${escapar(c.ultima.replace(/\s+/g, ' '))}</span>
+          ${c.nao_lidas ? `<span class="qtd">${c.nao_lidas}</span>` : ''}</div>
+      </div>
+    </a>`).join('') : '<p class="vazio" style="padding:16px">Nenhuma conversa encontrada.</p>';
   el('lista').querySelectorAll('[data-tel]').forEach(a => a.addEventListener('click', () => abrir(a.dataset.tel)));
 }
 
@@ -95,23 +193,34 @@ async function carregarConversa(rolar) {
   try { d = await (await fetch('/conversas/api/conversa/' + encodeURIComponent(atual))).json(); } catch (e) { return; }
   if (el('form-nome').style.display === 'none') {
     el('c-nome').textContent = d.nome || d.telefone_formatado;
-    el('c-telefone').textContent = d.nome ? d.telefone_formatado : '';
+    el('c-telefone').textContent = d.nome ? d.telefone_formatado : 'Contato sem nome';
     el('campo-nome').value = d.nome || '';
+    avatar(el('c-avatar'), d.nome, d.telefone);
   }
-  el('c-lead').innerHTML = d.lead ? `Lead: <a href="/leads/${d.lead.id}">${escapar(d.lead.empresa)}</a> · ${escapar(d.lead.status)}` : '';
+  el('c-lead').innerHTML = d.lead ? `· Lead: <a href="/leads/${d.lead.id}">${escapar(d.lead.empresa)}</a> <span class="selo selo-azul">${escapar(d.lead.status)}</span>` : '';
   el('c-optout').style.display = d.lead && d.lead.opt_out ? '' : 'none';
+  const todas = d.mensagens.concat(d.enviando.map(m => ({ ...m, direcao: 'saida', enviando: true })));
+  const nova = JSON.stringify(todas.map(m => [m.texto, m.status, m.hora]));
+  if (nova === assinatura && !rolar) { mostrarSituacao(d.situacao); return; }  // nada mudou: não redesenha
+  assinatura = nova;
   const caixa = el('mensagens');
-  const noFim = caixa.scrollHeight - caixa.scrollTop - caixa.clientHeight < 40;
-  caixa.innerHTML = d.mensagens.map(m => `<div class="msg ${m.direcao} ${m.status === 'erro' ? 'erro' : ''}">${escapar(m.texto)}
-      <div class="rodape-msg">${m.quando}${m.direcao === 'saida' && STATUS[m.status] ? ' · ' + STATUS[m.status] : ''}${m.erro ? ' · ' + escapar(m.erro) : ''}</div></div>`).join('')
-    + d.enviando.map(m => `<div class="msg saida">${escapar(m.texto)}<div class="rodape-msg">${m.quando} · enviando...</div></div>`).join('')
-    || '<p class="vazio">Nenhuma mensagem ainda.</p>';
+  const noFim = caixa.scrollHeight - caixa.scrollTop - caixa.clientHeight < 60;
+  let html = '', diaAnterior = '', direcaoAnterior = '';
+  for (const m of todas) {
+    if (m.dia !== diaAnterior) { html += `<div class="dia"><span>${rotuloDia(m.dia)}</span></div>`; diaAnterior = m.dia; direcaoAnterior = ''; }
+    const classes = ['bolha', m.direcao, m.status === 'erro' ? 'erro' : '', m.enviando ? 'enviando' : '', m.direcao === direcaoAnterior ? 'seguida' : ''];
+    const situacao = m.enviando ? '🕓' : (m.direcao === 'saida' ? (STATUS[m.status] || '') : '');
+    html += `<div class="${classes.join(' ')}" title="${escapar(m.erro || '')}"><span class="texto">${textoMensagem(m.texto)}</span>`
+          + `<span class="meta">${m.hora}${situacao ? ' ' + situacao : ''}</span></div>`;
+    direcaoAnterior = m.direcao;
+  }
+  caixa.innerHTML = html || '<div class="vazio-chat"><p>Nenhuma mensagem ainda.</p></div>';
   if (rolar || noFim) caixa.scrollTop = caixa.scrollHeight;
   mostrarSituacao(d.situacao);
 }
 
 function abrir(telefone) {
-  atual = telefone; modoNovo = false;
+  atual = telefone; modoNovo = false; assinatura = '';
   el('sem-conversa').style.display = 'none';
   el('area-conversa').style.display = 'flex';
   el('nova-campos').style.display = 'none';
@@ -127,10 +236,11 @@ el('nova').addEventListener('click', () => {
   el('sem-conversa').style.display = 'none';
   el('area-conversa').style.display = 'flex';
   el('nova-campos').style.display = '';
-  el('c-nome').textContent = 'Nova mensagem'; el('c-telefone').textContent = ''; el('c-lead').innerHTML = '';
+  el('c-nome').textContent = 'Nova mensagem'; el('c-telefone').textContent = 'Para qualquer celular, com DDD'; el('c-lead').innerHTML = '';
+  el('c-avatar').textContent = '+'; el('c-avatar').style.background = 'var(--verde)';
   el('editar-nome').style.display = 'none'; fecharNome();
   el('c-optout').style.display = 'none';
-  el('mensagens').innerHTML = '<p class="vazio">Digite o celular, o nome (opcional) e a mensagem.</p>';
+  el('mensagens').innerHTML = '<div class="vazio-chat"><p>Digite o celular, o nome (opcional) e a mensagem.</p></div>';
   el('novo-telefone').value = ''; el('novo-nome').value = '';
   el('novo-telefone').focus();
   carregarLista();
@@ -145,17 +255,21 @@ async function enviar(ev) {
   el('botao-enviar').disabled = true;
   try {
     const r = await postarJSON('/conversas/api/enviar', dados);
-    el('texto').value = '';
+    el('texto').value = ''; ajustarAltura();
     if (r.aviso) aviso(r.aviso);
     abrir(r.telefone);
   } catch (e) { alert(e.message); }
   el('botao-enviar').disabled = false;
 }
+function ajustarAltura() { const t = el('texto'); t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 140) + 'px'; }
 el('form-enviar').addEventListener('submit', enviar);
+el('texto').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) enviar(e); });
+el('texto').addEventListener('input', ajustarAltura);
+let espera; el('busca').addEventListener('input', () => { clearTimeout(espera); espera = setTimeout(carregarLista, 300); });
 
-function fecharNome() { el('form-nome').style.display = 'none'; el('area-nome').style.display = ''; }
+function fecharNome() { el('form-nome').style.display = 'none'; el('area-nome').style.display = ''; el('editar-nome').style.display = modoNovo ? 'none' : ''; }
 el('editar-nome').addEventListener('click', () => {
-  el('area-nome').style.display = 'none'; el('form-nome').style.display = 'flex';
+  el('area-nome').style.display = 'none'; el('editar-nome').style.display = 'none'; el('form-nome').style.display = 'flex';
   el('campo-nome').focus(); el('campo-nome').select();
 });
 el('cancelar-nome').addEventListener('click', fecharNome);
@@ -163,12 +277,10 @@ el('form-nome').addEventListener('submit', async ev => {
   ev.preventDefault();
   try {
     const r = await postarJSON('/conversas/api/nome', { telefone: atual, nome: el('campo-nome').value });
-    el('c-nome').textContent = r.nome;
-    fecharNome(); aviso('Nome salvo.'); carregarLista(); carregarConversa(false);
+    el('c-nome').textContent = r.nome; avatar(el('c-avatar'), r.nome, atual);
+    fecharNome(); aviso('Nome salvo.'); carregarLista(); assinatura = ''; carregarConversa(false);
   } catch (e) { alert(e.message); }
 });
-el('texto').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) enviar(e); });
-let espera; el('busca').addEventListener('input', () => { clearTimeout(espera); espera = setTimeout(carregarLista, 300); });
 
 carregarLista();
 if (atual) abrir(atual);
