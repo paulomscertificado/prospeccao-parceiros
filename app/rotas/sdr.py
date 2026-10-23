@@ -368,7 +368,7 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
             for erro in r["erros"]:
                 avisar(request, erro, "erro")
             if not partes and not r["erros"]:
-                avisar(request, "Não há mensagens desse canal na campanha para testar.", "alerta")
+                avisar(request, "As mensagens desta campanha ainda estão vazias. Gere ou edite as mensagens e tente de novo.", "alerta")
         db.commit()
         return voltar(f"/campanhas/{cid}#testar")
     elif acao == "remover-lead":

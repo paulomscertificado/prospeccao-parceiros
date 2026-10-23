@@ -456,7 +456,13 @@ def enviar_teste(db, camp: Campanha, usuario: Usuario, email_teste: str, whatsap
     for t in escolhidas:
         empresa = t.lead.empresa if t.lead else "empresa"
         rotulo = f"[TESTE · {empresa} · {config.ANGULOS.get(t.angulo, t.acao)}]"
-        if t.canal == "email" and email_teste:
+        if not (t.mensagem or "").strip():
+            continue
+        canal_nome = {"email": "E-mail", "whatsapp": "WhatsApp", "ligacao": "Roteiro de ligação"}.get(t.canal, t.canal)
+        rotulo = rotulo[:-1] + f" · {canal_nome}]"
+        # O teste vai para todos os destinos informados, qualquer que seja o canal do toque
+        # (ex.: campanha só com ligação/WhatsApp também pode ser conferida pelo e-mail).
+        if email_teste:
             try:
                 email_smtp.enviar(email_teste, f"[TESTE] {t.assunto or 'MS Certificação Digital'}",
                                   f"{rotulo}\n\n{t.mensagem}", lead_id=None)
@@ -464,7 +470,7 @@ def enviar_teste(db, camp: Campanha, usuario: Usuario, email_teste: str, whatsap
             except email_smtp.ErroEmail as erro:
                 feito["erros"].append(f"E-mail: {erro}")
                 break
-        elif t.canal == "whatsapp" and whatsapp_teste and numero:
+        if whatsapp_teste and numero:
             try:
                 whatsapp_leads.enviar(whatsapp_teste, "Teste", f"{rotulo}\n\n{t.mensagem}", db=db, manual=True,
                                       usuario_id=usuario.id, conexao=numero)

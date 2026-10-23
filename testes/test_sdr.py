@@ -535,8 +535,8 @@ def test_teste_da_campanha_vai_so_para_quem_testa(cliente, monkeypatch):
         db.flush()
         for nome in ("Contábil Teste A", "Contábil Teste B"):
             lead = _novo_lead(db, nome, email=f"x@{nome[-1].lower()}-teste-camp.com.br")
-            for dia, ang in ((0, "apresentacao"), (2, "praticidade")):
-                db.add(Tarefa(tipo="prospeccao", lead_id=lead.id, canal="email", data=date.today() + timedelta(days=dia),
+            for dia, ang, canal in ((0, "apresentacao", "ligacao"), (2, "praticidade", "whatsapp")):
+                db.add(Tarefa(tipo="prospeccao", lead_id=lead.id, canal=canal, data=date.today() + timedelta(days=dia),
                               campanha_id=camp.id, status="rascunho", angulo=ang, assunto=f"Assunto {ang}", mensagem="Oi!"))
         cid = camp.id
     pagina = cliente.get(f"/campanhas/{cid}").text

@@ -34,7 +34,7 @@
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <div class="campos">
       <div><label>Seu e-mail de teste</label><input type="email" name="email_teste" value="{{ usuario.email }}"></div>
-      <div><label>Seu WhatsApp de teste (opcional)</label><input type="tel" name="whatsapp_teste" placeholder="(81) 99999-0000"></div>
+      <div><label>Seu WhatsApp de teste (opcional)</label><input type="text" inputmode="tel" name="whatsapp_teste" placeholder="(81) 99999-0000"></div>
       <div><label>Mensagens de quantas empresas</label><select name="empresas">{% for n in [1, 2, 3, 5] %}<option>{{ n }}</option>{% endfor %}</select></div>
       <div><label>Quais toques</label><select name="toques"><option value="primeiro">Só o primeiro contato</option><option value="todos">Todos os 4 toques</option></select></div>
     </div>
