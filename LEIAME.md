@@ -133,6 +133,7 @@ pessoas. Só o dono do número e o administrador compartilham, pausam ou desliga
 | "O formulário expirou" | Recarregue a página (F5) e repita |
 | Lead da base sem responsável | A Receita não tem sócio-administrador pessoa física para essa empresa: preencha à mão |
 | A busca acha poucos escritórios | Importe a **base da Receita Federal** (Configurações > Integrações) |
+| O Google recusa mesmo com a senha de app certa | Depois de várias tentativas erradas o Google bloqueia por alguns minutos: espere e teste de novo. Para conferir a senha a partir deste computador: dois cliques em `testar_email_daqui.bat` |
 | "Connection unexpectedly closed" ao testar o e-mail | É senha errada: o Google fecha a conexão em vez de avisar. Use a **senha de app** de 16 letras (não a senha normal) |
 | "O Google recusou a senha" | Use a **senha de app** (16 letras) da conta de envio, não a senha normal (Configurações > E-mail mostra o passo a passo) |
 | E-mails caindo no spam | Configurações > E-mail mostra o que falta no DNS (DKIM e DMARC); comece com poucos e-mails por dia |
