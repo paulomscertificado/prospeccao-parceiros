@@ -25,7 +25,8 @@ O modo nuvem liga sozinho quando a variável `VERCEL` existe (a Vercel cria) ou 
   ([documentação](https://vercel.com/docs/cron-jobs/usage-and-pricing)); por isso o `vercel.json` tem
   `0 9 * * *` (6h de Brasília), só de reserva. Na nuvem, buscas, campanhas, fila de e-mail e respostas **só andam
   quando `/api/cron` é chamado**, então o computador da MS (que já fica ligado por causa do WhatsApp Leads) chama
-  `GET https://SEU-SITE/api/cron` a cada minuto pelo **Agendador de Tarefas do Windows**, com o cabeçalho
+  `GET https://SEU-SITE/api/cron` a cada minuto pelo **Agendador de Tarefas do Windows** (`dados\chamar_cron.ps1`, que
+  também religa o WhatsApp Leads escondido com `iniciar.py --escondido` se ele estiver fechado), com o cabeçalho
   `Authorization: Bearer <CRON_SECRET>`. Computador desligado = sistema parado até a reserva das 6h.
   Alternativa sem depender do computador: cron-job.org (grátis, a cada minuto, aceita cabeçalho).
   No Pro, volte o `vercel.json` para `* * * * *` e desligue a tarefa do Windows.
