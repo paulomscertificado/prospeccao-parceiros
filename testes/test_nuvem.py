@@ -235,3 +235,53 @@ def test_tela_whatsapp_na_nuvem_manda_pedidos_pela_ponte(cliente, nuvem):
     assert estado["situacao"]["conectado"] and estado["pedido"]["status"] == "feito"
     with sessao() as db:
         assert db.execute(select(ComandoWhatsApp)).scalars().all()[-1].status == "feito"
+
+
+def test_conversas_copiadas_e_envio_para_qualquer_numero(cliente, nuvem):
+    from app.modelos import MensagemWhatsApp
+
+    cab = {"x-token": TOKEN_PONTE}
+    status = {"conectado": True, "tipo": "qr", "estado": "Conectado", "estado_codigo": "conectado", "numero": "x"}
+    r = cliente.post("/api/ponte/troca", json={"status": status}, headers=cab).json()
+    assert "desde_conversas" in r
+    inicio = r["desde_conversas"]
+    conversas = {"mensagens": [
+        {"id": inicio + 1, "direcao": "entrada", "texto": "Oi, vi o anúncio de vocês", "status": "recebida", "erro": "",
+         "origem": "celular", "criado_em": "2026-10-23 09:00:00", "telefone": "+5581977770001", "nome": "Carla Cliente"},
+        {"id": inicio + 2, "direcao": "saida", "texto": "Olá, Carla! Como posso ajudar?", "status": "na_fila", "erro": "",
+         "origem": "manual", "criado_em": "2026-10-23 09:01:00", "telefone": "+5581977770001", "nome": "Carla Cliente"}],
+        "status": [], "ultimo_id": inicio + 2}
+    cliente.post("/api/ponte/retorno", headers=cab, json={"confirmados": [], "novidades": {}, "conversas": conversas})
+    cliente.post("/api/ponte/retorno", headers=cab, json={"confirmados": [], "novidades": {}, "conversas": conversas})  # repetido: não duplica
+    pagina = cliente.get("/conversas")
+    assert pagina.status_code == 200 and "Nova mensagem" in pagina.text and 'href="/conversas"' in pagina.text
+    lista = cliente.get("/conversas/api/lista").json()["conversas"]
+    carla = next(c for c in lista if c["telefone"] == "81977770001")
+    assert carla["nome"] == "Carla Cliente" and carla["nao_lidas"] == 1 and carla["ultima_direcao"] == "saida"
+    assert cliente.get("/conversas/api/lista?busca=carla").json()["conversas"][0]["telefone"] == "81977770001"
+    c = cliente.get("/conversas/api/conversa/81977770001").json()
+    assert [m["direcao"] for m in c["mensagens"]] == ["entrada", "saida"]
+    assert next(x for x in cliente.get("/conversas/api/lista").json()["conversas"]
+                if x["telefone"] == "81977770001")["nao_lidas"] == 0  # abrir a conversa marca como lida
+    # status atualizado depois (na fila -> enviada)
+    cliente.post("/api/ponte/retorno", headers=cab, json={"confirmados": [], "novidades": {}, "conversas": {
+        "mensagens": [], "status": [{"id": inicio + 2, "status": "enviada", "erro": ""}], "ultimo_id": inicio + 2}})
+    assert cliente.get("/conversas/api/conversa/81977770001").json()["mensagens"][-1]["status"] == "enviada"
+
+    csrf = pagina.text.split('name="csrf" content="')[1].split('"')[0]
+    h = {"x-csrf-token": csrf}
+    assert cliente.post("/conversas/api/enviar", json={"telefone": "123", "texto": "oi"}, headers=h).status_code == 400
+    r = cliente.post("/conversas/api/enviar", json={"telefone": "(81) 96666-0002", "nome": "Novo Contato",
+                                                   "texto": "Olá! Aqui é da MS."}, headers=h)
+    assert r.status_code == 200 and r.json()["telefone"] == "81966660002"
+    assert cliente.get("/conversas/api/conversa/81966660002").json()["enviando"][0]["texto"] == "Olá! Aqui é da MS."
+    envios = cliente.post("/api/ponte/troca", json={"status": status}, headers=cab).json()["envios"]
+    novo = next(e for e in envios if e["texto"] == "Olá! Aqui é da MS.")
+    assert novo["manual"] and novo["telefone"] == "5581966660002" and novo["nome"] == "Novo Contato"
+    with sessao() as db:  # quem pediu SAIR não recebe nem pela tela Conversas
+        lead, _ = criar_lead(db, {"empresa": "Contábil Saiu Conversa", "whatsapp": "(81) 95555-0003"}, _admin(db))
+        lead.opt_out = True
+    r = cliente.post("/conversas/api/enviar", json={"telefone": "81955550003", "texto": "oi"}, headers=h)
+    assert r.status_code == 409 and "opt-out" in r.json()["erro"]
+    with sessao() as db:
+        assert db.execute(select(MensagemWhatsApp).where(MensagemWhatsApp.telefone == "81977770001")).scalars().all().__len__() == 2

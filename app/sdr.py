@@ -517,6 +517,27 @@ def sincronizar_whatsapp_conectado(db) -> dict:
     return resultado
 
 
+def variantes_do_telefone(telefone: str) -> set[str]:
+    """O WhatsApp às vezes entrega celulares antigos sem o nono dígito: o número com e sem ele."""
+    numero = util.normalizar_telefone(telefone)
+    if not numero:
+        return set()
+    candidatos = {numero}
+    if len(numero) == 11 and numero[2] == "9":
+        candidatos.add(numero[:2] + numero[3:])
+    elif len(numero) == 10 and numero[2] in "6789":
+        candidatos.add(numero[:2] + "9" + numero[2:])
+    return candidatos
+
+
+def lead_pelo_telefone(db, telefone: str) -> Lead | None:
+    candidatos = variantes_do_telefone(telefone)
+    if not candidatos:
+        return None
+    return db.execute(select(Lead).where(Lead.chave_whatsapp.in_(candidatos) | Lead.chave_telefone.in_(candidatos))
+                      .limit(1)).scalars().first()
+
+
 def aplicar_novidades_whatsapp(db, dados: dict) -> dict:
     """Respostas dos parceiros (→ IA SDR), status dos envios e opt-outs vindos do WhatsApp Leads."""
     from .leads_servico import registrar_opt_out
@@ -524,17 +545,7 @@ def aplicar_novidades_whatsapp(db, dados: dict) -> dict:
     resultado = {"respostas": 0, "status": 0, "opt_out": 0}
 
     def lead_do_telefone(telefone: str) -> Lead | None:
-        numero = util.normalizar_telefone(telefone)
-        if not numero:
-            return None
-        # O WhatsApp às vezes entrega celulares antigos sem o nono dígito: procura com e sem ele.
-        candidatos = {numero}
-        if len(numero) == 11 and numero[2] == "9":
-            candidatos.add(numero[:2] + numero[3:])
-        elif len(numero) == 10 and numero[2] in "6789":
-            candidatos.add(numero[:2] + "9" + numero[2:])
-        return db.execute(select(Lead).where(Lead.chave_whatsapp.in_(candidatos) | Lead.chave_telefone.in_(candidatos))
-                          .limit(1)).scalars().first()
+        return lead_pelo_telefone(db, telefone)
 
     situacao = {"enviada": "enviada", "erro": "falhou", "cancelada": "falhou"}
     for envio in dados.get("envios", []):

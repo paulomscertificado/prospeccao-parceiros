@@ -44,7 +44,8 @@ MENU_EQUIPE = [
     ("/relatorios", "Relatórios", "documento"),
     ("/inteligencia", "Inteligência", "alvo"),
     ("/ia", "IA Comercial", "brilho"),
-    ("/whatsapp", "WhatsApp", "conversa"),
+    ("/conversas", "Conversas", "conversa"),
+    ("/whatsapp", "WhatsApp", "celular"),
     ("/configuracoes", "Configurações", "engrenagem"),
 ]
 # Áreas que só aparecem com a configuração "mostrar_vendas" = 1 (Configurações > Geral)

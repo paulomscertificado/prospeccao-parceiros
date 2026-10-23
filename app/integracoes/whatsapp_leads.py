@@ -109,7 +109,8 @@ def status(usar_cache: bool = True) -> dict:
     return resultado
 
 
-def enviar(telefone: str, nome: str, texto: str, resposta: bool = False, db=None) -> str:
+def enviar(telefone: str, nome: str, texto: str, resposta: bool = False, db=None, manual: bool = False,
+           usuario_id: int | None = None) -> str:
     """Coloca a mensagem na fila do WhatsApp Leads. Devolve o id da mensagem lá
     (na ponte: "p" + id da espera aqui; vira o id de lá quando o computador confirmar)."""
     if config.WHATSAPP_PONTE:
@@ -120,7 +121,8 @@ def enviar(telefone: str, nome: str, texto: str, resposta: bool = False, db=None
         from ..banco import sessao
         from ..modelos import PonteWhatsApp
 
-        item = PonteWhatsApp(telefone=telefone, nome=nome[:200], texto=texto, resposta=resposta)
+        item = PonteWhatsApp(telefone=telefone, nome=nome[:200], texto=texto, resposta=resposta, manual=manual,
+                             usuario_id=usuario_id)
         if db is not None:
             db.add(item)
             db.flush()

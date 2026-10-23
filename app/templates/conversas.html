@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block titulo %}Conversas{% endblock %}
+{% block conteudo %}
+<style>
+  .caixa-conversas { display: grid; grid-template-columns: 320px 1fr; gap: 12px; height: calc(100vh - 170px); min-height: 460px; }
+  .caixa-conversas .cartao { margin: 0; display: flex; flex-direction: column; min-height: 0; }
+  .lista-conversas { overflow-y: auto; flex: 1; margin: 8px -12px 0; }
+  .item-conversa { display: block; padding: 10px 12px; border-top: 1px solid var(--borda); cursor: pointer; color: inherit; }
+  .item-conversa:hover, .item-conversa.ativa { background: #eef4fb; text-decoration: none; }
+  .item-conversa .linha1 { display: flex; justify-content: space-between; gap: 8px; }
+  .item-conversa .previa { color: #637083; font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bolha-qtd { background: #1fa463; color: #fff; border-radius: 10px; padding: 0 7px; font-size: .75rem; }
+  .mensagens { flex: 1; overflow-y: auto; padding: 8px 4px; background: #f6f8fb; border-radius: 8px; margin: 8px 0; }
+  .msg { max-width: 75%; margin: 6px 0; padding: 7px 10px; border-radius: 10px; white-space: pre-wrap; word-wrap: break-word; }
+  .msg.entrada { background: #fff; border: 1px solid var(--borda); }
+  .msg.saida { background: #dcf8c6; margin-left: auto; }
+  .msg .rodape-msg { font-size: .72rem; color: #637083; margin-top: 3px; text-align: right; }
+  .msg.erro { background: #fde2e1; }
+  .escrever { display: flex; gap: 8px; }
+  .escrever textarea { flex: 1; min-height: 44px; max-height: 140px; }
+  @media (max-width: 800px) { .caixa-conversas { grid-template-columns: 1fr; height: auto; } .mensagens { max-height: 60vh; } }
+</style>
+<div class="cabecalho"><div><h1>Conversas</h1><div class="suave">Mensagens do WhatsApp conectado. O que você escreve aqui sai na hora pelo número da MS.</div></div>
+  <div><button class="btn btn-primario" id="nova">+ Nova mensagem</button></div></div>
+
+{% if not ponte %}
+<div class="aviso aviso-alerta">Neste computador, as conversas ficam no próprio WhatsApp Leads. A tela Conversas funciona no site (nuvem).</div>
+{% endif %}
+<div id="aviso-situacao" class="aviso aviso-alerta" style="display:none"></div>
+
+<div class="caixa-conversas">
+  <div class="cartao">
+    <input type="search" id="busca" placeholder="Buscar por nome ou telefone" aria-label="Buscar conversa">
+    <div class="lista-conversas" id="lista"><p class="vazio" style="padding:12px">Carregando...</p></div>
+  </div>
+  <div class="cartao">
+    <div id="sem-conversa" class="vazio" style="margin:auto;text-align:center">Escolha uma conversa ao lado ou clique em <b>+ Nova mensagem</b>.</div>
+    <div id="area-conversa" style="display:none;flex:1;flex-direction:column;min-height:0">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+        <div><b id="c-nome"></b> <span class="suave" id="c-telefone"></span></div>
+        <div id="c-lead" class="pequeno"></div>
+      </div>
+      <div id="c-optout" class="aviso aviso-erro" style="display:none;margin:6px 0 0">Este contato pediu para não receber mensagens (opt-out).</div>
+      <div class="mensagens" id="mensagens"></div>
+      <div id="nova-campos" class="campos" style="display:none;margin-bottom:8px">
+        <div><label>Celular (com DDD)</label><input type="tel" id="novo-telefone" placeholder="(81) 99999-0000"></div>
+        <div><label>Nome (opcional)</label><input type="text" id="novo-nome"></div>
+      </div>
+      <form class="escrever" id="form-enviar">
+        <textarea id="texto" placeholder="Escreva a mensagem (Enter envia, Shift+Enter pula linha)" aria-label="Mensagem"></textarea>
+        <button class="btn btn-verde" id="botao-enviar">Enviar</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let atual = {{ telefone_inicial|json }} || '';
+let modoNovo = false;
+const el = id => document.getElementById(id);
+const escapar = t => (t || '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+const STATUS = { na_fila: 'na fila', enviada: '✓ enviada', erro: 'não saiu', cancelada: 'cancelada', recebida: '' };
+
+function mostrarSituacao(s) {
+  const a = el('aviso-situacao');
+  if (!s) return;
+  if (!s.disponivel) { a.style.display = ''; a.textContent = s.erro || 'O computador com o WhatsApp está desligado.'; }
+  else if (!s.conectado) { a.style.display = ''; a.innerHTML = 'O celular está desconectado: as mensagens saem quando conectar (menu <a href="/whatsapp">WhatsApp</a>).'; }
+  else a.style.display = 'none';
+}
+
+async function carregarLista() {
+  let d;
+  try { d = await (await fetch('/conversas/api/lista?busca=' + encodeURIComponent(el('busca').value))).json(); } catch (e) { return; }
+  mostrarSituacao(d.situacao);
+  el('lista').innerHTML = d.conversas.length ? d.conversas.map(c => `
+    <a class="item-conversa ${c.telefone === atual && !modoNovo ? 'ativa' : ''}" data-tel="${c.telefone}">
+      <div class="linha1"><b>${escapar(c.nome || c.telefone_formatado)}</b><span class="pequeno suave">${c.quando}</span></div>
+      <div class="linha1"><span class="previa">${c.ultima_direcao === 'saida' ? 'Você: ' : ''}${escapar(c.ultima)}</span>
+        ${c.nao_lidas ? `<span class="bolha-qtd">${c.nao_lidas}</span>` : ''}</div>
+    </a>`).join('') : '<p class="vazio" style="padding:12px">Nenhuma conversa ainda. As mensagens do número conectado aparecem aqui.</p>';
+  el('lista').querySelectorAll('[data-tel]').forEach(a => a.addEventListener('click', () => abrir(a.dataset.tel)));
+}
+
+async function carregarConversa(rolar) {
+  if (!atual || modoNovo) return;
+  let d;
+  try { d = await (await fetch('/conversas/api/conversa/' + encodeURIComponent(atual))).json(); } catch (e) { return; }
+  el('c-nome').textContent = d.nome || d.telefone_formatado;
+  el('c-telefone').textContent = d.nome ? d.telefone_formatado : '';
+  el('c-lead').innerHTML = d.lead ? `Lead: <a href="/leads/${d.lead.id}">${escapar(d.lead.empresa)}</a> · ${escapar(d.lead.status)}` : '';
+  el('c-optout').style.display = d.lead && d.lead.opt_out ? '' : 'none';
+  const caixa = el('mensagens');
+  const noFim = caixa.scrollHeight - caixa.scrollTop - caixa.clientHeight < 40;
+  caixa.innerHTML = d.mensagens.map(m => `<div class="msg ${m.direcao} ${m.status === 'erro' ? 'erro' : ''}">${escapar(m.texto)}
+      <div class="rodape-msg">${m.quando}${m.direcao === 'saida' && STATUS[m.status] ? ' · ' + STATUS[m.status] : ''}${m.erro ? ' · ' + escapar(m.erro) : ''}</div></div>`).join('')
+    + d.enviando.map(m => `<div class="msg saida">${escapar(m.texto)}<div class="rodape-msg">${m.quando} · enviando...</div></div>`).join('')
+    || '<p class="vazio">Nenhuma mensagem ainda.</p>';
+  if (rolar || noFim) caixa.scrollTop = caixa.scrollHeight;
+  mostrarSituacao(d.situacao);
+}
+
+function abrir(telefone) {
+  atual = telefone; modoNovo = false;
+  el('sem-conversa').style.display = 'none';
+  el('area-conversa').style.display = 'flex';
+  el('nova-campos').style.display = 'none';
+  history.replaceState(null, '', '/conversas?telefone=' + telefone);
+  carregarConversa(true); carregarLista();
+  el('texto').focus();
+}
+
+el('nova').addEventListener('click', () => {
+  modoNovo = true;
+  el('sem-conversa').style.display = 'none';
+  el('area-conversa').style.display = 'flex';
+  el('nova-campos').style.display = '';
+  el('c-nome').textContent = 'Nova mensagem'; el('c-telefone').textContent = ''; el('c-lead').innerHTML = '';
+  el('c-optout').style.display = 'none';
+  el('mensagens').innerHTML = '<p class="vazio">Digite o celular, o nome (opcional) e a mensagem.</p>';
+  el('novo-telefone').value = ''; el('novo-nome').value = '';
+  el('novo-telefone').focus();
+  carregarLista();
+});
+
+async function enviar(ev) {
+  ev.preventDefault();
+  const texto = el('texto').value.trim();
+  if (!texto) return;
+  const dados = modoNovo ? { telefone: el('novo-telefone').value, nome: el('novo-nome').value, texto }
+                         : { telefone: atual, texto };
+  el('botao-enviar').disabled = true;
+  try {
+    const r = await postarJSON('/conversas/api/enviar', dados);
+    el('texto').value = '';
+    if (r.aviso) aviso(r.aviso);
+    abrir(r.telefone);
+  } catch (e) { alert(e.message); }
+  el('botao-enviar').disabled = false;
+}
+el('form-enviar').addEventListener('submit', enviar);
+el('texto').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) enviar(e); });
+let espera; el('busca').addEventListener('input', () => { clearTimeout(espera); espera = setTimeout(carregarLista, 300); });
+
+carregarLista();
+if (atual) abrir(atual);
+setInterval(() => { carregarLista(); carregarConversa(false); }, 4000);
+</script>
+{% endblock %}

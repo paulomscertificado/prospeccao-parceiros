@@ -16,7 +16,7 @@ from .. import config, sdr, trabalhos, util
 from ..rotinas import responder_automaticamente, rodada
 from ..banco import agora, gravar_config, ler_config_int, sessao
 from ..integracoes import whatsapp_cloud
-from ..modelos import ComandoWhatsApp, Lead, Mensagem, PonteWhatsApp
+from ..modelos import ComandoWhatsApp, Lead, Mensagem, MensagemWhatsApp, PonteWhatsApp
 from ..seguranca import ip_de, limite_api
 
 rotas = APIRouter(prefix="/api")
@@ -124,15 +124,19 @@ async def ponte_troca(request: Request):
                                .order_by(PonteWhatsApp.id).limit(50)).scalars():
             item.status = "retirada"
             envios.append({"id": item.id, "telefone": item.telefone, "nome": item.nome, "texto": item.texto,
-                           "resposta": item.resposta})
+                           "resposta": item.resposta, "manual": item.manual})
         comandos = []
         for c in db.execute(select(ComandoWhatsApp).where(ComandoWhatsApp.status == "aguardando")
                             .order_by(ComandoWhatsApp.id).limit(10)).scalars():
             c.status = "retirado"
             comandos.append({"id": c.id, "acao": c.acao, "dados": json.loads(c.dados or "{}")})
         desde = ler_config_int(db, "wl_ultimo_id", 0)
-        intervalo = 3 if comandos or _tela_aberta(db) else 30
-    return {"desde": desde, "envios": envios, "comandos": comandos, "intervalo": intervalo}
+        desde_conversas = ler_config_int(db, "wl_conv_ultimo_id", 0)
+        # rápido com a tela WhatsApp/Conversas aberta, com pedidos ou enquanto as conversas antigas são copiadas
+        rapido = comandos or envios or _tela_aberta(db) or ler_config_int(db, "wl_conv_pendente", 0)
+        intervalo = 3 if rapido else 30
+    return {"desde": desde, "envios": envios, "comandos": comandos, "intervalo": intervalo,
+            "desde_conversas": desde_conversas}
 
 
 CAMPOS_STATUS = ("conectado", "tipo", "estado", "numero", "enviadas_hoje", "limite_diario", "dentro_do_horario",
@@ -143,6 +147,35 @@ def _gravar_status(db, recebido: dict) -> None:
     status = {k: recebido.get(k) for k in CAMPOS_STATUS}
     status["visto_em"] = agora().isoformat()
     gravar_config(db, "wl_status", status)
+
+
+def _guardar_conversas(db, conversas: dict) -> None:
+    """Cópia das conversas do WhatsApp Leads (todas as mensagens) para a tela Conversas."""
+    from datetime import datetime
+
+    mensagens = conversas.get("mensagens") or []
+    ids = [int(m["id"]) for m in mensagens]
+    existentes = set(db.execute(select(MensagemWhatsApp.id_wl).where(MensagemWhatsApp.id_wl.in_(ids))).scalars()) if ids else set()
+    for m in mensagens:
+        if int(m["id"]) in existentes:
+            continue
+        telefone = util.normalizar_telefone(m.get("telefone", "")) or util.so_digitos(m.get("telefone", ""))
+        try:
+            criado = datetime.fromisoformat(str(m.get("criado_em", ""))[:19])
+        except ValueError:
+            criado = agora()
+        db.add(MensagemWhatsApp(id_wl=int(m["id"]), telefone=telefone[:20], nome=str(m.get("nome") or "")[:200],
+                                direcao=str(m.get("direcao", ""))[:10], texto=str(m.get("texto") or ""),
+                                status=str(m.get("status") or "")[:20], erro=str(m.get("erro") or "")[:500],
+                                origem=str(m.get("origem") or "")[:30], criado_em=criado,
+                                lida=m.get("direcao") != "entrada"))
+    for s in conversas.get("status") or []:
+        msg = db.execute(select(MensagemWhatsApp).where(MensagemWhatsApp.id_wl == int(s["id"]))).scalars().first()
+        if msg and (msg.status != s.get("status") or msg.erro != (s.get("erro") or "")):
+            msg.status, msg.erro = str(s.get("status") or "")[:20], str(s.get("erro") or "")[:500]
+    if "ultimo_id" in conversas:
+        gravar_config(db, "wl_conv_ultimo_id", str(int(conversas["ultimo_id"])))
+    gravar_config(db, "wl_conv_pendente", "1" if len(mensagens) >= 300 else "0")
 
 
 def _tela_aberta(db) -> bool:
@@ -187,6 +220,8 @@ async def ponte_retorno(request: Request):
                 comando.status, comando.erro = ("erro", str(c["erro"])[:500]) if c.get("erro") else ("feito", "")
         if dados.get("status"):  # status logo depois dos pedidos (ex.: QR code novo)
             _gravar_status(db, dados["status"])
+        if dados.get("conversas"):
+            _guardar_conversas(db, dados["conversas"])
         novidades = dados.get("novidades") or {}
         resultado = sdr.aplicar_novidades_whatsapp(db, novidades) if novidades else {}
         if "ultimo_id" in novidades:

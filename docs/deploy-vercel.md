@@ -71,6 +71,13 @@ entrega os pedidos (`comandos`, marcados "retirado") e o retorno devolve o resul
 (com o QR code em imagem). Enquanto a tela está aberta (`wl_tela_vista_em` < 20 s), a troca responde
 `intervalo: 3` e o WhatsApp Leads passa a trocar a cada 3 s; fora disso, a cada 30 s. Só o administrador age.
 
+**Tela Conversas** (`rotas/conversas.py`, menu "Conversas"): a troca manda `desde_conversas` e o retorno traz
+`conversas` = todas as mensagens do WhatsApp Leads (qualquer contato, entrada e saída) depois desse id, de 300 em
+300 (`integracao.conversas_desde`), mais o status das enviadas nas últimas 6 h. Ficam em `mensagens_whatsapp`
+(chave = telefone com DDD, sem 55). Enquanto há lote cheio (`wl_conv_pendente`) a ponte troca a cada 3 s.
+O que se escreve na tela vira `ponte_whatsapp.manual = 1` → `integracao.enviar_manual` → fila "manual" (sai na
+hora). Opt-out da Prospecção bloqueia; quando o número é de um lead, entra no histórico dele.
+
 Sem sinal do computador por 3 minutos, a tela mostra "WhatsApp desligado" e o botão de envio avisa em vez de
 deixar a mensagem esperando sem prazo. Senha: `WHATSAPP_PONTE_TOKEN` (Vercel) = token do `ligar_nuvem.bat`.
 

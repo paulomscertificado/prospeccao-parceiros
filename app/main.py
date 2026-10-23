@@ -102,7 +102,7 @@ async def _nao_encontrado(request: Request, erro):
                                        "mensagem": "O endereço não existe ou o registro foi apagado."}, status_code=404)
 
 
-from .rotas import admin, agenda, api, auth, comercial, leads, painel, portal, sdr, whatsapp  # noqa: E402
+from .rotas import admin, agenda, api, auth, comercial, conversas, leads, painel, portal, sdr, whatsapp  # noqa: E402
 
-for modulo in (auth, painel, sdr, leads, agenda, comercial, admin, whatsapp, portal, api):
+for modulo in (auth, painel, sdr, leads, agenda, comercial, admin, conversas, whatsapp, portal, api):
     app.include_router(modulo.rotas)

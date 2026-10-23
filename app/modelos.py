@@ -46,10 +46,29 @@ class PonteWhatsApp(Base):
     nome: Mapped[str] = mapped_column(String(200), default="")
     texto: Mapped[str] = mapped_column(Text)
     resposta: Mapped[bool] = mapped_column(Boolean, default=False)
+    manual: Mapped[bool] = mapped_column(Boolean, default=False)  # escrita por uma pessoa na tela Conversas
+    usuario_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="aguardando", index=True)  # aguardando, retirada, na_fila, erro
     id_wl: Mapped[str] = mapped_column(String(40), default="")  # id da mensagem no WhatsApp Leads
     erro: Mapped[str] = mapped_column(Text, default="")
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
+
+
+class MensagemWhatsApp(Base):
+    """Cópia das conversas do número conectado (todas, de qualquer contato), trazida do WhatsApp Leads pela ponte
+    para a tela Conversas. Chave da conversa: telefone com DDD, sem o 55 (util.normalizar_telefone)."""
+    __tablename__ = "mensagens_whatsapp"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    id_wl: Mapped[int] = mapped_column(Integer, unique=True, index=True)  # id da mensagem no WhatsApp Leads
+    telefone: Mapped[str] = mapped_column(String(20), index=True)
+    nome: Mapped[str] = mapped_column(String(200), default="")
+    direcao: Mapped[str] = mapped_column(String(10))   # entrada (contato -> MS) ou saida
+    texto: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(20), default="")  # recebida, na_fila, enviada, erro, cancelada
+    erro: Mapped[str] = mapped_column(Text, default="")
+    origem: Mapped[str] = mapped_column(String(30), default="")  # manual, automacao, sdr, ia, celular
+    lida: Mapped[bool] = mapped_column(Boolean, default=False)
+    criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, index=True)
 
 
 class ComandoWhatsApp(Base):
