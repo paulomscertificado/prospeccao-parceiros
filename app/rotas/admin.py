@@ -181,15 +181,19 @@ def testar_email(request: Request, para: str = Form(""), usuario: Usuario = Depe
         db.commit()
         avisar(request, f"E-mail de teste enviado para {para}. Confira se chegou na caixa de entrada (e não no spam).")
     except email_smtp.ErroEmail as erro:
+        registrar_log(db, usuario, "erro_email_teste", "configuracao", None, str(erro)[:250], request)
+        db.commit()
         avisar(request, str(erro), "erro")
     return voltar("/configuracoes?aba=email")
 
 
 @rotas.post("/configuracoes/email/testar-leitura", dependencies=[Depends(verificar_csrf)])
-def testar_leitura(request: Request, usuario: Usuario = Depends(admin)):
+def testar_leitura(request: Request, usuario: Usuario = Depends(admin), db: Session = Depends(obter_db)):
     try:
         avisar(request, email_imap.testar())
     except email_imap.ErroImap as erro:
+        registrar_log(db, usuario, "erro_email_leitura", "configuracao", None, str(erro)[:250], request)
+        db.commit()
         avisar(request, str(erro), "erro")
     return voltar("/configuracoes?aba=email")
 

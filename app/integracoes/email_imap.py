@@ -44,6 +44,9 @@ def sem_citacao(texto: str) -> str:
 
 def ler_respostas(emails_de_leads: set[str], maximo: int = 30) -> list[dict]:
     """Devolve [{"de", "assunto", "texto"}] dos e-mails não lidos vindos de leads (e marca como lidos)."""
+    from .. import arquivo_env
+
+    arquivo_env.carregar_do_banco(forcar=True)  # na nuvem: a senha salva há pouco já vale aqui
     if not configurado():
         return []
     achados = []
@@ -70,6 +73,9 @@ def ler_respostas(emails_de_leads: set[str], maximo: int = 30) -> list[dict]:
 
 def testar() -> str:
     """Entra na caixa e conta os e-mails não lidos. Devolve um texto para a tela (ou lança ErroImap)."""
+    from .. import arquivo_env
+
+    arquivo_env.carregar_do_banco(forcar=True)  # na nuvem: a senha salva há pouco já vale aqui
     if not configurado():
         raise ErroImap("A leitura das respostas não está configurada.")
     try:

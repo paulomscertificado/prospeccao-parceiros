@@ -66,6 +66,9 @@ RODAPE_OPT_OUT = rodape(None)
 
 def enviar(para: str, assunto: str, corpo: str, responder_para: str = "", com_rodape: bool = True,
            lead_id: int | None = None) -> str:
+    from .. import arquivo_env
+
+    arquivo_env.carregar_do_banco(forcar=True)  # na nuvem: a senha salva há pouco já vale aqui
     problema = problema_de_configuracao()
     if problema:
         raise ErroEmail(problema)
