@@ -107,9 +107,10 @@ def enviar(para: str, assunto: str, corpo: str, responder_para: str = "", com_ro
     except smtplib.SMTPServerDisconnected as erro:
         # O Google não responde "senha errada": ele fecha a conexão logo depois da senha.
         if not logado and ("gmail" in config.SMTP_HOST or "google" in config.SMTP_HOST):
-            raise ErroEmail("O Google recusou a senha (fechou a conexão ao conferir). Use uma SENHA DE APP de 16 letras "
-                            "criada em myaccount.google.com/apppasswords com a conta do e-mail de envio — a senha normal "
-                            "da conta não funciona. Cole a senha de app em Configurações > E-mail e salve.") from None
+            raise ErroEmail(f"O Google recusou a senha da conta {usuario} (fechou a conexão ao conferir). "
+                            "Confira: 1) a senha de app (16 letras) foi criada ESTANDO LOGADO nessa conta, em "
+                            "myaccount.google.com/apppasswords; 2) se o e-mail de envio for um apelido (alias) ou grupo, "
+                            "preencha \"Conta que faz o login\" com a conta dona dele. A senha normal não funciona.") from None
         raise ErroEmail(f"Não consegui enviar o e-mail ({erro}). Confira a internet e o servidor.") from None
     except smtplib.SMTPAuthenticationError:
         if "gmail" in config.SMTP_HOST or "google" in config.SMTP_HOST:

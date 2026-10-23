@@ -149,5 +149,22 @@ def test_google_fechando_a_conexao_vira_aviso_de_senha(cliente, env_temporario, 
     monkeypatch.setattr(email_smtp.smtplib, "SMTP", SMTPQueDesliga)
     config.SMTP_HOST, config.SMTP_PORTA, config.SMTP_SENHA = "smtp.gmail.com", 587, "senhaerrada"
     config.SMTP_REMETENTE = "MS <contato@mscertificados.com.br>"
-    with pytest.raises(email_smtp.ErroEmail, match="SENHA DE APP de 16 letras"):
+    with pytest.raises(email_smtp.ErroEmail, match="senha de app \(16 letras\) foi criada ESTANDO LOGADO"):
         email_smtp.enviar("alguem@exemplo.com", "oi", "oi")
+
+
+def test_email_de_envio_apelido_entra_com_a_conta_dona(cliente, env_temporario, monkeypatch):
+    monkeypatch.setattr(email_smtp.smtplib, "SMTP", SMTPFalso)
+    SMTPFalso.enviados = []
+    monkeypatch.setattr(dns_email, "verificar", lambda d: {"provedor": "Google", "google": True, "itens": []})
+    csrf = _csrf(cliente)
+    cliente.post("/configuracoes/email", data={"csrf": csrf, "endereco": "contato@mscertificados.com.br",
+                                               "usuario_login": "paulo@mscertificados.com.br",
+                                               "senha": "abcd efgh ijkl mnop", "provedor": "google", "ler_respostas": "on"})
+    texto = env_temporario.read_text(encoding="utf-8")
+    assert "SMTP_USUARIO=paulo@mscertificados.com.br" in texto and "IMAP_USUARIO=paulo@mscertificados.com.br" in texto
+    assert "contato@mscertificados.com.br" in texto  # o remetente continua o contato@
+    cliente.post("/configuracoes/email/testar", data={"csrf": csrf, "para": "maria@exemplo.com"})
+    usuario, msg = SMTPFalso.enviados[-1]
+    assert usuario == "paulo@mscertificados.com.br" and "contato@mscertificados.com.br" in msg["From"]
+    assert 'value="paulo@mscertificados.com.br"' in cliente.get("/configuracoes?aba=email").text

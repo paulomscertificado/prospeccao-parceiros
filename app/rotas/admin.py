@@ -115,18 +115,23 @@ def _email_atual() -> dict:
     return {"nome": nome, "endereco": endereco or (config.SMTP_USUARIO if config.SMTP_HOST else ""), "host": config.SMTP_HOST,
             "porta": config.SMTP_PORTA, "tls": config.SMTP_TLS, "tem_senha": bool(config.SMTP_SENHA),
             "responder_para": config.SMTP_RESPONDER_PARA, "imap": bool(config.IMAP_HOST),
-            "imap_host": config.IMAP_HOST, "dominio": config.EMAIL_DOMINIO}
+            "imap_host": config.IMAP_HOST, "dominio": config.EMAIL_DOMINIO,
+            "usuario_login": config.SMTP_USUARIO if config.SMTP_HOST and config.SMTP_USUARIO != endereco else ""}
 
 
 @rotas.post("/configuracoes/email", dependencies=[Depends(verificar_csrf)])
 def salvar_email(request: Request, endereco: str = Form(...), nome: str = Form("MS Certificação Digital"),
                  senha: str = Form(""), provedor: str = Form("google"), host: str = Form(""), porta: str = Form("587"),
                  responder_para: str = Form(""), ler_respostas: str = Form(""), imap_host: str = Form(""),
-                 usuario: Usuario = Depends(admin), db: Session = Depends(obter_db)):
+                 usuario_login: str = Form(""), usuario: Usuario = Depends(admin), db: Session = Depends(obter_db)):
     from .. import arquivo_env
 
     destino = "/configuracoes?aba=email"
     endereco = endereco.strip().lower()
+    login = usuario_login.strip().lower() or endereco  # apelido (alias): entra com a conta dona dele
+    if login != endereco and not util.email_valido(login):
+        avisar(request, "A conta que faz o login precisa ser um e-mail válido.", "erro")
+        return voltar("/configuracoes?aba=email")
     if not util.email_valido(endereco):
         avisar(request, "Digite um e-mail válido.", "erro")
         return voltar(destino)
@@ -155,11 +160,11 @@ def salvar_email(request: Request, endereco: str = Form(...), nome: str = Form("
             avisar(request, "Informe o servidor de envio (SMTP).", "erro")
             return voltar(destino)
     nome = nome.strip().replace('"', "") or "MS Certificação Digital"
-    valores = {"SMTP_HOST": host.strip(), "SMTP_PORTA": str(porta_n), "SMTP_TLS": tls, "SMTP_USUARIO": endereco,
+    valores = {"SMTP_HOST": host.strip(), "SMTP_PORTA": str(porta_n), "SMTP_TLS": tls, "SMTP_USUARIO": login,
                "SMTP_SENHA": senha, "SMTP_REMETENTE": f"{nome} <{endereco}>",
                "SMTP_RESPONDER_PARA": responder_para.strip()}
     if ler_respostas == "on" and imap:
-        valores.update({"IMAP_HOST": imap, "IMAP_PORTA": "993", "IMAP_USUARIO": endereco, "IMAP_SENHA": senha})
+        valores.update({"IMAP_HOST": imap, "IMAP_PORTA": "993", "IMAP_USUARIO": login, "IMAP_SENHA": senha})
     else:
         valores.update({"IMAP_HOST": "", "IMAP_USUARIO": "", "IMAP_SENHA": ""})
     arquivo_env.gravar(valores)
