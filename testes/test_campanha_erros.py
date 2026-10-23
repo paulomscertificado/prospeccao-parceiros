@@ -84,3 +84,47 @@ def test_regiao_sem_empresas_avisa_em_vez_de_ficar_pronta_vazia(cliente):
         cid = camp.id
     with pytest.raises(RuntimeError, match="Não encontrei empresas novas"):
         campanhas.gerar(cid)
+
+
+def test_campanhas_seguidas_pegam_empresas_diferentes(cliente, tmp_path, monkeypatch):
+    from app import score
+
+    _zipar(tmp_path, "Municipios.zip", [["2531", "RECIFE"]])
+    _zipar(tmp_path, "Estabelecimentos0.zip", [
+        _estab(f"7500000{i}", f"CONTABIL DIFERENTE {i}", f"c{i}@diferente{i}-teste.com.br", "GRACAS") for i in range(1, 9)])
+    base_receita.importar_pasta(str(tmp_path))
+
+    def pesquisar(db, lead, usar_ia=True):
+        lead.pesquisado_em = lead.criado_em
+        score.atualizar(db, lead)
+
+    monkeypatch.setattr(pesquisa, "pesquisar_lead", pesquisar)
+    empresas = []
+    with sessao() as db:
+        admin = db.execute(select(Usuario).where(Usuario.perfil == "admin")).scalars().first()
+        ids = []
+        for n in (1, 2, 3):
+            camp = Campanha(nome=f"Graças {n}", categorias="contabil", cidade="gracas", estado="PE", quantidade=2,
+                            canais="email", status="gerando", usuario_id=admin.id)
+            db.add(camp)
+            db.flush()
+            ids.append(camp.id)
+    for cid in ids:
+        campanhas.gerar(cid)
+        with sessao() as db:
+            empresas.append({t.lead.empresa for t in db.execute(select(Tarefa).where(Tarefa.campanha_id == cid)).scalars()})
+    assert all(len(e) == 2 for e in empresas), empresas
+    assert not (empresas[0] & empresas[1]) and not (empresas[0] & empresas[2]) and not (empresas[1] & empresas[2])
+    # campanha cancelada libera as empresas para uma campanha nova
+    with sessao() as db:
+        admin = db.execute(select(Usuario).where(Usuario.perfil == "admin")).scalars().first()
+        campanhas.cancelar(db, db.get(Campanha, ids[0]), admin)
+        camp = Campanha(nome="Graças 4", categorias="contabil", cidade="gracas", estado="PE", quantidade=2,
+                        canais="email", status="gerando", usuario_id=admin.id)
+        db.add(camp)
+        db.flush()
+        cid = camp.id
+    campanhas.gerar(cid)
+    with sessao() as db:
+        quarta = {t.lead.empresa for t in db.execute(select(Tarefa).where(Tarefa.campanha_id == cid)).scalars()}
+    assert quarta and not (quarta & (empresas[1] | empresas[2]))

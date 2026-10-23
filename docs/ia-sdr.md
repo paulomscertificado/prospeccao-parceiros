@@ -42,6 +42,8 @@ Mensagens únicas (apresentação, praticidade, receita, encerramento) ──►
 APROVAÇÃO NECESSÁRIA  [APROVAR] [EDITAR] [CANCELAR]
         │
         ▼
+Seleção: cada campanha pega empresas DIFERENTES (`campanhas._leads_em_outras_campanhas`: pula leads de campanhas
+não canceladas; `_buscar_candidatos` busca mais fundo na base, até `MAXIMO_BUSCA` por segmento)
 Fila: e-mail automático (limites) · WhatsApp automático só p/ quem já conversou (resto com 1 clique) · LinkedIn com 1 clique
         │
         ▼

@@ -139,8 +139,22 @@ def _mensagens(lead_id: int, usuario_id: int, cta: str, tom: str) -> tuple[int, 
             return lead_id, sdr.mensagens_por_regras(db, lead, usuario, cta)
 
 
+def _leads_em_outras_campanhas(db, campanha_id: int) -> set[int]:
+    """Leads que já estão em outra campanha que não foi cancelada nem deu erro: não entram de novo."""
+    return set(db.execute(
+        select(Tarefa.lead_id).join(Campanha, Tarefa.campanha_id == Campanha.id)
+        .where(Tarefa.campanha_id != campanha_id, Tarefa.lead_id.is_not(None),
+               Campanha.status.not_in(["cancelada", "erro"]))
+        .distinct()).scalars())
+
+
+MAXIMO_BUSCA = 4000  # empresas olhadas por segmento, no máximo, para completar a campanha
+
+
 def _buscar_candidatos(campanha_id: int) -> list[int]:
-    """Etapa 1: empresas da base da Receita nas categorias e na região (o dobro, para poder escolher)."""
+    """Etapa 1: empresas da base da Receita nas categorias e na região (o dobro, para poder escolher).
+    Cada campanha pega empresas DIFERENTES: pula quem já está em outra campanha ativa, quem já foi contatado,
+    pediu para sair ou foi encerrado, e procura mais fundo na base até completar a quantidade."""
     with sessao() as db:
         camp = db.get(Campanha, campanha_id)
         usuario = db.get(Usuario, camp.usuario_id)
@@ -150,23 +164,35 @@ def _buscar_candidatos(campanha_id: int) -> list[int]:
         if not base_receita.disponivel(db):
             raise RuntimeError("A base da Receita ainda não foi importada (Configurações > Integrações).")
         candidatos: list[int] = []
+        ja_usados = _leads_em_outras_campanhas(db, campanha_id)
         por_categoria = max(1, -(-quantidade * 2 // max(1, len(cods))))
         for cod in cods:
-            achados = 0
-            for dados in base_receita.buscar(db, camp.cidade, camp.estado, por_categoria, [cod]):
-                if achados >= por_categoria:
+            achados, vistos, limite_busca = 0, set(), por_categoria
+            while achados < por_categoria:
+                resultados = base_receita.buscar(db, camp.cidade, camp.estado, limite_busca, [cod])
+                for dados in resultados:
+                    if achados >= por_categoria:
+                        break
+                    if dados["cnpj"] in vistos:
+                        continue  # já olhada na volta anterior
+                    vistos.add(dados["cnpj"])
+                    origem = dados.pop("origem")
+                    dados.pop("categoria", None)
+                    lead, motivo = criar_lead(db, dados, usuario, origem=origem)
+                    if not lead or lead.id in candidatos:
+                        continue
+                    if lead.id in ja_usados:
+                        continue  # já está em outra campanha: esta campanha pega outras empresas
+                    if motivo and (lead.opt_out or lead.perdido or lead.etapa >= 1 or lead.automacao_pausada):
+                        continue  # já cadastrado e já trabalhado: não entra de novo
+                    if lead.categoria_id is None and cod in cats:
+                        lead.categoria = cats[cod]
+                    candidatos.append(lead.id)
+                    achados += 1
+                # acabaram as empresas da região, ou já olhamos o bastante
+                if len(resultados) < limite_busca * 3 or limite_busca * 3 >= MAXIMO_BUSCA:
                     break
-                origem = dados.pop("origem")
-                dados.pop("categoria", None)
-                lead, motivo = criar_lead(db, dados, usuario, origem=origem)
-                if not lead:
-                    continue
-                if motivo and (lead.opt_out or lead.perdido or lead.etapa >= 1 or lead.automacao_pausada):
-                    continue  # já cadastrado e já trabalhado: não entra de novo
-                if lead.categoria_id is None and cod in cats:
-                    lead.categoria = cats[cod]
-                candidatos.append(lead.id)
-                achados += 1
+                limite_busca = min(limite_busca * 4, MAXIMO_BUSCA // 3)
         if not candidatos:
             nomes = ", ".join(c.nome for c in cats.values()) or "das categorias escolhidas"
             raise RuntimeError(f"Não encontrei empresas novas de {nomes} em \"{camp.cidade}\"/{camp.estado} na base da "
