@@ -71,6 +71,14 @@ class MensagemWhatsApp(Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, index=True)
 
 
+class ContatoWhatsApp(Base):
+    """Nome do contato escolhido na tela Conversas (vale mais que o nome que veio do WhatsApp)."""
+    __tablename__ = "contatos_whatsapp"
+    telefone: Mapped[str] = mapped_column(String(20), primary_key=True)  # DDD + número, sem o 55
+    nome: Mapped[str] = mapped_column(String(200), default="")
+    atualizado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
+
+
 class ComandoWhatsApp(Base):
     """Botão da tela WhatsApp (nuvem) esperando o computador do WhatsApp Leads executar. Ver rotas/whatsapp.py."""
     __tablename__ = "comandos_whatsapp"

@@ -301,3 +301,30 @@ def test_historico_antigo_entra_lido_e_na_ordem_certa(cliente, nuvem):
     assert item["ultima"] == "Mensagem nova de hoje" and item["nao_lidas"] == 1  # o histórico não conta como não lido
     textos = [m["texto"] for m in cliente.get("/conversas/api/conversa/81933330001").json()["mensagens"]]
     assert textos == ["Mensagem antiga do histórico", "Mensagem nova de hoje"]
+
+
+def test_nome_do_contato_editavel(cliente, nuvem):
+    from app.modelos import ComandoWhatsApp
+
+    cab = {"x-token": TOKEN_PONTE}
+    inicio = cliente.post("/api/ponte/troca", json={"status": {}}, headers=cab).json()["desde_conversas"]
+    msg = {"id": inicio + 1, "direcao": "entrada", "texto": "Olá", "status": "recebida", "erro": "", "origem": "",
+           "criado_em": "2026-10-23 11:00:00", "telefone": "+5581911110001", "nome": "Nome Do WhatsApp"}
+    cliente.post("/api/ponte/retorno", headers=cab, json={"confirmados": [], "novidades": {},
+                                                          "conversas": {"mensagens": [msg], "status": [], "ultimo_id": inicio + 1}})
+    pagina = cliente.get("/conversas")
+    assert "Editar nome" in pagina.text
+    h = {"x-csrf-token": pagina.text.split('name="csrf" content="')[1].split('"')[0]}
+    assert cliente.post("/conversas/api/nome", json={"telefone": "81911110001", "nome": " "}, headers=h).status_code == 400
+    r = cliente.post("/conversas/api/nome", json={"telefone": "81911110001", "nome": "Dra. Joana – Contábil Sol"}, headers=h)
+    assert r.status_code == 200
+    assert cliente.get("/conversas/api/conversa/81911110001").json()["nome"] == "Dra. Joana – Contábil Sol"
+    item = next(c for c in cliente.get("/conversas/api/lista").json()["conversas"] if c["telefone"] == "81911110001")
+    assert item["nome"] == "Dra. Joana – Contábil Sol"
+    assert [c["telefone"] for c in cliente.get("/conversas/api/lista?busca=joana").json()["conversas"]] == ["81911110001"]
+    comandos = cliente.post("/api/ponte/troca", json={"status": {}}, headers=cab).json()["comandos"]
+    assert {"acao": "renomear_contato", "dados": {"telefone": "5581911110001", "nome": "Dra. Joana – Contábil Sol"}} in \
+        [{"acao": c["acao"], "dados": c["dados"]} for c in comandos]
+    # nome digitado na "Nova mensagem" também fica guardado
+    cliente.post("/conversas/api/enviar", json={"telefone": "81911110002", "nome": "Pedro Novo", "texto": "Oi"}, headers=h)
+    assert cliente.get("/conversas/api/conversa/81911110002").json()["nome"] == "Pedro Novo"

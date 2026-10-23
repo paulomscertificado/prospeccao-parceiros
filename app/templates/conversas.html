@@ -37,7 +37,12 @@
     <div id="sem-conversa" class="vazio" style="margin:auto;text-align:center">Escolha uma conversa ao lado ou clique em <b>+ Nova mensagem</b>.</div>
     <div id="area-conversa" style="display:none;flex:1;flex-direction:column;min-height:0">
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
-        <div><b id="c-nome"></b> <span class="suave" id="c-telefone"></span></div>
+        <div id="area-nome"><b id="c-nome"></b> <span class="suave" id="c-telefone"></span>
+          <button type="button" class="btn btn-pequeno" id="editar-nome" title="Editar o nome do contato">✏️ Editar nome</button></div>
+        <form id="form-nome" style="display:none;gap:6px;align-items:center">
+          <input type="text" id="campo-nome" maxlength="200" aria-label="Nome do contato" style="min-width:220px">
+          <button class="btn btn-pequeno btn-primario">Salvar</button>
+          <button type="button" class="btn btn-pequeno" id="cancelar-nome">Cancelar</button></form>
         <div id="c-lead" class="pequeno"></div>
       </div>
       <div id="c-optout" class="aviso aviso-erro" style="display:none;margin:6px 0 0">Este contato pediu para não receber mensagens (opt-out).</div>
@@ -88,8 +93,11 @@ async function carregarConversa(rolar) {
   if (!atual || modoNovo) return;
   let d;
   try { d = await (await fetch('/conversas/api/conversa/' + encodeURIComponent(atual))).json(); } catch (e) { return; }
-  el('c-nome').textContent = d.nome || d.telefone_formatado;
-  el('c-telefone').textContent = d.nome ? d.telefone_formatado : '';
+  if (el('form-nome').style.display === 'none') {
+    el('c-nome').textContent = d.nome || d.telefone_formatado;
+    el('c-telefone').textContent = d.nome ? d.telefone_formatado : '';
+    el('campo-nome').value = d.nome || '';
+  }
   el('c-lead').innerHTML = d.lead ? `Lead: <a href="/leads/${d.lead.id}">${escapar(d.lead.empresa)}</a> · ${escapar(d.lead.status)}` : '';
   el('c-optout').style.display = d.lead && d.lead.opt_out ? '' : 'none';
   const caixa = el('mensagens');
@@ -107,6 +115,8 @@ function abrir(telefone) {
   el('sem-conversa').style.display = 'none';
   el('area-conversa').style.display = 'flex';
   el('nova-campos').style.display = 'none';
+  el('editar-nome').style.display = '';
+  fecharNome();
   history.replaceState(null, '', '/conversas?telefone=' + telefone);
   carregarConversa(true); carregarLista();
   el('texto').focus();
@@ -118,6 +128,7 @@ el('nova').addEventListener('click', () => {
   el('area-conversa').style.display = 'flex';
   el('nova-campos').style.display = '';
   el('c-nome').textContent = 'Nova mensagem'; el('c-telefone').textContent = ''; el('c-lead').innerHTML = '';
+  el('editar-nome').style.display = 'none'; fecharNome();
   el('c-optout').style.display = 'none';
   el('mensagens').innerHTML = '<p class="vazio">Digite o celular, o nome (opcional) e a mensagem.</p>';
   el('novo-telefone').value = ''; el('novo-nome').value = '';
@@ -141,6 +152,21 @@ async function enviar(ev) {
   el('botao-enviar').disabled = false;
 }
 el('form-enviar').addEventListener('submit', enviar);
+
+function fecharNome() { el('form-nome').style.display = 'none'; el('area-nome').style.display = ''; }
+el('editar-nome').addEventListener('click', () => {
+  el('area-nome').style.display = 'none'; el('form-nome').style.display = 'flex';
+  el('campo-nome').focus(); el('campo-nome').select();
+});
+el('cancelar-nome').addEventListener('click', fecharNome);
+el('form-nome').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  try {
+    const r = await postarJSON('/conversas/api/nome', { telefone: atual, nome: el('campo-nome').value });
+    el('c-nome').textContent = r.nome;
+    fecharNome(); aviso('Nome salvo.'); carregarLista(); carregarConversa(false);
+  } catch (e) { alert(e.message); }
+});
 el('texto').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) enviar(e); });
 let espera; el('busca').addEventListener('input', () => { clearTimeout(espera); espera = setTimeout(carregarLista, 300); });
 

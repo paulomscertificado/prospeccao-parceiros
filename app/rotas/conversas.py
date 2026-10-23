@@ -5,6 +5,8 @@ escreve aqui vira um envio "manual" na fila da ponte (ponte_whatsapp.manual) e s
 como as respostas escritas na tela Conversas do WhatsApp Leads. Quem pediu SAIR não recebe.
 """
 
+import json
+
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, or_, select
@@ -14,7 +16,7 @@ from .. import config, sdr, util
 from ..banco import agora, gravar_config, obter_db
 from ..integracoes import whatsapp_leads
 from ..leads_servico import historico
-from ..modelos import MensagemWhatsApp, PonteWhatsApp, Usuario
+from ..modelos import ComandoWhatsApp, ContatoWhatsApp, MensagemWhatsApp, PonteWhatsApp, Usuario
 from ..seguranca import equipe, verificar_csrf
 from ..web import tela
 
@@ -24,6 +26,24 @@ rotas = APIRouter()
 def _chave(telefone: str) -> str:
     """Chave da conversa: DDD + número, sem o 55 (números estrangeiros: só os dígitos)."""
     return util.normalizar_telefone(telefone) or util.so_digitos(telefone)
+
+
+def _nomes_escolhidos(db: Session) -> dict[str, str]:
+    return {c.telefone: c.nome for c in db.execute(select(ContatoWhatsApp)).scalars() if c.nome}
+
+
+def _salvar_nome(db: Session, chave: str, nome: str, usuario: Usuario) -> None:
+    """Guarda o nome aqui e pede ao WhatsApp Leads para trocar o nome do contato lá também."""
+    nome = nome.strip()[:200]
+    contato = db.get(ContatoWhatsApp, chave)
+    if contato is None:
+        db.add(ContatoWhatsApp(telefone=chave, nome=nome))
+    else:
+        contato.nome, contato.atualizado_em = nome, agora()
+    if nome and config.WHATSAPP_PONTE:
+        db.add(ComandoWhatsApp(acao="renomear_contato", usuario_id=usuario.id,
+                               dados=json.dumps({"telefone": "55" + chave if len(chave) in (10, 11) else chave,
+                                                 "nome": nome}, ensure_ascii=False)))
 
 
 def _tela_vista(db: Session) -> None:
@@ -49,15 +69,18 @@ def lista(busca: str = "", usuario: Usuario = Depends(equipe), db: Session = Dep
                 .group_by(MensagemWhatsApp.telefone).order_by(func.max(MensagemWhatsApp.criado_em).desc()).limit(200))
     termo = busca.strip()
     if termo:
-        filtros = [MensagemWhatsApp.nome.ilike(f"%{termo}%")]
+        filtros = [MensagemWhatsApp.nome.ilike(f"%{termo}%"),
+                   MensagemWhatsApp.telefone.in_(select(ContatoWhatsApp.telefone)
+                                                 .where(ContatoWhatsApp.nome.ilike(f"%{termo}%")))]
         if util.so_digitos(termo):
             filtros.append(MensagemWhatsApp.telefone.like(f"%{util.so_digitos(termo)}%"))
         consulta = consulta.where(or_(*filtros))
     resultado = []
+    escolhidos = _nomes_escolhidos(db)
     for telefone, _ultima_em, nao_lidas in db.execute(consulta).all():
         m = db.execute(select(MensagemWhatsApp).where(MensagemWhatsApp.telefone == telefone)
                        .order_by(MensagemWhatsApp.criado_em.desc(), MensagemWhatsApp.id.desc()).limit(1)).scalars().first()
-        nome = m.nome or db.execute(select(MensagemWhatsApp.nome).where(MensagemWhatsApp.telefone == m.telefone,
+        nome = escolhidos.get(m.telefone) or m.nome or db.execute(select(MensagemWhatsApp.nome).where(MensagemWhatsApp.telefone == m.telefone,
                                                                          MensagemWhatsApp.nome != "")
                                     .order_by(MensagemWhatsApp.id.desc()).limit(1)).scalar() or ""
         resultado.append({"telefone": m.telefone, "telefone_formatado": util.formatar_telefone(m.telefone),
@@ -85,7 +108,9 @@ def conversa(telefone: str, usuario: Usuario = Depends(equipe), db: Session = De
                                                        PonteWhatsApp.status.in_(["aguardando", "retirada"]))
                            .order_by(PonteWhatsApp.id)).scalars().all()
     lead = sdr.lead_pelo_telefone(db, chave)
-    nome = next((m.nome for m in reversed(mensagens) if m.nome), "") or (lead.responsavel or lead.empresa if lead else "")
+    escolhido = db.get(ContatoWhatsApp, chave)
+    nome = (escolhido.nome if escolhido and escolhido.nome else "") \
+        or next((m.nome for m in reversed(mensagens) if m.nome), "") or (lead.responsavel or lead.empresa if lead else "")
     return JSONResponse({
         "telefone": chave, "telefone_formatado": util.formatar_telefone(chave), "nome": nome,
         "mensagens": [{"direcao": m.direcao, "texto": m.texto, "status": m.status, "erro": m.erro, "origem": m.origem,
@@ -118,6 +143,23 @@ async def enviar(request: Request, usuario: Usuario = Depends(equipe), db: Sessi
         return JSONResponse({"erro": str(erro)}, status_code=409)
     if lead:
         historico(db, lead.id, "whatsapp", f"Mensagem enviada pela tela Conversas: {texto[:300]}", usuario, canal="whatsapp")
+    if str(dados.get("nome", "")).strip() and not db.get(ContatoWhatsApp, chave):
+        _salvar_nome(db, chave, str(dados["nome"]), usuario)  # nome digitado na "Nova mensagem"
     db.commit()
     aviso = "" if whatsapp_leads.status().get("conectado") else "O celular está desconectado: a mensagem sai quando conectar."
     return {"ok": True, "telefone": chave, "aviso": aviso}
+
+
+@rotas.post("/conversas/api/nome", dependencies=[Depends(verificar_csrf)])
+async def editar_nome(request: Request, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+    """Editar o nome do contato (vale na tela Conversas e no WhatsApp Leads)."""
+    dados = await request.json()
+    chave = _chave(str(dados.get("telefone", "")))
+    nome = str(dados.get("nome", "")).strip()
+    if not chave:
+        return JSONResponse({"erro": "Contato sem telefone."}, status_code=400)
+    if not nome:
+        return JSONResponse({"erro": "Digite o nome do contato."}, status_code=400)
+    _salvar_nome(db, chave, nome, usuario)
+    db.commit()
+    return {"ok": True, "nome": nome[:200]}

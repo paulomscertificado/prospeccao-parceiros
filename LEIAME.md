@@ -32,6 +32,8 @@ no navegador, de qualquer lugar: não precisa do `iniciar.bat`. O passo a passo 
 - Menu **Conversas**: todas as conversas do número conectado (lista à esquerda, conversa à direita), com
   busca por nome ou telefone. Escreva e aperte **Enter** para responder. **+ Nova mensagem** manda para qualquer
   celular (digite com DDD). Sai na hora pelo número da MS; quem pediu SAIR não recebe.
+  Para trocar o nome de um contato, abra a conversa e clique em **✏️ Editar nome** (o nome muda também no
+  WhatsApp Leads).
   As conversas antigas (até 1 ano) chegam quando o celular é conectado pelo QR code. Para puxar de novo: menu
   WhatsApp > Desligar este número > Conectar com QR code.
 - Menu **WhatsApp**: a mesma tela do WhatsApp Leads, dentro do site. Mostra se o celular está conectado e

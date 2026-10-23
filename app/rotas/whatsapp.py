@@ -22,7 +22,7 @@ from ..web import avisar, tela, voltar
 rotas = APIRouter()
 
 ACOES = {"conectar": "Conectar", "pausar": "Pausar conexão", "desligar": "Desligar este número",
-         "salvar_regras": "Salvar regras de envio"}
+         "salvar_regras": "Salvar regras de envio", "renomear_contato": "Renomear contato"}
 
 
 def _estado(db: Session) -> dict:
