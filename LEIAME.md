@@ -32,6 +32,8 @@ no navegador, de qualquer lugar: não precisa do `iniciar.bat`. O passo a passo 
 - Menu **Conversas**: todas as conversas do número conectado (lista à esquerda, conversa à direita), com
   busca por nome ou telefone. Escreva e aperte **Enter** para responder. **+ Nova mensagem** manda para qualquer
   celular (digite com DDD). Sai na hora pelo número da MS; quem pediu SAIR não recebe.
+  As conversas antigas (até 1 ano) chegam quando o celular é conectado pelo QR code. Para puxar de novo: menu
+  WhatsApp > Desligar este número > Conectar com QR code.
 - Menu **WhatsApp**: a mesma tela do WhatsApp Leads, dentro do site. Mostra se o celular está conectado e
   tem os botões **Conectar com QR code**, **Usar modo teste**, **Pausar**, **Desligar** e as **regras de envio**.
   O QR code aparece ali mesmo, para ler com o celular. Os botões levam alguns segundos, porque quem faz a

@@ -168,7 +168,7 @@ def _guardar_conversas(db, conversas: dict) -> None:
                                 direcao=str(m.get("direcao", ""))[:10], texto=str(m.get("texto") or ""),
                                 status=str(m.get("status") or "")[:20], erro=str(m.get("erro") or "")[:500],
                                 origem=str(m.get("origem") or "")[:30], criado_em=criado,
-                                lida=m.get("direcao") != "entrada"))
+                                lida=m.get("direcao") != "entrada" or m.get("origem") == "historico"))
     for s in conversas.get("status") or []:
         msg = db.execute(select(MensagemWhatsApp).where(MensagemWhatsApp.id_wl == int(s["id"]))).scalars().first()
         if msg and (msg.status != s.get("status") or msg.erro != (s.get("erro") or "")):

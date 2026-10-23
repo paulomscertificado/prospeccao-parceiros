@@ -285,3 +285,19 @@ def test_conversas_copiadas_e_envio_para_qualquer_numero(cliente, nuvem):
     assert r.status_code == 409 and "opt-out" in r.json()["erro"]
     with sessao() as db:
         assert db.execute(select(MensagemWhatsApp).where(MensagemWhatsApp.telefone == "81977770001")).scalars().all().__len__() == 2
+
+
+def test_historico_antigo_entra_lido_e_na_ordem_certa(cliente, nuvem):
+    cab = {"x-token": TOKEN_PONTE}
+    inicio = cliente.post("/api/ponte/troca", json={"status": {}}, headers=cab).json()["desde_conversas"]
+    msgs = [
+        {"id": inicio + 1, "direcao": "entrada", "texto": "Mensagem nova de hoje", "status": "recebida", "erro": "",
+         "origem": "", "criado_em": "2026-10-23 10:00:00", "telefone": "+5581933330001", "nome": "Hist"},
+        {"id": inicio + 2, "direcao": "entrada", "texto": "Mensagem antiga do histórico", "status": "recebida", "erro": "",
+         "origem": "historico", "criado_em": "2026-05-01 08:00:00", "telefone": "+5581933330001", "nome": "Hist"}]
+    cliente.post("/api/ponte/retorno", headers=cab, json={"confirmados": [], "novidades": {},
+                                                          "conversas": {"mensagens": msgs, "status": [], "ultimo_id": inicio + 2}})
+    item = next(c for c in cliente.get("/conversas/api/lista").json()["conversas"] if c["telefone"] == "81933330001")
+    assert item["ultima"] == "Mensagem nova de hoje" and item["nao_lidas"] == 1  # o histórico não conta como não lido
+    textos = [m["texto"] for m in cliente.get("/conversas/api/conversa/81933330001").json()["mensagens"]]
+    assert textos == ["Mensagem antiga do histórico", "Mensagem nova de hoje"]

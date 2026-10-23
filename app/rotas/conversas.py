@@ -42,13 +42,11 @@ def tela_conversas(request: Request, telefone: str = "", usuario: Usuario = Depe
 @rotas.get("/conversas/api/lista")
 def lista(busca: str = "", usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
     _tela_vista(db)
-    ultimas = (select(MensagemWhatsApp.telefone, func.max(MensagemWhatsApp.id).label("ultimo_id"),
-                      func.sum(((MensagemWhatsApp.direcao == "entrada") & MensagemWhatsApp.lida.is_(False))
-                               .cast(MensagemWhatsApp.id.type)).label("nao_lidas"))
-               .group_by(MensagemWhatsApp.telefone).subquery())
-    consulta = (select(MensagemWhatsApp, ultimas.c.nao_lidas)
-                .join(ultimas, MensagemWhatsApp.id == ultimas.c.ultimo_id)
-                .order_by(MensagemWhatsApp.id.desc()).limit(200))
+    # Uma linha por contato, a conversa mais recente primeiro (pela data da mensagem: o histórico antigo chega depois)
+    consulta = (select(MensagemWhatsApp.telefone, func.max(MensagemWhatsApp.criado_em).label("ultima_em"),
+                       func.sum(((MensagemWhatsApp.direcao == "entrada") & MensagemWhatsApp.lida.is_(False))
+                                .cast(MensagemWhatsApp.id.type)).label("nao_lidas"))
+                .group_by(MensagemWhatsApp.telefone).order_by(func.max(MensagemWhatsApp.criado_em).desc()).limit(200))
     termo = busca.strip()
     if termo:
         filtros = [MensagemWhatsApp.nome.ilike(f"%{termo}%")]
@@ -56,7 +54,9 @@ def lista(busca: str = "", usuario: Usuario = Depends(equipe), db: Session = Dep
             filtros.append(MensagemWhatsApp.telefone.like(f"%{util.so_digitos(termo)}%"))
         consulta = consulta.where(or_(*filtros))
     resultado = []
-    for m, nao_lidas in db.execute(consulta).all():
+    for telefone, _ultima_em, nao_lidas in db.execute(consulta).all():
+        m = db.execute(select(MensagemWhatsApp).where(MensagemWhatsApp.telefone == telefone)
+                       .order_by(MensagemWhatsApp.criado_em.desc(), MensagemWhatsApp.id.desc()).limit(1)).scalars().first()
         nome = m.nome or db.execute(select(MensagemWhatsApp.nome).where(MensagemWhatsApp.telefone == m.telefone,
                                                                          MensagemWhatsApp.nome != "")
                                     .order_by(MensagemWhatsApp.id.desc()).limit(1)).scalar() or ""
@@ -76,10 +76,10 @@ def conversa(telefone: str, usuario: Usuario = Depends(equipe), db: Session = De
     _tela_vista(db)
     chave = _chave(telefone)
     mensagens = list(db.execute(select(MensagemWhatsApp).where(MensagemWhatsApp.telefone == chave)
-                                .order_by(MensagemWhatsApp.id.desc()).limit(300)).scalars())[::-1]
-    for m in mensagens:
-        if m.direcao == "entrada" and not m.lida:
-            m.lida = True
+                                .order_by(MensagemWhatsApp.criado_em.desc(), MensagemWhatsApp.id.desc())
+                                .limit(300)).scalars())[::-1]
+    for m in [m for m in mensagens if m.direcao == "entrada" and not m.lida]:
+        m.lida = True
     db.commit()
     pendentes = db.execute(select(PonteWhatsApp).where(PonteWhatsApp.manual.is_(True),
                                                        PonteWhatsApp.status.in_(["aguardando", "retirada"]))
