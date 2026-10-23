@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% block titulo %}Primeiro acesso{% endblock %}
 {% block publico %}
-<div class="login">
+<div class="login"><div class="conteiner">
+  <div class="capa">
+    <div class="marca"><img class="logo-img" src="/static/logo-ms.png" alt="MS Certificação Digital"><span class="divisor"></span>
+      <span class="rotulo-marca">Autoridade de registro<br>ICP-Brasil</span></div>
+    <span class="etiqueta">Primeiro acesso</span>
+  </div>
   <form class="cartao" method="post" action="/primeiro-acesso">
     <h1 style="margin-bottom:6px">Bem-vinda!</h1>
     <p class="suave">Crie a conta do <b>administrador</b> do sistema. Depois você cadastra os vendedores em Configurações.</p>
@@ -13,5 +18,6 @@
     <div class="campo"><label>Repita a senha</label><input type="password" name="senha2" required minlength="8"></div>
     <button class="btn btn-primario" style="width:100%;justify-content:center">Criar conta e entrar</button>
   </form>
+</div>
 </div>
 {% endblock %}

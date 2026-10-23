@@ -25,14 +25,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf" content="{{ csrf }}">
   <title>{% block titulo %}Prospecção{% endblock %} · MS Parceiros</title>
-  <link rel="stylesheet" href="/static/estilo.css?v=4">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="/static/estilo.css?v=6">
+  <link rel="icon" href="/static/logo-ms.png">
 </head>
 <body>
 {% if usuario %}
-<div class="topo-celular"><button id="abrir-menu" aria-label="Abrir menu">☰</button><b>MS Parceiros</b></div>
+<div class="topo-celular"><button id="abrir-menu" aria-label="Abrir menu">☰</button><img src="/static/logo-ms.png" alt="MS Certificação Digital"><b>Parceiros</b></div>
 <div class="estrutura">
   <nav class="menu">
-    <div class="marca"><span class="logo">MS</span><span><b>Parceiros</b><small>Prospecção B2B</small></span></div>
+    <div class="marca"><img class="logo-img" src="/static/logo-ms.png" alt="MS Certificação Digital"><span class="divisor"></span>
+      <span class="rotulo-marca">Parceiros<br>Prospecção B2B</span></div>
     {% for link, nome, icone in menu %}
       <a class="item {{ 'ativo' if (caminho == link or (link not in ['/', '/portal'] and caminho.startswith(link))) }}" href="{{ link }}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ ICONES[icone] }}"/></svg>{{ nome }}{% if link == '/oportunidades' and avisos_novos %}<span class="contador">{{ avisos_novos }}</span>{% endif %}{% if link == '/whatsapp' %}<span class="ponto {{ 'verde' if wl.conectado else ('amarelo' if wl.disponivel else 'vermelho') }}" style="margin-left:auto" title="WhatsApp {{ 'conectado' if wl.conectado else ('aguardando QR code' if wl.estado_codigo == 'aguardando_qr' else ('desconectado' if wl.disponivel else 'desligado')) }}"></span>{% endif %}</a>

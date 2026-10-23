@@ -1,12 +1,15 @@
 /* Prospecção de Parceiros – MS Certificação Digital.
-   Cores e medidas nas variáveis abaixo (ver docs/design-system.md). Azul e verde da identidade MS. */
+   Cores e medidas nas variáveis abaixo (ver docs/design-system.md).
+   Identidade do Portfólio MS 2026: azul-marinho #0D3B66/#0A2F57, verde #3CC77A, Inter + etiquetas em monoespaçada. */
 :root {
-  --azul: #0f3a64;
-  --azul-escuro: #0a2a49;
-  --azul-claro: #e8f0f8;
-  --verde: #1fa463;
+  --azul: #0d3b66;
+  --azul-escuro: #0a2f57;
+  --azul-medio: #12456f;
+  --azul-claro: #e7eff7;
+  --verde-marca: #3cc77a;   /* detalhes: traços, pontos, item ativo (como no portfólio) */
+  --verde: #1f9d5c;         /* botões e textos sobre branco (o verde da marca é claro demais para texto branco) */
   --verde-claro: #e3f6ec;
-  --fundo: #f4f6f9;
+  --fundo: #f3f6fa;
   --cartao: #ffffff;
   --texto: #1b2633;
   --suave: #637083;
@@ -15,11 +18,12 @@
   --erro-claro: #fdecea;
   --alerta: #b7791f;
   --alerta-claro: #fff6e0;
-  --roxo: #6b46c1;
-  --roxo-claro: #f1ebfd;
+  --roxo: #1e5f96;         /* tudo que é IA: azul médio da marca (sem roxo, fora da identidade) */
+  --roxo-claro: #e4eef8;
   --raio: 10px;
   --sombra: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .08);
   --fonte: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+  --fonte-mono: "JetBrains Mono", "DejaVu Sans Mono", Consolas, "Courier New", monospace;
 }
 
 * { box-sizing: border-box; }
@@ -116,7 +120,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-sp
 .btn-verde { background: var(--verde); border-color: var(--verde); color: #fff; }
 .btn-verde:hover { background: #178a52; }
 .btn-ia { background: var(--roxo); border-color: var(--roxo); color: #fff; }
-.btn-ia:hover { background: #553399; }
+.btn-ia:hover { background: #174d7b; }
 .btn-perigo { color: var(--erro); border-color: #f2c4bf; }
 .btn-pequeno { padding: 4px 9px; font-size: .8rem; }
 .btn[disabled] { opacity: .5; cursor: not-allowed; }
@@ -241,3 +245,53 @@ dialog::backdrop { background: rgba(10, 30, 50, .45); }
 
 .ponto { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; background: #94a3b8; }
 .ponto.verde { background: #22c55e; } .ponto.amarelo { background: #f59e0b; } .ponto.vermelho { background: #ef4444; }
+
+/* ---------- Identidade visual MS (Portfólio 2026) ---------- */
+h1 { font-weight: 800; letter-spacing: -.025em; }
+h2 { font-weight: 700; letter-spacing: -.01em; }
+.cabecalho h1::after { content: ""; display: block; width: 40px; height: 3px; border-radius: 2px;
+                       background: var(--verde-marca); margin-top: 8px; }
+.etiqueta, .kpi .rotulo, th { font-family: var(--fonte-mono); text-transform: uppercase; letter-spacing: .12em;
+                              font-weight: 500; }
+.kpi .rotulo, th { font-size: .68rem; }
+.etiqueta { display: inline-flex; align-items: center; gap: 7px; font-size: .68rem; color: var(--azul);
+            border: 1px solid #c9d8e6; border-radius: 999px; padding: 3px 11px; background: #fff; }
+.etiqueta::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--verde-marca); }
+
+/* Menu lateral: azul-marinho do portfólio, logotipo e item ativo com traço verde */
+.menu { background: linear-gradient(180deg, var(--azul) 0%, var(--azul-escuro) 100%); color: #dbe6f0; }
+.marca { gap: 12px; padding: 6px 8px 20px; }
+.marca .logo-img { height: 34px; width: auto; display: block; }
+.marca .divisor { width: 1px; align-self: stretch; background: rgba(219, 230, 240, .25); }
+.marca .rotulo-marca { font-family: var(--fonte-mono); font-size: .62rem; letter-spacing: .14em; line-height: 1.5;
+                       text-transform: uppercase; color: #9fb4c9; }
+.menu a.item:hover { background: rgba(255, 255, 255, .06); }
+.menu a.item.ativo { background: rgba(60, 199, 122, .12); color: #fff; box-shadow: inset 3px 0 0 var(--verde-marca); }
+.menu a.item.ativo svg { color: var(--verde-marca); opacity: 1; }
+.menu .rodape { border-top-color: rgba(219, 230, 240, .15); }
+.topo-celular img { height: 22px; }
+
+/* Indicadores e cartões */
+.kpi { border-radius: 12px; }
+.kpi .valor { font-weight: 800; letter-spacing: -.02em; }
+.kpi.destaque { background: var(--azul); border-color: var(--azul); }
+.kpi.destaque .rotulo { color: var(--verde-marca); }
+.cartao { border-radius: 12px; }
+.btn-verde:hover { background: #188a4f; }
+input:focus, select:focus, textarea:focus { outline: 2px solid rgba(60, 199, 122, .45); border-color: var(--verde); }
+
+/* Login e primeiro acesso: como a capa do portfólio (azul-marinho com círculos finos) */
+.login { background:
+           radial-gradient(circle at 105% -10%, transparent 0 220px, rgba(219, 230, 240, .07) 221px 222px, transparent 223px),
+           radial-gradient(circle at 105% -10%, transparent 0 330px, rgba(219, 230, 240, .06) 331px 332px, transparent 333px),
+           radial-gradient(circle at 105% -10%, transparent 0 440px, rgba(219, 230, 240, .05) 441px 442px, transparent 443px),
+           linear-gradient(160deg, var(--azul) 0%, var(--azul-escuro) 100%); }
+.login .conteiner { width: 100%; max-width: 400px; }
+.login .capa { color: #fff; margin-bottom: 18px; }
+.login .capa .marca { padding: 0 0 22px; }
+.login .capa .logo-img { height: 46px; }
+.login .capa h1 { font-size: 2.1rem; color: #fff; margin-top: 12px; }
+.login .capa h1::after { content: ""; display: block; width: 46px; height: 3px; border-radius: 2px;
+                         background: var(--verde-marca); margin-top: 12px; }
+.login .capa p { color: #dbe6f0; margin-top: 12px; }
+.login .capa .etiqueta { background: transparent; color: #dbe6f0; border-color: rgba(219, 230, 240, .3); }
