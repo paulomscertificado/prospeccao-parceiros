@@ -71,13 +71,13 @@ def ler_site(site: str, max_paginas: int = 6) -> dict:
             for link in links[: max_paginas - 1]:
                 try:
                     r2 = c.get(link)
-                except httpx.HTTPError:
+                except (httpx.HTTPError, ValueError):  # link/redirecionamento inválido no site: pula
                     continue
                 if r2.status_code < 400 and "html" in r2.headers.get("content-type", "html"):
                     paginas.append(link)
                     htmls.append(r2.text[:400_000])
                     textos.append(_texto_visivel(r2.text[:400_000]))
-    except httpx.HTTPError:
+    except (httpx.HTTPError, ValueError):  # site fora do ar ou com endereço inválido: segue sem ele
         return {}
     return {"paginas": paginas, "texto": "\n".join(textos)[:60_000], "html": "\n".join(htmls)}
 

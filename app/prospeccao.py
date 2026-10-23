@@ -191,9 +191,9 @@ def dados_do_site(site: str) -> dict:
                     r2 = c.get(urljoin(str(r.url), contato.group(1)))
                     if r2.status_code < 400:
                         textos.append(r2.text[:400_000])
-                except httpx.HTTPError:
+                except (httpx.HTTPError, ValueError):  # link de contato inválido (ex.: um e-mail): pula
                     pass
-    except httpx.HTTPError:
+    except (httpx.HTTPError, ValueError):  # site fora do ar ou com endereço inválido: segue sem ele
         return {}
     html = "\n".join(textos)
     dominio_site = util.dominio(url)
@@ -244,7 +244,7 @@ def descobrir_site(empresa: str, email: str, cnpj: str = "") -> str:
             with httpx.Client(timeout=8, follow_redirects=True,
                               headers={"User-Agent": "Mozilla/5.0 (compatible; MS-Prospeccao/1.0)"}) as c:
                 r = c.get(url)
-        except httpx.HTTPError:
+        except (httpx.HTTPError, ValueError):
             continue
         if r.status_code >= 400 or "html" not in r.headers.get("content-type", ""):
             continue

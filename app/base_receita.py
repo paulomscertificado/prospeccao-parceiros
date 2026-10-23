@@ -379,7 +379,13 @@ def buscar(db, cidade: str, uf: str, limite: int, categorias: list[str] | None =
             palavras += [util.chave_texto(p) for p in c.lista("palavras_chave")]
     consulta = select(EmpresaReceita).where(EmpresaReceita.uf == uf)
     if cidade:
-        consulta = consulta.where(EmpresaReceita.municipio_chave == util.chave_texto(cidade))
+        chave = util.chave_texto(cidade)
+        existe = db.execute(select(EmpresaReceita.cnpj).where(EmpresaReceita.uf == uf,
+                                                              EmpresaReceita.municipio_chave == chave).limit(1)).first()
+        if existe:
+            consulta = consulta.where(EmpresaReceita.municipio_chave == chave)
+        else:  # não é uma cidade do estado: procura como bairro (ex.: "Boa Viagem", em Recife)
+            consulta = consulta.where(EmpresaReceita.bairro.ilike(cidade.strip()))
     if categorias:
         consulta = consulta.where(EmpresaReceita.categoria.in_(categorias))
     if so_matriz:

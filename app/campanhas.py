@@ -106,19 +106,37 @@ def _anotar(campanha_id: int, etapa: str, status: str | None = None, erro: str =
 
 
 def _pesquisar(lead_id: int, usar_ia: bool) -> None:
+    """Pesquisa UMA empresa. Qualquer problema (site quebrado, fonte fora do ar) fica só nela: a campanha segue."""
     from .pesquisa import pesquisar_lead
 
-    with sessao() as db:
-        lead = db.get(Lead, lead_id)
-        if lead and not lead.pesquisado_em:
-            pesquisar_lead(db, lead, usar_ia=usar_ia)
+    try:
+        with sessao() as db:
+            lead = db.get(Lead, lead_id)
+            if lead and not lead.pesquisado_em:
+                pesquisar_lead(db, lead, usar_ia=usar_ia)
+    except Exception as erro:  # noqa: BLE001 - uma empresa com problema não pode travar a campanha
+        log.warning("Pesquisa da empresa %s falhou: %s", lead_id, erro)
+        with sessao() as db:
+            lead = db.get(Lead, lead_id)
+            if lead and not lead.pesquisado_em:
+                lead.pesquisado_em = agora()  # não tenta de novo a cada rodada
+                from . import score
+
+                score.atualizar(db, lead)  # nota e fit com os dados da Receita (sem o site)
+                historico(db, lead.id, "sistema", "Não foi possível pesquisar o site desta empresa "
+                          f"({str(erro)[:150]}). Ela segue com os dados da Receita.", None)
 
 
 def _mensagens(lead_id: int, usuario_id: int, cta: str, tom: str) -> tuple[int, dict]:
+    """Mensagens de UMA empresa. Se a IA falhar, usa os modelos por regras (a campanha não para)."""
     with sessao() as db:
         lead = db.get(Lead, lead_id)
         usuario = db.get(Usuario, lead.vendedor_id or usuario_id)
-        return lead_id, sdr.gerar_mensagens(db, lead, usuario, cta, tom)
+        try:
+            return lead_id, sdr.gerar_mensagens(db, lead, usuario, cta, tom)
+        except Exception as erro:  # noqa: BLE001
+            log.warning("Mensagens da empresa %s: IA falhou (%s), usando os modelos", lead_id, erro)
+            return lead_id, sdr.mensagens_por_regras(db, lead, usuario, cta)
 
 
 def _buscar_candidatos(campanha_id: int) -> list[int]:
@@ -149,6 +167,10 @@ def _buscar_candidatos(campanha_id: int) -> list[int]:
                     lead.categoria = cats[cod]
                 candidatos.append(lead.id)
                 achados += 1
+        if not candidatos:
+            nomes = ", ".join(c.nome for c in cats.values()) or "das categorias escolhidas"
+            raise RuntimeError(f"Não encontrei empresas novas de {nomes} em \"{camp.cidade}\"/{camp.estado} na base da "
+                               "Receita. Confira o nome da cidade (ou do bairro) e o estado, ou escolha outro segmento.")
         return list(dict.fromkeys(candidatos))
 
 
