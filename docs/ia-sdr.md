@@ -129,6 +129,6 @@ automático de ângulos/CTAs, fila em Redis para volumes acima de milhares de en
 
 ## Testar antes de aprovar
 
-`campanhas.enviar_teste` (ação `/campanhas/{id}/testar`): manda os toques de 1 a 5 empresas (só o primeiro ou todos) para o e-mail/WhatsApp de quem testa, com "[TESTE]". Não grava `Mensagem` nos leads, não conta nos limites, não muda a campanha; fica só no log (`testou_campanha`).
+`campanhas.enviar_teste` (ação `/campanhas/{id}/testar`): a pessoa escolhe a campanha (`campanha_teste`, qualquer uma que ela pode ver, aguardando/ativa/pausada), o canal (`canal_teste` = whatsapp ou email) e o destino dela; vão os toques daquele canal de 1 a 5 empresas (só o primeiro ou todos), com "[TESTE]". A tela mostra quantas mensagens de cada canal a campanha tem (`mensagens_para_teste`). Não grava `Mensagem` nos leads, não conta nos limites, não muda a campanha; fica só no log (`testou_campanha`).
 
 Canal: a IA não faz ligações. Com WhatsApp permitido, o celular informado à Receita vira o WhatsApp do lead (`celular_do_lead`). Empresas sem canal permitido (só telefone fixo) ficam fora da campanha, vão para `Campanha.so_fixo` e o usuário recebe aviso + cartão "Faça uma campanha de ligação" na campanha; `cadencias.aplicar` nunca cria tarefa de ligação em campanha.

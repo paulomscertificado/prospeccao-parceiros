@@ -462,17 +462,35 @@ def andamento(db, camp: Campanha) -> list[dict]:
     return list(linhas.values())
 
 
-def enviar_teste(db, camp: Campanha, usuario: Usuario, email_teste: str, whatsapp_teste: str,
+def mensagens_para_teste(db, campanhas_ids: list[int]) -> dict[int, dict[str, int]]:
+    """Quantas mensagens de e-mail e de WhatsApp (ainda não enviadas) cada campanha tem: {id: {"email": n, "whatsapp": n}}."""
+    contagem: dict[int, dict[str, int]] = {i: {"email": 0, "whatsapp": 0} for i in campanhas_ids}
+    if not campanhas_ids:
+        return contagem
+    linhas = db.execute(select(Tarefa.campanha_id, Tarefa.canal, func.count(Tarefa.id))
+                        .where(Tarefa.campanha_id.in_(campanhas_ids), Tarefa.canal.in_(["email", "whatsapp"]),
+                               Tarefa.status.in_(["rascunho", "pendente"]))
+                        .group_by(Tarefa.campanha_id, Tarefa.canal)).all()
+    for cid, canal, n in linhas:
+        contagem[cid][canal] = n
+    return contagem
+
+
+def enviar_teste(db, camp: Campanha, usuario: Usuario, canal: str, destino: str,
                  empresas: int = 1, todos_os_toques: bool = False) -> dict:
-    """Ambiente de teste: manda as mensagens da campanha para o e-mail/WhatsApp DE QUEM ESTÁ TESTANDO, com
-    "[TESTE]" no começo. Nenhum lead recebe nada, nada conta nos limites e a campanha não muda de situação."""
+    """Ambiente de teste: manda as mensagens de UM canal da campanha (e-mail ou WhatsApp) para o e-mail/WhatsApp DE
+    QUEM ESTÁ TESTANDO, com "[TESTE]" no começo. Nenhum lead recebe nada, nada conta nos limites e a campanha
+    não muda de situação."""
     from . import conexoes
     from .integracoes import email_smtp, whatsapp_leads
 
-    tarefas = db.execute(select(Tarefa).where(Tarefa.campanha_id == camp.id, Tarefa.status.in_(["rascunho", "pendente"]))
+    tarefas = db.execute(select(Tarefa).where(Tarefa.campanha_id == camp.id, Tarefa.canal == canal,
+                                              Tarefa.status.in_(["rascunho", "pendente"]))
                          .order_by(Tarefa.lead_id, Tarefa.data, Tarefa.id)).scalars().all()
     escolhidas, leads = [], []
     for t in tarefas:
+        if not (t.mensagem or "").strip():
+            continue
         if t.lead_id not in leads:
             if len(leads) >= max(1, min(empresas, 5)):
                 continue
@@ -480,38 +498,28 @@ def enviar_teste(db, camp: Campanha, usuario: Usuario, email_teste: str, whatsap
         elif not todos_os_toques:
             continue
         escolhidas.append(t)
-    feito = {"emails": 0, "whatsapps": 0, "erros": []}
+    feito = {"enviadas": 0, "erros": []}
     numero = ""
-    if whatsapp_teste:
+    if canal == "whatsapp" and escolhidas:
         try:
             numero = conexoes.para_enviar(db, usuario)
         except conexoes.SemNumero as erro:
             feito["erros"].append(f"WhatsApp: {erro}")
+            return feito
     for t in escolhidas:
         empresa = t.lead.empresa if t.lead else "empresa"
         rotulo = f"[TESTE · {empresa} · {config.ANGULOS.get(t.angulo, t.acao)}]"
-        if not (t.mensagem or "").strip():
-            continue
-        canal_nome = {"email": "E-mail", "whatsapp": "WhatsApp", "ligacao": "Roteiro de ligação"}.get(t.canal, t.canal)
-        rotulo = rotulo[:-1] + f" · {canal_nome}]"
-        # O teste vai para todos os destinos informados, qualquer que seja o canal do toque
-        # (ex.: campanha só com ligação/WhatsApp também pode ser conferida pelo e-mail).
-        if email_teste:
-            try:
-                email_smtp.enviar(email_teste, f"[TESTE] {t.assunto or 'MS Certificação Digital'}",
+        try:
+            if canal == "email":
+                email_smtp.enviar(destino, f"[TESTE] {t.assunto or 'MS Certificação Digital'}",
                                   f"{rotulo}\n\n{t.mensagem}", lead_id=None)
-                feito["emails"] += 1
-            except email_smtp.ErroEmail as erro:
-                feito["erros"].append(f"E-mail: {erro}")
-                break
-        if whatsapp_teste and numero:
-            try:
-                whatsapp_leads.enviar(whatsapp_teste, "Teste", f"{rotulo}\n\n{t.mensagem}", db=db, manual=True,
+            else:
+                whatsapp_leads.enviar(destino, "Teste", f"{rotulo}\n\n{t.mensagem}", db=db, manual=True,
                                       usuario_id=usuario.id, conexao=numero)
-                feito["whatsapps"] += 1
-            except whatsapp_leads.ErroWhatsAppLeads as erro:
-                feito["erros"].append(f"WhatsApp: {erro}")
-                break
+            feito["enviadas"] += 1
+        except (email_smtp.ErroEmail, whatsapp_leads.ErroWhatsAppLeads) as erro:
+            feito["erros"].append(f"{'E-mail' if canal == 'email' else 'WhatsApp'}: {erro}")
+            break
     return feito
 
 

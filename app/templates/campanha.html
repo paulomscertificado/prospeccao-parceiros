@@ -29,20 +29,49 @@
 {% if c.status in ('aguardando_aprovacao', 'ativa', 'pausada') %}
 <details class="cartao" id="testar" {{ 'open' if c.status == 'aguardando_aprovacao' }}>
   <summary><h2 style="display:inline">🧪 Testar antes de aprovar</h2>
-    <span class="pequeno suave">— receba as mensagens da campanha no SEU e-mail/WhatsApp. Nenhum lead recebe nada.</span></summary>
-  <form method="post" action="/campanhas/{{ c.id }}/testar" style="margin-top:12px">
+    <span class="pequeno suave">— receba as mensagens no SEU e-mail ou WhatsApp. Nenhum lead recebe nada.</span></summary>
+  <form method="post" action="/campanhas/{{ c.id }}/testar" style="margin-top:12px" id="form-teste">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <div class="campos">
-      <div><label>Seu e-mail de teste</label><input type="email" name="email_teste" value="{{ usuario.email }}"></div>
-      <div><label>Seu WhatsApp de teste (opcional)</label><input type="text" inputmode="tel" name="whatsapp_teste" placeholder="(81) 99999-0000"></div>
+      <div><label>1. Qual campanha testar</label>
+        <select name="campanha_teste" id="campanha-teste">
+          {% for t in testaveis %}<option value="{{ t.id }}" data-email="{{ t.email }}" data-whatsapp="{{ t.whatsapp }}" {{ 'selected' if t.id == c.id }}>{{ t.nome }} ({{ t.whatsapp }} WhatsApp · {{ t.email }} e-mail)</option>{% endfor %}
+        </select></div>
+      <div><label>2. Testar qual canal</label>
+        <select name="canal_teste" id="canal-teste">
+          <option value="whatsapp">💬 WhatsApp</option>
+          <option value="email">✉ E-mail</option>
+        </select></div>
+      <div id="campo-whatsapp"><label>3. Seu WhatsApp (recebe o teste)</label><input type="text" inputmode="tel" name="whatsapp_teste" placeholder="(81) 99999-0000"></div>
+      <div id="campo-email"><label>3. Seu e-mail (recebe o teste)</label><input type="email" name="email_teste" value="{{ usuario.email }}"></div>
       <div><label>Mensagens de quantas empresas</label><select name="empresas">{% for n in [1, 2, 3, 5] %}<option>{{ n }}</option>{% endfor %}</select></div>
       <div><label>Quais toques</label><select name="toques"><option value="primeiro">Só o primeiro contato</option><option value="todos">Todos os 4 toques</option></select></div>
     </div>
-    <p class="pequeno suave">Chega com "[TESTE]" no assunto/início e o nome da empresa, para você ver exatamente o que o lead receberia.
-      Não conta nos limites e não muda nada na campanha. O WhatsApp sai pelo seu número conectado.</p>
-    <button class="btn btn-primario">Enviar teste para mim</button>
+    <p class="pequeno suave" id="aviso-canal"></p>
+    <p class="pequeno suave">Chega com "[TESTE]" e o nome da empresa, do jeito que o lead receberia. Não conta nos limites e não muda nada
+      na campanha. O WhatsApp de teste sai pelo seu número conectado.</p>
+    <button class="btn btn-primario" id="botao-teste">Enviar teste para mim</button>
   </form>
 </details>
+<script>
+(function () {
+  const camp = document.getElementById("campanha-teste"), canal = document.getElementById("canal-teste");
+  const aviso = document.getElementById("aviso-canal"), botao = document.getElementById("botao-teste");
+  function atualizar(trocouCampanha) {
+    const op = camp.selectedOptions[0], qtd = {email: +op.dataset.email, whatsapp: +op.dataset.whatsapp};
+    if (trocouCampanha && !qtd[canal.value]) canal.value = qtd.whatsapp ? "whatsapp" : "email";
+    document.getElementById("campo-whatsapp").style.display = canal.value === "whatsapp" ? "" : "none";
+    document.getElementById("campo-email").style.display = canal.value === "email" ? "" : "none";
+    const nome = canal.value === "email" ? "e-mail" : "WhatsApp";
+    aviso.textContent = qtd[canal.value] ? qtd[canal.value] + " mensagens de " + nome + " nesta campanha."
+                                         : "Esta campanha não tem mensagens de " + nome + ". Escolha o outro canal ou outra campanha.";
+    botao.disabled = !qtd[canal.value];
+  }
+  camp.addEventListener("change", () => atualizar(true));
+  canal.addEventListener("change", () => atualizar(false));
+  atualizar(true);
+})();
+</script>
 {% endif %}
 
 {% if whatsapp_hoje %}

@@ -284,7 +284,17 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(equipe),
             sem_numero = str(erro)
     ids_fixo = [int(i) for i in (camp.so_fixo or "").split(",") if i.isdigit()]
     so_fixo = db.execute(select(Lead).where(Lead.id.in_(ids_fixo))).scalars().all() if ids_fixo else []
+    testaveis_q = (select(Campanha).where(Campanha.arquivada.is_(False),
+                                          Campanha.status.in_(["aguardando_aprovacao", "ativa", "pausada"]))
+                   .order_by(Campanha.criado_em.desc()).limit(50))
+    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
+        testaveis_q = testaveis_q.where(Campanha.usuario_id == usuario.id)
+    testaveis = db.execute(testaveis_q).scalars().all()
+    if camp not in testaveis:
+        testaveis.insert(0, camp)
+    contagem = campanhas.mensagens_para_teste(db, [t.id for t in testaveis])
     return tela(request, "campanha.html", {
+        "testaveis": [{"id": t.id, "nome": t.nome, **contagem[t.id]} for t in testaveis],
         "so_fixo": so_fixo,
         "andamento": campanhas.andamento(db, camp) if camp.status not in ("gerando", "erro") else [],
         "whatsapp_hoje": whatsapp_hoje, "numero_whatsapp": numero, "sem_numero": sem_numero,
@@ -350,28 +360,31 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
                 t.mensagem, t.assunto = novo, str(form.get("assunto", t.assunto))[:200]
                 avisar(request, "Mensagem atualizada.")
     elif acao == "testar":
-        email_teste = str(form.get("email_teste", "")).strip()
-        whats_teste = util.normalizar_telefone(str(form.get("whatsapp_teste", "")))
-        if email_teste and not util.email_valido(email_teste):
-            avisar(request, "Digite um e-mail de teste válido.", "erro")
-        elif not email_teste and not whats_teste:
-            avisar(request, "Informe um e-mail e/ou um celular (com DDD) para receber o teste.", "erro")
+        alvo = _campanha(db, util.para_int(form.get("campanha_teste")) or cid, usuario)
+        canal = "whatsapp" if form.get("canal_teste") == "whatsapp" else "email"
+        if canal == "email":
+            destino = str(form.get("email_teste", "")).strip()
+            invalido = "Digite um e-mail de teste válido." if not util.email_valido(destino) else ""
         else:
-            r = campanhas.enviar_teste(db, camp, usuario, email_teste, "55" + whats_teste if whats_teste else "",
-                                       util.para_int(form.get("empresas")) or 1, form.get("toques") == "todos")
-            registrar_log(db, usuario, "testou_campanha", "campanha", cid,
-                          f"{r['emails']} e-mails, {r['whatsapps']} WhatsApps de teste", request)
-            partes = []
-            if r["emails"]:
-                partes.append(f"{r['emails']} e-mail(s) para {email_teste}")
-            if r["whatsapps"]:
-                partes.append(f"{r['whatsapps']} WhatsApp(s) para {util.formatar_telefone(whats_teste)}")
-            if partes:
-                avisar(request, "Teste enviado: " + " e ".join(partes) + ". Nenhum lead recebeu nada.")
+            digitos = util.normalizar_telefone(str(form.get("whatsapp_teste", "")))
+            destino = "55" + digitos if digitos else ""
+            invalido = "Digite o seu celular com DDD para receber o teste no WhatsApp." if not digitos else ""
+        if invalido:
+            avisar(request, invalido, "erro")
+        else:
+            r = campanhas.enviar_teste(db, alvo, usuario, canal, destino, util.para_int(form.get("empresas")) or 1,
+                                       form.get("toques") == "todos")
+            registrar_log(db, usuario, "testou_campanha", "campanha", alvo.id,
+                          f"{r['enviadas']} mensagens de {canal} de teste para {destino}", request)
+            if r["enviadas"]:
+                para = destino if canal == "email" else util.formatar_telefone(destino[2:])
+                avisar(request, f"Teste da campanha \"{alvo.nome}\" enviado: {r['enviadas']} "
+                                f"{'e-mail(s)' if canal == 'email' else 'WhatsApp(s)'} para {para}. Nenhum lead recebeu nada.")
             for erro in r["erros"]:
                 avisar(request, erro, "erro")
-            if not partes and not r["erros"]:
-                avisar(request, "As mensagens desta campanha ainda estão vazias. Gere ou edite as mensagens e tente de novo.", "alerta")
+            if not r["enviadas"] and not r["erros"]:
+                avisar(request, f"A campanha \"{alvo.nome}\" não tem mensagens de "
+                                f"{'e-mail' if canal == 'email' else 'WhatsApp'} para testar. Escolha o outro canal.", "alerta")
         db.commit()
         return voltar(f"/campanhas/{cid}#testar")
     elif acao == "remover-lead":
