@@ -43,9 +43,11 @@
   <div class="kpi"><div class="rotulo">Taxa de conversão</div><div class="valor">{{ ind.taxa_conversao|pct }}</div><div class="detalhe">{{ ind.parceiros_convertidos }} novos parceiros</div></div>
   <div class="kpi"><div class="rotulo">Parceiros cadastrados</div><div class="valor">{{ ind.parceiros_cadastrados }}</div><div class="detalhe">{{ ind.parceiros_ativacao }} em ativação</div></div>
   <div class="kpi"><div class="rotulo">Parceiros ativos</div><div class="valor">{{ ind.parceiros_ativos }}</div><div class="detalhe">{{ ind.parceiros_inativos }} inativos/bloqueados</div></div>
+  {% if mostrar_vendas %}
   <div class="kpi"><div class="rotulo">Certificados vendidos</div><div class="valor">{{ ind.certificados_vendidos }}</div><div class="detalhe">ticket médio {{ ind.ticket_medio|moeda }}</div></div>
   <div class="kpi"><div class="rotulo">Receita gerada</div><div class="valor">{{ ind.receita|moeda }}</div><div class="detalhe">lucro bruto {{ ind.lucro_bruto|moeda }}</div></div>
   <div class="kpi"><div class="rotulo">Comissão gerada</div><div class="valor">{{ ind.comissao|moeda }}</div><div class="detalhe">média {{ ind.comissao_media|moeda }}</div></div>
+  {% endif %}
 </div>
 
 <div class="grade-2">
@@ -57,8 +59,10 @@
 
 <div class="grade-3">
   <div class="cartao"><h2>Parceiros</h2><div class="grafico baixo"><canvas id="g-parceiros"></canvas></div></div>
+  {% if mostrar_vendas %}
   <div class="cartao"><h2>Certificados por parceiro</h2><div class="grafico baixo"><canvas id="g-certificados"></canvas></div></div>
   <div class="cartao"><h2>Receita por parceiro</h2><div class="grafico baixo"><canvas id="g-receita"></canvas></div></div>
+  {% endif %}
 </div>
 
 <div class="grade-2">
@@ -77,6 +81,7 @@
   </div>
 </div>
 
+{% if mostrar_vendas %}
 <div class="grade-2">
   <div class="cartao"><h2>Ranking dos parceiros <a class="btn btn-pequeno" href="/parceiros?aba=ranking">Ver ranking</a></h2>
     <table><tr><th>Parceiro</th><th class="num">Certificados</th><th class="num">Faturamento</th><th class="num">Comissão</th></tr>
@@ -90,6 +95,7 @@
     {% else %}<tr><td colspan="3" class="vazio">Nenhum certificado vencendo.</td></tr>{% endfor %}</table>
   </div>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
@@ -115,7 +121,7 @@ if (window.Chart) {
   new Chart(document.getElementById('g-parceiros'), { type: 'doughnut',
     data: { labels: G.parceiros.map(x => x[0]), datasets: [{ data: G.parceiros.map(x => x[1]), backgroundColor: [VERDE, '#e0a72e', CINZA] }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } } });
-  const barras = (id, dados, cor, moeda) => new Chart(document.getElementById(id), { type: 'bar',
+  const barras = (id, dados, cor, moeda) => document.getElementById(id) && new Chart(document.getElementById(id), { type: 'bar',
     data: { labels: dados.map(x => x[0]), datasets: [{ data: dados.map(x => x[1]), backgroundColor: cor, borderRadius: 4 }] },
     options: { ...base, indexAxis: 'y', scales: { x: { beginAtZero: true, ticks: moeda ? { callback: v => 'R$ ' + v.toLocaleString('pt-BR') } : { precision: 0 } }, y: semGrade } } });
   barras('g-certificados', G.certificados, AZUL, false);

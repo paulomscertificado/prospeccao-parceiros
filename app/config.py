@@ -212,6 +212,7 @@ NOMES_UF = {
 
 # Configurações que o administrador altera na tela (guardadas no banco).
 CONFIG_PADRAO = {
+    "mostrar_vendas": "0",  # Vendas, Vencimentos e Comissões ocultos no menu e no Dashboard (pedido da MS)
     "empresa_nome": "MS Certificação Digital",
     "link_parceria": "https://mscertificados.com.br",
     "texto_comissao": "comissão por cada certificado emitido",

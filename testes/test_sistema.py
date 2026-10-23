@@ -365,3 +365,20 @@ def test_apagar_demonstracao(cliente, csrf):
     with sessao() as db:
         assert db.execute(select(Lead.id).where(Lead.origem == "Demonstração")).first() is None
         assert db.execute(select(Usuario.id).where(Usuario.email.like("%@demo.example"))).first() is None
+
+
+def test_vendas_vencimentos_comissoes_ocultos_por_padrao(cliente):
+    from app.banco import gravar_config, sessao
+
+    pagina = cliente.get("/").text
+    assert 'href="/vendas"' not in pagina and 'href="/comissoes"' not in pagina and 'href="/vencimentos"' not in pagina
+    assert "Comissão gerada" not in pagina and "Ranking dos parceiros" not in pagina
+    assert 'href="/leads"' in pagina and "Conversão do funil" in pagina
+    with sessao() as db:
+        gravar_config(db, "mostrar_vendas", "1")
+    try:
+        pagina = cliente.get("/").text
+        assert 'href="/vendas"' in pagina and "Comissão gerada" in pagina and "Ranking dos parceiros" in pagina
+    finally:
+        with sessao() as db:
+            gravar_config(db, "mostrar_vendas", "0")

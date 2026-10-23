@@ -46,6 +46,8 @@ MENU_EQUIPE = [
     ("/ia", "IA Comercial", "brilho"),
     ("/configuracoes", "Configurações", "engrenagem"),
 ]
+# Áreas que só aparecem com a configuração "mostrar_vendas" = 1 (Configurações > Geral)
+AREAS_DE_VENDAS = {"/vencimentos", "/vendas", "/comissoes"}
 MENU_PARCEIRO = [
     ("/portal", "Meu painel", "grafico"),
     ("/portal/indicar", "Indicar cliente", "pessoas"),
@@ -63,16 +65,18 @@ def avisar(request: Request, texto: str, tipo: str = "ok") -> None:
 def tela(request: Request, nome: str, contexto: dict | None = None, status_code: int = 200):
     usuario = getattr(request.state, "usuario", None)
     avisos_novos = 0
+    mostrar_vendas = False
     wl = {"disponivel": False, "conectado": False}
     if usuario and usuario.perfil != "parceiro":
         from sqlalchemy import func, select
 
-        from .banco import FabricaSessao
+        from .banco import FabricaSessao, ler_config
         from .modelos import Notificacao
 
         with FabricaSessao() as db:
             avisos_novos = db.execute(select(func.count(Notificacao.id)).where(
                 Notificacao.usuario_id == usuario.id, Notificacao.lida.is_(False))).scalar() or 0
+            mostrar_vendas = ler_config(db, "mostrar_vendas") == "1"
         from .integracoes import whatsapp_leads
 
         wl = whatsapp_leads.status()
@@ -83,7 +87,9 @@ def tela(request: Request, nome: str, contexto: dict | None = None, status_code:
         "wl": wl,
         "csrf": token_csrf(request),
         "avisos": request.session.pop("avisos", []),
-        "menu": (MENU_PARCEIRO if usuario and usuario.perfil == "parceiro" else MENU_EQUIPE) if usuario else [],
+        "menu": (MENU_PARCEIRO if usuario.perfil == "parceiro" else
+                 [m for m in MENU_EQUIPE if mostrar_vendas or m[0] not in AREAS_DE_VENDAS]) if usuario else [],
+        "mostrar_vendas": mostrar_vendas,
         "caminho": request.url.path,
         "hoje": date.today(),
     }

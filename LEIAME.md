@@ -44,6 +44,9 @@ no navegador, de qualquer lugar: não precisa do `iniciar.bat`. O passo a passo 
 | Registrar uma venda | **Vendas** (a comissão e o vencimento são calculados sozinhos) |
 | Ver quem vai vencer | **Vencimentos** (alertas 90, 60, 30, 15 e 7 dias antes viram tarefas na Agenda) |
 | Pagar comissões | **Comissões**: marque e clique em "Marcar como pagas" |
+
+**Vendas, Vencimentos e Comissões ficam ocultos** no menu e no Dashboard. Para mostrar de novo: Configurações >
+Geral > "Mostrar Vendas, Vencimentos e Comissões" = 1 > Salvar.
 | Relatórios e exportação | **Relatórios** (PDF, Excel, CSV) |
 | Perguntar sobre o negócio | **IA Comercial** (perguntas prontas funcionam mesmo sem IA) |
 

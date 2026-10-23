@@ -14,6 +14,7 @@ from ..web import avisar, tela, voltar
 rotas = APIRouter()
 
 CAMPOS_GERAIS = [
+    ("mostrar_vendas", "Mostrar Vendas, Vencimentos e Comissões no menu e no Dashboard (1 = sim, 0 = não)", "numero"),
     ("empresa_nome", "Nome da empresa", "texto"),
     ("link_parceria", "Link da página de parceria ({{link_parceria}})", "texto"),
     ("texto_comissao", "Texto da comissão nas mensagens ({{comissao}})", "texto"),
