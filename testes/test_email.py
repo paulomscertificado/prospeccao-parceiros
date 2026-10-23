@@ -129,3 +129,25 @@ def test_verificacao_do_dns(monkeypatch):
     situacao = {nome: ok for nome, ok, _, _ in r["itens"]}
     assert r["google"] and situacao == {"SPF": True, "DKIM": False, "DMARC": False}
     assert "Autenticar e-mail" in r["itens"][1][3] and "_dmarc.mscertificados.com.br" in r["itens"][2][3]
+
+
+def test_senha_normal_do_google_e_recusada_com_explicacao(cliente, env_temporario, monkeypatch):
+    csrf = _csrf(cliente)
+    r = cliente.post("/configuracoes/email", data={"csrf": csrf, "endereco": "contato@mscertificados.com.br",
+                                                   "senha": "Senha12Conta", "provedor": "google"})
+    assert "16 letras" in r.text and "12 caracteres" in r.text
+    assert "SMTP_SENHA=Senha12Conta" not in env_temporario.read_text(encoding="utf-8")
+
+
+def test_google_fechando_a_conexao_vira_aviso_de_senha(cliente, env_temporario, monkeypatch):
+    import smtplib
+
+    class SMTPQueDesliga(SMTPFalso):
+        def login(self, usuario, senha):
+            raise smtplib.SMTPServerDisconnected("Connection unexpectedly closed")
+
+    monkeypatch.setattr(email_smtp.smtplib, "SMTP", SMTPQueDesliga)
+    config.SMTP_HOST, config.SMTP_PORTA, config.SMTP_SENHA = "smtp.gmail.com", 587, "senhaerrada"
+    config.SMTP_REMETENTE = "MS <contato@mscertificados.com.br>"
+    with pytest.raises(email_smtp.ErroEmail, match="SENHA DE APP de 16 letras"):
+        email_smtp.enviar("alguem@exemplo.com", "oi", "oi")

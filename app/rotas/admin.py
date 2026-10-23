@@ -1,5 +1,7 @@
 """Configurações (administrador): regras do negócio, pesos do score, usuários, LGPD e logs."""
 
+import re
+
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -134,7 +136,13 @@ def salvar_email(request: Request, endereco: str = Form(...), nome: str = Form("
     if responder_para.strip() and not util.email_valido(responder_para.strip()):
         avisar(request, "O e-mail de \"responder para\" não é válido.", "erro")
         return voltar(destino)
-    senha = senha.replace(" ", "").strip() or config.SMTP_SENHA  # vazio = mantém a senha atual
+    digitada = senha.replace(" ", "").strip()
+    if digitada and provedor == "google" and not re.fullmatch(r"[A-Za-z]{16}", digitada):
+        avisar(request, f"A senha de app do Google tem 16 letras (ex.: abcd efgh ijkl mnop), e você digitou "
+                        f"{len(digitada)} caracteres — parece a senha normal da conta, que não funciona aqui. "
+                        "Crie a senha de app em myaccount.google.com/apppasswords (veja o passo a passo ao lado).", "erro")
+        return voltar(destino)
+    senha = digitada or config.SMTP_SENHA  # vazio = mantém a senha atual
     if not senha:
         avisar(request, "Informe a senha de app do e-mail.", "erro")
         return voltar(destino)

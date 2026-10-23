@@ -88,16 +88,26 @@ def enviar(para: str, assunto: str, corpo: str, responder_para: str = "", com_ro
     msg.set_content(corpo + (rodape(lead_id) if com_rodape else ""))
     usuario = config.SMTP_USUARIO or remetente
     try:
+        logado = False
         if config.SMTP_PORTA == 465:
             with smtplib.SMTP_SSL(config.SMTP_HOST, 465, context=ssl.create_default_context(), timeout=30) as s:
                 s.login(usuario, config.SMTP_SENHA)
+                logado = True
                 s.send_message(msg)
         else:
             with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORTA, timeout=30) as s:
                 if config.SMTP_TLS:
                     s.starttls(context=ssl.create_default_context())
                 s.login(usuario, config.SMTP_SENHA)
+                logado = True
                 s.send_message(msg)
+    except smtplib.SMTPServerDisconnected as erro:
+        # O Google não responde "senha errada": ele fecha a conexão logo depois da senha.
+        if not logado and ("gmail" in config.SMTP_HOST or "google" in config.SMTP_HOST):
+            raise ErroEmail("O Google recusou a senha (fechou a conexão ao conferir). Use uma SENHA DE APP de 16 letras "
+                            "criada em myaccount.google.com/apppasswords com a conta do e-mail de envio — a senha normal "
+                            "da conta não funciona. Cole a senha de app em Configurações > E-mail e salve.") from None
+        raise ErroEmail(f"Não consegui enviar o e-mail ({erro}). Confira a internet e o servidor.") from None
     except smtplib.SMTPAuthenticationError:
         if "gmail" in config.SMTP_HOST or "google" in config.SMTP_HOST:
             raise ErroEmail("O Google recusou a senha. Use uma SENHA DE APP (16 letras) criada em "
