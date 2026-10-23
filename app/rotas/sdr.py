@@ -248,7 +248,7 @@ async def criar_campanha(request: Request, usuario: Usuario = Depends(equipe), d
     camp = Campanha(
         nome=str(form.get("nome") or _nome_automatico(db, cats, cidade)).strip()[:160],
         pedido=str(form.get("pedido", ""))[:2000], categorias=",".join(cats), cidade=cidade, estado=uf,
-        quantidade=max(1, min(util.para_int(form.get("quantidade")) or 50, 500)), canais=",".join(canais),
+        quantidade=max(1, min(util.para_int(form.get("quantidade")) or util.para_int(form.get("quantidade_outra")) or 20, 500)), canais=",".join(canais),
         objetivo=str(form.get("objetivo") or "Encontrar parceiros")[:200], tom=str(form.get("tom") or "consultivo"),
         cta=cta[:200], cadencia_id=util.para_int(form.get("cadencia_id")), usuario_id=usuario.id,
         inicio=util.para_data(form.get("inicio")) or date.today(), status="gerando", personalizar_ia=ia.disponivel(),

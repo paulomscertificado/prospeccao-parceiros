@@ -38,7 +38,11 @@
   <div class="cartao">
     <h2 class="passo-titulo"><span class="numero-passo">3</span> Quantas empresas?</h2>
     <div class="grupo-btn">
-      {% for n in [20, 50, 100] %}<label class="chip"><input type="radio" name="quantidade" value="{{ n }}" {{ 'checked' if n == (e.quantidade or 20) or (e.quantidade and e.quantidade not in [20,50,100] and n == 20) }}> {{ n }}</label>{% endfor %}
+      {% set fixos = [1, 5, 20, 50, 100] %}{% set q = e.quantidade or 20 %}
+      {% for n in fixos %}<label class="chip"><input type="radio" name="quantidade" value="{{ n }}" {{ 'checked' if n == q }}> {{ n }}</label>{% endfor %}
+      <label class="chip"><input type="radio" name="quantidade" value="outro" id="q-outro" {{ 'checked' if q not in fixos }}> Personalizado:
+        <input type="number" name="quantidade_outra" min="1" max="500" value="{{ q if q not in fixos else '' }}" placeholder="ex.: 30" style="width:80px;padding:2px 6px"
+               onfocus="document.getElementById('q-outro').checked = true" aria-label="Quantidade personalizada"></label>
     </div>
     <p class="ajuda">A IA pesquisa o dobro e fica com as melhores.</p>
   </div>
