@@ -38,9 +38,9 @@
     {% endfor %}
     <div class="rodape">
       {% if usuario.perfil != 'parceiro' %}
-      <div style="margin-bottom:8px"><a href="{{ config.WHATSAPP_LEADS_URL }}/whatsapp" target="_blank" rel="noopener" title="Abrir o WhatsApp Leads">
+      <div style="margin-bottom:8px"><a href="/whatsapp" title="Abrir a tela WhatsApp">
         <span class="ponto {{ 'verde' if wl.conectado else ('amarelo' if wl.disponivel else 'vermelho') }}"></span>
-        WhatsApp {{ 'conectado' if wl.conectado else ('desconectado' if wl.disponivel else 'fechado') }}{{ ' (teste)' if wl.conectado and wl.tipo == 'teste' }}</a></div>
+        WhatsApp {{ 'conectado' if wl.conectado else ('aguardando QR code' if wl.estado_codigo == 'aguardando_qr' else ('desconectado' if wl.disponivel else 'desligado')) }}{{ ' (teste)' if wl.conectado and wl.tipo == 'teste' }}</a></div>
       {% endif %}
       <div><b>{{ usuario.nome }}</b></div>
       <div class="suave" style="color:#9fb3c8">{{ usuario.perfil_nome }}</div>

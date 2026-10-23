@@ -6,7 +6,7 @@
   <div class="acoes"><a class="btn" href="/cadencias">Cadências</a></div>
 </div>
 
-{% if not wl.conectado %}<div class="aviso aviso-info">Para enviar com 1 clique pelo seu número, abra o <b>WhatsApp Leads</b> e conecte o WhatsApp ({{ wl.erro or 'está desconectado' }}). Enquanto isso, use "Abrir no WhatsApp".</div>{% endif %}
+{% if not wl.conectado %}<div class="aviso aviso-info">Para enviar com 1 clique pelo seu número, conecte o WhatsApp na tela <a href="/whatsapp"><b>WhatsApp</b></a> ({{ wl.erro or 'está desconectado' }}). Enquanto isso, use "Abrir no WhatsApp".</div>{% endif %}
 <div class="faixa"><b>Hoje você possui {{ pendentes_hoje }} follow-up{{ 's' if pendentes_hoje != 1 }} pendente{{ 's' if pendentes_hoje != 1 }}.</b>
   <span class="pequeno" style="color:#c9d9ea">WhatsApp hoje: {{ limites.whatsapp[0] }} de {{ limites.whatsapp[1] or '∞' }} · E-mails hoje: {{ limites.email[0] }} de {{ limites.email[1] or '∞' }}</span></div>
 
