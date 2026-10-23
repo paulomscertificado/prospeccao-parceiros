@@ -103,13 +103,13 @@ criptografado com `CHAVE_CRIPTOGRAFIA`. O domínio exigido é
 `EMAIL_DOMINIO` no `.env` (padrão `mscertificados.com.br`).
 
 ### Para não cair no spam (DNS do domínio)
-A mesma tela confere o DNS. Situação em 22/10/2026:
+A mesma tela confere o DNS (que fica na **Cloudflare**). Situação em 23/10/2026: **tudo configurado**.
 
-| Registro | Situação | O que fazer |
-|---|---|---|
-| SPF | OK (`v=spf1 include:_spf.google.com ~all`) | nada |
-| DKIM | **falta** | Google Admin > Apps > Google Workspace > Gmail > **Autenticar e-mail** > gerar registro; publicar o TXT `google._domainkey` no DNS e clicar em "Iniciar autenticação" |
-| DMARC | **falta** | TXT em `_dmarc.mscertificados.com.br`: `v=DMARC1; p=none; rua=mailto:dmarc@mscertificados.com.br` |
+| Registro | Situação |
+|---|---|
+| SPF | OK (`v=spf1 include:_spf.google.com ~all`) |
+| DKIM | OK (`google._domainkey`, autenticação ativa no Google Admin) |
+| DMARC | OK (`_dmarc`: `v=DMARC1; p=none; rua=mailto:contato@mscertificados.com.br`) — modo observar; depois de algumas semanas sem problemas, pode passar para `p=quarantine` |
 
 Boas práticas: comece com poucos e-mails por dia (ex.: 20) e aumente aos poucos em Configurações
 (limites diário, por hora e por domínio); o Google Workspace permite até 2.000 por dia por conta, mas
