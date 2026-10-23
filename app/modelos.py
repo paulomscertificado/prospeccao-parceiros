@@ -343,6 +343,7 @@ class Campanha(Base):
     usuario_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"), nullable=True)
     personalizar_ia: Mapped[bool] = mapped_column(Boolean, default=False)
     status_ia: Mapped[str] = mapped_column(String(120), default="")
+    arquivada: Mapped[bool] = mapped_column(Boolean, default=False)  # some da lista (Ver arquivadas)
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
 
     cadencia: Mapped["Cadencia | None"] = relationship()

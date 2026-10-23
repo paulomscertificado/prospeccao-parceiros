@@ -177,3 +177,50 @@ def test_conversas_separadas_por_numero(cliente, nuvem):
     with sessao() as db:
         item = db.execute(select(PonteWhatsApp).order_by(PonteWhatsApp.id.desc())).scalars().first()
         assert item.conexao == f"u{fid}" and item.manual
+
+
+def test_campanhas_de_cada_usuario_arquivar_e_excluir(cliente):
+    fid = _usuario("func6@teste.com.br", "funcionario", "Fabiana Funcionária")
+    with sessao() as db:
+        admin = db.execute(select(Usuario).where(Usuario.perfil == "admin")).scalars().first()
+        dela = Campanha(nome="Campanha da Fabiana", categorias="contabil", cidade="Recife", estado="PE",
+                        status="aguardando_aprovacao", usuario_id=fid)
+        do_admin = Campanha(nome="Campanha do Admin", categorias="contabil", cidade="Recife", estado="PE",
+                            status="aguardando_aprovacao", usuario_id=admin.id)
+        db.add_all([dela, do_admin])
+        db.flush()
+        lead, _ = criar_lead(db, {"empresa": "Contábil Na Campanha Excluída"}, admin)
+        db.add(Tarefa(tipo="prospeccao", lead_id=lead.id, canal="whatsapp", data=date.today(), campanha_id=dela.id,
+                      status="rascunho", mensagem="Oi"))
+        dela_id, admin_id, lead_id = dela.id, do_admin.id, lead.id
+    f = _entrar("func6@teste.com.br")
+    lista = f.get("/campanhas").text
+    assert "Campanha da Fabiana" in lista and "Campanha do Admin" not in lista  # cada um com as suas
+    assert f.get(f"/campanhas/{admin_id}").status_code == 404
+    assert "Campanha da Fabiana" in cliente.get("/campanhas").text and "Campanha do Admin" in cliente.get("/campanhas").text
+    csrf = csrf_de(f.get(f"/campanhas/{dela_id}").text)
+    # não pode mexer na campanha dos outros
+    assert f.post(f"/campanhas/{admin_id}/excluir", data={"csrf": csrf}).status_code == 404
+    f.post(f"/campanhas/{dela_id}/arquivar", data={"csrf": csrf})
+    assert "Campanha da Fabiana" not in f.get("/campanhas").text and "Campanha da Fabiana" in f.get("/campanhas?ver=arquivadas").text
+    f.post(f"/campanhas/{dela_id}/excluir", data={"csrf": csrf})
+    with sessao() as db:
+        assert db.get(Campanha, dela_id) is None
+        assert db.get(Lead, lead_id) is not None  # a empresa continua em Leads
+        assert not db.execute(select(Tarefa).where(Tarefa.lead_id == lead_id, Tarefa.status == "rascunho")).first()
+
+
+def test_campanha_ativa_mostra_whatsapp_de_hoje(cliente):
+    with sessao() as db:
+        admin = db.execute(select(Usuario).where(Usuario.perfil == "admin")).scalars().first()
+        camp = Campanha(nome="Campanha WhatsApp Hoje", categorias="contabil", cidade="Recife", estado="PE",
+                        status="ativa", aprovado_em=agora(), usuario_id=admin.id)
+        db.add(camp)
+        db.flush()
+        lead, _ = criar_lead(db, {"empresa": "Contábil Zap Hoje", "whatsapp": "(81) 94444-7007"}, admin)
+        db.add(Tarefa(tipo="prospeccao", lead_id=lead.id, canal="whatsapp", data=date.today(), campanha_id=camp.id,
+                      status="pendente", mensagem="Olá! Mensagem de hoje."))
+        cid = camp.id
+    pagina = cliente.get(f"/campanhas/{cid}").text
+    assert "WhatsApp de hoje" in pagina and "Contábil Zap Hoje" in pagina and "Olá! Mensagem de hoje." in pagina
+    assert 'value="whatsapp" checked' in cliente.get("/campanhas/nova").text  # WhatsApp é o canal padrão

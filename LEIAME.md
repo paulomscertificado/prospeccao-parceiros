@@ -135,6 +135,8 @@ pessoas. Só o dono do número e o administrador compartilham, pausam ou desliga
 | A busca acha poucos escritórios | Importe a **base da Receita Federal** (Configurações > Integrações) |
 | "O Google recusou a senha" | Use a **senha de app** (16 letras) da conta de envio, não a senha normal (Configurações > E-mail mostra o passo a passo) |
 | E-mails caindo no spam | Configurações > E-mail mostra o que falta no DNS (DKIM e DMARC); comece com poucos e-mails por dia |
+| Arquivar ou excluir uma campanha | Na lista de campanhas (ou dentro da campanha): **Arquivar** tira da lista (veja em "Arquivadas"); **Excluir** apaga a campanha e cancela o que estava programado. As empresas continuam em Leads. Cada pessoa vê e mexe só nas próprias campanhas (administrador e gestor veem todas) |
+| Onde envio os WhatsApps da campanha? | Dentro da campanha aprovada, em **WhatsApp de hoje**: um botão por mensagem, sai pelo seu número |
 | Campanhas repetindo as mesmas empresas | Não acontece mais: cada campanha pula as empresas que já estão em outra campanha ativa (ou já contatadas) e busca mais fundo na base. Cancelar uma campanha libera as empresas dela |
 | Campanha com "erro" ao montar | Leia o motivo na campanha. Região sem empresas: confira cidade/bairro e estado (bairro funciona, ex.: "Boa Viagem" / PE). Uma empresa com site quebrado não para mais a campanha: ela segue com os dados da Receita |
 | A campanha não manda e-mails sozinha | Configure o SMTP no `.env` e confira em Configurações se "fila envia e-mails sozinha" = 1; o envio só acontece em dias úteis, no horário configurado |

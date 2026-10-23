@@ -250,8 +250,8 @@ def _montar(campanha_id: int, escolhidos: list[int], textos: dict[int, dict]) ->
         cad = db.get(Cadencia, camp.cadencia_id) if camp.cadencia_id else cadencia_sdr(db)
         leads = [l for l in (db.get(Lead, i) for i in escolhidos) if l]
         for lead in leads:
-            if lead.vendedor_id is None and usuario.perfil in config.PERFIS_SO_PROPRIOS:
-                lead.vendedor_id = usuario.id
+            if lead.vendedor_id is None:
+                lead.vendedor_id = usuario.id  # o lead passa a ser de quem criou a campanha (e o WhatsApp sai pelo número dela)
         r = cadencias.aplicar(db, cad, leads, usuario, camp.inicio or date.today(), camp.id, textos,
                               [c for c in camp.canais.split(",") if c], "rascunho", camp.cta, camp.tom)
         camp.etapa = (f"Pronta: {r['leads']} empresas, {r['tarefas']} mensagens"
@@ -384,6 +384,28 @@ def cancelar(db, camp: Campanha, usuario: Usuario) -> int:
             t.lead.status = "Pesquisando" if t.lead.pesquisado_em else "Novo"
     camp.status = "cancelada"
     return len(tarefas)
+
+
+def excluir(db, camp: Campanha, usuario: Usuario) -> None:
+    """Apaga a campanha. Antes cancela o que estava programado; as empresas (leads) e o histórico das mensagens
+    já enviadas continuam no sistema."""
+    from sqlalchemy import delete, update
+
+    from .modelos import Mensagem, Trabalho
+
+    cancelar(db, camp, usuario)
+    db.execute(update(Mensagem).where(Mensagem.campanha_id == camp.id).values(campanha_id=None))
+    db.execute(delete(Tarefa).where(Tarefa.campanha_id == camp.id, Tarefa.status.in_(["cancelada", "rascunho"])))
+    db.execute(update(Tarefa).where(Tarefa.campanha_id == camp.id).values(campanha_id=None))
+    db.execute(delete(Trabalho).where(Trabalho.tipo.in_(["campanha", "personalizar"]), Trabalho.ref_id == camp.id))
+    db.delete(camp)
+
+
+def whatsapp_de_hoje(db, camp: Campanha) -> list[Tarefa]:
+    """Mensagens de WhatsApp da campanha para hoje (ou atrasadas): enviadas com 1 clique na própria campanha."""
+    return list(db.execute(select(Tarefa).where(Tarefa.campanha_id == camp.id, Tarefa.canal == "whatsapp",
+                                                Tarefa.status == "pendente", Tarefa.data <= date.today())
+                           .order_by(Tarefa.data, Tarefa.hora, Tarefa.id).limit(100)).scalars())
 
 
 # ---------------------------------------------------------------- Fila e fim de cadência (rotina)

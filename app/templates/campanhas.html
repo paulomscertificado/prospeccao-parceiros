@@ -1,21 +1,104 @@
 {% extends "base.html" %}
 {% block titulo %}Campanhas{% endblock %}
 {% block conteudo %}
+<style>
+  .filtro-pilulas { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 0 0 14px; }
+  .pilula { padding: 6px 14px; border-radius: 999px; border: 1px solid var(--borda); background: #fff; color: var(--texto);
+            font-size: .82rem; font-weight: 500; }
+  .pilula:hover { text-decoration: none; border-color: #b9c7d6; }
+  .pilula.ativa { background: var(--azul); border-color: var(--azul); color: #fff; }
+  .lista-campanhas { display: grid; gap: 10px; }
+  .camp { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center; background: #fff;
+          border: 1px solid var(--borda); border-radius: 14px; padding: 14px 18px; box-shadow: var(--sombra);
+          position: relative; transition: border-color .15s, box-shadow .15s; }
+  .camp:hover { border-color: #c5d3e2; box-shadow: 0 4px 14px rgba(13, 59, 102, .08); }
+  .camp::before { content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 3px; border-radius: 0 3px 3px 0;
+                  background: var(--cor-status, #cbd5e1); }
+  .camp .titulo { font-weight: 700; font-size: 1rem; color: var(--azul); }
+  .camp .titulo:hover { text-decoration: none; color: var(--azul-escuro); }
+  .camp .linha-info { display: flex; gap: 8px 14px; flex-wrap: wrap; align-items: center; margin-top: 5px; font-size: .82rem; color: #5f6b7a; }
+  .camp .linha-info svg { width: 14px; height: 14px; vertical-align: -2px; margin-right: 3px; color: #8a96a6; }
+  .chip { display: inline-block; padding: 1px 9px; border-radius: 999px; background: var(--azul-claro); color: var(--azul);
+          font-size: .74rem; font-weight: 600; }
+  .camp .etapa { font-size: .8rem; color: #6b7686; margin-top: 6px; }
+  .camp .etapa.erro { color: var(--erro); }
+  .camp .lado { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; min-width: 210px; }
+  .progresso { width: 210px; }
+  .progresso .barra { height: 6px; border-radius: 999px; background: #eef2f6; overflow: hidden; }
+  .progresso .barra span { display: block; height: 100%; background: var(--verde-marca); border-radius: 999px; }
+  .progresso .numeros { display: flex; justify-content: space-between; gap: 8px; font-size: .72rem; color: #6b7686; margin-top: 4px;
+                        font-family: var(--fonte-mono); letter-spacing: .04em; }
+  .camp .acoes-camp { display: flex; gap: 4px; }
+  .botao-icone { border: 1px solid var(--borda); background: #fff; color: #6b7686; border-radius: 8px; padding: 4px 9px;
+                 cursor: pointer; font: inherit; font-size: .78rem; }
+  .botao-icone:hover { color: var(--azul); border-color: #b9c7d6; }
+  .botao-icone.perigo:hover { color: var(--erro); border-color: #f2c4bf; }
+  .vazio-campanhas { text-align: center; padding: 40px 16px; background: #fff; border: 1px dashed #cdd8e4; border-radius: 14px; color: #6b7686; }
+  @media (max-width: 760px) {
+    .camp { grid-template-columns: 1fr; }
+    .camp .lado { align-items: stretch; min-width: 0; }
+    .progresso { width: 100%; }
+  }
+</style>
 <div class="cabecalho">
-  <div><h1>IA SDR · Campanhas</h1><div class="suave">Toda campanha passa por aprovação antes de qualquer contato.</div></div>
+  <div><h1>IA SDR · Campanhas</h1><div class="suave">Toda campanha passa por aprovação antes de qualquer contato. Os WhatsApps saem pelo número de quem criou a campanha.</div></div>
   <a class="btn btn-primario" href="/campanhas/nova">+ Criar campanha</a>
 </div>
 <form class="faixa" method="get" action="/campanhas/nova">
   <div class="pedido"><input type="text" name="pedido" placeholder="Ex.: Quero encontrar parceiros entre empresas que atendem pequenas e médias empresas em São Paulo" aria-label="Pedido">
   <button class="btn btn-verde">Criar com a IA</button></div>
 </form>
-<div class="cartao" style="padding:0"><div class="tabela-rolagem"><table>
-  <tr><th>Campanha</th><th>Segmentos</th><th>Região</th><th>Situação</th><th class="num">Rascunho</th><th class="num">Pendentes</th><th class="num">Feitas</th><th>Criada</th></tr>
+
+<div class="filtro-pilulas">
+  {% for chave, nome in filtros.items() %}<a class="pilula {{ 'ativa' if ver == chave }}" href="?ver={{ chave }}{{ '&de=' ~ de if de }}">{{ nome }}</a>{% endfor %}
+  {% if equipe_campanhas %}
+  <form method="get" style="margin-left:auto"><input type="hidden" name="ver" value="{{ ver }}">
+    <select name="de" onchange="this.form.submit()" aria-label="De quem">
+      <option value="">Toda a equipe</option>
+      <option value="minhas" {{ 'selected' if de == 'minhas' }}>Só as minhas</option>
+      {% for uid in equipe_campanhas %}<option value="{{ uid }}" {{ 'selected' if de == uid|string }}>{{ pessoas.get(uid, '—') }}</option>{% endfor %}
+    </select></form>
+  {% endif %}
+</div>
+
+{% set CORES = {'aguardando_aprovacao': '#e0a72e', 'ativa': '#3cc77a', 'pausada': '#9fb4c9', 'erro': '#c0392b', 'gerando': '#1e5f96',
+                'concluida': '#0d3b66', 'cancelada': '#cbd5e1'} %}
+{% set SELOS = {'aguardando_aprovacao': ('selo-alerta', 'Aguardando aprovação'), 'ativa': ('selo-ok', 'Em andamento'),
+                'pausada': ('', 'Pausada'), 'erro': ('selo-erro', 'Com erro'), 'gerando': ('selo-azul', 'Montando...'),
+                'concluida': ('selo-azul', 'Concluída'), 'cancelada': ('', 'Cancelada')} %}
+<div class="lista-campanhas">
   {% for c in campanhas %}{% set n = contagens[c.id] %}
-  <tr><td><a href="/campanhas/{{ c.id }}"><b>{{ c.nome }}</b></a><div class="pequeno suave">{{ c.etapa }}</div></td>
-    <td class="pequeno">{{ c.categorias.replace(',', ', ') or '—' }}</td><td>{{ c.cidade }}{{ '/' ~ c.estado if c.estado }}</td>
-    <td><span class="selo {{ {'aguardando_aprovacao':'selo-alerta','ativa':'selo-ok','erro':'selo-erro','cancelada':'','gerando':'selo-azul'}.get(c.status, '') }}">{{ {'aguardando_aprovacao':'APROVAÇÃO NECESSÁRIA','gerando':'montando...'}.get(c.status, c.status) }}</span></td>
-    <td class="num">{{ n.get('rascunho', 0) }}</td><td class="num">{{ n.get('pendente', 0) }}</td><td class="num">{{ n.get('feita', 0) }}</td><td>{{ c.criado_em|data }}</td></tr>
-  {% else %}<tr><td colspan="8" class="vazio">Nenhuma campanha. Escreva o que procura na caixa acima.</td></tr>{% endfor %}
-</table></div></div>
+  {% set total = (n.get('rascunho', 0) + n.get('pendente', 0) + n.get('feita', 0)) %}
+  {% set selo = SELOS.get(c.status, ('', c.status)) %}
+  <div class="camp" style="--cor-status: {{ CORES.get(c.status, '#cbd5e1') }}">
+    <div style="min-width:0">
+      <a class="titulo" href="/campanhas/{{ c.id }}">{{ c.nome }}</a>
+      <div class="linha-info">
+        <span class="selo {{ selo[0] }}">{{ selo[1] }}</span>
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12zM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/></svg>{{ c.cidade|title }}{{ '/' ~ c.estado if c.estado }}</span>
+        {% for cod in c.categorias.split(',') if cod %}<span class="chip">{{ nomes_cat.get(cod, cod) }}</span>{% endfor %}
+        {% if not equipe_campanhas is none and equipe_campanhas and c.usuario_id %}<span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/></svg>{{ pessoas.get(c.usuario_id, '') }}</span>{% endif %}
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>{{ c.criado_em|data }}</span>
+      </div>
+      <div class="etapa {{ 'erro' if c.status == 'erro' }}">{{ c.erro if c.status == 'erro' and c.erro else c.etapa }}</div>
+    </div>
+    <div class="lado">
+      <div class="progresso" title="Mensagens: {{ n.get('feita', 0) }} feitas de {{ total }}">
+        <div class="barra"><span style="width: {{ (100 * n.get('feita', 0) / total)|round|int if total else 0 }}%"></span></div>
+        <div class="numeros"><span>{{ n.get('rascunho', 0) }} rascunho</span><span>{{ n.get('pendente', 0) }} na fila</span><span>{{ n.get('feita', 0) }} feitas</span></div>
+      </div>
+      <div class="acoes-camp">
+        <a class="botao-icone" href="/campanhas/{{ c.id }}">Abrir</a>
+        <form class="inline" method="post" action="/campanhas/{{ c.id }}/{{ 'desarquivar' if c.arquivada else 'arquivar' }}">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><button class="botao-icone">{{ 'Desarquivar' if c.arquivada else 'Arquivar' }}</button></form>
+        <form class="inline" method="post" action="/campanhas/{{ c.id }}/excluir"
+              data-confirmar="Excluir a campanha &quot;{{ c.nome }}&quot;? O que estava programado é cancelado. As empresas continuam em Leads.">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><button class="botao-icone perigo">Excluir</button></form>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="vazio-campanhas">{% if ver == 'arquivadas' %}Nenhuma campanha arquivada.{% else %}Nenhuma campanha aqui. Escreva o que procura na caixa acima ou clique em <b>+ Criar campanha</b>.{% endif %}</div>
+  {% endfor %}
+</div>
 {% endblock %}

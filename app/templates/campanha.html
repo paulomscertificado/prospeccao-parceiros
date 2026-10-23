@@ -3,8 +3,18 @@
 {% block conteudo %}
 <div class="cabecalho">
   <div><h1>{{ c.nome }}</h1><div class="suave">{{ c.cidade }}/{{ c.estado }} · {{ c.objetivo }} · tom {{ config.TONS.get(c.tom, c.tom) }}{% if c.pedido %} · pedido: "{{ c.pedido }}"{% endif %}</div></div>
-  <a class="btn" href="/campanhas">Voltar</a>
+  <div class="grupo-btn">
+    {% if pode_gerenciar %}
+    <form class="inline" method="post" action="/campanhas/{{ c.id }}/{{ 'desarquivar' if c.arquivada else 'arquivar' }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">{{ 'Desarquivar' if c.arquivada else 'Arquivar' }}</button></form>
+    <form class="inline" method="post" action="/campanhas/{{ c.id }}/excluir"
+          data-confirmar="Excluir a campanha &quot;{{ c.nome }}&quot;? O que estava programado é cancelado. As empresas continuam em Leads.">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-perigo">Excluir</button></form>
+    {% endif %}
+    <a class="btn" href="/campanhas">Voltar</a>
+  </div>
 </div>
+{% if dono %}<p class="pequeno suave" style="margin-top:-8px">Campanha de <b>{{ dono.nome }}</b>{% if c.arquivada %} · <span class="selo">arquivada</span>{% endif %}</p>{% endif %}
 
 {% if rodando %}
 <div class="aviso aviso-info"><b>Montando a campanha...</b> {{ c.etapa }} Esta página se atualiza sozinha.</div>
@@ -15,6 +25,29 @@
 {% elif c.status in ('ativa', 'concluida', 'pausada') %}
 <div class="aviso aviso-ok">Campanha {{ c.status }}{% if aprovador %} · aprovada por {{ aprovador.nome }} em {{ c.aprovado_em|datahora }}{% endif %}.</div>
 {% elif c.status == 'cancelada' %}<div class="aviso aviso-alerta">Campanha cancelada.</div>{% endif %}
+
+{% if whatsapp_hoje %}
+<div class="cartao" id="whatsapp-hoje">
+  <h2>WhatsApp de hoje <span class="selo selo-ok">{{ whatsapp_hoje|length }} para enviar</span></h2>
+  {% if sem_numero %}<div class="aviso aviso-alerta">{{ sem_numero }} <a href="/whatsapp">Conectar meu WhatsApp</a></div>
+  {% else %}<p class="pequeno suave">Sai pelo <b>{{ numero_whatsapp }}</b>, uma mensagem por clique, com as pausas e o limite do número.
+    Para quem já conversou com a MS, a IA SDR envia sozinha.</p>{% endif %}
+  {% for t in whatsapp_hoje %}
+  <div style="border-top:1px solid var(--borda);padding:10px 0">
+    <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+      <div><a href="/leads/{{ t.lead.id }}"><b>{{ t.lead.empresa }}</b></a>
+        <span class="pequeno suave">{{ t.lead.responsavel or '' }} · {{ (t.lead.whatsapp or t.lead.telefone)|telefone }} · {{ config.ANGULOS.get(t.angulo, t.acao) }}</span></div>
+      {% if not sem_numero and (t.lead.whatsapp or t.lead.telefone) %}
+      <form class="inline" method="post" action="/agenda/{{ t.id }}/enviar-whatsapp"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="voltar_para" value="/campanhas/{{ c.id }}#whatsapp-hoje">
+        <button class="btn btn-pequeno btn-verde">Enviar pelo WhatsApp</button></form>
+      {% elif not (t.lead.whatsapp or t.lead.telefone) %}<span class="selo selo-alerta">sem telefone</span>{% endif %}
+    </div>
+    <div class="mensagem" style="margin-top:6px">{{ t.mensagem }}</div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
 
 {% if not rodando %}
 <div class="grade">

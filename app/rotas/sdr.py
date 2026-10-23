@@ -159,14 +159,48 @@ def abordagem_sdr(request: Request, lead_id: int, cta: str = Form(""), tom: str 
 
 # ---------------------------------------------------------------- Campanhas
 
+FILTROS_CAMPANHA = {"todas": "Todas", "aprovacao": "Aguardando aprovação", "ativas": "Em andamento",
+                    "erro": "Com erro", "arquivadas": "Arquivadas"}
+
+
+def _campanha(db: Session, cid: int, usuario: Usuario) -> Campanha:
+    """A campanha, se a pessoa pode vê-la: cada um vê as próprias; administrador e gestor veem todas."""
+    camp = db.get(Campanha, cid)
+    if not camp or (usuario.perfil in config.PERFIS_SO_PROPRIOS and camp.usuario_id != usuario.id):
+        raise HTTPException(404)
+    return camp
+
+
 @rotas.get("/campanhas")
-def lista_campanhas(request: Request, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
-    lista = db.execute(select(Campanha).order_by(Campanha.criado_em.desc()).limit(100)).scalars().all()
+def lista_campanhas(request: Request, ver: str = "todas", de: str = "", usuario: Usuario = Depends(equipe),
+                    db: Session = Depends(obter_db)):
+    consulta = select(Campanha)
+    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
+        consulta = consulta.where(Campanha.usuario_id == usuario.id)  # cada um com as suas campanhas
+    elif de == "minhas":
+        consulta = consulta.where(Campanha.usuario_id == usuario.id)
+    elif util.para_int(de):
+        consulta = consulta.where(Campanha.usuario_id == util.para_int(de))
+    consulta = consulta.where(Campanha.arquivada.is_(ver == "arquivadas"))
+    if ver == "aprovacao":
+        consulta = consulta.where(Campanha.status == "aguardando_aprovacao")
+    elif ver == "ativas":
+        consulta = consulta.where(Campanha.status.in_(["ativa", "pausada", "gerando"]))
+    elif ver == "erro":
+        consulta = consulta.where(Campanha.status == "erro")
+    lista = db.execute(consulta.order_by(Campanha.criado_em.desc()).limit(200)).scalars().all()
     contagens = {}
     for c in lista:
         contagens[c.id] = dict(db.execute(select(Tarefa.status, func.count()).where(Tarefa.campanha_id == c.id)
                                           .group_by(Tarefa.status)).all())
-    return tela(request, "campanhas.html", {"campanhas": lista, "contagens": contagens})
+    nomes_cat = {c.codigo: c.nome for c in db.execute(select(Categoria)).scalars()}
+    pessoas = {u.id: u.nome for u in db.execute(select(Usuario)).scalars()}
+    equipe_ = ([] if usuario.perfil in config.PERFIS_SO_PROPRIOS else
+               sorted({c.usuario_id for c in db.execute(select(Campanha)).scalars() if c.usuario_id},
+                      key=lambda i: pessoas.get(i, "")))
+    return tela(request, "campanhas.html", {"campanhas": lista, "contagens": contagens, "ver": ver, "de": de,
+                                            "filtros": FILTROS_CAMPANHA, "nomes_cat": nomes_cat, "pessoas": pessoas,
+                                            "equipe_campanhas": equipe_})
 
 
 @rotas.get("/campanhas/nova")
@@ -176,7 +210,8 @@ def nova_campanha(request: Request, pedido: str = "", usuario: Usuario = Depends
     entendido = campanhas.interpretar_pedido(db, pedido) if pedido else None
     contagem = (base_receita.contar(db, entendido["estado"], entendido["cidade"])
                 if entendido and entendido.get("cidade") and entendido.get("estado") else {})
-    ultima = db.execute(select(Campanha).where(Campanha.cidade != "").order_by(Campanha.criado_em.desc()).limit(1)).scalars().first()
+    ultima = db.execute(select(Campanha).where(Campanha.cidade != "", Campanha.usuario_id == usuario.id)
+                        .order_by(Campanha.criado_em.desc()).limit(1)).scalars().first()
     if not contagem:
         cidade = (entendido or {}).get("cidade") or (ultima.cidade if ultima else "Recife")
         uf = (entendido or {}).get("estado") or (ultima.estado if ultima else "PE")
@@ -234,11 +269,23 @@ def _nome_automatico(db: Session, cats: list[str], cidade: str) -> str:
 
 @rotas.get("/campanhas/{cid:int}")
 def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
-    camp = db.get(Campanha, cid)
-    if not camp:
-        raise HTTPException(404)
+    from .. import conexoes
+
+    camp = _campanha(db, cid, usuario)
     nomes = {c.codigo: c.nome for c in db.execute(select(Categoria)).scalars()}
+    whatsapp_hoje = campanhas.whatsapp_de_hoje(db, camp) if camp.status == "ativa" else []
+    numero, sem_numero = "", ""
+    if whatsapp_hoje:
+        try:
+            numero_id = conexoes.para_enviar(db, conexoes.responsavel(db, None, usuario))
+            numero = (db.get(conexoes.ConexaoWhatsApp, numero_id).nome if db.get(conexoes.ConexaoWhatsApp, numero_id)
+                      else numero_id)
+        except conexoes.SemNumero as erro:
+            sem_numero = str(erro)
     return tela(request, "campanha.html", {
+        "whatsapp_hoje": whatsapp_hoje, "numero_whatsapp": numero, "sem_numero": sem_numero,
+        "pode_gerenciar": ve_tudo(usuario) or camp.usuario_id == usuario.id,
+        "dono": db.get(Usuario, camp.usuario_id) if camp.usuario_id else None,
         "c": camp, "resumo": campanhas.resumo_aprovacao(db, camp), "nomes_categorias": nomes,
         "rodando": camp.status == "gerando", "pode_aprovar": ve_tudo(usuario),
         "aprovador": db.get(Usuario, camp.aprovado_por_id) if camp.aprovado_por_id else None,
@@ -248,18 +295,36 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(equipe),
 @rotas.post("/campanhas/{cid:int}/{acao}", dependencies=[Depends(verificar_csrf)])
 async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario = Depends(equipe),
                         db: Session = Depends(obter_db)):
-    camp = db.get(Campanha, cid)
-    if not camp:
-        raise HTTPException(404)
+    camp = _campanha(db, cid, usuario)
     form = await request.form()
+    if acao in ("arquivar", "desarquivar", "excluir"):
+        if not (ve_tudo(usuario) or camp.usuario_id == usuario.id):
+            avisar(request, "Só quem criou a campanha (ou o administrador/gestor) pode arquivar ou excluir.", "erro")
+            return voltar(f"/campanhas/{cid}")
+        if acao == "excluir":
+            if camp.status in ("ativa", "pausada") and not ve_tudo(usuario):
+                avisar(request, "Esta campanha está em andamento: peça ao administrador ou gestor para excluir.", "erro")
+                return voltar(f"/campanhas/{cid}")
+            nome = camp.nome
+            campanhas.excluir(db, camp, usuario)
+            registrar_log(db, usuario, "excluiu_campanha", "campanha", cid, nome, request)
+            db.commit()
+            avisar(request, f"Campanha \"{nome}\" excluída. As empresas continuam em Leads.")
+            return voltar("/campanhas")
+        camp.arquivada = acao == "arquivar"
+        registrar_log(db, usuario, acao + "_campanha", "campanha", cid, camp.nome, request)
+        db.commit()
+        avisar(request, "Campanha arquivada (veja em Arquivadas)." if camp.arquivada else "Campanha de volta à lista.")
+        return voltar("/campanhas" if camp.arquivada else f"/campanhas/{cid}")
     if acao in ("aprovar", "cancelar") and not ve_tudo(usuario):
         avisar(request, "Só administrador ou gestor aprovam ou cancelam campanhas.", "erro")
         return voltar(f"/campanhas/{cid}")
     if acao == "aprovar" and camp.status == "aguardando_aprovacao":
         n = campanhas.aprovar(db, camp, usuario)
         registrar_log(db, usuario, "aprovou_campanha", "campanha", cid, f"{n} tarefas", request)
-        avisar(request, f"Campanha aprovada: {n} contatos programados. E-mails saem pela fila; WhatsApp e LinkedIn "
-                        "aparecem na Agenda para envio com um clique.")
+        avisar(request, f"Campanha aprovada: {n} contatos programados. Os WhatsApps de cada dia aparecem aqui na "
+                        "campanha para enviar com um clique (para quem já conversou com a MS, saem sozinhos); "
+                        "e-mails saem pela fila.")
     elif acao == "cancelar" and camp.status in ("aguardando_aprovacao", "ativa", "gerando", "erro"):
         n = campanhas.cancelar(db, camp, usuario)
         registrar_log(db, usuario, "cancelou_campanha", "campanha", cid, f"{n} tarefas", request)
