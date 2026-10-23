@@ -490,3 +490,34 @@ def test_marcar_autorizacao_de_whatsapp_na_ficha(cliente):
         preencher(lead, {"consentimento": True})
         assert lead.consentimento and lead.consentimento_em is not None
         assert campanhas.whatsapp_liberado(db, lead)
+
+
+def test_tela_de_envios_mostra_o_que_saiu_e_o_andamento(cliente):
+    with sessao() as db:
+        admin = _admin(db)
+        camp = Campanha(nome="Campanha Envios", categorias="contabil", cidade="Recife", estado="PE", status="ativa",
+                        aprovado_em=agora(), usuario_id=admin.id)
+        db.add(camp)
+        db.flush()
+        lead = _novo_lead(db, "Contábil Envio Visível", email="ola@enviovisivel-teste.com.br")
+        t1 = Tarefa(tipo="prospeccao", lead_id=lead.id, canal="email", data=date.today(), campanha_id=camp.id,
+                    status="feita", angulo="apresentacao", assunto="Parceria MS", mensagem="Olá!")
+        t2 = Tarefa(tipo="prospeccao", lead_id=lead.id, canal="email", data=date.today() + timedelta(days=2),
+                    campanha_id=camp.id, status="pendente", angulo="praticidade", mensagem="Seguindo...")
+        db.add_all([t1, t2])
+        db.flush()
+        m = mensagens.registrar(db, lead.id, "email", "Olá!", None, modo="api", status="enviada", assunto="Parceria MS",
+                                tarefa_id=t1.id, campanha_id=camp.id, angulo="apresentacao")
+        m.respondida = True
+        mensagens.registrar(db, lead.id, "email", "Erro", None, modo="api", status="falhou", erro="Caixa cheia",
+                            campanha_id=camp.id)
+        cid, lead_id = camp.id, lead.id
+    pagina = cliente.get("/envios").text
+    assert "Contábil Envio Visível" in pagina and "Parceria MS" in pagina and "Respondeu ✓" in pagina
+    assert "Não saiu" in pagina and "Caixa cheia" in pagina and "Como funcionam os disparos" in pagina
+    assert "Seguindo" not in pagina or "Próximos envios" in pagina
+    assert "Contábil Envio Visível" in cliente.get(f"/envios?lead={lead_id}").text
+    assert "Contábil Envio Visível" not in cliente.get("/envios?canal=whatsapp").text
+    camp_pag = cliente.get(f"/campanhas/{cid}").text
+    assert "Andamento por empresa" in camp_pag and "Respondeu ✓" in camp_pag
+    assert 'href="/envios"' in camp_pag  # no menu

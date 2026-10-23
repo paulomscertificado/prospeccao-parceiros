@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block titulo %}Envios{% endblock %}
+{% block conteudo %}
+<style>
+  .kpis-envio { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); margin-bottom: 16px; }
+  .kpi .barra-limite { height: 5px; border-radius: 999px; background: #eef2f6; margin-top: 8px; overflow: hidden; }
+  .kpi .barra-limite span { display: block; height: 100%; background: var(--verde-marca); }
+  .filtros-envio { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .filtros-envio select, .filtros-envio input { width: auto; }
+  .envio { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 12px 4px;
+           border-top: 1px solid var(--borda); }
+  .envio:first-child { border-top: 0; }
+  .canal-icone { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; color: #fff; }
+  .canal-icone.whatsapp { background: #1f9d5c; }
+  .canal-icone.email { background: var(--azul); }
+  .canal-icone svg { width: 18px; height: 18px; }
+  .envio .quem { font-weight: 600; }
+  .envio .meta { font-size: .78rem; color: #6b7686; display: flex; gap: 4px 12px; flex-wrap: wrap; margin-top: 2px; }
+  .envio details summary { cursor: pointer; font-size: .85rem; color: #4b5a6b; margin-top: 4px; list-style: none;
+                           white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .envio details summary::-webkit-details-marker { display: none; }
+  .envio details[open] summary { white-space: normal; }
+  .envio .corpo { white-space: pre-wrap; background: #f6f9fc; border-radius: 8px; padding: 10px 12px; margin-top: 6px; font-size: .86rem; }
+  .envio .lado { text-align: right; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+  .envio .hora { font-family: var(--fonte-mono); font-size: .72rem; color: #6b7686; letter-spacing: .04em; }
+  .regras li { margin-bottom: 6px; }
+  .proximo { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--borda); font-size: .86rem; }
+  .proximo:first-child { border-top: 0; }
+  .proximo .quando { font-family: var(--fonte-mono); font-size: .74rem; color: #6b7686; min-width: 92px; }
+</style>
+{% set ICONE_ZAP = "M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-3.8-.9L3 21l1.9-5.2A8.4 8.4 0 0 1 3.6 11.5 8.5 8.5 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z" %}
+{% set ICONE_EMAIL = "M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM22 7l-10 6L2 7" %}
+<div class="cabecalho">
+  <div><h1>Envios</h1><div class="suave">Tudo o que a MS mandou por e-mail e WhatsApp: para quem, quando e se chegou{% if lead_filtro %} · <b>{{ lead_filtro.empresa }}</b> <a href="/envios">(ver todos)</a>{% endif %}.</div></div>
+</div>
+
+<div class="kpis-envio">
+  {% set pe = (100 * resumo.email_hoje / resumo.email_limite)|round|int if resumo.email_limite else 0 %}
+  {% set pw = (100 * resumo.whats_hoje / resumo.whats_limite)|round|int if resumo.whats_limite else 0 %}
+  <div class="kpi destaque"><div class="rotulo">E-mails hoje</div><div class="valor">{{ resumo.email_hoje }} <span style="font-size:.9rem;opacity:.7">/ {{ resumo.email_limite }}</span></div>
+    <div class="barra-limite" style="background:rgba(255,255,255,.2)"><span style="width:{{ [pe, 100]|min }}%"></span></div></div>
+  <div class="kpi"><div class="rotulo">WhatsApp hoje</div><div class="valor">{{ resumo.whats_hoje }} <span class="suave" style="font-size:.9rem">/ {{ resumo.whats_limite }}</span></div>
+    <div class="barra-limite"><span style="width:{{ [pw, 100]|min }}%"></span></div></div>
+  <div class="kpi"><div class="rotulo">Na fila</div><div class="valor">{{ resumo.na_fila }}</div><div class="detalhe">esperando sair</div></div>
+  <div class="kpi"><div class="rotulo">Não saíram</div><div class="valor" style="{{ 'color:var(--erro)' if resumo.falharam }}">{{ resumo.falharam }}</div><div class="detalhe">no período</div></div>
+  <div class="kpi"><div class="rotulo">Respostas</div><div class="valor">{{ resumo.respostas }}</div><div class="detalhe">no período</div></div>
+</div>
+
+<div class="grade-lead">
+  <div class="cartao">
+    <form class="filtros-envio" method="get">
+      {% if filtros.lead %}<input type="hidden" name="lead" value="{{ filtros.lead }}">{% endif %}
+      <select name="periodo" aria-label="Período">{% for chave, (nome, _) in PERIODOS.items() %}<option value="{{ chave }}" {{ 'selected' if filtros.periodo == chave }}>{{ nome }}</option>{% endfor %}</select>
+      <select name="canal" aria-label="Canal"><option value="">E-mail e WhatsApp</option><option value="email" {{ 'selected' if filtros.canal == 'email' }}>Só e-mail</option><option value="whatsapp" {{ 'selected' if filtros.canal == 'whatsapp' }}>Só WhatsApp</option></select>
+      <select name="status" aria-label="Situação"><option value="">Todas as situações</option>
+        {% for chave, (nome, _) in STATUS_ENVIO.items() if chave != 'recebida' %}<option value="{{ chave }}" {{ 'selected' if filtros.status == chave }}>{{ nome }}</option>{% endfor %}
+        <option value="respondeu" {{ 'selected' if filtros.status == 'respondeu' }}>Que tiveram resposta</option>
+        <option value="respostas" {{ 'selected' if filtros.status == 'respostas' }}>Respostas recebidas</option></select>
+      <select name="campanha" aria-label="Campanha"><option value="">Todas as campanhas</option>{% for c in campanhas %}<option value="{{ c.id }}" {{ 'selected' if filtros.campanha == c.id|string }}>{{ c.nome }}</option>{% endfor %}</select>
+      <input type="search" name="busca" value="{{ filtros.busca }}" placeholder="Empresa" aria-label="Empresa">
+      <button class="btn btn-pequeno btn-primario">Filtrar</button>
+    </form>
+
+    {% for m in lista %}{% set st = STATUS_ENVIO.get(m.status, (m.status, '')) %}
+    <div class="envio">
+      <div class="canal-icone {{ m.canal }}" title="{{ CANAIS.get(m.canal, m.canal) }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="{{ ICONE_ZAP if m.canal == 'whatsapp' else ICONE_EMAIL }}"/></svg></div>
+      <div style="min-width:0">
+        <div class="quem">{% if m.lead %}<a href="/leads/{{ m.lead.id }}">{{ m.lead.empresa }}</a>{% else %}<span class="suave">Contato fora dos leads</span>{% endif %}
+          {% if m.status == 'recebida' %}<span class="pequeno suave">respondeu</span>{% endif %}</div>
+        <div class="meta">
+          {% if m.campanha_id %}<span>📣 {{ nomes_camp.get(m.campanha_id, 'campanha') }}</span>{% endif %}
+          {% if m.angulo %}<span>{{ config.ANGULOS.get(m.angulo, m.angulo) }}</span>{% endif %}
+          <span>{{ 'por ' ~ pessoas.get(m.usuario_id) if m.usuario_id else ('IA SDR' if m.status != 'recebida' else '') }}</span>
+          {% if m.canal == 'email' and m.lead and m.lead.email %}<span>{{ m.lead.email }}</span>{% endif %}
+          {% if m.canal == 'whatsapp' and m.lead %}<span>{{ (m.lead.whatsapp or m.lead.telefone)|telefone }}</span>{% endif %}
+        </div>
+        <details><summary>{{ (m.assunto ~ ' — ' if m.assunto else '') ~ m.corpo|replace('\n', ' ') }}</summary>
+          <div class="corpo">{% if m.assunto %}<b>Assunto:</b> {{ m.assunto }}<br><br>{% endif %}{{ m.corpo }}</div>
+          {% if m.erro %}<div class="aviso aviso-erro" style="margin:6px 0 0">{{ m.erro }}</div>{% endif %}</details>
+      </div>
+      <div class="lado">
+        <span class="selo {{ st[1] }}">{{ st[0] }}</span>
+        {% if m.respondida %}<span class="selo selo-alerta">Respondeu ✓</span>{% endif %}
+        <span class="hora">{{ m.criado_em.strftime('%d/%m %H:%M') }}</span>
+      </div>
+    </div>
+    {% else %}
+    <p class="vazio" style="padding:30px 10px">Nenhum envio neste período. Quando uma campanha for aprovada, os e-mails e WhatsApps aparecem aqui, com a situação de cada um.</p>
+    {% endfor %}
+  </div>
+
+  <div>
+    <div class="cartao">
+      <h2>Próximos envios <span class="pequeno suave">hoje e nos próximos 3 dias</span></h2>
+      {% for t in proximos %}
+      <div class="proximo">
+        <span class="quando">{{ 'Hoje' if t.data == hoje else t.data|data }} {{ t.hora or '' }}</span>
+        <div class="canal-icone {{ t.canal }}" style="width:26px;height:26px;border-radius:7px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="{{ ICONE_ZAP if t.canal == 'whatsapp' else ICONE_EMAIL }}"/></svg></div>
+        <div style="min-width:0;flex:1"><a href="/leads/{{ t.lead.id }}">{{ t.lead.empresa if t.lead else '—' }}</a>
+          <div class="pequeno suave">{{ config.ANGULOS.get(t.angulo, t.acao) }} · {{ 'sai sozinho' if t.canal == 'email' else '1 clique na campanha (ou sozinho, se já conversou)' }}</div></div>
+      </div>
+      {% else %}<p class="vazio">Nada programado. Aprove uma campanha para começar.</p>{% endfor %}
+    </div>
+
+    <details class="cartao" open>
+      <summary><h2 style="display:inline">Como funcionam os disparos</h2></summary>
+      <ul class="regras pequeno" style="padding-left:18px;margin-top:10px">
+        <li><b>Só depois da aprovação.</b> A campanha monta as mensagens e espera um administrador ou gestor aprovar.</li>
+        <li><b>4 toques por empresa</b>, cada um com um assunto diferente: dia 1 (apresentação), dia 3, dia 7 e dia 12. Se a empresa responder, os próximos toques são cancelados e o lead vai para Oportunidades. Sem resposta {{ regras.dias_sem_resposta }} dias depois do último, vira "Sem resposta".</li>
+        <li><b>E-mail sai sozinho</b>{% if regras.enviar_email_automatico != '1' %} (desligado agora em Configurações){% endif %}: a cada minuto o sistema olha a fila e manda o que estiver na hora, em <b>dias úteis das {{ regras.horario_envio_inicio }} às {{ regras.horario_envio_fim }}</b>.</li>
+        <li><b>Limites de e-mail:</b> até <b>{{ regras.limite_hora_email }} por hora</b> e <b>{{ regras.limite_diario_email }} por dia</b>; no máximo {{ regras.limite_diario_dominio }} por dia para a mesma empresa (domínio) e {{ regras.limite_diario_campanha }} por dia por campanha.</li>
+        <li><b>WhatsApp:</b> o primeiro contato é com <b>1 clique</b> (botão "Enviar pelo WhatsApp" dentro da campanha) e sai pelo número de quem criou a campanha. Para quem já conversou com a MS, sai sozinho{% if regras.enviar_whatsapp_automatico != '1' %} (desligado agora){% endif %}. Até {{ regras.limite_hora_whatsapp }} por hora e {{ regras.limite_diario_whatsapp }} por dia, com pausas entre uma mensagem e outra.</li>
+        <li><b>Nunca insiste:</b> no máximo 1 mensagem a cada {{ regras.horas_entre_contatos }} horas para a mesma empresa; quem pede SAIR não recebe mais nada.</li>
+      </ul>
+      <p class="pequeno suave">Os limites ficam em Configurações &gt; Geral (administrador).</p>
+    </details>
+  </div>
+</div>
+{% endblock %}

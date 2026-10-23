@@ -283,6 +283,7 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(equipe),
         except conexoes.SemNumero as erro:
             sem_numero = str(erro)
     return tela(request, "campanha.html", {
+        "andamento": campanhas.andamento(db, camp) if camp.status not in ("gerando", "erro") else [],
         "whatsapp_hoje": whatsapp_hoje, "numero_whatsapp": numero, "sem_numero": sem_numero,
         "pode_gerenciar": ve_tudo(usuario) or camp.usuario_id == usuario.id,
         "dono": db.get(Usuario, camp.usuario_id) if camp.usuario_id else None,

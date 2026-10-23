@@ -137,6 +137,7 @@ pessoas. Só o dono do número e o administrador compartilham, pausam ou desliga
 | "Connection unexpectedly closed" ao testar o e-mail | É senha errada: o Google fecha a conexão em vez de avisar. Use a **senha de app** de 16 letras (não a senha normal) |
 | "O Google recusou a senha" | Use a **senha de app** (16 letras) da conta de envio, não a senha normal (Configurações > E-mail mostra o passo a passo) |
 | E-mails caindo no spam | Configurações > E-mail mostra o que falta no DNS (DKIM e DMARC); comece com poucos e-mails por dia |
+| Ver se o e-mail/WhatsApp já foi para o lead | Menu **Envios**: tudo o que saiu, para quem, quando e a situação (na fila, enviada, não saiu, respondeu), os próximos envios e como funcionam os disparos. Na campanha: **Andamento por empresa**. Na ficha do lead: **Envios para este lead** |
 | Arquivar ou excluir uma campanha | Na lista de campanhas (ou dentro da campanha): **Arquivar** tira da lista (veja em "Arquivadas"); **Excluir** apaga a campanha e cancela o que estava programado. As empresas continuam em Leads. Cada pessoa vê e mexe só nas próprias campanhas (administrador e gestor veem todas) |
 | Onde envio os WhatsApps da campanha? | Dentro da campanha aprovada, em **WhatsApp de hoje**: um botão por mensagem, sai pelo seu número |
 | Campanhas repetindo as mesmas empresas | Não acontece mais: cada campanha pula as empresas que já estão em outra campanha ativa (ou já contatadas) e busca mais fundo na base. Cancelar uma campanha libera as empresas dela |

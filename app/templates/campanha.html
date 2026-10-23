@@ -78,6 +78,24 @@
   </div>
 </div>
 
+{% if andamento %}
+<div class="cartao" id="andamento">
+  <h2>Andamento por empresa <a class="btn btn-pequeno" href="/envios?campanha={{ c.id }}&periodo=90d">Ver todos os envios</a></h2>
+  <p class="pequeno suave">Cada bolinha é um toque: <span class="selo selo-ok">enviado</span> <span class="selo selo-azul">na fila / programado</span>
+    <span class="selo selo-erro">não saiu</span> <span class="selo">rascunho / cancelado</span>. Passe o mouse para ver a data.</p>
+  <div class="tabela-rolagem"><table>
+    <tr><th>Empresa</th><th>Toques</th><th>Resposta</th></tr>
+    {% for l in andamento %}
+    <tr><td><a href="/leads/{{ l.lead.id }}">{{ l.lead.empresa }}</a><div class="pequeno suave">{{ l.lead.status }}</div></td>
+      <td>{% for t in l.toques %}{% set cls = {'enviado': 'selo-ok', 'na_fila': 'selo-azul', 'programado': 'selo-azul', 'falhou': 'selo-erro'}.get(t.situacao, '') %}
+        <span class="selo {{ cls }}" title="{{ config.ANGULOS.get(t.angulo, '') }} · {{ t.situacao }} · {{ (t.quando.strftime('%d/%m %H:%M') if t.quando else t.data|data) }}{{ ' · ' ~ t.erro if t.erro }}">{{ '✉' if t.canal == 'email' else ('💬' if t.canal == 'whatsapp' else '•') }} {{ t.data.strftime('%d/%m') }}</span>
+      {% endfor %}</td>
+      <td>{% if l.respondeu %}<span class="selo selo-alerta">Respondeu ✓</span>{% else %}<span class="suave">—</span>{% endif %}</td></tr>
+    {% endfor %}
+  </table></div>
+</div>
+{% endif %}
+
 <div class="cartao" id="mensagens"><h2>Mensagens ({{ resumo.tarefas|length }})</h2>
   <p class="suave">Cada empresa tem mensagens próprias. Você pode editar qualquer texto ou tirar uma empresa da campanha antes de aprovar.</p>
   {% set ns = namespace(lead=None) %}

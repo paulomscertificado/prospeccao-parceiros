@@ -31,6 +31,7 @@ modelos_html.env.globals.update(config=config, CANAIS=config.CANAIS, PERFIS=conf
 MENU_EQUIPE = [
     ("/", "Dashboard", "grafico"),
     ("/campanhas", "IA SDR (campanhas)", "megafone"),
+    ("/envios", "Envios", "enviar"),
     ("/oportunidades", "Oportunidades", "fogo"),
     ("/prospeccao", "Prospecção", "lupa"),
     ("/leads", "Leads", "pessoas"),

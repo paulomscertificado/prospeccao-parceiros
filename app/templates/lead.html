@@ -19,6 +19,7 @@
     <form class="inline" method="post" action="/leads/{{ lead.id }}/proximo-passo"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-ia">Qual é o próximo melhor passo?</button></form>
     {% if not lead.humano_id %}<form class="inline" method="post" action="/leads/{{ lead.id }}/assumir" data-confirmar="Assumir este lead? A automação dele para na hora."><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-verde">Assumir lead</button></form>{% endif %}
     <a class="btn" href="/leads/{{ lead.id }}/agendar">Agendar reunião</a>
+    <a class="btn" href="/envios?lead={{ lead.id }}&periodo=90d">Envios para este lead</a>
   </div>
 </div>
 {% if not ia_ligada %}<div class="aviso aviso-info">A IA não está configurada: qualificação e mensagens usam as regras e templates do sistema. Para textos escritos pela IA, veja docs/configuracao.md.</div>{% endif %}

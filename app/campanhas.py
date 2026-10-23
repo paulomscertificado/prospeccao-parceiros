@@ -401,6 +401,33 @@ def excluir(db, camp: Campanha, usuario: Usuario) -> None:
     db.delete(camp)
 
 
+def andamento(db, camp: Campanha) -> list[dict]:
+    """Por empresa: cada toque da campanha (canal, data) e a situação: programado, enviado, não saiu, cancelado."""
+    from .modelos import Mensagem
+
+    tarefas = db.execute(select(Tarefa).where(Tarefa.campanha_id == camp.id)
+                         .order_by(Tarefa.lead_id, Tarefa.data, Tarefa.id)).scalars().all()
+    envios = {m.tarefa_id: m for m in db.execute(select(Mensagem).where(Mensagem.campanha_id == camp.id,
+                                                                         Mensagem.tarefa_id.is_not(None))).scalars()}
+    respondeu = {m.lead_id for m in db.execute(select(Mensagem).where(Mensagem.campanha_id == camp.id,
+                                                                       Mensagem.respondida.is_(True))).scalars()}
+    linhas: dict[int, dict] = {}
+    for t in tarefas:
+        if not t.lead:
+            continue
+        linha = linhas.setdefault(t.lead_id, {"lead": t.lead, "toques": [], "respondeu": t.lead_id in respondeu})
+        m = envios.get(t.id)
+        if m:
+            situacao = {"enviada": "enviado", "entregue": "enviado", "lida": "enviado", "na_fila": "na_fila",
+                        "falhou": "falhou", "copiada": "manual"}.get(m.status, "enviado")
+        else:
+            situacao = {"rascunho": "rascunho", "pendente": "programado", "feita": "enviado", "cancelada": "cancelado",
+                        "pulada": "cancelado"}.get(t.status, t.status)
+        linha["toques"].append({"canal": t.canal, "data": t.data, "angulo": t.angulo, "situacao": situacao,
+                                "quando": m.criado_em if m else None, "erro": m.erro if m else ""})
+    return list(linhas.values())
+
+
 def whatsapp_de_hoje(db, camp: Campanha) -> list[Tarefa]:
     """Mensagens de WhatsApp da campanha para hoje (ou atrasadas): enviadas com 1 clique na própria campanha."""
     return list(db.execute(select(Tarefa).where(Tarefa.campanha_id == camp.id, Tarefa.canal == "whatsapp",
