@@ -29,6 +29,10 @@ no navegador, de qualquer lugar: não precisa do `iniciar.bat`. O passo a passo 
 - **WhatsApp:** o computador com o **WhatsApp Leads** precisa ficar **ligado e aberto**. Ele é ligado ao site
   uma vez só, pelo `ligar_nuvem.bat` da pasta `whatsapp-leads`.
 - Campanhas e buscas começam em **até 1 minuto** depois do clique (a tela mostra "Na fila").
+- Menu **WhatsApp**: a mesma tela do WhatsApp Leads, dentro do site. Mostra se o celular está conectado e
+  tem os botões **Conectar com QR code**, **Usar modo teste**, **Pausar**, **Desligar** e as **regras de envio**.
+  O QR code aparece ali mesmo, para ler com o celular. Os botões levam alguns segundos, porque quem faz a
+  conexão é o computador da MS (que precisa estar ligado com o WhatsApp Leads aberto).
 
 ## 3. O dia a dia
 

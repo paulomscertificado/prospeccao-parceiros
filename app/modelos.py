@@ -52,6 +52,18 @@ class PonteWhatsApp(Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
 
 
+class ComandoWhatsApp(Base):
+    """Botão da tela WhatsApp (nuvem) esperando o computador do WhatsApp Leads executar. Ver rotas/whatsapp.py."""
+    __tablename__ = "comandos_whatsapp"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    acao: Mapped[str] = mapped_column(String(30))       # conectar, pausar, desligar, salvar_regras
+    dados: Mapped[str] = mapped_column(Text, default="{}")
+    status: Mapped[str] = mapped_column(String(20), default="aguardando", index=True)  # aguardando, retirado, feito, erro
+    erro: Mapped[str] = mapped_column(Text, default="")
+    usuario_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
+
+
 class Usuario(Base):
     __tablename__ = "usuarios"
     id: Mapped[int] = mapped_column(primary_key=True)

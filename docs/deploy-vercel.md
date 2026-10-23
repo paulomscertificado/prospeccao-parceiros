@@ -64,6 +64,12 @@ execução e, se o sistema for fechado no meio, continua ao abrir de novo.
 2. Coloca cada uma na fila de lá (mesmas pausas, horário, limite diário e lista de quem saiu).
 3. `POST /api/ponte/retorno` com o id de cada mensagem lá e as novidades (respostas → IA SDR, status, opt-outs).
 
+**Tela WhatsApp** (`rotas/whatsapp.py`, menu "WhatsApp"): a mesma tela do WhatsApp Leads (situação, QR code,
+modo teste, pausar, desligar, regras de envio). Cada botão vira um pedido na tabela `comandos_whatsapp`; a troca
+entrega os pedidos (`comandos`, marcados "retirado") e o retorno devolve o resultado e o status atualizado
+(com o QR code em imagem). Enquanto a tela está aberta (`wl_tela_vista_em` < 20 s), a troca responde
+`intervalo: 3` e o WhatsApp Leads passa a trocar a cada 3 s; fora disso, a cada 30 s. Só o administrador age.
+
 Sem sinal do computador por 3 minutos, a tela mostra "WhatsApp desligado" e o botão de envio avisa em vez de
 deixar a mensagem esperando sem prazo. Senha: `WHATSAPP_PONTE_TOKEN` (Vercel) = token do `ligar_nuvem.bat`.
 

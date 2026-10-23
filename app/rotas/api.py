@@ -16,7 +16,7 @@ from .. import config, sdr, trabalhos, util
 from ..rotinas import responder_automaticamente, rodada
 from ..banco import agora, gravar_config, ler_config_int, sessao
 from ..integracoes import whatsapp_cloud
-from ..modelos import Lead, Mensagem, PonteWhatsApp
+from ..modelos import ComandoWhatsApp, Lead, Mensagem, PonteWhatsApp
 from ..seguranca import ip_de, limite_api
 
 rotas = APIRouter(prefix="/api")
@@ -116,11 +116,8 @@ async def ponte_troca(request: Request):
         dados = await request.json()
     except ValueError:
         return JSONResponse({"erro": "json inválido"}, status_code=400)
-    status = {k: dados.get("status", {}).get(k) for k in
-              ("conectado", "tipo", "estado", "numero", "enviadas_hoje", "limite_diario", "dentro_do_horario", "horario")}
-    status["visto_em"] = agora().isoformat()
     with sessao() as db:
-        gravar_config(db, "wl_status", status)
+        _gravar_status(db, dados.get("status") or {})
         envios = []
         # "retirada" antes de devolver: se a resposta se perder, a mensagem NÃO é enviada duas vezes.
         for item in db.execute(select(PonteWhatsApp).where(PonteWhatsApp.status == "aguardando")
@@ -128,8 +125,36 @@ async def ponte_troca(request: Request):
             item.status = "retirada"
             envios.append({"id": item.id, "telefone": item.telefone, "nome": item.nome, "texto": item.texto,
                            "resposta": item.resposta})
+        comandos = []
+        for c in db.execute(select(ComandoWhatsApp).where(ComandoWhatsApp.status == "aguardando")
+                            .order_by(ComandoWhatsApp.id).limit(10)).scalars():
+            c.status = "retirado"
+            comandos.append({"id": c.id, "acao": c.acao, "dados": json.loads(c.dados or "{}")})
         desde = ler_config_int(db, "wl_ultimo_id", 0)
-    return {"desde": desde, "envios": envios}
+        intervalo = 3 if comandos or _tela_aberta(db) else 30
+    return {"desde": desde, "envios": envios, "comandos": comandos, "intervalo": intervalo}
+
+
+CAMPOS_STATUS = ("conectado", "tipo", "estado", "numero", "enviadas_hoje", "limite_diario", "dentro_do_horario",
+                 "horario", "estado_codigo", "erro", "qr", "regras")
+
+
+def _gravar_status(db, recebido: dict) -> None:
+    status = {k: recebido.get(k) for k in CAMPOS_STATUS}
+    status["visto_em"] = agora().isoformat()
+    gravar_config(db, "wl_status", status)
+
+
+def _tela_aberta(db) -> bool:
+    """Alguém está com a tela WhatsApp aberta (ela se atualiza a cada 3 s)? Então a ponte troca a cada 3 s."""
+    from datetime import datetime
+
+    from ..banco import ler_config
+
+    try:
+        return (agora() - datetime.fromisoformat(ler_config(db, "wl_tela_vista_em"))).total_seconds() < 20
+    except ValueError:
+        return False
 
 
 @rotas.post("/ponte/retorno")
@@ -156,6 +181,12 @@ async def ponte_retorno(request: Request):
                 item.status, item.id_wl = "na_fila", str(c.get("id_wl", ""))
                 if msg:
                     msg.id_externo = item.id_wl
+        for c in dados.get("comandos") or []:
+            comando = db.get(ComandoWhatsApp, int(c.get("id") or 0))
+            if comando:
+                comando.status, comando.erro = ("erro", str(c["erro"])[:500]) if c.get("erro") else ("feito", "")
+        if dados.get("status"):  # status logo depois dos pedidos (ex.: QR code novo)
+            _gravar_status(db, dados["status"])
         novidades = dados.get("novidades") or {}
         resultado = sdr.aplicar_novidades_whatsapp(db, novidades) if novidades else {}
         if "ultimo_id" in novidades:

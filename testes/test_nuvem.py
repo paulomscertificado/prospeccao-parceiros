@@ -200,3 +200,38 @@ def test_rodada_da_nuvem_respeita_intervalos():
     assert rotinas._na_vez(None, "teste_intervalo", 5)
     assert not rotinas._na_vez(None, "teste_intervalo", 5)  # chamou de novo no mesmo minuto: espera
     assert rotinas._na_vez(10, "qualquer", 5) and not rotinas._na_vez(11, "qualquer", 5)
+
+
+def test_tela_whatsapp_na_nuvem_manda_pedidos_pela_ponte(cliente, nuvem):
+    from app.modelos import ComandoWhatsApp
+
+    cab = {"x-token": TOKEN_PONTE}
+    status = {"conectado": False, "tipo": "qr", "estado": "Aguardando leitura do QR code", "estado_codigo": "aguardando_qr",
+              "qr": "data:image/png;base64,QRTESTE", "numero": "", "enviadas_hoje": 0, "limite_diario": 200,
+              "regras": {"intervalo_min_seg": "8", "intervalo_max_seg": "20", "limite_diario": "200",
+                         "horario_inicio": "08:00", "horario_fim": "20:00", "palavras_sair": "SAIR"}}
+    # sem a tela aberta, a ponte troca a cada 30 s
+    with sessao() as db:
+        gravar_config(db, "wl_tela_vista_em", "")
+    assert cliente.post("/api/ponte/troca", json={"status": status}, headers=cab).json()["intervalo"] == 30
+    pagina = cliente.get("/whatsapp")
+    assert pagina.status_code == 200 and "Conectar com QR code" in pagina.text and "Regras de envio" in pagina.text
+    assert 'href="/whatsapp"' in pagina.text  # está no menu
+    estado = cliente.get("/whatsapp/estado").json()
+    assert estado["situacao"]["qr"] == "data:image/png;base64,QRTESTE" and estado["situacao"]["disponivel"]
+    csrf = pagina.text.split('name="csrf" content="')[1].split('"')[0]
+    cliente.post("/whatsapp/comando", data={"csrf": csrf, "acao": "conectar", "tipo": "qr"})
+    cliente.post("/whatsapp/comando", data={"csrf": csrf, "acao": "salvar_regras", "intervalo_min_seg": "30",
+                                            "intervalo_max_seg": "10", "limite_diario": "50"})  # inválido: não vai
+    r = cliente.post("/api/ponte/troca", json={"status": status}, headers=cab).json()
+    assert r["intervalo"] == 3  # tela aberta: troca rápida
+    assert [(c["acao"], c["dados"]) for c in r["comandos"]] == [("conectar", {"tipo": "qr"})]
+    assert cliente.post("/api/ponte/troca", json={"status": status}, headers=cab).json()["comandos"] == []  # nunca em dobro
+    novo = {**status, "conectado": True, "estado": "Conectado", "estado_codigo": "conectado", "qr": "", "numero": "5581999"}
+    cliente.post("/api/ponte/retorno", headers=cab,
+                 json={"confirmados": [], "novidades": {}, "comandos": [{"id": r["comandos"][0]["id"], "erro": ""}],
+                       "status": novo})
+    estado = cliente.get("/whatsapp/estado").json()
+    assert estado["situacao"]["conectado"] and estado["pedido"]["status"] == "feito"
+    with sessao() as db:
+        assert db.execute(select(ComandoWhatsApp)).scalars().all()[-1].status == "feito"
