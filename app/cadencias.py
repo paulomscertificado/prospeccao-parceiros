@@ -53,6 +53,8 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
             canal = passo.canal
             if passo.canal == "auto" or passo.angulo:
                 canal = sdr.escolher_canal(db, lead, canais) if passo.canal == "auto" else passo.canal
+                if campanha_id and canal in ("ligacao", "manual"):
+                    continue  # campanha da IA não faz ligação: quem liga é o usuário (é avisado na campanha)
                 if lead.id not in mensagens_sdr:
                     mensagens_sdr[lead.id] = sdr.mensagens_por_regras(db, lead, responsavel, cta)
                 msg = mensagens_sdr[lead.id].get(passo.angulo or "apresentacao") or {}

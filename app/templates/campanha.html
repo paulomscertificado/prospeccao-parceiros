@@ -97,6 +97,18 @@
   </div>
 </div>
 
+{% if so_fixo %}
+<details class="cartao" id="ligacoes">
+  <summary><h2 style="display:inline">📞 Faça uma campanha de ligação: {{ so_fixo|length }} empresas só têm telefone fixo</h2></summary>
+  <p class="pequeno suave">A IA não faz ligações. Estas empresas ficaram fora da campanha porque não têm WhatsApp nem e-mail —
+    ligue para elas (ou monte sua campanha de ligação). Ao conseguir um WhatsApp/e-mail, salve no lead.</p>
+  <div class="tabela-rolagem"><table>
+    <tr><th>Empresa</th><th>Telefone</th><th>Score</th></tr>
+    {% for l in so_fixo %}<tr><td><a href="/leads/{{ l.id }}">{{ l.empresa }}</a></td><td>{{ l.telefone|telefone if l.telefone else '—' }}</td><td>{{ l.score }}</td></tr>{% endfor %}
+  </table></div>
+</details>
+{% endif %}
+
 {% if andamento %}
 <div class="cartao" id="andamento">
   <h2>Andamento por empresa <a class="btn btn-pequeno" href="/envios?campanha={{ c.id }}&periodo=90d">Ver todos os envios</a></h2>

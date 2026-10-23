@@ -131,4 +131,4 @@ automático de ângulos/CTAs, fila em Redis para volumes acima de milhares de en
 
 `campanhas.enviar_teste` (ação `/campanhas/{id}/testar`): manda os toques de 1 a 5 empresas (só o primeiro ou todos) para o e-mail/WhatsApp de quem testa, com "[TESTE]". Não grava `Mensagem` nos leads, não conta nos limites, não muda a campanha; fica só no log (`testou_campanha`).
 
-Canal: quando a campanha permite WhatsApp, o celular informado à Receita (telefone ou observações) vira o WhatsApp do lead (`celular_do_lead`), e as empresas com canal permitido têm prioridade (`tem_canal`); só-fixo vira ligação apenas se faltar empresa.
+Canal: a IA não faz ligações. Com WhatsApp permitido, o celular informado à Receita vira o WhatsApp do lead (`celular_do_lead`). Empresas sem canal permitido (só telefone fixo) ficam fora da campanha, vão para `Campanha.so_fixo` e o usuário recebe aviso + cartão "Faça uma campanha de ligação" na campanha; `cadencias.aplicar` nunca cria tarefa de ligação em campanha.
