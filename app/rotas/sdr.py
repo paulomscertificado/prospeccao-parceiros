@@ -346,6 +346,31 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
             else:
                 t.mensagem, t.assunto = novo, str(form.get("assunto", t.assunto))[:200]
                 avisar(request, "Mensagem atualizada.")
+    elif acao == "testar":
+        email_teste = str(form.get("email_teste", "")).strip()
+        whats_teste = util.normalizar_telefone(str(form.get("whatsapp_teste", "")))
+        if email_teste and not util.email_valido(email_teste):
+            avisar(request, "Digite um e-mail de teste válido.", "erro")
+        elif not email_teste and not whats_teste:
+            avisar(request, "Informe um e-mail e/ou um celular (com DDD) para receber o teste.", "erro")
+        else:
+            r = campanhas.enviar_teste(db, camp, usuario, email_teste, "55" + whats_teste if whats_teste else "",
+                                       util.para_int(form.get("empresas")) or 1, form.get("toques") == "todos")
+            registrar_log(db, usuario, "testou_campanha", "campanha", cid,
+                          f"{r['emails']} e-mails, {r['whatsapps']} WhatsApps de teste", request)
+            partes = []
+            if r["emails"]:
+                partes.append(f"{r['emails']} e-mail(s) para {email_teste}")
+            if r["whatsapps"]:
+                partes.append(f"{r['whatsapps']} WhatsApp(s) para {util.formatar_telefone(whats_teste)}")
+            if partes:
+                avisar(request, "Teste enviado: " + " e ".join(partes) + ". Nenhum lead recebeu nada.")
+            for erro in r["erros"]:
+                avisar(request, erro, "erro")
+            if not partes and not r["erros"]:
+                avisar(request, "Não há mensagens desse canal na campanha para testar.", "alerta")
+        db.commit()
+        return voltar(f"/campanhas/{cid}#testar")
     elif acao == "remover-lead":
         lead_id = util.para_int(form.get("lead_id"))
         for t in db.execute(select(Tarefa).where(Tarefa.campanha_id == cid, Tarefa.lead_id == lead_id,

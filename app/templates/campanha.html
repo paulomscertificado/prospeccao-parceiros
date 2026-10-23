@@ -26,6 +26,25 @@
 <div class="aviso aviso-ok">Campanha {{ c.status }}{% if aprovador %} · aprovada por {{ aprovador.nome }} em {{ c.aprovado_em|datahora }}{% endif %}.</div>
 {% elif c.status == 'cancelada' %}<div class="aviso aviso-alerta">Campanha cancelada.</div>{% endif %}
 
+{% if c.status in ('aguardando_aprovacao', 'ativa', 'pausada') %}
+<details class="cartao" id="testar" {{ 'open' if c.status == 'aguardando_aprovacao' }}>
+  <summary><h2 style="display:inline">🧪 Testar antes de aprovar</h2>
+    <span class="pequeno suave">— receba as mensagens da campanha no SEU e-mail/WhatsApp. Nenhum lead recebe nada.</span></summary>
+  <form method="post" action="/campanhas/{{ c.id }}/testar" style="margin-top:12px">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="campos">
+      <div><label>Seu e-mail de teste</label><input type="email" name="email_teste" value="{{ usuario.email }}"></div>
+      <div><label>Seu WhatsApp de teste (opcional)</label><input type="tel" name="whatsapp_teste" placeholder="(81) 99999-0000"></div>
+      <div><label>Mensagens de quantas empresas</label><select name="empresas">{% for n in [1, 2, 3, 5] %}<option>{{ n }}</option>{% endfor %}</select></div>
+      <div><label>Quais toques</label><select name="toques"><option value="primeiro">Só o primeiro contato</option><option value="todos">Todos os 4 toques</option></select></div>
+    </div>
+    <p class="pequeno suave">Chega com "[TESTE]" no assunto/início e o nome da empresa, para você ver exatamente o que o lead receberia.
+      Não conta nos limites e não muda nada na campanha. O WhatsApp sai pelo seu número conectado.</p>
+    <button class="btn btn-primario">Enviar teste para mim</button>
+  </form>
+</details>
+{% endif %}
+
 {% if whatsapp_hoje %}
 <div class="cartao" id="whatsapp-hoje">
   <h2>WhatsApp de hoje <span class="selo selo-ok">{{ whatsapp_hoje|length }} para enviar</span></h2>

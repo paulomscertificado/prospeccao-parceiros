@@ -428,6 +428,53 @@ def andamento(db, camp: Campanha) -> list[dict]:
     return list(linhas.values())
 
 
+def enviar_teste(db, camp: Campanha, usuario: Usuario, email_teste: str, whatsapp_teste: str,
+                 empresas: int = 1, todos_os_toques: bool = False) -> dict:
+    """Ambiente de teste: manda as mensagens da campanha para o e-mail/WhatsApp DE QUEM ESTÁ TESTANDO, com
+    "[TESTE]" no começo. Nenhum lead recebe nada, nada conta nos limites e a campanha não muda de situação."""
+    from . import conexoes
+    from .integracoes import email_smtp, whatsapp_leads
+
+    tarefas = db.execute(select(Tarefa).where(Tarefa.campanha_id == camp.id, Tarefa.status.in_(["rascunho", "pendente"]))
+                         .order_by(Tarefa.lead_id, Tarefa.data, Tarefa.id)).scalars().all()
+    escolhidas, leads = [], []
+    for t in tarefas:
+        if t.lead_id not in leads:
+            if len(leads) >= max(1, min(empresas, 5)):
+                continue
+            leads.append(t.lead_id)
+        elif not todos_os_toques:
+            continue
+        escolhidas.append(t)
+    feito = {"emails": 0, "whatsapps": 0, "erros": []}
+    numero = ""
+    if whatsapp_teste:
+        try:
+            numero = conexoes.para_enviar(db, usuario)
+        except conexoes.SemNumero as erro:
+            feito["erros"].append(f"WhatsApp: {erro}")
+    for t in escolhidas:
+        empresa = t.lead.empresa if t.lead else "empresa"
+        rotulo = f"[TESTE · {empresa} · {config.ANGULOS.get(t.angulo, t.acao)}]"
+        if t.canal == "email" and email_teste:
+            try:
+                email_smtp.enviar(email_teste, f"[TESTE] {t.assunto or 'MS Certificação Digital'}",
+                                  f"{rotulo}\n\n{t.mensagem}", lead_id=None)
+                feito["emails"] += 1
+            except email_smtp.ErroEmail as erro:
+                feito["erros"].append(f"E-mail: {erro}")
+                break
+        elif t.canal == "whatsapp" and whatsapp_teste and numero:
+            try:
+                whatsapp_leads.enviar(whatsapp_teste, "Teste", f"{rotulo}\n\n{t.mensagem}", db=db, manual=True,
+                                      usuario_id=usuario.id, conexao=numero)
+                feito["whatsapps"] += 1
+            except whatsapp_leads.ErroWhatsAppLeads as erro:
+                feito["erros"].append(f"WhatsApp: {erro}")
+                break
+    return feito
+
+
 def whatsapp_de_hoje(db, camp: Campanha) -> list[Tarefa]:
     """Mensagens de WhatsApp da campanha para hoje (ou atrasadas): enviadas com 1 clique na própria campanha."""
     return list(db.execute(select(Tarefa).where(Tarefa.campanha_id == camp.id, Tarefa.canal == "whatsapp",

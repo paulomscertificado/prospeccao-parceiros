@@ -521,3 +521,35 @@ def test_tela_de_envios_mostra_o_que_saiu_e_o_andamento(cliente):
     camp_pag = cliente.get(f"/campanhas/{cid}").text
     assert "Andamento por empresa" in camp_pag and "Respondeu ✓" in camp_pag
     assert 'href="/envios"' in camp_pag  # no menu
+
+
+def test_teste_da_campanha_vai_so_para_quem_testa(cliente, monkeypatch):
+    enviados = []
+    monkeypatch.setattr(email_smtp, "configurado", lambda: True)
+    monkeypatch.setattr(email_smtp, "enviar", lambda para, assunto, corpo, **k: enviados.append((para, assunto, corpo)) or "id")
+    with sessao() as db:
+        admin = _admin(db)
+        camp = Campanha(nome="Campanha Para Testar", categorias="contabil", cidade="Recife", estado="PE",
+                        status="aguardando_aprovacao", usuario_id=admin.id)
+        db.add(camp)
+        db.flush()
+        for nome in ("Contábil Teste A", "Contábil Teste B"):
+            lead = _novo_lead(db, nome, email=f"x@{nome[-1].lower()}-teste-camp.com.br")
+            for dia, ang in ((0, "apresentacao"), (2, "praticidade")):
+                db.add(Tarefa(tipo="prospeccao", lead_id=lead.id, canal="email", data=date.today() + timedelta(days=dia),
+                              campanha_id=camp.id, status="rascunho", angulo=ang, assunto=f"Assunto {ang}", mensagem="Oi!"))
+        cid = camp.id
+    pagina = cliente.get(f"/campanhas/{cid}").text
+    assert "Testar antes de aprovar" in pagina
+    csrf = pagina.split('name="csrf" content="')[1].split('"')[0]
+    r = cliente.post(f"/campanhas/{cid}/testar", data={"csrf": csrf, "email_teste": "maria@exemplo.com",
+                                                      "empresas": "2", "toques": "primeiro"})
+    assert "Teste enviado" in r.text and "Nenhum lead recebeu nada" in r.text
+    assert len(enviados) == 2 and all(p == "maria@exemplo.com" and a.startswith("[TESTE]") for p, a, _ in enviados)
+    enviados.clear()
+    cliente.post(f"/campanhas/{cid}/testar", data={"csrf": csrf, "email_teste": "maria@exemplo.com",
+                                                   "empresas": "1", "toques": "todos"})
+    assert len(enviados) == 2 and "Contábil Teste A" in enviados[0][2]
+    with sessao() as db:
+        assert db.get(Campanha, cid).status == "aguardando_aprovacao"
+        assert not db.execute(select(Mensagem).where(Mensagem.campanha_id == cid)).first()  # nada registrado nos leads

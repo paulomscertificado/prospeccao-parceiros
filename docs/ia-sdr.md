@@ -126,3 +126,7 @@ sugestões de novas categorias pela IA.
 
 **Próximos passos sugeridos:** Google Calendar, templates de WhatsApp aprovados por categoria, teste A/B
 automático de ângulos/CTAs, fila em Redis para volumes acima de milhares de envios por dia.
+
+## Testar antes de aprovar
+
+`campanhas.enviar_teste` (ação `/campanhas/{id}/testar`): manda os toques de 1 a 5 empresas (só o primeiro ou todos) para o e-mail/WhatsApp de quem testa, com "[TESTE]". Não grava `Mensagem` nos leads, não conta nos limites, não muda a campanha; fica só no log (`testou_campanha`).
