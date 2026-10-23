@@ -424,3 +424,65 @@ def test_botoes_do_whatsapp_conectado(cliente, monkeypatch):
         assert db.get(Tarefa, tid).status == "feita"
     assert falso.enviados and falso.enviados[-1]["texto"] == "Olá! Mensagem pela Agenda."
     assert "Enviar pelo WhatsApp conectado" in cliente.get(f"/leads/{lead_id}").text
+
+
+def test_fila_de_whatsapp_so_para_quem_ja_conversou(cliente, monkeypatch):
+    """Celular conectado: a IA SDR manda sozinha só para quem autorizou ou já escreveu; contato frio espera o clique."""
+    from app.integracoes import whatsapp_leads
+
+    falso = WhatsAppLeadsFalso()
+    monkeypatch.setattr(whatsapp_leads, "configurado", lambda: True)
+    monkeypatch.setattr(whatsapp_leads, "enviar", falso.enviar)
+    monkeypatch.setattr(whatsapp_leads, "status", lambda usar_cache=True: {"disponivel": True, "conectado": True})
+    monkeypatch.setattr(mensagens, "dentro_do_horario", lambda db, momento=None: True)
+    with sessao() as db:
+        gravar_config(db, "horas_entre_contatos", "0")
+        camp = Campanha(nome="Zap automático", status="ativa", aprovado_em=agora(), usuario_id=_admin(db).id)
+        db.add(camp)
+        db.flush()
+        frio = _novo_lead(db, "Contábil Zap Frio", whatsapp="(81) 98111-0001")
+        autorizou = _novo_lead(db, "Contábil Zap Autorizou", whatsapp="(81) 98111-0002", consentimento=True)
+        escreveu = _novo_lead(db, "Contábil Zap Escreveu", whatsapp="(81) 98111-0003")
+        mensagens.registrar(db, escreveu.id, "whatsapp", "Oi, quero saber mais", None, status="recebida")
+        for lead in (frio, autorizou, escreveu):
+            db.add(Tarefa(tipo="prospeccao", lead_id=lead.id, canal="whatsapp", data=date.today(), hora="00:00",
+                          campanha_id=camp.id, angulo="lembrete", mensagem=f"Olá, {lead.empresa}!"))
+        db.flush()
+        assert autorizou.consentimento_em is None or autorizou.consentimento  # registrado na criação
+        ids = {frio.id: "frio", autorizou.id: "autorizou", escreveu.id: "escreveu"}
+
+    with sessao() as db:
+        monkeypatch.setattr(whatsapp_leads, "status", lambda usar_cache=True: {"disponivel": True, "conectado": False})
+        assert campanhas.processar_fila_whatsapp(db)["enviados"] == 0  # celular desconectado: nada sai
+    monkeypatch.setattr(whatsapp_leads, "status", lambda usar_cache=True: {"disponivel": True, "conectado": True})
+    with sessao() as db:
+        assert campanhas.processar_fila_whatsapp(db)["enviados"] == 2
+    enviados = {e["telefone"] for e in falso.enviados}
+    assert enviados == {"(81) 98111-0002", "(81) 98111-0003"}  # o contato frio não recebeu nada
+    with sessao() as db:
+        tarefas = {ids[t.lead_id]: t for t in db.execute(select(Tarefa).where(Tarefa.campanha_id.isnot(None),
+                                                                           Tarefa.lead_id.in_(ids))).scalars()}
+        assert tarefas["frio"].status == "pendente" and tarefas["autorizou"].status == "feita"
+        assert "sozinha" in tarefas["escreveu"].resultado
+        gravar_config(db, "enviar_whatsapp_automatico", "0")
+    try:
+        with sessao() as db:
+            assert campanhas.processar_fila_whatsapp(db)["enviados"] == 0  # desligado em Configurações
+    finally:
+        with sessao() as db:
+            gravar_config(db, "enviar_whatsapp_automatico", "1")
+
+
+def test_marcar_autorizacao_de_whatsapp_na_ficha(cliente):
+    with sessao() as db:
+        lead = _novo_lead(db, "Contábil Autoriza Ficha", whatsapp="(81) 98222-0001")
+        lead_id = lead.id
+    pagina = cliente.get(f"/leads/{lead_id}").text
+    assert "Autorizou receber mensagens da MS pelo WhatsApp" in pagina
+    from app.leads_servico import preencher
+
+    with sessao() as db:
+        lead = db.get(Lead, lead_id)
+        preencher(lead, {"consentimento": True})
+        assert lead.consentimento and lead.consentimento_em is not None
+        assert campanhas.whatsapp_liberado(db, lead)

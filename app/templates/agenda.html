@@ -46,6 +46,7 @@
   {% if t.status == 'pendente' %}
   {% set bloqueio = bloqueios.get(t.id, '') %}
   {% if bloqueio %}<div class="aviso aviso-alerta" style="margin:8px 0 0">{{ bloqueio }}</div>{% endif %}
+  {% if t.id in automaticas %}<div class="aviso aviso-info" style="margin:8px 0 0">A IA SDR manda esta mensagem sozinha pelo WhatsApp conectado (o contato já conversou com a MS){{ '' if wl.conectado else ' assim que o celular for conectado' }}.</div>{% endif %}
   <div class="grupo-btn" style="margin-top:8px">
     {% set telefone = (t.lead.whatsapp if t.lead else (t.cliente.telefone if t.cliente else '')) %}
     {% if t.mensagem %}<button class="btn btn-pequeno" data-copiar="1" data-alvo="t-{{ t.id }}" data-lead="{{ t.lead_id or '' }}" data-tarefa="{{ t.id }}" data-canal="{{ t.canal }}" data-assunto="{{ t.assunto }}">Copiar mensagem</button>{% endif %}

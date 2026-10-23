@@ -388,6 +388,59 @@ def processar_fila(db, maximo: int = 25) -> dict:
     return feito
 
 
+def whatsapp_liberado(db, lead: Lead) -> bool:
+    """A IA SDR só manda WhatsApp SOZINHA para quem já conversou com a MS: autorizou receber (consentimento)
+    ou já mandou mensagem pelo WhatsApp. O primeiro contato frio continua com 1 clique de uma pessoa
+    (conexão por QR code + política do WhatsApp: mensagem automática para quem não conhece o número = bloqueio)."""
+    if lead.consentimento:
+        return True
+    from .modelos import Mensagem
+
+    return db.execute(select(Mensagem.id).where(Mensagem.lead_id == lead.id, Mensagem.canal == "whatsapp",
+                                                Mensagem.status == "recebida").limit(1)).first() is not None
+
+
+def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
+    """Envia pelo WhatsApp conectado (WhatsApp Leads) os passos de WhatsApp das campanhas aprovadas, só para
+    leads liberados (ver whatsapp_liberado). Poucos por rodada: a fila de lá ainda aplica pausas e limite diário."""
+    from .integracoes import whatsapp_leads
+
+    feito = {"enviados": 0, "bloqueados": 0, "erros": 0}
+    if ler_config(db, "enviar_whatsapp_automatico") != "1" or not whatsapp_leads.configurado():
+        return feito
+    if not mensagens.dentro_do_horario(db):
+        return feito
+    situacao = whatsapp_leads.status()
+    if not (situacao.get("disponivel") and situacao.get("conectado")):
+        return feito  # celular desconectado: tudo espera, nada se perde
+    hora = agora().strftime("%H:%M")
+    consulta = (select(Tarefa).join(Campanha, Tarefa.campanha_id == Campanha.id)
+                .join(Lead, Tarefa.lead_id == Lead.id)
+                .where(Tarefa.status == "pendente", Tarefa.tipo == "prospeccao", Tarefa.canal == "whatsapp",
+                       Tarefa.data <= date.today(), Campanha.status == "ativa", Campanha.aprovado_em.is_not(None))
+                .order_by(Tarefa.data, Tarefa.hora, Tarefa.id).limit(200))
+    for t in db.execute(consulta).scalars():
+        if feito["enviados"] >= maximo:
+            break
+        if t.data == date.today() and (t.hora or "00:00") > hora:
+            continue
+        lead = t.lead
+        if not sdr.automacao_ativa(lead) or not whatsapp_liberado(db, lead) or not (t.mensagem or "").strip():
+            continue  # contato frio (ou já com um humano): fica na Agenda para o clique
+        try:
+            sdr.enviar_whatsapp_conectado(db, t.mensagem, None, lead=lead, tarefa=t)
+        except sdr.EnvioRecusado as erro:
+            texto = str(erro).lower()
+            if "limite" in texto or "whatsapp leads" in texto or "desligado" in texto:
+                feito["bloqueados"] += 1
+                break  # limite do canal ou WhatsApp fora do ar: o resto espera a próxima rodada
+            feito["bloqueados"] += 1
+            continue
+        t.resultado = "Enviada sozinha pela IA SDR (contato já conversou com a MS)"
+        feito["enviados"] += 1
+    return feito
+
+
 def finalizar_cadencias(db) -> int:
     """Depois do último toque sem resposta: 'Perdido – Sem resposta'. Não continua infinitamente."""
     dias = ler_config_int(db, "dias_sem_resposta", 3)

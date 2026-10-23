@@ -26,6 +26,10 @@
   <div><label>Próximo contato</label><input type="date" name="proximo_contato" value="{{ lead.proximo_contato.isoformat() if lead.proximo_contato else '' }}"></div>
   <div class="largo"><label>Sócios / responsáveis (dados públicos, um por linha)</label><textarea name="socios" style="min-height:60px">{{ lead.socios or '' }}</textarea></div>
   <div class="largo">
+    <label class="marcar"><input type="checkbox" name="consentimento" {{ 'checked' if lead.consentimento }}>
+      <b>Autorizou receber mensagens da MS pelo WhatsApp</b> <span class="pequeno suave">(com o celular conectado, a IA SDR manda os próximos passos sozinha)</span></label>
+  </div>
+  <div class="largo">
     <label>Critérios observados (entram no score)</label>
     <div class="campos" style="gap:2px 12px">
       {% for campo, nome in [("atende_empresas","Atende empresas"),("equipe_comercial","Possui equipe comercial"),("multiplos_socios","Tem mais de um sócio"),("presenca_digital_forte","Presença digital forte"),("demonstrou_interesse","Demonstrou interesse na parceria")] %}

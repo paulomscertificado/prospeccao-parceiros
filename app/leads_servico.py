@@ -15,7 +15,7 @@ CAMPOS_TEXTO = ["empresa", "cnpj", "responsavel", "cargo", "telefone", "whatsapp
                 "socios", "porte", "regime", "origem", "fonte_url", "observacoes", "base_legal"]
 CAMPOS_NUMERO = ["qtd_clientes_estimada", "funcionarios"]
 CAMPOS_MARCA = ["equipe_comercial", "multiplos_socios", "atende_empresas", "presenca_digital_forte",
-                "demonstrou_interesse"]
+                "demonstrou_interesse", "consentimento"]
 
 
 def limpar_campos(lead: Lead) -> None:
@@ -116,6 +116,8 @@ def preencher(lead: Lead, dados: dict, so_vazios: bool = False) -> list[str]:
             if novo != bool(getattr(lead, campo)):
                 setattr(lead, campo, novo)
                 alterados.append(campo)
+                if campo == "consentimento":  # LGPD: quando a autorização foi registrada
+                    lead.consentimento_em = agora() if novo else None
     if "vendedor_id" in dados:
         lead.vendedor_id = dados["vendedor_id"] or None
     if "proximo_contato" in dados:

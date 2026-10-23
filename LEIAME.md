@@ -74,7 +74,9 @@ preço nem comissão e não fecha parceria.
 2. A IA monta a campanha: acha as empresas, pesquisa o site de cada uma, calcula o potencial, escolhe as melhores e
    escreve uma mensagem **diferente para cada empresa**, em 4 toques (dia 1, 3, 7 e 12).
 3. Você confere e clica em **APROVAR CAMPANHA** (ou edita/cancela). Nada sai antes disso.
-4. E-mails saem sozinhos (com limites). WhatsApp e LinkedIn aparecem na Agenda para enviar com um clique.
+4. E-mails saem sozinhos (com limites). WhatsApp: com o celular conectado, sai **sozinho para quem já conversou com
+   a MS** (respondeu pelo WhatsApp ou tem marcado na ficha "Autorizou receber mensagens da MS pelo WhatsApp"); para
+   os demais, a Agenda mostra o botão para enviar com um clique. LinkedIn: sempre com um clique.
 5. Quando alguém responde com interesse, a automação para e aparece em **Oportunidades** (🔥) com o resumo.
    Clique em **Assumir lead**, ligue, marque a reunião e siga com a negociação.
 6. Veja em **Inteligência** qual segmento, canal e mensagem funcionam melhor.

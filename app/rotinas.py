@@ -96,6 +96,13 @@ def rodada(numero: int | None) -> None:
         log.exception("Erro na fila de envio")
     try:
         with sessao() as db:
+            r = campanhas.processar_fila_whatsapp(db)
+            if r["enviados"]:
+                log.info("Fila do WhatsApp: %s mensagens para contatos que já conversaram", r["enviados"])
+    except Exception:  # noqa: BLE001
+        log.exception("Erro na fila de WhatsApp")
+    try:
+        with sessao() as db:
             r = sdr.sincronizar_whatsapp_conectado(db)
             if r["respostas"]:
                 log.info("WhatsApp conectado: %s respostas de parceiros processadas", r["respostas"])

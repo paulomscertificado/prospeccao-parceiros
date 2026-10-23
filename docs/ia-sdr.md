@@ -42,7 +42,7 @@ Mensagens únicas (apresentação, praticidade, receita, encerramento) ──►
 APROVAÇÃO NECESSÁRIA  [APROVAR] [EDITAR] [CANCELAR]
         │
         ▼
-Fila: e-mail automático (limites) · WhatsApp/LinkedIn com 1 clique na Agenda
+Fila: e-mail automático (limites) · WhatsApp automático só p/ quem já conversou (resto com 1 clique) · LinkedIn com 1 clique
         │
         ▼
 Resposta (webhook WhatsApp · IMAP · registro manual) ──► IA classifica (15 classes)

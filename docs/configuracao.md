@@ -75,6 +75,13 @@ e-mails **não lidos** de remetentes que são leads; os outros continuam "não l
 - Quando o lead responde, abre-se a janela de 24 h: o webhook classifica a resposta e, com
   `sdr_resposta_automatica = 1`, a SDR responde "vou passar para o time comercial" pela API.
 
+- **Disparo automático pelo WhatsApp conectado** (`campanhas.processar_fila_whatsapp`, a cada minuto): com o
+  celular conectado no WhatsApp Leads, os passos de WhatsApp das campanhas **aprovadas** saem sozinhos **só para
+  quem já conversou com a MS**: marcou "Autorizou receber mensagens da MS pelo WhatsApp" na ficha
+  (`consentimento`, com data) ou já mandou mensagem pelo WhatsApp (`campanhas.whatsapp_liberado`). Até 3 por
+  minuto, dentro do horário de envio, com os limites daqui e as pausas/limite diário de lá. Celular desconectado:
+  tudo espera. Desligar: Configurações > Geral > `enviar_whatsapp_automatico = 0`. Contato frio: sempre 1 clique.
+
 ### Agenda de reuniões
 Cada usuário tem um **expediente** (Configurações > Usuários, ex.: `seg-sex 09:00-12:00,14:00-18:00`) e a duração
 da reunião. Os horários oferecidos = expediente − reuniões já marcadas. Integração com Google Calendar: prevista.

@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .. import cadencias, config, ia, leads_servico, mensagens, util
-from ..banco import agora, obter_db, sessao
+from ..banco import agora, ler_config, obter_db, sessao
 from ..leads_servico import historico, pode_ver
 from ..modelos import Cadencia, Campanha, Lead, PassoCadencia, Tarefa, Template, Usuario
 from ..seguranca import equipe, gestao, registrar_log, ve_tudo, verificar_csrf
@@ -161,8 +161,13 @@ def agenda(request: Request, ver: str = "hoje", canal: str = "", tipo: str = "",
     usuarios = db.execute(select(Usuario).where(Usuario.perfil != "parceiro", Usuario.ativo.is_(True))).scalars().all()
     bloqueios = {t.id: mensagens.bloqueio_de_envio(db, t.lead, t.canal) for t in tarefas
                  if t.status == "pendente" and t.lead and t.canal in ("whatsapp", "email")}
+    from ..campanhas import whatsapp_liberado
+
+    # Passos de WhatsApp de campanha que a IA SDR manda sozinha (contato que já conversou com a MS)
+    automaticas = {t.id for t in tarefas if t.status == "pendente" and t.canal == "whatsapp" and t.lead and t.campanha_id
+                   and ler_config(db, "enviar_whatsapp_automatico") == "1" and whatsapp_liberado(db, t.lead)}
     return tela(request, "agenda.html", {
-        "tarefas": tarefas, "ver": ver, "canal": canal, "tipo": tipo, "pendentes_hoje": pendentes_hoje,
+        "tarefas": tarefas, "automaticas": automaticas, "ver": ver, "canal": canal, "tipo": tipo, "pendentes_hoje": pendentes_hoje,
         "usuarios": usuarios if ve_tudo(usuario) else [], "responsavel": responsavel, "bloqueios": bloqueios,
         "limites": {c: (mensagens.enviadas_hoje(db, c), mensagens.limite_diario(db, c)) for c in ("whatsapp", "email")},
     })

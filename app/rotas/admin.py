@@ -39,6 +39,8 @@ CAMPOS_GERAIS = [
     ("enviar_email_automatico", "IA SDR · fila envia e-mails sozinha depois da aprovação (1 = sim, 0 = não)", "numero"),
     ("sdr_resposta_automatica", "IA SDR · responde \"vou passar para o time\" quando o canal permite (1 = sim, 0 = não)", "numero"),
     ("dias_sem_resposta", "IA SDR · dias depois do último toque para marcar SEM RESPOSTA", "numero"),
+    ("enviar_whatsapp_automatico", "IA SDR · com o celular conectado, manda sozinha o WhatsApp para quem já conversou "
+     "ou autorizou (1 = sim, 0 = não). Primeiro contato frio: sempre 1 clique", "numero"),
     ("aprovacao_obrigatoria", "IA SDR · campanha só começa com aprovação (1 = sim, 0 = não)", "numero"),
     ("notificar_por_email", "IA SDR · avisar o responsável por e-mail quando surgir oportunidade (1 = sim)", "numero"),
 ]
