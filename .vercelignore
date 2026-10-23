@@ -9,3 +9,5 @@ Dockerfile
 docker-compose.yml
 **/__pycache__/
 .pytest_cache/
+.env.local
+.vercel/
