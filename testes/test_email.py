@@ -149,7 +149,7 @@ def test_google_fechando_a_conexao_vira_aviso_de_senha(cliente, env_temporario, 
     monkeypatch.setattr(email_smtp.smtplib, "SMTP", SMTPQueDesliga)
     config.SMTP_HOST, config.SMTP_PORTA, config.SMTP_SENHA = "smtp.gmail.com", 587, "senhaerrada"
     config.SMTP_REMETENTE = "MS <contato@mscertificados.com.br>"
-    with pytest.raises(email_smtp.ErroEmail, match="senha de app \(16 letras\) foi criada ESTANDO LOGADO"):
+    with pytest.raises(email_smtp.ErroEmail, match=r"senha de app \(16 letras\) foi criada ESTANDO LOGADO"):
         email_smtp.enviar("alguem@exemplo.com", "oi", "oi")
 
 
