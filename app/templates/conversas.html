@@ -86,7 +86,13 @@
 
 <div class="chat">
   <aside class="chat-lista">
-    <div class="topo"><div class="chat-busca">
+    <div class="topo">
+      {% if numeros|length > 1 %}<select id="numero" aria-label="Número de WhatsApp" style="width:100%;margin-bottom:8px">
+        <option value="">Todos os meus números</option>
+        {% for n in numeros %}<option value="{{ n.id }}">{{ '📱 ' if n.minha }}{{ n.nome }}{{ '' if n.conectado else ' (desconectado)' }}</option>{% endfor %}
+      </select>{% endif %}
+      {% if not numeros %}<div class="aviso aviso-alerta" style="margin:0 0 8px">Você ainda não tem número. <a href="/whatsapp">Conecte o seu WhatsApp</a>.</div>{% endif %}
+      <div class="chat-busca">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14zM21 21l-5-5"/></svg>
       <input type="search" id="busca" placeholder="Buscar por nome ou telefone" aria-label="Buscar conversa"></div></div>
     <div class="chat-itens" id="lista"><p class="vazio" style="padding:16px">Carregando...</p></div>
@@ -135,6 +141,9 @@
 {% block scripts %}
 <script>
 let atual = {{ telefone_inicial|json }} || '';
+let numeroAtual = new URLSearchParams(location.search).get('numero') || {{ numero_padrao|json }} || '';
+const NOMES_NUMEROS = Object.fromEntries({{ numeros|json }}.map(n => [n.id, n.nome]));
+const filtroNumero = () => (document.getElementById('numero') || {}).value || '';
 let modoNovo = false;
 let assinatura = '';
 const el = id => document.getElementById(id);
@@ -167,33 +176,38 @@ function mostrarSituacao(s) {
   const a = el('aviso-situacao');
   if (!s) return;
   if (!s.disponivel) { a.style.display = ''; a.textContent = s.erro || 'O computador com o WhatsApp está desligado.'; }
-  else if (!s.conectado) { a.style.display = ''; a.innerHTML = 'O celular está desconectado: as mensagens saem quando conectar (menu <a href="/whatsapp">WhatsApp</a>).'; }
+  else if (s.sem_numero) { a.style.display = ''; a.innerHTML = 'Você ainda não tem número de WhatsApp. <a href="/whatsapp">Conecte o seu</a>.'; }
+  else if (!s.conectado) { a.style.display = ''; a.innerHTML = 'Este número está desconectado: as mensagens saem quando conectar (menu <a href="/whatsapp">WhatsApp</a>).'; }
   else a.style.display = 'none';
 }
 
 async function carregarLista() {
   let d;
-  try { d = await (await fetch('/conversas/api/lista?busca=' + encodeURIComponent(el('busca').value))).json(); } catch (e) { return; }
+  try { d = await (await fetch('/conversas/api/lista?busca=' + encodeURIComponent(el('busca').value)
+                               + '&numero=' + encodeURIComponent(filtroNumero()))).json(); } catch (e) { return; }
   mostrarSituacao(d.situacao);
   el('lista').innerHTML = d.conversas.length ? d.conversas.map(c => `
-    <a class="chat-item ${c.telefone === atual && !modoNovo ? 'ativa' : ''} ${c.nao_lidas ? 'nao-lida' : ''}" data-tel="${c.telefone}">
+    <a class="chat-item ${c.telefone === atual && c.numero === numeroAtual && !modoNovo ? 'ativa' : ''} ${c.nao_lidas ? 'nao-lida' : ''}" data-tel="${c.telefone}" data-numero="${c.numero}">
       <div class="avatar" style="background:${cor(c.telefone)}">${escapar(iniciais(c.nome, c.telefone))}</div>
       <div class="info">
         <div class="linha"><span class="nome">${escapar(c.nome || c.telefone_formatado)}</span><span class="hora">${c.quando}</span></div>
         <div class="linha"><span class="previa">${c.ultima_direcao === 'saida' ? 'Você: ' : ''}${escapar(c.ultima.replace(/\s+/g, ' '))}</span>
           ${c.nao_lidas ? `<span class="qtd">${c.nao_lidas}</span>` : ''}</div>
+        ${d.varios_numeros && !filtroNumero() ? `<div class="pequeno suave">📱 ${escapar(c.numero_nome)}</div>` : ''}
       </div>
     </a>`).join('') : '<p class="vazio" style="padding:16px">Nenhuma conversa encontrada.</p>';
-  el('lista').querySelectorAll('[data-tel]').forEach(a => a.addEventListener('click', () => abrir(a.dataset.tel)));
+  el('lista').querySelectorAll('[data-tel]').forEach(a => a.addEventListener('click', () => abrir(a.dataset.tel, a.dataset.numero)));
 }
 
 async function carregarConversa(rolar) {
   if (!atual || modoNovo) return;
   let d;
-  try { d = await (await fetch('/conversas/api/conversa/' + encodeURIComponent(atual))).json(); } catch (e) { return; }
+  try { d = await (await fetch('/conversas/api/conversa/' + encodeURIComponent(atual) + '?numero=' + encodeURIComponent(numeroAtual))).json(); } catch (e) { return; }
+  if (d.erro) { el('mensagens').innerHTML = `<div class="vazio-chat"><p>${escapar(d.erro)}</p></div>`; return; }
   if (el('form-nome').style.display === 'none') {
     el('c-nome').textContent = d.nome || d.telefone_formatado;
-    el('c-telefone').textContent = d.nome ? d.telefone_formatado : 'Contato sem nome';
+    el('c-telefone').textContent = (d.nome ? d.telefone_formatado : 'Contato sem nome')
+      + (Object.keys(NOMES_NUMEROS).length > 1 ? ' · pelo ' + (NOMES_NUMEROS[d.numero] || d.numero) : '');
     el('campo-nome').value = d.nome || '';
     avatar(el('c-avatar'), d.nome, d.telefone);
   }
@@ -219,14 +233,15 @@ async function carregarConversa(rolar) {
   mostrarSituacao(d.situacao);
 }
 
-function abrir(telefone) {
+function abrir(telefone, numero) {
   atual = telefone; modoNovo = false; assinatura = '';
+  if (numero) numeroAtual = numero;
   el('sem-conversa').style.display = 'none';
   el('area-conversa').style.display = 'flex';
   el('nova-campos').style.display = 'none';
   el('editar-nome').style.display = '';
   fecharNome();
-  history.replaceState(null, '', '/conversas?telefone=' + telefone);
+  history.replaceState(null, '', '/conversas?telefone=' + telefone + '&numero=' + numeroAtual);
   carregarConversa(true); carregarLista();
   el('texto').focus();
 }
@@ -250,14 +265,15 @@ async function enviar(ev) {
   ev.preventDefault();
   const texto = el('texto').value.trim();
   if (!texto) return;
-  const dados = modoNovo ? { telefone: el('novo-telefone').value, nome: el('novo-nome').value, texto }
-                         : { telefone: atual, texto };
+  const dados = modoNovo ? { telefone: el('novo-telefone').value, nome: el('novo-nome').value, texto,
+                             numero: filtroNumero() || numeroAtual }
+                         : { telefone: atual, texto, numero: numeroAtual };
   el('botao-enviar').disabled = true;
   try {
     const r = await postarJSON('/conversas/api/enviar', dados);
     el('texto').value = ''; ajustarAltura();
     if (r.aviso) aviso(r.aviso);
-    abrir(r.telefone);
+    abrir(r.telefone, r.numero);
   } catch (e) { alert(e.message); }
   el('botao-enviar').disabled = false;
 }
@@ -266,6 +282,7 @@ el('form-enviar').addEventListener('submit', enviar);
 el('texto').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) enviar(e); });
 el('texto').addEventListener('input', ajustarAltura);
 let espera; el('busca').addEventListener('input', () => { clearTimeout(espera); espera = setTimeout(carregarLista, 300); });
+if (el('numero')) el('numero').addEventListener('change', () => { if (filtroNumero()) numeroAtual = filtroNumero(); carregarLista(); });
 
 function fecharNome() { el('form-nome').style.display = 'none'; el('area-nome').style.display = ''; el('editar-nome').style.display = modoNovo ? 'none' : ''; }
 el('editar-nome').addEventListener('click', () => {
@@ -283,7 +300,7 @@ el('form-nome').addEventListener('submit', async ev => {
 });
 
 carregarLista();
-if (atual) abrir(atual);
+if (atual) abrir(atual, numeroAtual);
 setInterval(() => { carregarLista(); carregarConversa(false); }, 4000);
 </script>
 {% endblock %}

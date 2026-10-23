@@ -218,21 +218,23 @@ def test_tela_whatsapp_na_nuvem_manda_pedidos_pela_ponte(cliente, nuvem):
     assert pagina.status_code == 200 and "Conectar com QR code" in pagina.text and "Regras de envio" in pagina.text
     assert 'href="/whatsapp"' in pagina.text  # está no menu
     estado = cliente.get("/whatsapp/estado").json()
-    assert estado["situacao"]["qr"] == "data:image/png;base64,QRTESTE" and estado["situacao"]["disponivel"]
+    principal = next(n for n in estado["numeros"] if n["id"] == "principal")
+    assert principal["situacao"]["qr"] == "data:image/png;base64,QRTESTE" and principal["situacao"]["disponivel"]
     csrf = pagina.text.split('name="csrf" content="')[1].split('"')[0]
-    cliente.post("/whatsapp/comando", data={"csrf": csrf, "acao": "conectar", "tipo": "qr"})
+    cliente.post("/whatsapp/comando", data={"csrf": csrf, "acao": "conectar", "numero": "principal", "tipo": "qr"})
     cliente.post("/whatsapp/comando", data={"csrf": csrf, "acao": "salvar_regras", "intervalo_min_seg": "30",
                                             "intervalo_max_seg": "10", "limite_diario": "50"})  # inválido: não vai
     r = cliente.post("/api/ponte/troca", json={"status": status}, headers=cab).json()
     assert r["intervalo"] == 3  # tela aberta: troca rápida
-    assert [(c["acao"], c["dados"]) for c in r["comandos"]] == [("conectar", {"tipo": "qr"})]
+    assert [(c["acao"], c["dados"]) for c in r["comandos"]] == [("conectar", {"conexao": "principal", "tipo": "qr"})]
     assert cliente.post("/api/ponte/troca", json={"status": status}, headers=cab).json()["comandos"] == []  # nunca em dobro
     novo = {**status, "conectado": True, "estado": "Conectado", "estado_codigo": "conectado", "qr": "", "numero": "5581999"}
     cliente.post("/api/ponte/retorno", headers=cab,
                  json={"confirmados": [], "novidades": {}, "comandos": [{"id": r["comandos"][0]["id"], "erro": ""}],
                        "status": novo})
     estado = cliente.get("/whatsapp/estado").json()
-    assert estado["situacao"]["conectado"] and estado["pedido"]["status"] == "feito"
+    assert next(n for n in estado["numeros"] if n["id"] == "principal")["situacao"]["conectado"]
+    assert estado["pedido"]["status"] == "feito"
     with sessao() as db:
         assert db.execute(select(ComandoWhatsApp)).scalars().all()[-1].status == "feito"
 

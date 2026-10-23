@@ -1,94 +1,81 @@
 {% extends "base.html" %}
 {% block titulo %}WhatsApp{% endblock %}
 {% block conteudo %}
-{% set s = estado.situacao %}
-<div class="cabecalho"><div><h1>WhatsApp</h1><div class="suave">Conexão do número e regras de envio (o celular fica ligado ao computador da MS, no WhatsApp Leads)</div></div></div>
+<style>
+  .numeros { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+  .numero { margin: 0; display: flex; flex-direction: column; gap: 10px; }
+  .numero .topo-numero { display: flex; align-items: center; gap: 12px; }
+  .numero .icone-numero { width: 42px; height: 42px; border-radius: 12px; background: var(--azul); color: #fff; display: grid; place-items: center; flex-shrink: 0; }
+  .numero .icone-numero svg { width: 20px; height: 20px; }
+  .numero .titulo { flex: 1; min-width: 0; }
+  .numero .titulo b { display: block; }
+  .qr-area { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; background: #f6f9fc; border-radius: 10px; padding: 12px; }
+  .qr-area img { width: 220px; max-width: 100%; background: #fff; padding: 8px; border-radius: 8px; }
+  .qr-area ol { padding-left: 18px; margin: 0; font-size: .85rem; }
+  .compartilhar { border-top: 1px dashed var(--borda); padding-top: 10px; }
+  .compartilhar summary { cursor: pointer; font-weight: 600; color: var(--azul); font-size: .85rem; }
+  .lista-pessoas { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 2px 10px; margin: 8px 0; }
+  .vazio-numero { text-align: center; padding: 20px 10px; }
+</style>
+<div class="cabecalho"><div><h1>WhatsApp</h1><div class="suave">Cada pessoa conecta o próprio número para prospectar e conversar. O número fica ligado no computador da MS.</div></div></div>
 
 {% if not estado.ponte %}
 <div class="cartao"><h2>Situação</h2>
-  <p><b>{{ 'Conectado' if s.conectado else (s.erro or 'Desconectado') }}</b></p>
   <p>Neste computador, a conexão e as regras ficam na tela do próprio WhatsApp Leads.</p>
   <a class="btn btn-primario" href="{{ url_local }}" target="_blank" rel="noopener">Abrir o WhatsApp Leads</a>
 </div>
 {% else %}
-<div class="cartao" id="cartao-conexao">
-  <h2>Situação</h2>
-  <p><span class="selo" id="selo-estado">…</span> <strong id="estado-texto"></strong> <span id="numero" class="suave"></span></p>
-  <div id="aviso-computador" class="aviso aviso-alerta" style="display:none"></div>
-  <div id="erro-conexao" class="aviso aviso-erro" style="display:none"></div>
-  <div id="aviso-pedido" class="aviso aviso-info" style="display:none"></div>
-  <p id="limites" class="pequeno suave"></p>
+<div id="aviso-computador" class="aviso aviso-erro" style="display:none"></div>
+<div id="aviso-pedido" class="aviso aviso-info" style="display:none"></div>
 
-  <div id="area-qr" style="display:none">
-    <div class="grade-2" style="align-items:start">
-      <div><img id="imagem-qr" alt="QR code do WhatsApp" style="width:260px;max-width:100%;background:#fff;padding:8px;border-radius:8px"></div>
-      <div>
-        <h3>Leia o QR code com o celular</h3>
-        <ol style="padding-left:18px">
-          <li>Abra o <b>WhatsApp</b> (ou WhatsApp Business) no celular.</li>
-          <li>Toque nos <b>três pontinhos</b> (Android) ou em <b>Configurações</b> (iPhone).</li>
-          <li>Toque em <b>Aparelhos conectados</b> → <b>Conectar um aparelho</b>.</li>
-          <li>Aponte a câmera para o quadrado ao lado.</li>
-        </ol>
-        <p class="pequeno suave">O código muda sozinho a cada poucos segundos. Esta tela se atualiza sozinha.</p>
-      </div>
+{% set minha = (estado.numeros|selectattr('minha')|list) %}
+<h2 style="margin:4px 0 10px"><span class="etiqueta">Meu WhatsApp</span></h2>
+<div class="numeros" style="margin-bottom:22px">
+  {% if minha %}
+    {% for n in minha %}{% include "_numero_whatsapp.html" %}{% endfor %}
+  {% else %}
+  <div class="cartao numero vazio-numero">
+    <div class="icone-numero" style="margin:0 auto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM11 18h2"/></svg></div>
+    <b>Você ainda não conectou o seu número</b>
+    <p class="pequeno suave">Com o seu número conectado, a IA SDR envia os WhatsApps dos seus leads por ele e as suas conversas aparecem em <a href="/conversas">Conversas</a>.
+      Use de preferência um número de trabalho (a conexão por QR code não é oficial: mensagens demais para quem não te conhece podem bloquear o número).</p>
+    <div class="grupo-btn" style="justify-content:center">
+      <form class="inline" method="post" action="/whatsapp/comando"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="acao" value="conectar"><input type="hidden" name="numero" value="meu"><input type="hidden" name="tipo" value="qr">
+        <button class="btn btn-primario">Conectar com QR code</button></form>
+      <form class="inline" method="post" action="/whatsapp/comando"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="acao" value="conectar"><input type="hidden" name="numero" value="meu"><input type="hidden" name="tipo" value="teste">
+        <button class="btn">Usar modo teste</button></form>
     </div>
-  </div>
-
-  {% if usuario.perfil == 'admin' %}
-  <div id="area-desconectar" class="grupo-btn" style="display:none;margin-top:8px">
-    <form class="inline" method="post" action="/whatsapp/comando"><input type="hidden" name="csrf" value="{{ csrf }}">
-      <input type="hidden" name="acao" value="pausar"><button class="btn">Pausar conexão</button></form>
-    <form class="inline" method="post" action="/whatsapp/comando"
-          onsubmit="return confirm('Desligar o WhatsApp do sistema? Para voltar, será preciso ler o QR code de novo.')">
-      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="acao" value="desligar">
-      <button class="btn btn-perigo">Desligar este número</button></form>
   </div>
   {% endif %}
 </div>
 
-{% if usuario.perfil == 'admin' %}
-<div class="cartao">
-  <h2>Conectar</h2>
-  <div class="grade-2">
-    <div class="cartao" style="margin:0">
-      <h3>Modo teste</h3>
-      <p class="pequeno suave">Simula o WhatsApp. Nenhuma mensagem sai de verdade. Use para testar campanhas e
-        respostas sem gastar o número.</p>
-      <form method="post" action="/whatsapp/comando"><input type="hidden" name="csrf" value="{{ csrf }}">
-        <input type="hidden" name="acao" value="conectar"><input type="hidden" name="tipo" value="teste">
-        <button class="btn">Usar modo teste</button></form>
-    </div>
-    <div class="cartao" style="margin:0">
-      <h3>Meu WhatsApp (QR code)</h3>
-      <p class="pequeno suave">Liga um número de verdade, como o WhatsApp Web. Grátis, mas <b>não é oficial</b>:
-        o WhatsApp pode bloquear o número se ele mandar muitas mensagens para quem não te conhece.
-        Use um <b>número separado</b> do principal.</p>
-      <form method="post" action="/whatsapp/comando"><input type="hidden" name="csrf" value="{{ csrf }}">
-        <input type="hidden" name="acao" value="conectar"><input type="hidden" name="tipo" value="qr">
-        <button class="btn btn-primario">Conectar com QR code</button></form>
-    </div>
-  </div>
+{% set outros = (estado.numeros|rejectattr('id', 'in', minha|map(attribute='id')|list)|list) %}
+{% if outros %}
+<h2 style="margin:4px 0 10px"><span class="etiqueta">{{ 'Todos os números' if usuario.perfil == 'admin' else 'Números compartilhados comigo' }}</span></h2>
+<div class="numeros" style="margin-bottom:22px">
+  {% for n in outros %}{% include "_numero_whatsapp.html" %}{% endfor %}
 </div>
+{% endif %}
 
+{% if usuario.perfil == 'admin' %}
 <form class="cartao" method="post" action="/whatsapp/comando">
   <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="acao" value="salvar_regras">
   <h2>Regras de envio (contra bloqueio)</h2>
-  <p class="pequeno suave">Valem para todas as mensagens que saem pelo número (IA SDR e automações do WhatsApp Leads).</p>
+  <p class="pequeno suave">Valem para todos os números (cada número tem o próprio limite por dia). Só o administrador muda.</p>
   {% if not regras %}<div class="aviso aviso-alerta">As regras atuais aparecem quando o computador com o WhatsApp Leads se conectar.</div>{% endif %}
   <div class="campos">
     <div><label>Pausa mínima entre mensagens (segundos)</label><input type="number" min="1" name="intervalo_min_seg" value="{{ regras.intervalo_min_seg or 8 }}"></div>
     <div><label>Pausa máxima (segundos)</label><input type="number" min="1" name="intervalo_max_seg" value="{{ regras.intervalo_max_seg or 20 }}"></div>
-    <div><label>Limite de mensagens por dia</label><input type="number" min="1" name="limite_diario" value="{{ regras.limite_diario or 200 }}"></div>
+    <div><label>Limite de mensagens por dia (por número)</label><input type="number" min="1" name="limite_diario" value="{{ regras.limite_diario or 200 }}"></div>
     <div><label>Enviar a partir de</label><input type="time" name="horario_inicio" value="{{ regras.horario_inicio or '08:00' }}"></div>
     <div><label>Enviar até</label><input type="time" name="horario_fim" value="{{ regras.horario_fim or '20:00' }}"></div>
     <div class="largo"><label>Palavras para o lead sair da lista</label><input type="text" name="palavras_sair" value="{{ regras.palavras_sair or 'SAIR, PARAR, CANCELAR, DESCADASTRAR' }}">
-      <p class="ajuda">Se o lead mandar só uma dessas palavras, ele para de receber mensagens.</p></div>
+      <p class="ajuda">Se o lead mandar só uma dessas palavras, ele para de receber mensagens (em qualquer número).</p></div>
   </div>
   <button class="btn btn-primario">Salvar regras</button>
 </form>
-{% else %}
-<p class="suave">Só o administrador conecta, pausa ou muda as regras do WhatsApp.</p>
 {% endif %}
 {% endif %}
 {% endblock %}
@@ -96,28 +83,31 @@
 {% block scripts %}
 {% if estado.ponte %}
 <script>
-const ESTADO_INICIAL = {{ estado|json }};
 function mostrar(e) {
-  const s = e.situacao || {};
-  const ligado = !!s.disponivel;
-  const selo = document.getElementById('selo-estado');
-  selo.textContent = !ligado ? 'Computador desligado' : (s.conectado ? 'Conectado' : 'Desconectado');
-  selo.className = 'selo ' + (!ligado ? 'selo-erro' : (s.conectado ? 'selo-ok' : 'selo-alerta'));
-  document.getElementById('estado-texto').textContent = ligado ? ((s.estado || '') + (s.tipo === 'teste' ? ' (modo teste)' : '')) : '';
-  document.getElementById('numero').textContent = s.numero ? '· ' + s.numero : '';
+  const pc = e.computador || {};
   const aviso = document.getElementById('aviso-computador');
-  aviso.style.display = ligado ? 'none' : '';
-  aviso.textContent = s.erro && !ligado ? s.erro : '';
-  const erro = document.getElementById('erro-conexao');
-  erro.style.display = ligado && s.erro ? '' : 'none';
-  erro.textContent = ligado ? (s.erro || '') : '';
-  document.getElementById('limites').textContent = ligado && s.limite_diario
-    ? `Hoje: ${s.enviadas_hoje || 0} de ${s.limite_diario} mensagens · horário de envio ${s.horario || ''}` : '';
-  const qr = ligado && s.estado_codigo === 'aguardando_qr' && s.qr;
-  document.getElementById('area-qr').style.display = qr ? '' : 'none';
-  if (qr) document.getElementById('imagem-qr').src = s.qr;
-  const desligar = document.getElementById('area-desconectar');
-  if (desligar) desligar.style.display = ligado && s.estado_codigo && s.estado_codigo !== 'desconectado' ? '' : 'none';
+  aviso.style.display = pc.disponivel ? 'none' : '';
+  aviso.textContent = pc.disponivel ? '' : (pc.erro || 'O computador com o WhatsApp Leads está desligado.');
+  for (const n of e.numeros) {
+    const caixa = document.querySelector(`[data-numero="${n.id}"]`);
+    if (!caixa) continue;
+    const s = n.situacao || {};
+    const selo = caixa.querySelector('.selo-estado');
+    selo.textContent = !s.disponivel ? 'Computador desligado' : (s.conectado ? 'Conectado' + (s.tipo === 'teste' ? ' (teste)' : '')
+      : (s.estado_codigo === 'aguardando_qr' ? 'Aguardando QR code' : (s.estado || 'Desconectado')));
+    selo.className = 'selo selo-estado ' + (!s.disponivel ? 'selo-erro' : (s.conectado ? 'selo-ok' : 'selo-alerta'));
+    caixa.querySelector('.numero-tel').textContent = s.numero ? s.numero : '';
+    caixa.querySelector('.limite').textContent = s.conectado ? `Hoje: ${s.enviadas_hoje || 0} mensagens automáticas` : '';
+    const erro = caixa.querySelector('.erro-numero');
+    erro.style.display = s.disponivel && s.erro ? '' : 'none';
+    erro.textContent = s.erro || '';
+    const qr = s.disponivel && s.estado_codigo === 'aguardando_qr' && s.qr;
+    caixa.querySelector('.qr-area').style.display = qr ? '' : 'none';
+    if (qr) caixa.querySelector('.qr-area img').src = s.qr;
+    const ligado = s.disponivel && s.estado_codigo && !['desconectado', ''].includes(s.estado_codigo);
+    caixa.querySelectorAll('.so-ligado').forEach(b => b.style.display = ligado ? '' : 'none');
+    caixa.querySelectorAll('.so-desligado').forEach(b => b.style.display = ligado ? 'none' : '');
+  }
   const p = e.pedido, ap = document.getElementById('aviso-pedido');
   if (p && p.status !== 'feito') {
     ap.style.display = '';
@@ -125,10 +115,8 @@ function mostrar(e) {
     ap.textContent = p.status === 'erro' ? `${p.acao}: não deu certo (${p.erro}).` : `${p.acao}: aguardando o computador do WhatsApp...`;
   } else { ap.style.display = 'none'; }
 }
-mostrar(ESTADO_INICIAL);
-setInterval(async () => {
-  try { mostrar(await (await fetch('/whatsapp/estado')).json()); } catch (e) {}
-}, 3000);
+mostrar({{ estado|json }});
+setInterval(async () => { try { mostrar(await (await fetch('/whatsapp/estado')).json()); } catch (e) {} }, 3000);
 </script>
 {% endif %}
 {% endblock %}

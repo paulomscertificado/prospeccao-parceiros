@@ -80,9 +80,11 @@ def tela(request: Request, nome: str, contexto: dict | None = None, status_code:
                 Notificacao.usuario_id == usuario.id, Notificacao.lida.is_(False))).scalar() or 0
             mostrar_vendas = ler_config(db, "mostrar_vendas") == "1"
             mostrar_agenda = ler_config(db, "mostrar_agenda") == "1"
-        from .integracoes import whatsapp_leads
+        from . import conexoes
 
-        wl = whatsapp_leads.status()
+        with FabricaSessao() as db:
+            wl = conexoes.para_o_menu(db, usuario)
+            db.commit()
     dados = {
         "request": request,
         "usuario": usuario,

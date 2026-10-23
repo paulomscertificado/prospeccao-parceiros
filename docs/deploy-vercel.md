@@ -71,6 +71,15 @@ entrega os pedidos (`comandos`, marcados "retirado") e o retorno devolve o resul
 (com o QR code em imagem). Enquanto a tela está aberta (`wl_tela_vista_em` < 20 s), a troca responde
 `intervalo: 3` e o WhatsApp Leads passa a trocar a cada 3 s; fora disso, a cada 30 s. Só o administrador age.
 
+**Vários números** (`app/conexoes.py`, tabela `conexoes_whatsapp`): cada usuário conecta o próprio número (id
+`u<id do usuário>`; o da MS é `principal`). No WhatsApp Leads cada número é um conector (`whatsapp.Conexoes`,
+sessão em `dados/sessoes/<id>.db`; o principal continua em `dados/sessao_whatsapp.db`) com fila, pausa e limite
+diário próprios; só o principal dispara as automações/Atendente IA de lá (SAIR vale em todos). O status chega em
+`status.conexoes`; pedidos e envios levam `conexao`. A IA SDR envia pelo número do responsável pelo lead
+(`conexoes.responsavel` → `para_enviar`: o próprio ou um compartilhado com ele); sem número, a fila espera e
+avisa a pessoa (1 vez por dia). Dono e administrador compartilham (`/whatsapp/compartilhar`: toda a equipe ou
+pessoas escolhidas). Conversas filtram por número acessível.
+
 **Tela Conversas** (`rotas/conversas.py`, menu "Conversas"): a troca manda `desde_conversas` e o retorno traz
 `conversas` = todas as mensagens do WhatsApp Leads (qualquer contato, entrada e saída) depois desse id, de 300 em
 300 (`integracao.conversas_desde`), mais o status das enviadas nas últimas 6 h. Ficam em `mensagens_whatsapp`

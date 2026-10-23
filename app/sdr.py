@@ -467,9 +467,12 @@ class EnvioRecusado(Exception):
 
 
 def enviar_whatsapp_conectado(db, texto: str, usuario: Usuario | None, lead: Lead | None = None,
-                              telefone: str = "", nome: str = "", tarefa: Tarefa | None = None) -> Mensagem:
-    """Envia UMA mensagem pelo WhatsApp conectado no WhatsApp Leads (clique de uma pessoa).
-    Aplica as regras daqui (opt-out, frequência, limites) antes de colocar na fila de lá."""
+                              telefone: str = "", nome: str = "", tarefa: Tarefa | None = None,
+                              conexao: str | None = None) -> Mensagem:
+    """Envia UMA mensagem pelo WhatsApp conectado no WhatsApp Leads (clique de uma pessoa ou fila da IA SDR).
+    Sai pelo número do responsável pelo lead (app/conexoes.py). Aplica as regras daqui (opt-out, frequência,
+    limites) antes de colocar na fila de lá."""
+    from . import conexoes
     from .integracoes import whatsapp_leads
     from .leads_servico import registrar_contato
 
@@ -484,14 +487,20 @@ def enviar_whatsapp_conectado(db, texto: str, usuario: Usuario | None, lead: Lea
     bloqueio = mensagens.bloqueio_de_envio(db, lead, "whatsapp", tarefa.campanha_id if tarefa else None)
     if bloqueio:
         raise EnvioRecusado(bloqueio)
+    if not conexao:
+        try:
+            conexao = conexoes.para_enviar(db, conexoes.responsavel(db, lead, usuario, tarefa))
+        except conexoes.SemNumero as erro:
+            raise EnvioRecusado(str(erro)) from None
     try:
-        id_externo = whatsapp_leads.enviar(telefone, nome, texto, db=db)
+        id_externo = whatsapp_leads.enviar(telefone, nome, texto, db=db, conexao=conexao)
     except whatsapp_leads.ErroWhatsAppLeads as erro:
         raise EnvioRecusado(str(erro)) from None
     msg = mensagens.registrar(db, lead.id if lead else None, "whatsapp", texto, usuario, modo="whatsapp-leads",
                               status="na_fila", tarefa_id=tarefa.id if tarefa else None, id_externo=str(id_externo),
                               campanha_id=tarefa.campanha_id if tarefa else None, angulo=tarefa.angulo if tarefa else "",
                               categoria_id=lead.categoria_id if lead else None)
+    msg.conexao = conexao
     if tarefa is not None:
         tarefa.status, tarefa.concluida_em, tarefa.resultado = "feita", agora(), "Enviada pelo WhatsApp conectado"
     if lead is not None:
@@ -567,6 +576,6 @@ def aplicar_novidades_whatsapp(db, dados: dict) -> dict:
         analise = processar_resposta(db, lead, recebida["texto"], "whatsapp")
         from .rotinas import responder_automaticamente
 
-        responder_automaticamente(db, lead, "whatsapp", analise)
+        responder_automaticamente(db, lead, "whatsapp", analise, conexao=recebida.get("conexao"))  # pelo mesmo número
         resultado["respostas"] += 1
     return resultado

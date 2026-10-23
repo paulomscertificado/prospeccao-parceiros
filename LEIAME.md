@@ -107,12 +107,20 @@ Configure as categorias em Configurações > **Categorias de parceiros** e o que
 
 | Perfil | Vê |
 |---|---|
-| Administrador | Tudo, inclusive Configurações e usuários |
-| Gestor | Toda a equipe e os indicadores (não altera configurações) |
+| Administrador | Tudo, inclusive Configurações, usuários, todos os números de WhatsApp e as regras de envio |
+| Gestor | Toda a equipe e os indicadores; aprova campanhas (não altera configurações) |
+| Funcionário MS | Quase toda a plataforma (prospecção, campanhas, IA, cadências, templates, categorias, conversas), mas **só os próprios dados** e o que for compartilhado com ele; não aprova campanhas nem mexe em Configurações |
 | Vendedor | Só os próprios leads, tarefas e vendas |
 | Parceiro | Só o portal: própria carteira, indicações, vendas e comissão |
 
-Crie usuários em **Configurações > Usuários**.
+Crie usuários em **Configurações > Usuários** (o perfil padrão é Funcionário MS).
+
+**Cada pessoa com o seu WhatsApp:** no menu **WhatsApp > Meu WhatsApp**, cada um conecta o próprio número pelo
+QR code. A IA SDR manda os WhatsApps dos leads de cada pessoa pelo número dela; sem número conectado, as
+mensagens esperam e a pessoa recebe um aviso para conectar. Em **Conversas**, cada um vê só as conversas do
+próprio número e dos números compartilhados com ele.
+**Compartilhar um número:** no cartão do número, **Compartilhar este número** → "Toda a equipe" ou escolha as
+pessoas. Só o dono do número e o administrador compartilham, pausam ou desligam.
 
 ## 6. Problemas comuns
 

@@ -202,7 +202,7 @@ def _montar(campanha_id: int, escolhidos: list[int], textos: dict[int, dict]) ->
         cad = db.get(Cadencia, camp.cadencia_id) if camp.cadencia_id else cadencia_sdr(db)
         leads = [l for l in (db.get(Lead, i) for i in escolhidos) if l]
         for lead in leads:
-            if lead.vendedor_id is None and usuario.perfil == "vendedor":
+            if lead.vendedor_id is None and usuario.perfil in config.PERFIS_SO_PROPRIOS:
                 lead.vendedor_id = usuario.id
         r = cadencias.aplicar(db, cad, leads, usuario, camp.inicio or date.today(), camp.id, textos,
                               [c for c in camp.canais.split(",") if c], "rascunho", camp.cta, camp.tom)
@@ -410,9 +410,8 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
         return feito
     if not mensagens.dentro_do_horario(db):
         return feito
-    situacao = whatsapp_leads.status()
-    if not (situacao.get("disponivel") and situacao.get("conectado")):
-        return feito  # celular desconectado: tudo espera, nada se perde
+    if not whatsapp_leads.status().get("disponivel"):
+        return feito  # computador com o WhatsApp Leads desligado: tudo espera, nada se perde
     hora = agora().strftime("%H:%M")
     consulta = (select(Tarefa).join(Campanha, Tarefa.campanha_id == Campanha.id)
                 .join(Lead, Tarefa.lead_id == Lead.id)
@@ -431,6 +430,10 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
             sdr.enviar_whatsapp_conectado(db, t.mensagem, None, lead=lead, tarefa=t)
         except sdr.EnvioRecusado as erro:
             texto = str(erro).lower()
+            if "ainda não conectou" in texto:  # o responsável não tem número: avisa (1 vez por dia) e segue
+                _avisar_para_conectar(db, lead, t)
+                feito["bloqueados"] += 1
+                continue
             if "limite" in texto or "whatsapp leads" in texto or "desligado" in texto:
                 feito["bloqueados"] += 1
                 break  # limite do canal ou WhatsApp fora do ar: o resto espera a próxima rodada
@@ -439,6 +442,23 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
         t.resultado = "Enviada sozinha pela IA SDR (contato já conversou com a MS)"
         feito["enviados"] += 1
     return feito
+
+
+def _avisar_para_conectar(db, lead: Lead, tarefa: Tarefa) -> None:
+    """A IA SDR tem mensagem para sair, mas o responsável não conectou o WhatsApp: avisa uma vez por dia."""
+    from . import conexoes
+    from .banco import gravar_config
+    from .modelos import Notificacao
+
+    quem = conexoes.responsavel(db, lead, None, tarefa)
+    if quem is None:
+        return
+    chave = f"aviso_conectar_{quem.id}"
+    if ler_config(db, chave) == date.today().isoformat():
+        return
+    gravar_config(db, chave, date.today().isoformat())
+    db.add(Notificacao(usuario_id=quem.id, link="/whatsapp",
+                       texto="A IA SDR tem mensagens de WhatsApp esperando: conecte o seu número em WhatsApp > Meu WhatsApp."))
 
 
 def finalizar_cadencias(db) -> int:

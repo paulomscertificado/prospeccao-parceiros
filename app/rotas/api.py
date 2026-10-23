@@ -63,7 +63,7 @@ async def webhook_receber(request: Request):
             if not lead:
                 continue
             analise = sdr.processar_resposta(db, lead, r["texto"], "whatsapp")
-            responder_automaticamente(db, lead, "whatsapp", analise)
+            responder_automaticamente(db, lead, "whatsapp", analise)  # API oficial: número único da Meta
     return {"ok": True}
 
 
@@ -124,7 +124,7 @@ async def ponte_troca(request: Request):
                                .order_by(PonteWhatsApp.id).limit(50)).scalars():
             item.status = "retirada"
             envios.append({"id": item.id, "telefone": item.telefone, "nome": item.nome, "texto": item.texto,
-                           "resposta": item.resposta, "manual": item.manual})
+                           "resposta": item.resposta, "manual": item.manual, "conexao": item.conexao or "principal"})
         comandos = []
         for c in db.execute(select(ComandoWhatsApp).where(ComandoWhatsApp.status == "aguardando")
                             .order_by(ComandoWhatsApp.id).limit(10)).scalars():
@@ -140,7 +140,7 @@ async def ponte_troca(request: Request):
 
 
 CAMPOS_STATUS = ("conectado", "tipo", "estado", "numero", "enviadas_hoje", "limite_diario", "dentro_do_horario",
-                 "horario", "estado_codigo", "erro", "qr", "regras")
+                 "horario", "estado_codigo", "erro", "qr", "regras", "conexoes")
 
 
 def _gravar_status(db, recebido: dict) -> None:
@@ -165,6 +165,7 @@ def _guardar_conversas(db, conversas: dict) -> None:
         except ValueError:
             criado = agora()
         db.add(MensagemWhatsApp(id_wl=int(m["id"]), telefone=telefone[:20], nome=str(m.get("nome") or "")[:200],
+                                conexao=str(m.get("conexao") or "principal")[:40],
                                 direcao=str(m.get("direcao", ""))[:10], texto=str(m.get("texto") or ""),
                                 status=str(m.get("status") or "")[:20], erro=str(m.get("erro") or "")[:500],
                                 origem=str(m.get("origem") or "")[:30], criado_em=criado,

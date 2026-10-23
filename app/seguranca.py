@@ -184,11 +184,12 @@ def exigir(*perfis: str):
     return _checar
 
 
-EQUIPE = ("admin", "gestor", "vendedor")
+EQUIPE = ("admin", "gestor", "funcionario", "vendedor")
 GESTAO = ("admin", "gestor")
 equipe = exigir(*EQUIPE)
 gestao = exigir(*GESTAO)
 admin = exigir("admin")
+ferramentas = exigir(*config.PERFIS_FERRAMENTAS)  # Funcionário MS também usa (o vendedor não)
 parceiro = exigir("parceiro")
 
 

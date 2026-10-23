@@ -14,7 +14,7 @@ from ..banco import agora, obter_db
 from ..leads_servico import historico, pode_ver
 from ..modelos import (Cadencia, Campanha, Categoria, Conhecimento, Lead, Notificacao, Oportunidade, Tarefa,
                        Usuario)
-from ..seguranca import admin, equipe, gestao, registrar_log, ve_tudo, verificar_csrf
+from ..seguranca import admin, equipe, ferramentas, gestao, registrar_log, ve_tudo, verificar_csrf
 from ..web import avisar, tela, voltar
 
 rotas = APIRouter()
@@ -37,7 +37,7 @@ def _equipe(db: Session):
 @rotas.get("/oportunidades")
 def oportunidades(request: Request, ver: str = "novas", usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
     consulta = select(Oportunidade).join(Lead, Oportunidade.lead_id == Lead.id)
-    if usuario.perfil == "vendedor":
+    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
         consulta = consulta.where((Lead.vendedor_id == usuario.id) | (Lead.vendedor_id.is_(None)))
     consulta = consulta.where(Oportunidade.status == "nova") if ver == "novas" else consulta.where(
         Oportunidade.status != "nova")
@@ -56,7 +56,7 @@ def oportunidades(request: Request, ver: str = "novas", usuario: Usuario = Depen
 @rotas.post("/oportunidades/{oid:int}/descartar", dependencies=[Depends(verificar_csrf)])
 def descartar(request: Request, oid: int, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
     op = db.get(Oportunidade, oid)
-    if not op or (usuario.perfil == "vendedor" and op.lead.vendedor_id not in (None, usuario.id)):
+    if not op or (usuario.perfil in config.PERFIS_SO_PROPRIOS and op.lead.vendedor_id not in (None, usuario.id)):
         raise HTTPException(404)
     op.status, op.responsavel_id, op.assumida_em = "descartada", usuario.id, agora()
     historico(db, op.lead_id, "sistema", f"Oportunidade descartada por {usuario.nome}.", usuario)
@@ -68,7 +68,7 @@ def descartar(request: Request, oid: int, usuario: Usuario = Depends(equipe), db
 def assumir(request: Request, lead_id: int, voltar_para: str = Form(""), usuario: Usuario = Depends(equipe),
             db: Session = Depends(obter_db)):
     lead = db.get(Lead, lead_id)
-    if not lead or (usuario.perfil == "vendedor" and lead.vendedor_id not in (None, usuario.id)):
+    if not lead or (usuario.perfil in config.PERFIS_SO_PROPRIOS and lead.vendedor_id not in (None, usuario.id)):
         raise HTTPException(404)
     sdr.assumir_lead(db, lead, usuario)
     registrar_log(db, usuario, "assumiu_lead", "lead", lead.id, request=request)
@@ -80,7 +80,7 @@ def assumir(request: Request, lead_id: int, voltar_para: str = Form(""), usuario
 @rotas.get("/leads/{lead_id:int}/agendar")
 def agendar_tela(request: Request, lead_id: int, responsavel: int | None = None, usuario: Usuario = Depends(equipe),
                  db: Session = Depends(obter_db)):
-    lead = _lead(db, lead_id, usuario) if usuario.perfil == "vendedor" else db.get(Lead, lead_id)
+    lead = _lead(db, lead_id, usuario) if usuario.perfil in config.PERFIS_SO_PROPRIOS else db.get(Lead, lead_id)
     if not lead:
         raise HTTPException(404)
     resp = db.get(Usuario, responsavel or lead.humano_id or lead.vendedor_id or usuario.id) or usuario
@@ -315,7 +315,7 @@ ESQUEMA_CATEGORIAS = {
 
 
 @rotas.post("/inteligencia/sugerir-categorias", dependencies=[Depends(verificar_csrf)])
-def sugerir_categorias(request: Request, usuario: Usuario = Depends(gestao), db: Session = Depends(obter_db)):
+def sugerir_categorias(request: Request, usuario: Usuario = Depends(ferramentas), db: Session = Depends(obter_db)):
     if not ia.disponivel():
         avisar(request, "Para a IA sugerir novas categorias, configure ANTHROPIC_API_KEY no .env.", "alerta")
         return voltar("/inteligencia")
@@ -338,7 +338,7 @@ def sugerir_categorias(request: Request, usuario: Usuario = Depends(gestao), db:
 # ---------------------------------------------------------------- Categorias e base de conhecimento
 
 @rotas.get("/categorias")
-def categorias(request: Request, usuario: Usuario = Depends(gestao), db: Session = Depends(obter_db)):
+def categorias(request: Request, usuario: Usuario = Depends(ferramentas), db: Session = Depends(obter_db)):
     from .. import base_receita
 
     return tela(request, "categorias.html", {
@@ -394,7 +394,7 @@ def conhecimento(request: Request, usuario: Usuario = Depends(equipe), db: Sessi
 
 @rotas.post("/conhecimento/{kid:int}", dependencies=[Depends(verificar_csrf)])
 def salvar_conhecimento(request: Request, kid: int, pergunta: str = Form(...), resposta: str = Form(...),
-                        ativa: str = Form(""), excluir: str = Form(""), usuario: Usuario = Depends(gestao),
+                        ativa: str = Form(""), excluir: str = Form(""), usuario: Usuario = Depends(ferramentas),
                         db: Session = Depends(obter_db)):
     item = Conhecimento() if kid == 0 else db.get(Conhecimento, kid)
     if item is None:

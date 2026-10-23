@@ -47,6 +47,7 @@ class PonteWhatsApp(Base):
     texto: Mapped[str] = mapped_column(Text)
     resposta: Mapped[bool] = mapped_column(Boolean, default=False)
     manual: Mapped[bool] = mapped_column(Boolean, default=False)  # escrita por uma pessoa na tela Conversas
+    conexao: Mapped[str] = mapped_column(String(40), default="principal")  # por qual número sai
     usuario_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="aguardando", index=True)  # aguardando, retirada, na_fila, erro
     id_wl: Mapped[str] = mapped_column(String(40), default="")  # id da mensagem no WhatsApp Leads
@@ -61,6 +62,7 @@ class MensagemWhatsApp(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     id_wl: Mapped[int] = mapped_column(Integer, unique=True, index=True)  # id da mensagem no WhatsApp Leads
     telefone: Mapped[str] = mapped_column(String(20), index=True)
+    conexao: Mapped[str] = mapped_column(String(40), default="principal", index=True)  # por qual número passou
     nome: Mapped[str] = mapped_column(String(200), default="")
     direcao: Mapped[str] = mapped_column(String(10))   # entrada (contato -> MS) ou saida
     texto: Mapped[str] = mapped_column(Text, default="")
@@ -69,6 +71,17 @@ class MensagemWhatsApp(Base):
     origem: Mapped[str] = mapped_column(String(30), default="")  # manual, automacao, sdr, ia, celular
     lida: Mapped[bool] = mapped_column(Boolean, default=False)
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, index=True)
+
+
+class ConexaoWhatsApp(Base):
+    """Um número de WhatsApp ligado no computador da MS: o principal ou o de um usuário. Ver app/conexoes.py."""
+    __tablename__ = "conexoes_whatsapp"
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)  # "principal" ou "u<id do usuário>"
+    nome: Mapped[str] = mapped_column(String(120), default="")
+    dono_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    compartilhada_todos: Mapped[bool] = mapped_column(Boolean, default=False)
+    compartilhada_com: Mapped[str] = mapped_column(Text, default="[]")  # JSON com ids de usuários
+    criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
 
 
 class ContatoWhatsApp(Base):
@@ -385,6 +398,7 @@ class Mensagem(Base):
     corpo: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[str] = mapped_column(String(20), default="enviada")  # copiada, enviada, entregue, lida, falhou, recebida
     id_externo: Mapped[str] = mapped_column(String(120), default="", index=True)
+    conexao: Mapped[str] = mapped_column(String(40), default="")  # WhatsApp: por qual número saiu
     erro: Mapped[str] = mapped_column(Text, default="")
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, index=True)
 

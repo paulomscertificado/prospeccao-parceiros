@@ -24,14 +24,14 @@ def _vendedores(db):
 
 def _parceiros_visiveis(db: Session, usuario: Usuario):
     consulta = select(Parceiro).order_by(Parceiro.escritorio)
-    if usuario.perfil == "vendedor":
+    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
         consulta = consulta.where(Parceiro.vendedor_id == usuario.id)
     return list(db.execute(consulta).scalars())
 
 
 def _parceiro(db: Session, pid: int, usuario: Usuario) -> Parceiro:
     p = db.get(Parceiro, pid)
-    if not p or (usuario.perfil == "vendedor" and p.vendedor_id != usuario.id):
+    if not p or (usuario.perfil in config.PERFIS_SO_PROPRIOS and p.vendedor_id != usuario.id):
         raise HTTPException(404)
     return p
 
@@ -126,7 +126,7 @@ async def parceiro_salvar(request: Request, pid: int, usuario: Usuario = Depends
 def clientes(request: Request, q: str = "", parceiro: int | None = None, status: str = "",
              usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
     consulta = select(Cliente).order_by(Cliente.criado_em.desc())
-    if usuario.perfil == "vendedor":
+    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
         ids = [p.id for p in _parceiros_visiveis(db, usuario)]
         consulta = consulta.where(Cliente.parceiro_id.in_(ids))
     if q:
@@ -174,7 +174,7 @@ def vendas(request: Request, periodo: str = "90d", parceiro: int | None = None, 
            renovar: int | None = None, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
     p = metricas.periodo(periodo)
     consulta = select(Venda).where(Venda.data >= p.inicio).order_by(Venda.data.desc(), Venda.id.desc())
-    if usuario.perfil == "vendedor":
+    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
         consulta = consulta.where(Venda.vendedor_id == usuario.id)
     if parceiro:
         consulta = consulta.where(Venda.parceiro_id == parceiro)
@@ -185,7 +185,7 @@ def vendas(request: Request, periodo: str = "90d", parceiro: int | None = None, 
         "totais": {"qtd": len(lista), "receita": sum(v.valor for v in lista), "comissao": sum(v.comissao for v in lista),
                    "lucro": sum(v.valor - v.custo - v.comissao for v in lista)},
         "produtos": db.execute(select(Produto).where(Produto.ativo.is_(True)).order_by(Produto.nome)).scalars().all(),
-        "parceiros": _parceiros_visiveis(db, usuario) if usuario.perfil == "vendedor" else
+        "parceiros": _parceiros_visiveis(db, usuario) if usuario.perfil in config.PERFIS_SO_PROPRIOS else
         db.execute(select(Parceiro).where(Parceiro.status != "BLOQUEADO").order_by(Parceiro.escritorio)).scalars().all(),
         "clientes": db.execute(select(Cliente).order_by(Cliente.nome).limit(1000)).scalars().all(),
         "cliente_sel": cliente, "renovar": cert_renovar, "vendedores": _vendedores(db),
@@ -248,7 +248,7 @@ def venda_excluir(request: Request, vid: int, usuario: Usuario = Depends(admin),
 def comissoes(request: Request, situacao: str = "a_pagar", parceiro: int | None = None,
               usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
     consulta = select(Venda).where(Venda.comissao > 0).order_by(Venda.data.desc())
-    if usuario.perfil == "vendedor":
+    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
         consulta = consulta.where(Venda.vendedor_id == usuario.id)
     if situacao == "a_pagar":
         consulta = consulta.where(Venda.comissao_paga.is_(False))
@@ -327,7 +327,7 @@ def vencimentos(request: Request, janela: str = "30", parceiro: int | None = Non
                                   Certificado.data_vencimento <= hoje + timedelta(days=dias))
     if parceiro:
         consulta = consulta.where(Certificado.parceiro_id == parceiro)
-    if usuario.perfil == "vendedor":
+    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
         ids = [p.id for p in _parceiros_visiveis(db, usuario)]
         consulta = consulta.where(or_(Certificado.parceiro_id.in_(ids), Certificado.parceiro_id.is_(None)))
     certs = db.execute(consulta.limit(1000)).scalars().all()

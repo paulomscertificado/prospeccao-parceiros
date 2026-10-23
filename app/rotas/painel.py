@@ -165,7 +165,7 @@ def _export_parceiros(db, usuario):
 
 def _export_clientes(db, usuario):
     consulta = select(Cliente).order_by(Cliente.nome)
-    if usuario.perfil == "vendedor":
+    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
         consulta = consulta.join(Parceiro, Cliente.parceiro_id == Parceiro.id).where(Parceiro.vendedor_id == usuario.id)
     clientes = db.execute(consulta).scalars().all()
     return "Clientes", ["Cliente", "CNPJ/CPF", "Contato", "Telefone", "E-mail", "Parceiro", "Status", "Cadastro"], [
@@ -175,7 +175,7 @@ def _export_clientes(db, usuario):
 
 def _export_vendas(db, usuario, so_comissao=False):
     consulta = select(Venda).order_by(Venda.data.desc())
-    if usuario.perfil == "vendedor":
+    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
         consulta = consulta.where(Venda.vendedor_id == usuario.id)
     if so_comissao:
         consulta = consulta.where(Venda.comissao > 0)

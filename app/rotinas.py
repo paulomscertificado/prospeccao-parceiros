@@ -18,7 +18,7 @@ from .modelos import Lead
 log = logging.getLogger(__name__)
 
 
-def responder_automaticamente(db, lead: Lead, canal: str, analise: dict) -> bool:
+def responder_automaticamente(db, lead: Lead, canal: str, analise: dict, conexao: str | None = None) -> bool:
     """Envia a resposta da SDR (ex.: "vou passar para o time comercial") quando o canal permite.
     WhatsApp: só dentro da janela de 24 h aberta pela mensagem do lead (regra da Meta)."""
     from . import mensagens
@@ -32,9 +32,17 @@ def responder_automaticamente(db, lead: Lead, canal: str, analise: dict) -> bool
         elif canal == "whatsapp" and lead.whatsapp and whatsapp_cloud.configurado():
             id_externo = whatsapp_cloud.enviar_texto(lead.whatsapp, texto)
         elif canal == "whatsapp" and (lead.whatsapp or lead.telefone) and whatsapp_leads.configurado():
-            # Resposta a quem acabou de escrever: sai na frente na fila do WhatsApp Leads.
+            # Resposta a quem acabou de escrever: sai na frente na fila do WhatsApp Leads, pelo mesmo número
+            # em que o lead escreveu (ou pelo número do responsável pelo lead).
+            from . import conexoes
+
+            if not conexao:
+                try:
+                    conexao = conexoes.para_enviar(db, conexoes.responsavel(db, lead))
+                except conexoes.SemNumero:
+                    return False
             id_externo = str(whatsapp_leads.enviar(lead.whatsapp or lead.telefone, lead.responsavel or lead.empresa,
-                                                   texto, resposta=True, db=db))
+                                                   texto, resposta=True, db=db, conexao=conexao))
             mensagens.registrar(db, lead.id, canal, texto, None, modo="whatsapp-leads", status="na_fila",
                                 id_externo=id_externo, categoria_id=lead.categoria_id, angulo="resposta")
             return True

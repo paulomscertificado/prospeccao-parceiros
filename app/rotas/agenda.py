@@ -11,7 +11,7 @@ from .. import cadencias, config, ia, leads_servico, mensagens, util
 from ..banco import agora, ler_config, obter_db, sessao
 from ..leads_servico import historico, pode_ver
 from ..modelos import Cadencia, Campanha, Lead, PassoCadencia, Tarefa, Template, Usuario
-from ..seguranca import equipe, gestao, registrar_log, ve_tudo, verificar_csrf
+from ..seguranca import equipe, ferramentas, gestao, registrar_log, ve_tudo, verificar_csrf
 from ..web import avisar, tela, voltar
 
 rotas = APIRouter()
@@ -48,7 +48,7 @@ def editar_cadencia_tela(request: Request, cad_id: int, usuario: Usuario = Depen
 
 
 @rotas.post("/cadencias/{cad_id:int}", dependencies=[Depends(verificar_csrf)])
-async def salvar_cadencia(request: Request, cad_id: int, usuario: Usuario = Depends(gestao), db: Session = Depends(obter_db)):
+async def salvar_cadencia(request: Request, cad_id: int, usuario: Usuario = Depends(ferramentas), db: Session = Depends(obter_db)):
     form = await request.form()
     cad = db.get(Cadencia, cad_id) if cad_id else Cadencia()
     if cad is None:
@@ -96,7 +96,7 @@ def template_tela(request: Request, tid: int, usuario: Usuario = Depends(equipe)
 @rotas.post("/templates/{tid:int}", dependencies=[Depends(verificar_csrf)])
 def salvar_template(request: Request, tid: int, nome: str = Form(...), canal: str = Form(...), assunto: str = Form(""),
                     corpo: str = Form(...), nome_meta: str = Form(""), ativo: str = Form(""),
-                    usuario: Usuario = Depends(gestao), db: Session = Depends(obter_db)):
+                    usuario: Usuario = Depends(ferramentas), db: Session = Depends(obter_db)):
     t = db.get(Template, tid) if tid else Template()
     if t is None:
         raise HTTPException(404)
@@ -112,7 +112,7 @@ def salvar_template(request: Request, tid: int, nome: str = Form(...), canal: st
 
 
 @rotas.post("/templates/criar-com-ia", dependencies=[Depends(verificar_csrf)])
-def template_ia(request: Request, canal: str = Form(...), objetivo: str = Form(...), usuario: Usuario = Depends(gestao),
+def template_ia(request: Request, canal: str = Form(...), objetivo: str = Form(...), usuario: Usuario = Depends(ferramentas),
                 db: Session = Depends(obter_db)):
     try:
         dados = ia.criar_template(db, canal, objetivo)
@@ -130,7 +130,7 @@ def template_ia(request: Request, canal: str = Form(...), objetivo: str = Form(.
 
 def _consulta_agenda(usuario: Usuario, filtro_usuario: int | None):
     consulta = select(Tarefa)
-    if usuario.perfil == "vendedor":
+    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
         consulta = consulta.where(Tarefa.usuario_id == usuario.id)
     elif filtro_usuario:
         consulta = consulta.where(Tarefa.usuario_id == filtro_usuario)
@@ -175,7 +175,7 @@ def agenda(request: Request, ver: str = "hoje", canal: str = "", tipo: str = "",
 
 def _tarefa(db: Session, tarefa_id: int, usuario: Usuario) -> Tarefa:
     t = db.get(Tarefa, tarefa_id)
-    if not t or (usuario.perfil == "vendedor" and t.usuario_id != usuario.id
+    if not t or (usuario.perfil in config.PERFIS_SO_PROPRIOS and t.usuario_id != usuario.id
                  and not (t.lead and pode_ver(usuario, t.lead))):
         raise HTTPException(404)
     return t

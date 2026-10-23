@@ -79,7 +79,7 @@ def criar_lead(db: Session, dados: dict, usuario: Usuario | None, origem: str = 
         from .modelos import Categoria
 
         lead.categoria = db.execute(select(Categoria).where(Categoria.codigo == dados["categoria"])).scalars().first()
-    if lead.vendedor_id is None and usuario and usuario.perfil == "vendedor":
+    if lead.vendedor_id is None and usuario and usuario.perfil in config.PERFIS_SO_PROPRIOS:
         lead.vendedor_id = usuario.id
     score.atualizar(db, lead)
     db.add(lead)
@@ -214,13 +214,13 @@ def registrar_resposta(db: Session, lead: Lead, canal: str, texto: str, usuario:
 
 def filtrar_por_usuario(consulta, usuario: Usuario):
     """Vendedor vê só os próprios leads; administrador e gestor veem todos."""
-    if usuario.perfil == "vendedor":
+    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
         return consulta.where(Lead.vendedor_id == usuario.id)
     return consulta
 
 
 def pode_ver(usuario: Usuario, lead: Lead) -> bool:
-    return usuario.perfil in ("admin", "gestor") or (usuario.perfil == "vendedor" and lead.vendedor_id == usuario.id)
+    return usuario.perfil in ("admin", "gestor") or (usuario.perfil in config.PERFIS_SO_PROPRIOS and lead.vendedor_id == usuario.id)
 
 
 def anonimizar(lead: Lead, manter_bloqueio: bool = False) -> None:

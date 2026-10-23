@@ -5,7 +5,7 @@ from datetime import date, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import mensagens
+from . import config, mensagens
 from .banco import ler_config
 from .leads_servico import historico
 from .modelos import Cadencia, Lead, Tarefa, Usuario
@@ -68,7 +68,7 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
                 assunto=assunto, mensagem=corpo, angulo=passo.angulo or "", status=status_tarefa,
             ))
             resultado["tarefas"] += 1
-        if lead.vendedor_id is None and usuario.perfil == "vendedor":
+        if lead.vendedor_id is None and usuario.perfil in config.PERFIS_SO_PROPRIOS:
             lead.vendedor_id = usuario.id
         if lead.status in ("Novo", "Pesquisando"):
             lead.status = "Abordagem criada"

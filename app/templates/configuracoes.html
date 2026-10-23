@@ -53,7 +53,7 @@
     <tr>
       <td><input form="u-0" type="text" name="nome" placeholder="Nome" required aria-label="Nome"></td>
       <td><input form="u-0" type="email" name="email" placeholder="email@empresa.com.br" required aria-label="E-mail"></td>
-      <td><select form="u-0" name="perfil" aria-label="Perfil">{% for c, n in PERFIS.items() %}<option value="{{ c }}" {{ 'selected' if c == 'vendedor' }}>{{ n }}</option>{% endfor %}</select></td>
+      <td><select form="u-0" name="perfil" aria-label="Perfil">{% for c, n in PERFIS.items() %}<option value="{{ c }}" {{ 'selected' if c == 'funcionario' }}>{{ n }}</option>{% endfor %}</select></td>
       <td><select form="u-0" name="parceiro_id" aria-label="Parceiro"><option value="">—</option>{% for p in parceiros %}<option value="{{ p.id }}">{{ p.escritorio }}</option>{% endfor %}</select></td>
       <td><input form="u-0" type="text" name="expediente" value="seg-sex 09:00-12:00,14:00-18:00" aria-label="Expediente" style="min-width:210px"></td>
       <td><input form="u-0" type="checkbox" name="ativo" checked aria-label="Ativo"></td>

@@ -331,9 +331,10 @@ class WhatsAppLeadsFalso:
     def __init__(self):
         self.enviados, self.proximo = [], 100
 
-    def enviar(self, telefone, nome, texto, resposta=False, db=None):
+    def enviar(self, telefone, nome, texto, resposta=False, db=None, conexao="principal", **_):
         self.proximo += 1
-        self.enviados.append({"id": self.proximo, "telefone": telefone, "texto": texto, "resposta": resposta})
+        self.enviados.append({"id": self.proximo, "telefone": telefone, "texto": texto, "resposta": resposta,
+                              "conexao": conexao})
         return self.proximo
 
 
@@ -343,6 +344,7 @@ def test_envio_e_respostas_pelo_whatsapp_conectado(cliente, monkeypatch):
     falso = WhatsAppLeadsFalso()
     monkeypatch.setattr(whatsapp_leads, "configurado", lambda: True)
     monkeypatch.setattr(whatsapp_leads, "enviar", falso.enviar)
+    monkeypatch.setattr(whatsapp_leads, "status", lambda usar_cache=True: {"disponivel": True, "conectado": True})
     with sessao() as db:
         lead = _novo_lead(db, "Contábil Zap SDR", whatsapp="(81) 98877-6655", responsavel="Rita Lima")
         tarefa = Tarefa(tipo="prospeccao", lead_id=lead.id, canal="whatsapp", data=date.today(), angulo="apresentacao",
@@ -408,6 +410,7 @@ def test_botoes_do_whatsapp_conectado(cliente, monkeypatch):
         "disponivel": True, "conectado": True, "tipo": "teste", "estado": "Conectado", "erro": ""})
     monkeypatch.setattr(whatsapp_leads, "configurado", lambda: True)
     monkeypatch.setattr(whatsapp_leads, "enviar", falso.enviar)
+    monkeypatch.setattr(whatsapp_leads, "status", lambda usar_cache=True: {"disponivel": True, "conectado": True})
     with sessao() as db:
         lead = _novo_lead(db, "Contábil Botão Zap", whatsapp="(81) 96655-4433")
         lead.vendedor_id = _admin(db).id
@@ -433,6 +436,7 @@ def test_fila_de_whatsapp_so_para_quem_ja_conversou(cliente, monkeypatch):
     falso = WhatsAppLeadsFalso()
     monkeypatch.setattr(whatsapp_leads, "configurado", lambda: True)
     monkeypatch.setattr(whatsapp_leads, "enviar", falso.enviar)
+    monkeypatch.setattr(whatsapp_leads, "status", lambda usar_cache=True: {"disponivel": True, "conectado": True})
     monkeypatch.setattr(whatsapp_leads, "status", lambda usar_cache=True: {"disponivel": True, "conectado": True})
     monkeypatch.setattr(mensagens, "dentro_do_horario", lambda db, momento=None: True)
     with sessao() as db:

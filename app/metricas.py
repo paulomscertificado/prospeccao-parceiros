@@ -45,7 +45,7 @@ def _no_periodo(valor, p: Periodo) -> bool:
 
 
 def _escopo_leads(consulta, usuario: Usuario, vendedor_id: int | None):
-    if usuario.perfil == "vendedor":
+    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
         return consulta.where(Lead.vendedor_id == usuario.id)
     if vendedor_id:
         return consulta.where(Lead.vendedor_id == vendedor_id)
@@ -53,7 +53,7 @@ def _escopo_leads(consulta, usuario: Usuario, vendedor_id: int | None):
 
 
 def _escopo_vendas(consulta, usuario: Usuario, vendedor_id: int | None):
-    if usuario.perfil == "vendedor":
+    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
         return consulta.where(Venda.vendedor_id == usuario.id)
     if vendedor_id:
         return consulta.where(Venda.vendedor_id == vendedor_id)
@@ -76,7 +76,7 @@ def _vendas(db: Session, usuario: Usuario, vendedor_id=None):
 
 def _parceiros(db: Session, usuario: Usuario, vendedor_id=None):
     consulta = select(Parceiro)
-    if usuario.perfil == "vendedor":
+    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
         consulta = consulta.where(Parceiro.vendedor_id == usuario.id)
     elif vendedor_id:
         consulta = consulta.where(Parceiro.vendedor_id == vendedor_id)
@@ -145,7 +145,7 @@ def indicadores(db: Session, usuario: Usuario, p: Periodo, vendedor_id: int | No
 
 
 def _escopo_tarefas(consulta, usuario: Usuario):
-    if usuario.perfil == "vendedor":
+    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
         return consulta.where(Tarefa.usuario_id == usuario.id)
     return consulta
 
@@ -293,7 +293,7 @@ def leads_parados(db: Session, usuario: Usuario, dias: int | None = None) -> lis
 
 def contar_followups_hoje(db: Session, usuario: Usuario) -> int:
     consulta = select(func.count(Tarefa.id)).where(Tarefa.status == "pendente", Tarefa.data <= date.today())
-    if usuario.perfil == "vendedor":
+    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
         consulta = consulta.where(Tarefa.usuario_id == usuario.id)
     return db.execute(consulta).scalar() or 0
 

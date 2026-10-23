@@ -1,0 +1,53 @@
+{# Cartão de um número de WhatsApp (tela WhatsApp). Variável: n (ver rotas/whatsapp.py, _cartao). #}
+<div class="cartao numero" data-numero="{{ n.id }}">
+  <div class="topo-numero">
+    <div class="icone-numero" style="{{ 'background:var(--verde)' if n.principal }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM11 18h2"/></svg></div>
+    <div class="titulo"><b>{{ n.nome }}</b>
+      <span class="pequeno suave">{{ 'Seu número' if n.minha else 'De ' ~ (n.dono or '—') }}{% if n.compartilhada_todos %} · compartilhado com toda a equipe{% elif n.compartilhada_com %} · compartilhado com {{ n.compartilhada_com|length }} pessoa(s){% endif %}</span></div>
+    <span class="selo selo-estado">…</span>
+  </div>
+  <div class="pequeno"><span class="numero-tel"></span> <span class="limite suave"></span></div>
+  <div class="aviso aviso-erro erro-numero" style="display:none;margin:0"></div>
+  <div class="qr-area" style="display:none">
+    <img alt="QR code do WhatsApp">
+    <div><b>Leia com o celular</b>
+      <ol><li>Abra o <b>WhatsApp</b> no celular.</li><li>Toque nos <b>três pontinhos</b> (Android) ou em <b>Configurações</b> (iPhone).</li>
+        <li><b>Aparelhos conectados</b> → <b>Conectar um aparelho</b>.</li><li>Aponte a câmera para o quadrado.</li></ol>
+      <p class="pequeno suave" style="margin-top:6px">O código muda sozinho. Se expirar, clique em Conectar de novo.</p></div>
+  </div>
+  {% if n.gerenciar %}
+  <div class="grupo-btn">
+    <form class="inline so-desligado" method="post" action="/whatsapp/comando"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="acao" value="conectar"><input type="hidden" name="numero" value="{{ n.id }}"><input type="hidden" name="tipo" value="qr">
+      <button class="btn btn-primario btn-pequeno">Conectar com QR code</button></form>
+    <form class="inline so-desligado" method="post" action="/whatsapp/comando"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="acao" value="conectar"><input type="hidden" name="numero" value="{{ n.id }}"><input type="hidden" name="tipo" value="teste">
+      <button class="btn btn-pequeno">Modo teste</button></form>
+    <form class="inline so-ligado" method="post" action="/whatsapp/comando"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="acao" value="pausar"><input type="hidden" name="numero" value="{{ n.id }}">
+      <button class="btn btn-pequeno">Pausar</button></form>
+    <form class="inline" method="post" action="/whatsapp/comando" onsubmit="return confirm('Desligar este número? Para voltar, será preciso ler o QR code de novo.')">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="acao" value="desligar"><input type="hidden" name="numero" value="{{ n.id }}">
+      <button class="btn btn-pequeno btn-perigo">Desligar</button></form>
+    {% if not n.principal %}
+    <form class="inline" method="post" action="/whatsapp/comando" onsubmit="return confirm('Remover este número do sistema? As conversas antigas continuam guardadas.')">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="acao" value="remover"><input type="hidden" name="numero" value="{{ n.id }}">
+      <button class="btn btn-pequeno btn-perigo">Remover</button></form>
+    {% endif %}
+  </div>
+  <details class="compartilhar">
+    <summary>Compartilhar este número</summary>
+    <form method="post" action="/whatsapp/compartilhar">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="numero" value="{{ n.id }}">
+      <div class="campo" style="margin-top:8px"><label>Nome do número</label><input type="text" name="nome" value="{{ n.nome }}" maxlength="120"></div>
+      <label class="marcar"><input type="checkbox" name="todos" {{ 'checked' if n.compartilhada_todos }}> <b>Toda a equipe</b> pode usar este número</label>
+      <p class="pequeno suave" style="margin:6px 0 0">Ou escolha as pessoas:</p>
+      <div class="lista-pessoas">
+        {% for p in equipe if p.nome != n.dono %}<label class="marcar"><input type="checkbox" name="usuarios" value="{{ p.id }}" {{ 'checked' if p.id in n.compartilhada_com }}> {{ p.nome }}</label>{% endfor %}
+      </div>
+      <p class="pequeno suave">Quem recebe o compartilhamento vê as conversas deste número e pode enviar por ele (e a IA SDR usa este número para os leads dessa pessoa quando ela não tiver número próprio).</p>
+      <button class="btn btn-pequeno btn-primario">Salvar compartilhamento</button>
+    </form>
+  </details>
+  {% endif %}
+</div>
