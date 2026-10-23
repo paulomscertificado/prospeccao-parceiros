@@ -4,3 +4,8 @@ __pycache__/
 .env
 dados/
 .pytest_cache/
+
+.vercel
+.env*
+!.env.example
+supabase/.temp/

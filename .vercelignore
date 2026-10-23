@@ -11,3 +11,4 @@ docker-compose.yml
 .pytest_cache/
 .env.local
 .vercel/
+supabase/
