@@ -151,6 +151,19 @@ def _leads_em_outras_campanhas(db, campanha_id: int) -> set[int]:
 MAXIMO_BUSCA = 4000  # empresas olhadas por segmento, no máximo, para completar a campanha
 
 
+def celular_do_lead(lead: Lead) -> str:
+    """Um celular (DDD + 9 + 8 dígitos) do telefone do lead ou do anotado da Receita nas observações."""
+    for numero in [lead.telefone or ""] + re.findall(r"\(?\d{2}\)?\s?9\d{4}-?\d{4}", lead.observacoes or ""):
+        digitos = util.so_digitos(numero)
+        if len(digitos) == 11 and digitos[2] == "9":
+            return digitos
+    return ""
+
+
+def tem_canal(lead: Lead, canais: list[str]) -> bool:
+    return any({"whatsapp": lead.whatsapp, "email": lead.email, "linkedin": lead.linkedin}.get(c) for c in canais or ["whatsapp", "email"])
+
+
 def _buscar_candidatos(campanha_id: int) -> list[int]:
     """Etapa 1: empresas da base da Receita nas categorias e na região (o dobro, para poder escolher).
     Cada campanha pega empresas DIFERENTES: pula quem já está em outra campanha ativa, quem já foi contatado,
@@ -221,7 +234,12 @@ def etapa_gerar(campanha_id: int, _usuario_id, estado: dict, prazo: float) -> bo
         with sessao() as db:
             leads = [db.get(Lead, i) for i in candidatos]
             elegiveis = [l for l in leads if l and l.fit != "Sem fit" and not l.opt_out]
-            elegiveis.sort(key=lambda l: (-l.score, l.id))
+            canais = [c for c in db.get(Campanha, campanha_id).canais.split(",") if c]
+            for l in elegiveis:
+                if "whatsapp" in canais and not l.whatsapp:
+                    l.whatsapp = celular_do_lead(l)  # celular informado à Receita: a campanha tenta o WhatsApp nele
+            # Primeiro quem tem um canal que a campanha permite; os sem canal (só fixo) só entram se faltar empresa.
+            elegiveis.sort(key=lambda l: (not tem_canal(l, canais), -l.score, l.id))
             quantidade = max(1, db.get(Campanha, campanha_id).quantidade or 50)
             estado.update(escolhidos=[l.id for l in elegiveis[:quantidade]], textos={}, fase="mensagens")
         fase = "mensagens"
