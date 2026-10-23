@@ -34,14 +34,9 @@
     <div class="marca"><span class="logo">MS</span><span><b>Parceiros</b><small>Prospecção B2B</small></span></div>
     {% for link, nome, icone in menu %}
       <a class="item {{ 'ativo' if (caminho == link or (link not in ['/', '/portal'] and caminho.startswith(link))) }}" href="{{ link }}">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ ICONES[icone] }}"/></svg>{{ nome }}{% if link == '/oportunidades' and avisos_novos %}<span class="contador">{{ avisos_novos }}</span>{% endif %}</a>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ ICONES[icone] }}"/></svg>{{ nome }}{% if link == '/oportunidades' and avisos_novos %}<span class="contador">{{ avisos_novos }}</span>{% endif %}{% if link == '/whatsapp' %}<span class="ponto {{ 'verde' if wl.conectado else ('amarelo' if wl.disponivel else 'vermelho') }}" style="margin-left:auto" title="WhatsApp {{ 'conectado' if wl.conectado else ('aguardando QR code' if wl.estado_codigo == 'aguardando_qr' else ('desconectado' if wl.disponivel else 'desligado')) }}"></span>{% endif %}</a>
     {% endfor %}
     <div class="rodape">
-      {% if usuario.perfil != 'parceiro' %}
-      <div style="margin-bottom:8px"><a href="/whatsapp" title="Abrir a tela WhatsApp">
-        <span class="ponto {{ 'verde' if wl.conectado else ('amarelo' if wl.disponivel else 'vermelho') }}"></span>
-        WhatsApp {{ 'conectado' if wl.conectado else ('aguardando QR code' if wl.estado_codigo == 'aguardando_qr' else ('desconectado' if wl.disponivel else 'desligado')) }}{{ ' (teste)' if wl.conectado and wl.tipo == 'teste' }}</a></div>
-      {% endif %}
       <div><b>{{ usuario.nome }}</b></div>
       <div class="suave" style="color:#9fb3c8">{{ usuario.perfil_nome }}</div>
       <div style="margin-top:6px"><a href="/notificacoes">Avisos{{ ' (' ~ avisos_novos ~ ')' if avisos_novos }}</a> · <a href="/minha-conta">Minha conta</a> · <a href="/sair">Sair</a></div>
