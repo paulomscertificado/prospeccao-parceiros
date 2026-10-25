@@ -161,3 +161,25 @@ def test_campanha_de_whatsapp_nao_cria_ligacao_e_avisa_quem_so_tem_fixo(cliente,
         assert str(fixo.id) in camp.so_fixo.split(",") and "campanha de ligação" in camp.etapa
     pagina = cliente.get(f"/campanhas/{cid}").text
     assert "Faça uma campanha de ligação" in pagina and "Contabil So Fixo" in pagina
+
+
+def test_aprovar_campanha_antiga_cancela_ligacoes(cliente):
+    from datetime import date
+
+    with sessao() as db:
+        admin = db.execute(select(Usuario).where(Usuario.perfil == "admin")).scalars().first()
+        camp = Campanha(nome="Antiga com ligacao", categorias="contabil", cidade="recife", estado="PE",
+                        canais="whatsapp", status="aguardando_aprovacao", usuario_id=admin.id)
+        lead = Lead(empresa="Contabil Antiga Ligacao", cidade="Recife", estado="PE")
+        db.add_all([camp, lead])
+        db.flush()
+        for canal in ("ligacao", "whatsapp"):
+            db.add(Tarefa(tipo="prospeccao", lead_id=lead.id, canal=canal, data=date.today(), campanha_id=camp.id,
+                          status="rascunho", mensagem="Oi"))
+        db.flush()
+        campanhas.aprovar(db, camp, admin)
+        status = {t.canal: t.status for t in db.execute(select(Tarefa).where(Tarefa.campanha_id == camp.id)).scalars()}
+        camp.status = "pausada"  # não deixa a tarefa de WhatsApp na fila dos outros testes
+        for t in db.execute(select(Tarefa).where(Tarefa.campanha_id == camp.id)).scalars():
+            t.status = "cancelada"
+    assert status == {"ligacao": "cancelada", "whatsapp": "pendente"}

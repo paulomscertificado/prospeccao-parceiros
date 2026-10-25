@@ -253,12 +253,13 @@ def test_campanha_completa_com_aprovacao_e_fila(cliente, tmp_path, monkeypatch):
         assert db.get(Campanha, cid).status == "ativa"
         for t in db.execute(select(Tarefa).where(Tarefa.campanha_id == cid)).scalars():
             t.hora = "00:00"
+            t.data = min(t.data, date.today())  # num fim de semana a campanha joga tudo para segunda
         # limite por hora = o que já saiu nesta hora (outros testes) + 1
         gravar_config(db, "limite_hora_email", str(mensagens.enviadas_na_hora(db, "email") + 1))
         gravar_config(db, "horas_entre_contatos", "0")
     with sessao() as db:
         r = campanhas.processar_fila(db)
-    assert r["enviados"] == 1 and len(enviados) == 1  # limite por hora segurou o segundo e-mail
+    assert r["enviados"] == 1 and len(enviados) == 1, (r, enviados)  # limite por hora segurou o segundo e-mail
     with sessao() as db:
         msg = db.execute(select(Mensagem).where(Mensagem.campanha_id == cid)).scalars().one()
         assert msg.angulo == "apresentacao" and msg.status == "enviada"

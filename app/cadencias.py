@@ -20,6 +20,8 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
     Passos com canal "auto" (cadência da IA SDR): o canal sai da prioridade configurada e a mensagem é a
     do ângulo do passo (mensagens_sdr[lead_id][angulo], ou geradas na hora). status_tarefa="rascunho"
     deixa tudo esperando a aprovação da campanha."""
+    # Campanha da IA SDR: só e-mail e WhatsApp (ligação é o usuário quem faz, por conta própria)
+    da_ia = bool(campanha_id) and mensagens_sdr is not None
     from . import sdr
 
     mensagens_sdr = mensagens_sdr or {}
@@ -53,13 +55,15 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
             canal = passo.canal
             if passo.canal == "auto" or passo.angulo:
                 canal = sdr.escolher_canal(db, lead, canais) if passo.canal == "auto" else passo.canal
-                if campanha_id and canal in ("ligacao", "manual"):
-                    continue  # campanha da IA não faz ligação: quem liga é o usuário (é avisado na campanha)
+                if da_ia and canal not in ("email", "whatsapp"):
+                    continue  # campanha da IA só manda e-mail e WhatsApp: ligação o usuário faz por conta própria
                 if lead.id not in mensagens_sdr:
                     mensagens_sdr[lead.id] = sdr.mensagens_por_regras(db, lead, responsavel, cta)
                 msg = mensagens_sdr[lead.id].get(passo.angulo or "apresentacao") or {}
                 assunto = msg.get("assunto", "") if canal == "email" else ""
                 corpo = msg.get("email", "") if canal == "email" else msg.get("whatsapp", "")
+            elif da_ia and canal not in ("email", "whatsapp"):
+                continue  # campanha da IA só manda e-mail e WhatsApp: ligação/LinkedIn o usuário faz por conta própria
             else:
                 template = passo.template or mensagens.template_padrao(db, passo.canal)
                 assunto, corpo = mensagens.montar(db, template, lead, responsavel)

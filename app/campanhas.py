@@ -397,6 +397,9 @@ def resumo_aprovacao(db, camp: Campanha) -> dict:
 def aprovar(db, camp: Campanha, usuario: Usuario) -> int:
     """Rascunhos viram tarefas de verdade (datas a partir de hoje)."""
     rascunhos = db.execute(select(Tarefa).where(Tarefa.campanha_id == camp.id, Tarefa.status == "rascunho")).scalars().all()
+    for t in [t for t in rascunhos if t.canal not in ("email", "whatsapp")]:
+        t.status = "cancelada"  # campanhas antigas com ligação: a campanha só manda e-mail e WhatsApp
+    rascunhos = [t for t in rascunhos if t.status == "rascunho"]
     if rascunhos:
         primeiro = min(t.data for t in rascunhos)
         atraso = max(0, (date.today() - primeiro).days)
