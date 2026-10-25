@@ -56,7 +56,9 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
             if passo.canal == "auto" or passo.angulo:
                 canal = sdr.escolher_canal(db, lead, canais) if passo.canal == "auto" else passo.canal
                 if da_ia and canal not in ("email", "whatsapp"):
-                    continue  # campanha da IA só manda e-mail e WhatsApp: ligação o usuário faz por conta própria
+                    if "whatsapp" not in (canais or ["whatsapp"]):
+                        continue  # campanha só de e-mail e empresa sem e-mail: não entra
+                    canal = "whatsapp"  # só fixo: WhatsApp a pesquisar (o time acha o número e cadastra na campanha)
                 if lead.id not in mensagens_sdr:
                     mensagens_sdr[lead.id] = sdr.mensagens_por_regras(db, lead, responsavel, cta)
                 msg = mensagens_sdr[lead.id].get(passo.angulo or "apresentacao") or {}

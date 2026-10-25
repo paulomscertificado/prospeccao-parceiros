@@ -130,12 +130,13 @@ def test_campanhas_seguidas_pegam_empresas_diferentes(cliente, tmp_path, monkeyp
     assert quarta and not (quarta & (empresas[1] | empresas[2]))
 
 
-def test_campanha_de_whatsapp_nao_cria_ligacao_e_avisa_quem_so_tem_fixo(cliente, tmp_path, monkeypatch):
+def test_campanha_de_whatsapp_leva_quem_so_tem_fixo_para_o_time_pesquisar(cliente, tmp_path, monkeypatch):
     _zipar(tmp_path, "Municipios.zip", [["2531", "RECIFE"]])
     celular = _estab("76000001", "CONTABIL COM CELULAR", "c@celular-teste.com.br", "CENTRO")
     celular[22] = "998765432"  # 81 + 9 dígitos = celular
     _zipar(tmp_path, "Estabelecimentos0.zip", [celular, _estab("76000002", "CONTABIL SO FIXO", "f@fixo-teste.com.br", "CENTRO")])
     base_receita.importar_pasta(str(tmp_path))
+
     def pesquisar(db, lead, usar_ia=True):
         from app import score
 
@@ -155,13 +156,18 @@ def test_campanha_de_whatsapp_nao_cria_ligacao_e_avisa_quem_so_tem_fixo(cliente,
         camp = db.get(Campanha, cid)
         assert camp.status == "aguardando_aprovacao", camp.erro
         tarefas = db.execute(select(Tarefa).where(Tarefa.campanha_id == cid)).scalars().all()
-        assert tarefas and {t.canal for t in tarefas} == {"whatsapp"}
-        assert {t.lead.empresa for t in tarefas} == {"Contabil Com Celular"}
+        assert {t.canal for t in tarefas} == {"whatsapp"}  # nunca ligação
+        assert {t.lead.empresa for t in tarefas} == {"Contabil Com Celular", "Contabil So Fixo"}
         fixo = db.execute(select(Lead).where(Lead.empresa == "Contabil So Fixo")).scalars().one()
-        assert str(fixo.id) in camp.so_fixo.split(",") and "campanha de ligação" in camp.etapa
+        assert str(fixo.id) in camp.so_fixo.split(",") and not fixo.whatsapp
+        fixo_id = fixo.id
     pagina = cliente.get(f"/campanhas/{cid}").text
-    assert "Faça uma campanha de ligação" in pagina and "Contabil So Fixo" in pagina
-
+    assert "Pesquisar WhatsApp" in pagina and "Contabil So Fixo" in pagina
+    csrf = pagina.split('name="csrf" content="')[1].split('"')[0]
+    r = cliente.post(f"/campanhas/{cid}/whatsapp-lead", data={"csrf": csrf, "lead_id": fixo_id, "whatsapp": "(81) 99111-2222"})
+    assert "WhatsApp de Contabil So Fixo salvo" in r.text
+    with sessao() as db:
+        assert db.get(Lead, fixo_id).whatsapp == "81991112222"
 
 def test_aprovar_campanha_antiga_cancela_ligacoes(cliente):
     from datetime import date

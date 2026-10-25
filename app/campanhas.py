@@ -205,27 +205,20 @@ def _buscar_candidatos(campanha_id: int) -> list[int]:
                     if "whatsapp" in canais and not lead.whatsapp:
                         lead.whatsapp = celular_do_lead(lead)
                     if not tem_canal(lead, canais):
-                        if lead.telefone and lead.id not in so_fixo:
-                            so_fixo.append(lead.id)
-                        continue  # sem WhatsApp/e-mail: não conta; a busca segue até achar empresas que dá para contatar
+                        if not lead.telefone:
+                            continue  # sem nenhum contato: não dá nem para pesquisar
+                        so_fixo.append(lead.id)  # só fixo: entra também; o time pesquisa o WhatsApp na internet
                     candidatos.append(lead.id)
                     achados += 1
                 # acabaram as empresas da região, ou já olhamos o bastante
                 if len(resultados) < limite_busca * 3 or limite_busca * 3 >= MAXIMO_BUSCA:
                     break
                 limite_busca = min(limite_busca * 4, MAXIMO_BUSCA // 3)
-        if not candidatos and so_fixo:
-            canal = " ou ".join({"whatsapp": "WhatsApp", "email": "e-mail"}.get(c, c) for c in canais) or "WhatsApp/e-mail"
-            raise RuntimeError(f"Em \"{camp.cidade}\"/{camp.estado} encontrei {len(so_fixo)} empresa(s) desse segmento, mas nenhuma "
-                               f"tem {canal} cadastrado (só telefone fixo). Tente: marcar também o canal E-mail, escolher "
-                               "uma cidade maior/vizinha (ex.: Recife) ou outro segmento. Para essas empresas, ligue você "
-                               "mesmo (Leads, filtro da cidade).")
         if not candidatos:
             nomes = ", ".join(c.nome for c in cats.values()) or "das categorias escolhidas"
             raise RuntimeError(f"Não encontrei empresas novas de {nomes} em \"{camp.cidade}\"/{camp.estado} na base da "
                                "Receita. Confira o nome da cidade (ou do bairro) e o estado, ou escolha outro segmento.")
-        # Os só com fixo vão no fim (no máximo 30): ficam fora da campanha, mas aparecem em "Faça uma campanha de ligação"
-        return list(dict.fromkeys(candidatos + so_fixo[:30]))
+        return list(dict.fromkeys(candidatos))
 
 
 def etapa_gerar(campanha_id: int, _usuario_id, estado: dict, prazo: float) -> bool:
@@ -253,17 +246,11 @@ def etapa_gerar(campanha_id: int, _usuario_id, estado: dict, prazo: float) -> bo
             for l in elegiveis:
                 if "whatsapp" in canais and not l.whatsapp:
                     l.whatsapp = celular_do_lead(l)  # celular informado à Receita: a campanha tenta o WhatsApp nele
-            # A campanha só leva quem tem um canal permitido; quem só tem telefone fixo fica de fora e o usuário
-            # é avisado para fazer uma campanha de ligação por conta própria.
-            so_fixo = [l for l in elegiveis if not tem_canal(l, canais) and l.telefone]
-            elegiveis = [l for l in elegiveis if tem_canal(l, canais)]
-            elegiveis.sort(key=lambda l: (-l.score, l.id))
-            estado["so_fixo"] = [l.id for l in sorted(so_fixo, key=lambda l: (-l.score, l.id))][:100]
-            if not elegiveis:
-                raise RuntimeError(f"Nenhuma das empresas encontradas tem "
-                                   f"{' ou '.join({'whatsapp': 'WhatsApp', 'email': 'e-mail'}.get(c, c) for c in canais) or 'WhatsApp/e-mail'}: "
-                                   f"{len(so_fixo)} só têm telefone fixo. Faça uma campanha de ligação com elas "
-                                   "(Leads, filtro da cidade) ou escolha outra região/segmento.")
+            # Quem já tem WhatsApp/e-mail vem primeiro; quem só tem telefone fixo entra também (WhatsApp sem número:
+            # o time pesquisa o contato na internet e cadastra na própria campanha).
+            elegiveis.sort(key=lambda l: (not tem_canal(l, canais), -l.score, l.id))
+            quantidade_c = max(1, db.get(Campanha, campanha_id).quantidade or 50)
+            estado["so_fixo"] = [l.id for l in elegiveis[:quantidade_c] if not tem_canal(l, canais)]
             quantidade = max(1, db.get(Campanha, campanha_id).quantidade or 50)
             estado.update(escolhidos=[l.id for l in elegiveis[:quantidade]], textos={}, fase="mensagens")
         fase = "mensagens"
@@ -301,11 +288,11 @@ def _montar(campanha_id: int, escolhidos: list[int], textos: dict[int, dict], so
         if so_fixo:
             from .modelos import Notificacao
 
-            camp.etapa += (f" {len(so_fixo)} empresas só têm telefone fixo e ficaram de fora: faça uma campanha de "
-                           "ligação com elas.")
+            camp.etapa += (f" {len(so_fixo)} empresas ainda sem WhatsApp (só telefone fixo): pesquise o contato na "
+                           "internet e cadastre na campanha.")
             camp.so_fixo = ",".join(str(i) for i in so_fixo)
             db.add(Notificacao(usuario_id=usuario.id, link=f"/campanhas/{camp.id}#ligacoes",
-                               texto=f"{len(so_fixo)} empresas da campanha \"{camp.nome}\" só têm telefone fixo: faça uma campanha de ligação"))
+                               texto=f"{len(so_fixo)} empresas da campanha \"{camp.nome}\" estão sem WhatsApp: pesquise e cadastre o número"))
         if ler_config(db, "aprovacao_obrigatoria") == "0":
             aprovar(db, camp, usuario)
         else:

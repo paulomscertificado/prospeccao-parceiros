@@ -359,6 +359,20 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
             else:
                 t.mensagem, t.assunto = novo, str(form.get("assunto", t.assunto))[:200]
                 avisar(request, "Mensagem atualizada.")
+    elif acao == "whatsapp-lead":
+        lead = db.get(Lead, util.para_int(form.get("lead_id")))
+        digitos = util.normalizar_telefone(str(form.get("whatsapp", "")))
+        if not lead or not db.execute(select(Tarefa.id).where(Tarefa.campanha_id == cid, Tarefa.lead_id == lead.id)).first():
+            avisar(request, "Empresa não encontrada nesta campanha.", "erro")
+        elif len(digitos) < 10:
+            avisar(request, "Digite o WhatsApp com DDD, por exemplo (81) 99999-0000.", "erro")
+        else:
+            lead.whatsapp = digitos
+            historico(db, lead.id, "contato", f"WhatsApp encontrado pelo time e cadastrado: {util.formatar_telefone(digitos)}",
+                      usuario)
+            avisar(request, f"WhatsApp de {lead.empresa} salvo. As mensagens da campanha vão para este número.")
+        db.commit()
+        return voltar(f"/campanhas/{cid}#ligacoes")
     elif acao == "testar":
         alvo = _campanha(db, util.para_int(form.get("campanha_teste")) or cid, usuario)
         canal = "whatsapp" if form.get("canal_teste") == "whatsapp" else "email"

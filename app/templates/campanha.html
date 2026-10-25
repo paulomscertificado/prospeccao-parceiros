@@ -90,6 +90,7 @@
         <input type="hidden" name="voltar_para" value="/campanhas/{{ c.id }}#whatsapp-hoje">
         <button class="btn btn-pequeno btn-verde">Enviar pelo WhatsApp</button></form>
       {% elif not (t.lead.whatsapp or t.lead.telefone) %}<span class="selo selo-alerta">sem telefone</span>{% endif %}
+      {% if not t.lead.whatsapp %}<a class="selo selo-alerta" href="#ligacoes">sem WhatsApp: pesquisar</a>{% endif %}
     </div>
     <div class="mensagem" style="margin-top:6px">{{ t.mensagem }}</div>
   </div>
@@ -127,13 +128,25 @@
 </div>
 
 {% if so_fixo %}
-<details class="cartao" id="ligacoes">
-  <summary><h2 style="display:inline">📞 Faça uma campanha de ligação: {{ so_fixo|length }} empresas só têm telefone fixo</h2></summary>
-  <p class="pequeno suave">A IA não faz ligações. Estas empresas ficaram fora da campanha porque não têm WhatsApp nem e-mail —
-    ligue para elas (ou monte sua campanha de ligação). Ao conseguir um WhatsApp/e-mail, salve no lead.</p>
+{% set faltando = so_fixo|rejectattr('whatsapp')|list %}
+<details class="cartao" id="ligacoes" {{ 'open' if faltando }}>
+  <summary><h2 style="display:inline">🔎 Pesquisar WhatsApp: {{ faltando|length }} de {{ so_fixo|length }} empresas ainda sem número</h2></summary>
+  <p class="pequeno suave">Estas empresas estão na campanha, mas a Receita só tem o telefone fixo delas. Pesquise na internet
+    (Google, Instagram, site) e cadastre o WhatsApp aqui: as mensagens da campanha passam a ir para ele.
+    Se preferir, ligue no fixo — muitos escritórios usam o fixo no WhatsApp Business.</p>
   <div class="tabela-rolagem"><table>
-    <tr><th>Empresa</th><th>Telefone</th><th>Score</th></tr>
-    {% for l in so_fixo %}<tr><td><a href="/leads/{{ l.id }}">{{ l.empresa }}</a></td><td>{{ l.telefone|telefone if l.telefone else '—' }}</td><td>{{ l.score }}</td></tr>{% endfor %}
+    <tr><th>Empresa</th><th>Telefone fixo</th><th>Pesquisar</th><th>WhatsApp</th></tr>
+    {% for l in so_fixo %}<tr>
+      <td><a href="/leads/{{ l.id }}">{{ l.empresa }}</a><div class="pequeno suave">{{ l.cidade }}</div></td>
+      <td>{{ l.telefone|telefone if l.telefone else '—' }}</td>
+      <td><a class="btn btn-pequeno" target="_blank" rel="noopener" href="https://www.google.com/search?q={{ (l.empresa ~ ' ' ~ (l.cidade or '') ~ ' whatsapp')|urlencode }}">Google</a>
+        <a class="btn btn-pequeno" target="_blank" rel="noopener" href="https://www.google.com/search?q={{ (l.empresa ~ ' ' ~ (l.cidade or '') ~ ' instagram')|urlencode }}">Instagram</a></td>
+      <td>{% if l.whatsapp %}<span class="selo selo-ok">✓ {{ l.whatsapp|telefone }}</span>{% else %}
+        <form class="inline" method="post" action="/campanhas/{{ c.id }}/whatsapp-lead"><input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="lead_id" value="{{ l.id }}">
+          <input type="text" inputmode="tel" name="whatsapp" placeholder="(81) 99999-0000" style="width:150px">
+          <button class="btn btn-pequeno btn-verde">Salvar</button></form>{% endif %}</td>
+    </tr>{% endfor %}
   </table></div>
 </details>
 {% endif %}
