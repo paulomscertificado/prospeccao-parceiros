@@ -92,6 +92,8 @@ def tela_envios(request: Request, canal: str = "", status: str = "", campanha: s
     lead_obj = db.get(Lead, util.para_int(lead)) if util.para_int(lead) else None
     pessoas = {u.id: u.nome for u in db.execute(select(Usuario)).scalars()}
     nomes_camp = {c.id: c.nome for c in db.execute(select(Campanha)).scalars()}
+    regras["horas_whatsapp"] = mensagens.horas_entre_contatos(db, "whatsapp")
+    regras["horas_email"] = mensagens.horas_entre_contatos(db, "email")
     return tela(request, "envios.html", {
         "lista": lista, "proximos": proximos, "resumo": resumo, "regras": regras, "STATUS_ENVIO": STATUS_ENVIO,
         "PERIODOS": PERIODOS, "filtros": {"canal": canal, "status": status, "campanha": campanha, "periodo": periodo,

@@ -110,7 +110,7 @@
         <li><b>E-mail sai sozinho</b>{% if regras.enviar_email_automatico != '1' %} (desligado agora em Configurações){% endif %}: a cada minuto o sistema olha a fila e manda o que estiver na hora, em <b>dias úteis das {{ regras.horario_envio_inicio }} às {{ regras.horario_envio_fim }}</b>.</li>
         <li><b>Limites de e-mail:</b> até <b>{{ regras.limite_hora_email }} por hora</b> e <b>{{ regras.limite_diario_email }} por dia</b>; no máximo {{ regras.limite_diario_dominio }} por dia para a mesma empresa (domínio) e {{ regras.limite_diario_campanha }} por dia por campanha.</li>
         <li><b>WhatsApp:</b> o primeiro contato é com <b>1 clique</b> (botão "Enviar pelo WhatsApp" dentro da campanha) e sai pelo número de quem criou a campanha. Para quem já conversou com a MS, sai sozinho{% if regras.enviar_whatsapp_automatico != '1' %} (desligado agora){% endif %}. Até {{ regras.limite_hora_whatsapp }} por hora e {{ regras.limite_diario_whatsapp }} por dia, com pausas entre uma mensagem e outra.</li>
-        <li><b>Nunca insiste:</b> no máximo 1 mensagem a cada {{ regras.horas_entre_contatos }} horas para a mesma empresa; quem pede SAIR não recebe mais nada.</li>
+        <li><b>Nunca insiste:</b> no máximo 1 WhatsApp a cada {{ regras.horas_whatsapp }} h e 1 e-mail a cada {{ regras.horas_email }} h para a mesma empresa (cada canal com o seu controle); quem pede SAIR não recebe mais nada.</li>
       </ul>
       <p class="pequeno suave">Os limites ficam em Configurações &gt; Geral (administrador).</p>
     </details>

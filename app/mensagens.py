@@ -47,6 +47,7 @@ def aplicar_variaveis(texto: str, valores: dict[str, str]) -> str:
     resultado = re.sub(r"\{\{\s*(\w+)\s*\}\}", lambda m: valores.get(m.group(1), ""), texto or "")
     # "Olá, !" quando não sabemos o nome → "Olá!"
     resultado = re.sub(r"[ \t]*,[ \t]*([!?.])", r"\1", resultado)
+    resultado = re.sub(r"(Olá|Oi|Bom dia|Boa tarde)[ \t]*,[ \t]*,", r"\1,", resultado)  # "Olá, , tudo bem?" → "Olá, tudo bem?"
     return re.sub(r"[ \t]{2,}", " ", resultado).strip()
 
 
@@ -110,11 +111,20 @@ def limite_diario(db: Session, canal: str) -> int:
     return ler_config_int(db, chave, 0) if chave else 0
 
 
-def ultimo_envio(db: Session, lead_id: int) -> datetime | None:
-    return db.execute(select(func.max(Mensagem.criado_em)).where(
+def ultimo_envio(db: Session, lead_id: int, canal: str | None = None) -> datetime | None:
+    consulta = select(func.max(Mensagem.criado_em)).where(
         Mensagem.lead_id == lead_id, Mensagem.direcao == "saida", Mensagem.angulo != "resposta",
-        Mensagem.status.in_(ENVIADAS),
-    )).scalar()
+        Mensagem.status.in_(ENVIADAS))
+    if canal:
+        consulta = consulta.where(Mensagem.canal == canal)
+    return db.execute(consulta).scalar()
+
+
+def horas_entre_contatos(db: Session, canal: str) -> int:
+    """Intervalo mínimo por canal (WhatsApp e e-mail separados); vazio = usa o geral (horas_entre_contatos)."""
+    chave = {"email": "horas_entre_contatos_email", "whatsapp": "horas_entre_contatos_whatsapp"}.get(canal)
+    valor = str(ler_config(db, chave) or "").strip() if chave else ""
+    return util.para_int(valor) if valor else ler_config_int(db, "horas_entre_contatos", 20)
 
 
 def bloqueio_de_envio(db: Session, lead: Lead | None, canal: str, campanha_id: int | None = None) -> str:
@@ -127,11 +137,12 @@ def bloqueio_de_envio(db: Session, lead: Lead | None, canal: str, campanha_id: i
             return "Este lead foi anonimizado pela política de retenção."
         if lead.perdido and lead.motivo_perda == "Contato inválido" and canal in ("whatsapp", "ligacao"):
             return "O número deste lead foi marcado como inválido."
-        horas = ler_config_int(db, "horas_entre_contatos", 20)
-        ultimo = ultimo_envio(db, lead.id)
+        horas = horas_entre_contatos(db, canal)
+        ultimo = ultimo_envio(db, lead.id, canal)  # cada canal tem o seu controle: e-mail não segura WhatsApp
+        nome = {"email": "e-mail", "whatsapp": "WhatsApp"}.get(canal, canal)
         if horas and ultimo and agora() - ultimo < timedelta(hours=horas):
-            return (f"Já houve uma mensagem para este lead há menos de {horas} horas "
-                    f"(controle de frequência). Tente amanhã.")
+            return (f"Já houve um {nome} para este lead há menos de {horas} horas (controle de frequência do {nome}). "
+                    "Tente mais tarde ou use o outro canal.")
     limite = limite_diario(db, canal)
     if limite and enviadas_hoje(db, canal) >= limite:
         return f"O limite diário de {limite} mensagens de {canal} foi atingido. Ajuste em Configurações."

@@ -557,3 +557,14 @@ def test_teste_da_campanha_vai_so_para_quem_testa(cliente, monkeypatch):
     # WhatsApp sem celular informado: pede o número e não envia nada
     r = cliente.post(f"/campanhas/{cid}/testar", data={"csrf": csrf, "canal_teste": "whatsapp", "whatsapp_teste": ""})
     assert "celular com DDD" in r.text
+
+
+def test_controle_de_frequencia_separado_por_canal(cliente):
+    with sessao() as db:
+        gravar_config(db, "horas_entre_contatos", "20")
+        lead = _novo_lead(db, "Contabil Freq Canal", email="x@freq-canal-teste.com.br")
+        mensagens.registrar(db, lead.id, "email", "Oi", None, status="enviada")
+        db.flush()
+        assert "e-mail" in mensagens.bloqueio_de_envio(db, lead, "email")
+        assert "há menos de" not in mensagens.bloqueio_de_envio(db, lead, "whatsapp")  # e-mail não segura o WhatsApp
+        gravar_config(db, "horas_entre_contatos", "0")
