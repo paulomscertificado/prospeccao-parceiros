@@ -54,8 +54,8 @@
   {% if equipe_campanhas %}
   <form method="get" style="margin-left:auto"><input type="hidden" name="ver" value="{{ ver }}">
     <select name="de" onchange="this.form.submit()" aria-label="De quem">
-      <option value="">Toda a equipe</option>
       <option value="minhas" {{ 'selected' if de == 'minhas' }}>Só as minhas</option>
+      <option value="todos" {{ 'selected' if de == 'todos' }}>Toda a equipe</option>
       {% for uid in equipe_campanhas %}<option value="{{ uid }}" {{ 'selected' if de == uid|string }}>{{ pessoas.get(uid, '—') }}</option>{% endfor %}
     </select></form>
   {% endif %}

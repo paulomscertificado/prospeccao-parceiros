@@ -177,7 +177,8 @@ def lista_campanhas(request: Request, ver: str = "todas", de: str = "", usuario:
     consulta = select(Campanha)
     if usuario.perfil in config.PERFIS_SO_PROPRIOS:
         consulta = consulta.where(Campanha.usuario_id == usuario.id)  # cada um com as suas campanhas
-    elif de == "minhas":
+    elif de in ("", "minhas"):
+        de = "minhas"  # padrão: as campanhas de quem está usando a conta
         consulta = consulta.where(Campanha.usuario_id == usuario.id)
     elif util.para_int(de):
         consulta = consulta.where(Campanha.usuario_id == util.para_int(de))

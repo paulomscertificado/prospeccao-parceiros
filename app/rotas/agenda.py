@@ -138,9 +138,10 @@ def _consulta_agenda(usuario: Usuario, filtro_usuario: int | None):
 
 
 @rotas.get("/agenda")
-def agenda(request: Request, ver: str = "hoje", canal: str = "", tipo: str = "", responsavel: int | None = None,
+def agenda(request: Request, ver: str = "hoje", canal: str = "", tipo: str = "", responsavel: str = "",
            usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
     hoje = date.today()
+    responsavel = None if responsavel == "todos" else (util.para_int(responsavel) or usuario.id)  # padrão: a pessoa da conta
     consulta = _consulta_agenda(usuario, responsavel)
     if ver == "hoje":
         consulta = consulta.where(Tarefa.status == "pendente", Tarefa.data <= hoje)

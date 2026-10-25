@@ -197,7 +197,8 @@ def test_campanhas_de_cada_usuario_arquivar_e_excluir(cliente):
     lista = f.get("/campanhas").text
     assert "Campanha da Fabiana" in lista and "Campanha do Admin" not in lista  # cada um com as suas
     assert f.get(f"/campanhas/{admin_id}").status_code == 404
-    assert "Campanha da Fabiana" in cliente.get("/campanhas").text and "Campanha do Admin" in cliente.get("/campanhas").text
+    assert "Campanha da Fabiana" not in cliente.get("/campanhas").text  # padrão: só as de quem está na conta
+    assert "Campanha da Fabiana" in cliente.get("/campanhas?de=todos").text and "Campanha do Admin" in cliente.get("/campanhas").text
     csrf = csrf_de(f.get(f"/campanhas/{dela_id}").text)
     # não pode mexer na campanha dos outros
     assert f.post(f"/campanhas/{admin_id}/excluir", data={"csrf": csrf}).status_code == 404

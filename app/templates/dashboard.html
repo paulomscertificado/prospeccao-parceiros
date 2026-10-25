@@ -10,8 +10,8 @@
     </select>
     {% if vendedores %}
     <select name="vendedor" onchange="this.form.submit()">
-      <option value="">Toda a equipe</option>
-      {% for v in vendedores %}<option value="{{ v.id }}" {{ 'selected' if vendedor_sel == v.id }}>{{ v.nome }}</option>{% endfor %}
+      <option value="todos" {{ 'selected' if not vendedor_sel }}>Toda a equipe</option>
+      {% for v in vendedores %}<option value="{{ v.id }}" {{ 'selected' if vendedor_sel == v.id }}>{{ v.nome }}{{ ' (você)' if v.id == usuario.id }}</option>{% endfor %}
     </select>{% endif %}
   </form>
 </div>

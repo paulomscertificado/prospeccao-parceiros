@@ -152,7 +152,8 @@ async def acoes_em_lote(request: Request, usuario: Usuario = Depends(equipe), db
 @rotas.get("/leads/pipeline")
 def pipeline(request: Request, vendedor: str = "", usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
     consulta = filtrar_por_usuario(select(Lead).where(Lead.anonimizado.is_(False)), usuario)
-    if vendedor and ve_tudo(usuario):
+    if ve_tudo(usuario) and vendedor != "todos":
+        vendedor = vendedor or str(usuario.id)  # padrão: os leads de quem está usando a conta
         consulta = consulta.where(Lead.vendedor_id == util.para_int(vendedor))
     colunas = []
     for codigo, nome, lista_status in config.COLUNAS_PIPELINE:

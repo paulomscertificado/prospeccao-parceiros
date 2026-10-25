@@ -18,7 +18,7 @@
   <input type="hidden" name="ver" value="{{ ver }}">
   <select name="canal" onchange="this.form.submit()" aria-label="Canal"><option value="">Todos os canais</option>{% for c, n in CANAIS.items() %}<option value="{{ c }}" {{ 'selected' if canal == c }}>{{ n }}</option>{% endfor %}</select>
   <select name="tipo" onchange="this.form.submit()" aria-label="Tipo"><option value="">Todos os tipos</option>{% for c, n in [("prospeccao","Cadência"),("followup","Follow-up"),("reuniao","Reunião"),("renovacao","Renovação"),("indicacao","Indicação de parceiro")] %}<option value="{{ c }}" {{ 'selected' if tipo == c }}>{{ n }}</option>{% endfor %}</select>
-  {% if usuarios %}<select name="responsavel" onchange="this.form.submit()" aria-label="Responsável"><option value="">Toda a equipe</option>{% for u in usuarios %}<option value="{{ u.id }}" {{ 'selected' if responsavel == u.id }}>{{ u.nome }}</option>{% endfor %}</select>{% endif %}
+  {% if usuarios %}<select name="responsavel" onchange="this.form.submit()" aria-label="Responsável"><option value="todos" {{ 'selected' if not responsavel }}>Toda a equipe</option>{% for u in usuarios %}<option value="{{ u.id }}" {{ 'selected' if responsavel == u.id }}>{{ u.nome }}{{ ' (você)' if u.id == usuario.id }}</option>{% endfor %}</select>{% endif %}
 </form>
 
 {% for t in tarefas %}

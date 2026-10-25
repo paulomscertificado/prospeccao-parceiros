@@ -5,7 +5,7 @@
   <div><h1>Pipeline</h1><div class="suave">Arraste os cards entre as colunas. Cada mudança fica registrada no histórico do lead.</div></div>
   <div class="acoes">
     {% if usuario.perfil in ['admin','gestor'] %}
-    <form method="get"><select name="vendedor" onchange="this.form.submit()" aria-label="Vendedor"><option value="">Toda a equipe</option>{% for v in vendedores %}<option value="{{ v.id }}" {{ 'selected' if vendedor==v.id|string }}>{{ v.nome }}</option>{% endfor %}</select></form>{% endif %}
+    <form method="get"><select name="vendedor" onchange="this.form.submit()" aria-label="Vendedor"><option value="todos" {{ 'selected' if vendedor == 'todos' }}>Toda a equipe</option>{% for v in vendedores %}<option value="{{ v.id }}" {{ 'selected' if vendedor==v.id|string }}>{{ v.nome }}{{ ' (você)' if v.id == usuario.id }}</option>{% endfor %}</select></form>{% endif %}
     <a class="btn" href="/leads">Ver em lista</a>
   </div>
 </div>

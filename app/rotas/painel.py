@@ -28,10 +28,11 @@ def _vendedores(db: Session):
 
 
 @rotas.get("/")
-def dashboard(request: Request, periodo: str = "30d", vendedor: int | None = None,
+def dashboard(request: Request, periodo: str = "30d", vendedor: str = "",
               usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
     p = metricas.periodo(periodo)
-    vendedor = vendedor if ve_tudo(usuario) else None
+    # padrão: os números de quem está usando a conta; "todos" = toda a equipe
+    vendedor = (None if vendedor == "todos" else (util.para_int(vendedor) or usuario.id)) if ve_tudo(usuario) else None
     ind = metricas.indicadores(db, usuario, p, vendedor)
     ranking = sorted(metricas.ranking_parceiros(db, usuario, p, vendedor), key=lambda r: (-r["certificados"], -r["faturamento"]))
     top = [r for r in ranking if r["certificados"]][:10]
