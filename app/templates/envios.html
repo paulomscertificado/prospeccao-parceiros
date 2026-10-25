@@ -65,14 +65,15 @@
     <div class="envio">
       <div class="canal-icone {{ m.canal }}" title="{{ CANAIS.get(m.canal, m.canal) }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="{{ ICONE_ZAP if m.canal == 'whatsapp' else ICONE_EMAIL }}"/></svg></div>
       <div style="min-width:0">
-        <div class="quem">{% if m.lead %}<a href="/leads/{{ m.lead.id }}">{{ m.lead.empresa }}</a>{% else %}<span class="suave">Contato fora dos leads</span>{% endif %}
+        {% set l = leads_por_id.get(m.lead_id) %}
+        <div class="quem">{% if l %}<a href="/leads/{{ l.id }}">{{ l.empresa }}</a>{% else %}<span class="suave">Contato fora dos leads</span>{% endif %}
           {% if m.status == 'recebida' %}<span class="pequeno suave">respondeu</span>{% endif %}</div>
         <div class="meta">
           {% if m.campanha_id %}<span>📣 {{ nomes_camp.get(m.campanha_id, 'campanha') }}</span>{% endif %}
           {% if m.angulo %}<span>{{ config.ANGULOS.get(m.angulo, m.angulo) }}</span>{% endif %}
           <span>{{ 'por ' ~ pessoas.get(m.usuario_id) if m.usuario_id else ('IA SDR' if m.status != 'recebida' else '') }}</span>
-          {% if m.canal == 'email' and m.lead and m.lead.email %}<span>{{ m.lead.email }}</span>{% endif %}
-          {% if m.canal == 'whatsapp' and m.lead %}<span>{{ (m.lead.whatsapp or m.lead.telefone)|telefone }}</span>{% endif %}
+          {% if m.canal == 'email' and l and l.email %}<span>{{ l.email }}</span>{% endif %}
+          {% if m.canal == 'whatsapp' and l %}<span>{{ (l.whatsapp or l.telefone)|telefone }}</span>{% endif %}
         </div>
         <details><summary>{{ (m.assunto ~ ' — ' if m.assunto else '') ~ m.corpo|replace('\n', ' ') }}</summary>
           <div class="corpo">{% if m.assunto %}<b>Assunto:</b> {{ m.assunto }}<br><br>{% endif %}{{ m.corpo }}</div>

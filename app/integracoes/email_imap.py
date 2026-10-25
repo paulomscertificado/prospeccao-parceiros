@@ -38,8 +38,13 @@ def sem_citacao(texto: str) -> str:
     for linha in texto.splitlines():
         if re.match(r"^\s*>", linha) or re.match(r"^\s*(Em .+escreveu|On .+wrote|-----Original|De:\s)", linha):
             break
+        # Gmail quebra "Em dom., 25 de out. de 2026 às 17:42, Fulano <\nemail> escreveu:" em duas linhas
+        if re.match(r"^\s*(Em|On) .{0,80}\d{1,2}:\d{2}", linha):
+            break
         linhas.append(linha)
-    return "\n".join(linhas).strip()
+    resposta = "\n".join(linhas).strip()
+    # assinatura padrão sozinha no fim ("Atenciosamente,") não ajuda a entender a resposta
+    return re.sub(r"\n+\s*(Atenciosamente|Att|Abraços|Obrigad[oa])[,.!]?\s*$", "", resposta, flags=re.I).strip()
 
 
 def ler_respostas(emails_de_leads: set[str], maximo: int = 30) -> list[dict]:

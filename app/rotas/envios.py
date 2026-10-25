@@ -90,6 +90,8 @@ def tela_envios(request: Request, canal: str = "", status: str = "", campanha: s
     if usuario.perfil in config.PERFIS_SO_PROPRIOS:
         camp_q = camp_q.where(Campanha.usuario_id == usuario.id)
     lead_obj = db.get(Lead, util.para_int(lead)) if util.para_int(lead) else None
+    ids = {m.lead_id for m in lista if m.lead_id} | {t.lead_id for t in proximos if t.lead_id}
+    leads_por_id = {l.id: l for l in db.execute(select(Lead).where(Lead.id.in_(ids))).scalars()} if ids else {}
     pessoas = {u.id: u.nome for u in db.execute(select(Usuario)).scalars()}
     nomes_camp = {c.id: c.nome for c in db.execute(select(Campanha)).scalars()}
     regras["horas_whatsapp"] = mensagens.horas_entre_contatos(db, "whatsapp")
@@ -99,5 +101,5 @@ def tela_envios(request: Request, canal: str = "", status: str = "", campanha: s
         "PERIODOS": PERIODOS, "filtros": {"canal": canal, "status": status, "campanha": campanha, "periodo": periodo,
                                           "lead": lead, "busca": busca},
         "campanhas": db.execute(camp_q).scalars().all(), "lead_filtro": lead_obj, "pessoas": pessoas,
-        "nomes_camp": nomes_camp, "hoje": hoje,
+        "nomes_camp": nomes_camp, "hoje": hoje, "leads_por_id": leads_por_id,
     })

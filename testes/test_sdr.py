@@ -568,3 +568,16 @@ def test_controle_de_frequencia_separado_por_canal(cliente):
         assert "e-mail" in mensagens.bloqueio_de_envio(db, lead, "email")
         assert "há menos de" not in mensagens.bloqueio_de_envio(db, lead, "whatsapp")  # e-mail não segura o WhatsApp
         gravar_config(db, "horas_entre_contatos", "0")
+
+
+def test_envios_mostra_a_empresa_e_vamos_conversar_e_interesse(cliente):
+    from app.integracoes.email_imap import sem_citacao
+
+    with sessao() as db:
+        lead = _novo_lead(db, "Contabil Envio Nome", email="x@envio-nome-teste.com.br")
+        mensagens.registrar(db, lead.id, "email", "Oi", None, status="enviada", assunto="Assunto")
+        assert sdr.classificar_resposta(db, lead, "vamos conversar")["classe"] in config.CLASSES_QUENTES
+    assert "Contabil Envio Nome" in cliente.get("/envios?periodo=hoje").text
+    resposta = ("teste, de resposta lead.\n\n\nAtenciosamente,\n\n\nEm dom., 25 de out. de 2026 às 17:42, "
+                "MS Certificação Digital <\ncontato@mscertificados.com.br> escreveu:\n> texto antigo")
+    assert sem_citacao(resposta) == "teste, de resposta lead."
