@@ -177,6 +177,8 @@ def _buscar_candidatos(campanha_id: int) -> list[int]:
         if not base_receita.disponivel(db):
             raise RuntimeError("A base da Receita ainda não foi importada (Configurações > Integrações).")
         candidatos: list[int] = []
+        canais = [c for c in camp.canais.split(",") if c]
+        so_fixo: list[int] = []
         ja_usados = _leads_em_outras_campanhas(db, campanha_id)
         por_categoria = max(1, -(-quantidade * 2 // max(1, len(cods))))
         for cod in cods:
@@ -200,17 +202,30 @@ def _buscar_candidatos(campanha_id: int) -> list[int]:
                         continue  # já cadastrado e já trabalhado: não entra de novo
                     if lead.categoria_id is None and cod in cats:
                         lead.categoria = cats[cod]
+                    if "whatsapp" in canais and not lead.whatsapp:
+                        lead.whatsapp = celular_do_lead(lead)
+                    if not tem_canal(lead, canais):
+                        if lead.telefone and lead.id not in so_fixo:
+                            so_fixo.append(lead.id)
+                        continue  # sem WhatsApp/e-mail: não conta; a busca segue até achar empresas que dá para contatar
                     candidatos.append(lead.id)
                     achados += 1
                 # acabaram as empresas da região, ou já olhamos o bastante
                 if len(resultados) < limite_busca * 3 or limite_busca * 3 >= MAXIMO_BUSCA:
                     break
                 limite_busca = min(limite_busca * 4, MAXIMO_BUSCA // 3)
+        if not candidatos and so_fixo:
+            canal = " ou ".join({"whatsapp": "WhatsApp", "email": "e-mail"}.get(c, c) for c in canais) or "WhatsApp/e-mail"
+            raise RuntimeError(f"Em \"{camp.cidade}\"/{camp.estado} encontrei {len(so_fixo)} empresa(s) desse segmento, mas nenhuma "
+                               f"tem {canal} cadastrado (só telefone fixo). Tente: marcar também o canal E-mail, escolher "
+                               "uma cidade maior/vizinha (ex.: Recife) ou outro segmento. Para essas empresas, ligue você "
+                               "mesmo (Leads, filtro da cidade).")
         if not candidatos:
             nomes = ", ".join(c.nome for c in cats.values()) or "das categorias escolhidas"
             raise RuntimeError(f"Não encontrei empresas novas de {nomes} em \"{camp.cidade}\"/{camp.estado} na base da "
                                "Receita. Confira o nome da cidade (ou do bairro) e o estado, ou escolha outro segmento.")
-        return list(dict.fromkeys(candidatos))
+        # Os só com fixo vão no fim (no máximo 30): ficam fora da campanha, mas aparecem em "Faça uma campanha de ligação"
+        return list(dict.fromkeys(candidatos + so_fixo[:30]))
 
 
 def etapa_gerar(campanha_id: int, _usuario_id, estado: dict, prazo: float) -> bool:
@@ -245,7 +260,8 @@ def etapa_gerar(campanha_id: int, _usuario_id, estado: dict, prazo: float) -> bo
             elegiveis.sort(key=lambda l: (-l.score, l.id))
             estado["so_fixo"] = [l.id for l in sorted(so_fixo, key=lambda l: (-l.score, l.id))][:100]
             if not elegiveis:
-                raise RuntimeError(f"Nenhuma das empresas encontradas tem {' ou '.join(canais) or 'WhatsApp/e-mail'}: "
+                raise RuntimeError(f"Nenhuma das empresas encontradas tem "
+                                   f"{' ou '.join({'whatsapp': 'WhatsApp', 'email': 'e-mail'}.get(c, c) for c in canais) or 'WhatsApp/e-mail'}: "
                                    f"{len(so_fixo)} só têm telefone fixo. Faça uma campanha de ligação com elas "
                                    "(Leads, filtro da cidade) ou escolha outra região/segmento.")
             quantidade = max(1, db.get(Campanha, campanha_id).quantidade or 50)
