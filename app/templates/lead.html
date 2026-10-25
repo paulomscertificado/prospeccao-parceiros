@@ -121,10 +121,11 @@
 
   <div class="cartao">
     <h2>Mensagens prontas</h2>
-    {% if bloqueio_whatsapp %}<div class="aviso aviso-alerta">{{ bloqueio_whatsapp }}</div>{% endif %}
     <select id="escolha-msg" aria-label="Template">{% for m in mensagens %}<option value="{{ loop.index0 }}">{{ CANAIS.get(m.canal, m.canal) }} · {{ m.nome }}</option>{% endfor %}</select>
     {% for m in mensagens %}
     <div class="msg-pronta {{ '' if loop.first else 'oculto' }}" data-indice="{{ loop.index0 }}" style="margin-top:10px">
+      {% set bloqueio_canal = bloqueio_email if m.canal == 'email' else (bloqueio_whatsapp if m.canal == 'whatsapp' else '') %}
+      {% if bloqueio_canal %}<div class="aviso aviso-alerta">{{ bloqueio_canal }}</div>{% endif %}
       {% if m.assunto %}<div class="pequeno"><b>Assunto:</b> {{ m.assunto }}</div>{% endif %}
       <div class="mensagem" id="msg-{{ m.id }}">{{ m.corpo }}</div>
       <div class="grupo-btn" style="margin-top:8px">
