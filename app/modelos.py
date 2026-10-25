@@ -368,6 +368,10 @@ class Tarefa(Base):
     acao: Mapped[str] = mapped_column(String(250), default="")
     assunto: Mapped[str] = mapped_column(String(200), default="")
     mensagem: Mapped[str] = mapped_column(Text, default="")
+    # Campanha da IA: os dois modelos do mesmo toque (o time pode trocar de canal se achar outro contato)
+    mensagem_whatsapp: Mapped[str] = mapped_column(Text, default="")
+    mensagem_email: Mapped[str] = mapped_column(Text, default="")
+    assunto_email: Mapped[str] = mapped_column(String(200), default="")
     angulo: Mapped[str] = mapped_column(String(20), default="")
     # rascunho (campanha aguardando aprovação), pendente, feita, pulada, cancelada
     status: Mapped[str] = mapped_column(String(20), default="pendente", index=True)

@@ -181,9 +181,19 @@
     <details {{ 'open' if loop.first }}><summary>{{ t.data|data }} · {{ CANAIS.get(t.canal, t.canal) }} · {{ config.ANGULOS.get(t.angulo, t.acao) }} <span class="selo">{{ t.status }}</span></summary>
       <form method="post" action="/campanhas/{{ c.id }}/editar-mensagem" style="margin:6px 0 10px">
         <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="tarefa_id" value="{{ t.id }}">
-        {% if t.canal == 'email' %}<input type="text" name="assunto" value="{{ t.assunto }}" aria-label="Assunto" style="margin-bottom:4px">{% endif %}
-        <textarea name="mensagem" style="min-height:120px" aria-label="Mensagem">{{ t.mensagem }}</textarea>
-        {% if t.status in ('rascunho', 'pendente') %}<button class="btn btn-pequeno" style="margin-top:4px">Salvar texto</button>{% endif %}
+        {% set tem_outro = t.mensagem_email if t.canal == 'whatsapp' else t.mensagem_whatsapp %}
+        <div class="{{ 'grade-2' if tem_outro }}" style="gap:12px">
+          <div><label class="pequeno"><b>{{ '✉ E-mail' if t.canal == 'email' else '💬 WhatsApp' }}</b> (vai por este canal)</label>
+            {% if t.canal == 'email' %}<input type="text" name="assunto" value="{{ t.assunto }}" aria-label="Assunto" style="margin-bottom:4px">{% endif %}
+            <textarea name="mensagem" style="min-height:140px" aria-label="Mensagem">{{ t.mensagem }}</textarea></div>
+          {% if tem_outro %}
+          <div><label class="pequeno"><b>{{ '💬 WhatsApp' if t.canal == 'email' else '✉ E-mail' }}</b> (modelo reserva, se achar esse contato)</label>
+            {% if t.canal == 'whatsapp' %}<input type="text" name="outro_assunto" value="{{ t.assunto_email }}" aria-label="Assunto do e-mail" style="margin-bottom:4px">{% endif %}
+            <textarea name="outro_modelo" style="min-height:140px" aria-label="Outro modelo">{{ tem_outro }}</textarea></div>
+          {% endif %}
+        </div>
+        {% if t.status in ('rascunho', 'pendente') %}<button class="btn btn-pequeno" style="margin-top:4px">Salvar textos</button>
+          {% if tem_outro %}<button class="btn btn-pequeno" formaction="/campanhas/{{ c.id }}/trocar-canal">Enviar este toque por {{ 'WhatsApp' if t.canal == 'email' else 'e-mail' }}</button>{% endif %}{% endif %}
       </form></details>
   {% else %}<p class="vazio">Nenhuma mensagem.</p>{% endfor %}
 </div>

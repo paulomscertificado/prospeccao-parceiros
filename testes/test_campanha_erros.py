@@ -157,6 +157,8 @@ def test_campanha_de_whatsapp_leva_quem_so_tem_fixo_para_o_time_pesquisar(client
         assert camp.status == "aguardando_aprovacao", camp.erro
         tarefas = db.execute(select(Tarefa).where(Tarefa.campanha_id == cid)).scalars().all()
         assert {t.canal for t in tarefas} == {"whatsapp"}  # nunca ligação
+        assert all(t.mensagem_whatsapp and t.mensagem_email and t.assunto_email for t in tarefas)  # os dois modelos
+        trocar_id = tarefas[0].id
         assert {t.lead.empresa for t in tarefas} == {"Contabil Com Celular", "Contabil So Fixo"}
         fixo = db.execute(select(Lead).where(Lead.empresa == "Contabil So Fixo")).scalars().one()
         assert str(fixo.id) in camp.so_fixo.split(",") and not fixo.whatsapp
@@ -168,6 +170,10 @@ def test_campanha_de_whatsapp_leva_quem_so_tem_fixo_para_o_time_pesquisar(client
     assert "WhatsApp de Contabil So Fixo salvo" in r.text
     with sessao() as db:
         assert db.get(Lead, fixo_id).whatsapp == "81991112222"
+    cliente.post(f"/campanhas/{cid}/trocar-canal", data={"csrf": csrf, "tarefa_id": trocar_id})
+    with sessao() as db:
+        t = db.get(Tarefa, trocar_id)
+        assert t.canal == "email" and t.mensagem == t.mensagem_email and t.assunto == t.assunto_email
 
 def test_aprovar_campanha_antiga_cancela_ligacoes(cliente):
     from datetime import date

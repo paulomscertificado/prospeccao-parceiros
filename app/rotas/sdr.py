@@ -358,7 +358,26 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
                                 "contrato ou frases de spam). Ajuste o texto.", "erro")
             else:
                 t.mensagem, t.assunto = novo, str(form.get("assunto", t.assunto))[:200]
-                avisar(request, "Mensagem atualizada.")
+                outro = str(form.get("outro_modelo", "")).strip()
+                if outro and sdr.texto_seguro(outro):
+                    if t.canal == "email":
+                        t.mensagem_whatsapp = outro
+                    else:
+                        t.mensagem_email, t.assunto_email = outro, str(form.get("outro_assunto", t.assunto_email))[:200]
+                if t.canal == "email":
+                    t.mensagem_email, t.assunto_email = t.mensagem, t.assunto
+                else:
+                    t.mensagem_whatsapp = t.mensagem
+                avisar(request, "Mensagens atualizadas.")
+    elif acao == "trocar-canal":
+        t = db.get(Tarefa, util.para_int(form.get("tarefa_id")) or 0)
+        if t and t.campanha_id == cid and t.status in ("rascunho", "pendente") and t.canal in ("email", "whatsapp"):
+            if t.canal == "whatsapp" and t.mensagem_email:
+                t.canal, t.mensagem, t.assunto = "email", t.mensagem_email, t.assunto_email
+            elif t.canal == "email" and t.mensagem_whatsapp:
+                t.canal, t.mensagem, t.assunto = "whatsapp", t.mensagem_whatsapp, ""
+            t.acao = f"Contato por {t.canal}"
+            avisar(request, f"Este toque agora vai por {'e-mail' if t.canal == 'email' else 'WhatsApp'}.")
     elif acao == "whatsapp-lead":
         lead = db.get(Lead, util.para_int(form.get("lead_id")))
         digitos = util.normalizar_telefone(str(form.get("whatsapp", "")))

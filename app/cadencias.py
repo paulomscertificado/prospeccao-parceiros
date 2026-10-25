@@ -53,6 +53,7 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
                     data += timedelta(days=1)
             dia_anterior = data
             canal = passo.canal
+            modelos = {}
             if passo.canal == "auto" or passo.angulo:
                 canal = sdr.escolher_canal(db, lead, canais) if passo.canal == "auto" else passo.canal
                 if da_ia and canal not in ("email", "whatsapp"):
@@ -64,6 +65,8 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
                 msg = mensagens_sdr[lead.id].get(passo.angulo or "apresentacao") or {}
                 assunto = msg.get("assunto", "") if canal == "email" else ""
                 corpo = msg.get("email", "") if canal == "email" else msg.get("whatsapp", "")
+                modelos = {"mensagem_whatsapp": msg.get("whatsapp", ""), "mensagem_email": msg.get("email", ""),
+                           "assunto_email": (msg.get("assunto", "") or "")[:200]}
             elif da_ia and canal not in ("email", "whatsapp"):
                 continue  # campanha da IA só manda e-mail e WhatsApp: ligação/LinkedIn o usuário faz por conta própria
             else:
@@ -73,7 +76,7 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
                 tipo="prospeccao", lead_id=lead.id, passo_id=passo.id, campanha_id=campanha_id,
                 usuario_id=responsavel.id if responsavel else None, canal=canal, data=data,
                 hora=passo.hora or "09:00", acao=passo.acao or f"Contato por {canal}",
-                assunto=assunto, mensagem=corpo, angulo=passo.angulo or "", status=status_tarefa,
+                assunto=assunto, mensagem=corpo, angulo=passo.angulo or "", status=status_tarefa, **modelos,
             ))
             resultado["tarefas"] += 1
         if lead.vendedor_id is None and usuario.perfil in config.PERFIS_SO_PROPRIOS:
