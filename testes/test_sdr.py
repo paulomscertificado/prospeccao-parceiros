@@ -596,3 +596,15 @@ def test_quinze_modelos_por_segmento_seguros(cliente):
         assert all(sdr.texto_seguro(m["corpo"]) and "{quem}" not in m["corpo"] and "{{nome}}" in m["corpo"] for m in lista)
     with sessao() as db:
         assert db.execute(select(func.count(Template.id)).where(Template.categoria == "contabil")).scalar() == 15
+
+
+def test_prospeccao_por_cnae(cliente, tmp_path):
+    from app.rotas.leads import _cnaes_do_formulario
+
+    class F(dict):
+        def getlist(self, k):
+            return self.get(k + "_lista", [])
+
+    assert _cnaes_do_formulario(F(cnaes_lista=["6319400"], cnaes_outros="6311-9/00, 70.20-4-00, 12")) == \
+        ["6319400", "6311900", "7020400"]
+    assert "Pesquisar por CNAE" in cliente.get("/prospeccao").text

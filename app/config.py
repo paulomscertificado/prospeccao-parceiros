@@ -255,6 +255,19 @@ CONFIG_PADRAO = {
 }
 
 # Categorias de parceiros (o administrador cria outras na tela Categorias).
+# CNAEs que dá para escolher na Prospecção (filtro direto na base da Receita), em grupos de atividades parecidas
+CNAES_BUSCA = {
+    "Internet, dados e software": [
+        ("6319400", "Portais, provedores de conteúdo e outros serviços de informação na internet"),
+        ("6311900", "Tratamento de dados, provedores de aplicação e hospedagem na internet"),
+        ("6201501", "Desenvolvimento de software sob encomenda"),
+        ("6202300", "Desenvolvimento e licenciamento de software customizável"),
+        ("6203100", "Desenvolvimento e licenciamento de software não customizável"),
+        ("6204000", "Consultoria em tecnologia da informação"),
+        ("6209100", "Suporte técnico, manutenção e outros serviços em TI"),
+    ],
+}
+
 # cnaes: entram todas as empresas ativas com essa atividade principal.
 # cnaes_com_palavra: só entram se o NOME tiver uma das palavras_chave (atividades genéricas demais).
 # prioridade: a empresa fica na primeira categoria que combinar (menor número primeiro).

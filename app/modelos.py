@@ -160,6 +160,7 @@ class Busca(Base):
     quantidade: Mapped[int] = mapped_column(Integer, default=100)
     tipo_empresa: Mapped[str] = mapped_column(String(80), default="")
     categoria: Mapped[str] = mapped_column(String(40), default="contabil")   # código da categoria de parceiro
+    cnaes: Mapped[str] = mapped_column(String(300), default="")  # filtro por CNAE na base da Receita (vazio = categoria)
     tamanho_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
     tamanho_max: Mapped[int | None] = mapped_column(Integer, nullable=True)
     fontes: Mapped[str] = mapped_column(String(120), default="")

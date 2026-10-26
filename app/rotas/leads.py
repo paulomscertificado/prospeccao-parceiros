@@ -539,10 +539,24 @@ async def importar(request: Request, arquivo: UploadFile = File(...), vendedor_i
 def prospeccao_tela(request: Request, pedido: str = "", usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
     preenchido = prospeccao.interpretar_pedido(pedido) if pedido else {}
     buscas = db.execute(select(Busca).order_by(Busca.criado_em.desc()).limit(15)).scalars().all()
+    from .. import base_receita
+
+    todos_cnaes = [c for grupo in config.CNAES_BUSCA.values() for c, _ in grupo]
     return tela(request, "prospeccao.html", {"fontes": prospeccao.fontes_disponiveis(db), "buscas": buscas,
+                                             "cnaes_busca": config.CNAES_BUSCA,
+                                             "cnaes_na_base": base_receita.contar_por_cnae(db, todos_cnaes),
                                              "categorias": db.execute(select(Categoria).where(Categoria.ativa.is_(True))
                                                                       .order_by(Categoria.prioridade)).scalars().all(),
                                              "pre": preenchido, "pedido": pedido})
+
+
+def _cnaes_do_formulario(form) -> list[str]:
+    """CNAEs marcados + os digitados ("63.19-4-00, 6311900") com 7 dígitos."""
+    import re
+
+    digitados = re.findall(r"\d[\d.\-/]{5,12}\d", str(form.get("cnaes_outros", "")))
+    todos = list(form.getlist("cnaes")) + [util.so_digitos(c) for c in digitados]
+    return list(dict.fromkeys(c for c in todos if len(c) == 7 and c.isdigit()))
 
 
 @rotas.post("/prospeccao/buscar", dependencies=[Depends(verificar_csrf)])
@@ -568,7 +582,8 @@ async def prospeccao_buscar(request: Request, usuario: Usuario = Depends(equipe)
                   tipo_empresa=(db.execute(select(Categoria.nome).where(Categoria.codigo == form.get("categoria")))
                                 .scalar() or config.TIPOS_EMPRESA[0]),
                   tamanho_min=util.para_int(form.get("tamanho_min")), tamanho_max=util.para_int(form.get("tamanho_max")),
-                  fontes=",".join(fontes), enriquecer=form.get("enriquecer") == "on")
+                  fontes=",".join(fontes), enriquecer=form.get("enriquecer") == "on",
+                  cnaes=",".join(_cnaes_do_formulario(form))[:300])
     db.add(busca)
     registrar_log(db, usuario, "prospeccao", "busca", None, f"{cidade}/{uf} {busca.quantidade}", request)
     db.commit()

@@ -143,6 +143,32 @@ def _anotar(texto: str):
         gravar_config(db, "receita_status", texto)
 
 
+def contar_por_cnae(db, cnaes: list[str]) -> dict[str, int]:
+    """Quantas empresas da base importada têm cada CNAE (0 = não importado). Lê a contagem guardada na importação
+    (contar na hora leva segundos com centenas de milhares de empresas)."""
+    import json
+
+    from .banco import ler_config
+
+    try:
+        guardada = json.loads(ler_config(db, "contagem_cnaes") or "{}")
+    except ValueError:
+        guardada = {}
+    return {c: guardada.get(c, 0) for c in cnaes}
+
+
+def atualizar_contagem_cnaes(db) -> None:
+    """Recalcula e guarda quantas empresas há por CNAE na base (rodar depois de importar)."""
+    import json
+
+    from sqlalchemy import func
+
+    from .banco import gravar_config
+
+    linhas = db.execute(select(EmpresaReceita.cnae, func.count()).group_by(EmpresaReceita.cnae)).all()
+    gravar_config(db, "contagem_cnaes", json.dumps({c: n for c, n in linhas if c}))
+
+
 def importar_pasta(pasta: str) -> int:
     """Lê os .zip da Receita na pasta e recria a base local. Devolve quantas empresas foram guardadas."""
     pasta_p = Path(pasta.strip().strip('"'))
@@ -231,6 +257,7 @@ def importar_pasta(pasta: str) -> int:
         gravar_config(db, "receita_atualizada_em", agora.strftime("%d/%m/%Y %H:%M"))
         gravar_config(db, "receita_total", str(total))
         gravar_config(db, "receita_por_categoria", por_categoria)
+        atualizar_contagem_cnaes(db)
     log.info("Base da Receita importada: %s empresas %s", total, por_categoria)
     return total
 
@@ -368,7 +395,7 @@ def contar(db, uf: str = "", cidade: str = "") -> dict[str, int]:
 
 
 def buscar(db, cidade: str, uf: str, limite: int, categorias: list[str] | None = None,
-           so_matriz: bool = True) -> list[dict]:
+           so_matriz: bool = True, cnaes: list[str] | None = None) -> list[dict]:
     """Empresas da cidade (das categorias pedidas): primeiro as que têm no nome as palavras da categoria
     (ex.: "condom" em administradoras), depois as com mais contatos e as mais antigas."""
     from .modelos import Categoria
@@ -386,7 +413,9 @@ def buscar(db, cidade: str, uf: str, limite: int, categorias: list[str] | None =
             consulta = consulta.where(EmpresaReceita.municipio_chave == chave)
         else:  # não é uma cidade do estado: procura como bairro (ex.: "Boa Viagem", em Recife)
             consulta = consulta.where(EmpresaReceita.bairro.ilike(cidade.strip()))
-    if categorias:
+    if cnaes:  # filtro direto pela atividade principal (CNAE), qualquer que seja a categoria
+        consulta = consulta.where(EmpresaReceita.cnae.in_(cnaes))
+    elif categorias:
         consulta = consulta.where(EmpresaReceita.categoria.in_(categorias))
     if so_matriz:
         consulta = consulta.where(EmpresaReceita.matriz == 1)

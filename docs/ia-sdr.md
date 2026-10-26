@@ -138,3 +138,5 @@ Dois modelos: cada toque da campanha da IA guarda o texto de WhatsApp e o de e-m
 ## Modelos por segmento
 
 `app/modelos_segmento.py`: 15 modelos por segmento (8 WhatsApp + 7 e-mail, cobrindo os 4 toques), 14 segmentos = 210 modelos, criados na partida por `garantir` (só os que faltam; editados não são sobrescritos). `Template.categoria`/`Template.angulo`. Aparecem no lead do segmento (antes dos gerais), em Cadências > Templates com filtro por segmento, e nas campanhas sem IA (`sdr._usar_modelos_do_segmento`, um modelo por toque escolhido pelo id da empresa).
+
+Prospecção por CNAE: `Busca.cnaes` + `base_receita.buscar(cnaes=...)` filtra pela atividade principal no lugar da categoria. Lista pronta em `config.CNAES_BUSCA`; contagem guardada em `contagem_cnaes` (`atualizar_contagem_cnaes`, roda ao fim da importação).

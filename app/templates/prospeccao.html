@@ -26,6 +26,21 @@
     <div><label>Tamanho máximo (funcionários)</label><input type="number" name="tamanho_max" min="0"></div>
   </div>
   <p class="ajuda">As fontes públicas raramente informam o número de funcionários. O filtro de tamanho só descarta quem tem tamanho conhecido fora da faixa.</p>
+  <details style="margin-top:10px" id="por-cnae">
+    <summary><b>Pesquisar por CNAE (atividade da empresa)</b> <span class="pequeno suave">— opcional; marcando, a busca na base
+      da Receita usa estes CNAEs no lugar do tipo de empresa</span></summary>
+    {% for grupo, itens in cnaes_busca.items() %}
+    <div class="pequeno" style="margin:8px 0 4px"><b>{{ grupo }}</b></div>
+    {% for codigo, nome in itens %}
+    <label class="marcar"><input type="checkbox" name="cnaes" value="{{ codigo }}">
+      <code>{{ codigo[:4] }}-{{ codigo[4] }}/{{ codigo[5:] }}</code> {{ nome }}
+      <span class="pequeno suave">({{ '{:,}'.format(cnaes_na_base.get(codigo, 0)).replace(',', '.') }} na base)</span></label>
+    {% endfor %}{% endfor %}
+    <label style="margin-top:8px">Outros CNAEs (separe por vírgula)</label>
+    <input type="text" name="cnaes_outros" placeholder="Ex.: 6319-4/00, 7020400">
+    <p class="ajuda">Só aparecem empresas de CNAEs que já foram importados da base da Receita. "0 na base" = esse CNAE ainda não
+      foi importado: peça para incluir nas categorias e importar de novo.</p>
+  </details>
   <label style="margin-top:10px">Fontes de dados</label>
   {% for codigo, nome, ok in fontes %}<label class="marcar"><input type="checkbox" name="fontes" value="{{ codigo }}" {{ 'checked' if ok else 'disabled' }}> {{ nome }}</label>{% endfor %}
   {% if not fontes[0][2] %}<div class="aviso aviso-alerta" style="margin:6px 0">Para achar escritórios em qualquer cidade, importe a base da Receita Federal (gratuita) em <a href="/configuracoes?aba=integracoes#receita">Configurações &gt; Integrações</a>{% if usuario.perfil != 'admin' %} (peça ao administrador){% endif %}. O OpenStreetMap tem poucos escritórios cadastrados no Brasil.</div>{% endif %}

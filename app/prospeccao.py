@@ -359,7 +359,9 @@ def _encontrar_e_cadastrar(busca_id: int) -> list[int] | None:
             fontes = busca.fontes.split(",")
             categoria = busca.categoria or "contabil"
             if "receita" in fontes:
-                encontrados += base_receita.buscar(db, busca.cidade, busca.estado, busca.quantidade, [categoria])
+                cnaes = [c for c in (busca.cnaes or "").split(",") if c]
+                encontrados += base_receita.buscar(db, busca.cidade, busca.estado, busca.quantidade, [categoria],
+                                                   cnaes=cnaes)
             # O mapa (OSM) só tem marcação para contabilidade; o Google busca pelo nome da categoria.
             if "osm" in fontes and categoria == "contabil":
                 encontrados += buscar_osm(busca.cidade, busca.estado, busca.raio_km, busca.quantidade, busca.tipo_empresa)
