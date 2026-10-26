@@ -21,9 +21,16 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------- Cadências
 
 @rotas.get("/cadencias")
-def lista_cadencias(request: Request, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def lista_cadencias(request: Request, segmento: str = "", usuario: Usuario = Depends(equipe),
+                    db: Session = Depends(obter_db)):
+    from .. import modelos_segmento
+
     lista = db.execute(select(Cadencia).order_by(Cadencia.id)).scalars().all()
-    templates = db.execute(select(Template).order_by(Template.canal, Template.nome)).scalars().all()
+    templates = db.execute(select(Template).where(Template.categoria == ("" if segmento == "geral" else segmento))
+                           .order_by(Template.canal.desc(), Template.nome) if segmento else
+                           select(Template).where(Template.categoria == "").order_by(Template.canal, Template.nome)
+                           ).scalars().all()
+    contagem = dict(db.execute(select(Template.categoria, func.count(Template.id)).group_by(Template.categoria)).all())
     campanhas = db.execute(select(Campanha).order_by(Campanha.criado_em.desc()).limit(20)).scalars().all()
     resumo = {}
     for c in campanhas:
@@ -35,6 +42,8 @@ def lista_cadencias(request: Request, usuario: Usuario = Depends(equipe), db: Se
                         "pendentes": sum(1 for t in tarefas if t.status == "pendente"),
                         "responderam": respondeu, "interessados": interessados}
     return tela(request, "cadencias.html", {"cadencias": lista, "templates": templates, "campanhas": campanhas,
+                                            "segmento": segmento, "contagem_modelos": contagem,
+                                            "segmentos": {c: s["rotulo"] for c, s in modelos_segmento.SEGMENTOS.items()},
                                             "resumo": resumo, "variaveis": mensagens.VARIAVEIS, "ia_ligada": ia.disponivel()})
 
 

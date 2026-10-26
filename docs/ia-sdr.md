@@ -134,3 +134,7 @@ automático de ângulos/CTAs, fila em Redis para volumes acima de milhares de en
 Canal: a IA não faz ligações. Com WhatsApp permitido, o celular informado à Receita vira o WhatsApp do lead (`celular_do_lead`). Empresas só com telefone fixo também entram (depois das que têm canal): a cadência cria passos de WhatsApp sem número, os ids vão para `Campanha.so_fixo` e a campanha mostra o cartão "Pesquisar WhatsApp" (links de busca + campo para salvar, ação `whatsapp-lead`). `cadencias.aplicar` nunca cria ligação/LinkedIn em campanha da IA, e `aprovar` cancela ligações de campanhas antigas.
 
 Dois modelos: cada toque da campanha da IA guarda o texto de WhatsApp e o de e-mail (`Tarefa.mensagem_whatsapp`, `mensagem_email`, `assunto_email`); `mensagem`/`assunto` são os do canal escolhido. Na campanha os dois aparecem lado a lado e editáveis; a ação `trocar-canal` passa o toque para o outro canal.
+
+## Modelos por segmento
+
+`app/modelos_segmento.py`: 15 modelos por segmento (8 WhatsApp + 7 e-mail, cobrindo os 4 toques), 14 segmentos = 210 modelos, criados na partida por `garantir` (só os que faltam; editados não são sobrescritos). `Template.categoria`/`Template.angulo`. Aparecem no lead do segmento (antes dos gerais), em Cadências > Templates com filtro por segmento, e nas campanhas sem IA (`sdr._usar_modelos_do_segmento`, um modelo por toque escolhido pelo id da empresa).

@@ -206,7 +206,9 @@ async def novo(request: Request, usuario: Usuario = Depends(equipe), db: Session
 
 def _contexto_lead(db: Session, lead: Lead, usuario: Usuario) -> dict:
     total, potencial, detalhes = score.calcular(db, lead)
-    templates = db.execute(select(Template).where(Template.ativo.is_(True)).order_by(Template.canal, Template.id)).scalars().all()
+    segmento = lead.categoria.codigo if lead.categoria else ""
+    templates = db.execute(select(Template).where(Template.ativo.is_(True), Template.categoria.in_(["", segmento]))
+                           .order_by(Template.categoria.desc(), Template.canal.desc(), Template.id)).scalars().all()
     prontas = []
     for t in templates:
         assunto, corpo = mensagens.montar(db, t, lead, usuario)

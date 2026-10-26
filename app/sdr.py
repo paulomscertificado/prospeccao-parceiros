@@ -121,8 +121,33 @@ def mensagens_por_regras(db, lead: Lead, usuario, cta: str = "") -> dict:
                         f"Obrigado!",
     }
     assinatura = f"\n\n{v['vendedor']}\nMS Certificação Digital · mscertificados.com.br"
-    return {a: {"whatsapp": t, "assunto": ASSUNTOS[a].format(empresa=v["empresa"]), "email": t + assinatura,
-                "fonte": "regras"} for a, t in textos.items()}
+    resultado = {a: {"whatsapp": t, "assunto": ASSUNTOS[a].format(empresa=v["empresa"]), "email": t + assinatura,
+                     "fonte": "regras"} for a, t in textos.items()}
+    if not generico and lead.categoria:
+        _usar_modelos_do_segmento(db, lead, v, resultado)
+    return resultado
+
+
+def _usar_modelos_do_segmento(db, lead: Lead, v: dict, resultado: dict) -> None:
+    """Troca os textos-base pelos modelos do segmento (Cadências > Templates), escolhendo um modelo por toque de
+    acordo com a empresa: assim cada empresa da campanha recebe uma variação diferente."""
+    from .modelos import Template
+
+    modelos = db.execute(select(Template).where(Template.ativo.is_(True), Template.categoria == lead.categoria.codigo,
+                                                Template.angulo != "").order_by(Template.id)).scalars().all()
+    for angulo, msgs in resultado.items():
+        for canal in ("whatsapp", "email"):
+            opcoes = [m for m in modelos if m.angulo == angulo and m.canal == canal]
+            if not opcoes:
+                continue
+            m = opcoes[(lead.id or 0) % len(opcoes)]
+            corpo = mensagens.aplicar_variaveis(m.corpo, v)
+            if not texto_seguro(corpo):
+                continue
+            msgs[canal] = corpo
+            if canal == "email" and m.assunto:
+                msgs["assunto"] = mensagens.aplicar_variaveis(m.assunto, v)
+        msgs["fonte"] = "modelos do segmento"
 
 
 ESQUEMA_MENSAGENS = {

@@ -7,7 +7,7 @@ import zipfile
 from datetime import date, datetime, timedelta
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app import agenda_horarios, base_receita, campanhas, config, mensagens, pesquisa, sdr, util
 from app.banco import agora, gravar_config, migrar_status, sessao
@@ -102,10 +102,11 @@ def test_mensagens_por_angulo_sem_spam(cliente):
     assert set(msgs) == set(config.ANGULOS)
     assert len({m["whatsapp"] for m in msgs.values()}) == 4  # cada toque é diferente
     assert msgs["apresentacao"]["whatsapp"].startswith("Olá, Maria! Tudo bem?")
-    assert "administra condomínios" in msgs["apresentacao"]["whatsapp"]
+    assert "condomínio" in msgs["apresentacao"]["whatsapp"] and msgs["apresentacao"]["fonte"] == "modelos do segmento"
+    assert "{" not in " ".join(m["whatsapp"] + m["email"] + m["assunto"] for m in msgs.values())  # variáveis preenchidas
     assert "viu minha mensagem" not in " ".join(m["whatsapp"] for m in msgs.values()).lower()
     assert all(sdr.texto_seguro(m["whatsapp"]) and sdr.texto_seguro(m["email"]) for m in msgs.values())
-    assert msgs["apresentacao"]["assunto"] == "Possível parceria — MS Certificação Digital + Sol Administradora de Condomínios"
+    assert "Sol Administradora de Condomínios" in msgs["apresentacao"]["assunto"]
     assert not sdr.texto_seguro("Temos uma excelente oportunidade para você")
     assert not sdr.texto_seguro("Comissão de 20% por certificado")
     assert not sdr.texto_seguro("Fazemos desconto especial")
@@ -581,3 +582,17 @@ def test_envios_mostra_a_empresa_e_vamos_conversar_e_interesse(cliente):
     resposta = ("teste, de resposta lead.\n\n\nAtenciosamente,\n\n\nEm dom., 25 de out. de 2026 às 17:42, "
                 "MS Certificação Digital <\ncontato@mscertificados.com.br> escreveu:\n> texto antigo")
     assert sem_citacao(resposta) == "teste, de resposta lead."
+
+
+
+def test_quinze_modelos_por_segmento_seguros(cliente):
+    from app import modelos_segmento
+    from app.modelos import Template
+
+    for codigo in modelos_segmento.SEGMENTOS:
+        lista = modelos_segmento.modelos_do_segmento(codigo)
+        assert len(lista) == 15 and sum(m["canal"] == "whatsapp" for m in lista) == 8
+        assert {m["angulo"] for m in lista} == set(config.ANGULOS)
+        assert all(sdr.texto_seguro(m["corpo"]) and "{quem}" not in m["corpo"] and "{{nome}}" in m["corpo"] for m in lista)
+    with sessao() as db:
+        assert db.execute(select(func.count(Template.id)).where(Template.categoria == "contabil")).scalar() == 15

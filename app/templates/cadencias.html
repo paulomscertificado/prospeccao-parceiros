@@ -30,6 +30,15 @@
 <div class="cartao" id="templates">
   <h2>Templates de mensagem</h2>
   <p class="suave">Variáveis: {% for v, d in variaveis.items() %}<code>{{ '{{' ~ v ~ '}}' }}</code> {{ d|lower }}{{ ', ' if not loop.last }}{% endfor %}.</p>
+  <form method="get" class="filtros" style="margin-bottom:10px">
+    <label class="pequeno">Modelos do segmento</label>
+    <select name="segmento" onchange="this.form.submit()">
+      <option value="">Gerais ({{ contagem_modelos.get('', 0) }})</option>
+      {% for cod, nome in segmentos.items() %}<option value="{{ cod }}" {{ 'selected' if segmento == cod }}>{{ nome }} ({{ contagem_modelos.get(cod, 0) }})</option>{% endfor %}
+    </select>
+    <span class="pequeno suave">Cada segmento tem 15 modelos (8 de WhatsApp e 7 de e-mail) para os 4 toques. Eles aparecem no lead
+      do segmento e dão variedade às campanhas.</span>
+  </form>
   <table>
     <tr><th>Nome</th><th>Canal</th><th>Assunto</th><th>Template Meta</th><th></th></tr>
     {% for t in templates %}<tr><td>{{ t.nome }} {% if not t.ativo %}<span class="selo">inativo</span>{% endif %}</td><td>{{ CANAIS.get(t.canal, t.canal) }}</td><td class="pequeno">{{ t.assunto }}</td><td class="pequeno">{{ t.nome_meta or '—' }}</td><td><a class="btn btn-pequeno" href="/templates/{{ t.id }}">Abrir</a></td></tr>{% endfor %}

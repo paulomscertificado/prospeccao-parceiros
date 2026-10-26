@@ -291,6 +291,9 @@ class Template(Base):
     # Nome do template aprovado na Meta (só para envio pela API oficial do WhatsApp)
     nome_meta: Mapped[str] = mapped_column(String(120), default="")
     ativo: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Modelos por segmento (app/modelos_segmento.py): código da categoria e toque da IA SDR; vazio = geral
+    categoria: Mapped[str] = mapped_column(String(40), default="", index=True)
+    angulo: Mapped[str] = mapped_column(String(20), default="")
 
 
 class Cadencia(Base):
@@ -669,6 +672,9 @@ def dados_iniciais(db) -> None:
         for dia, angulo, acao in CADENCIA_SDR:
             cad.passos.append(PassoCadencia(dia=dia, canal="auto", acao=acao, angulo=angulo))
         db.add(cad)
+    from . import modelos_segmento
+
+    modelos_segmento.garantir(db)  # 15 modelos por segmento (só cria os que faltam)
     if not db.execute(select(func.count(Produto.id))).scalar():
         for nome, preco, meses in config.PRODUTOS_PADRAO:
             db.add(Produto(nome=nome, preco=preco, custo=0, validade_meses=meses))
