@@ -643,6 +643,32 @@ CADENCIA_SDR = [
 ]
 
 
+def _categorias_novas(db) -> None:
+    """Cria as categorias padrão que ainda não existem. Os CNAEs da nova passam a ser dela: saem da categoria
+    antiga e as empresas da base da Receita com esses CNAEs são reclassificadas (ex.: 6319400 saiu de Tecnologia)."""
+    from sqlalchemy import update
+
+    from .base_receita import EmpresaReceita
+
+    existentes = {c for (c,) in db.execute(select(Categoria.codigo))}
+    for c in config.CATEGORIAS_PADRAO:
+        if c["codigo"] in existentes:
+            continue
+        db.add(Categoria(codigo=c["codigo"], nome=c["nome"], prioridade=c["prioridade"], aderencia=c["aderencia"],
+                         recorrente=c["recorrente"], cnaes=c["cnaes"], cnaes_com_palavra=c["cnaes_com_palavra"],
+                         palavras_chave=c["palavras_chave"], motivo=c["motivo"], estrategia=c["estrategia"],
+                         abertura=c["abertura"], gancho=c["gancho"]))
+        cnaes = [x for x in c["cnaes"].split(",") if x]
+        for antiga in db.execute(select(Categoria).where(Categoria.codigo != c["codigo"])).scalars():
+            lista = [x for x in antiga.cnaes.split(",") if x and x not in cnaes]
+            if lista != [x for x in antiga.cnaes.split(",") if x]:
+                antiga.cnaes = ",".join(lista)
+        if cnaes:
+            db.execute(update(EmpresaReceita).where(EmpresaReceita.cnae.in_(cnaes))
+                       .values(categoria=c["codigo"]))
+        db.flush()
+
+
 def dados_iniciais(db) -> None:
     """Cria templates, cadências, produtos, categorias e base de conhecimento na primeira vez."""
     if not db.execute(select(func.count(Categoria.id))).scalar():
@@ -651,6 +677,8 @@ def dados_iniciais(db) -> None:
                              recorrente=c["recorrente"], cnaes=c["cnaes"], cnaes_com_palavra=c["cnaes_com_palavra"],
                              palavras_chave=c["palavras_chave"], motivo=c["motivo"], estrategia=c["estrategia"],
                              abertura=c["abertura"], gancho=c["gancho"]))
+    else:
+        _categorias_novas(db)
     if not db.execute(select(func.count(Conhecimento.id))).scalar():
         for pergunta, resposta in CONHECIMENTO_PADRAO:
             db.add(Conhecimento(pergunta=pergunta, resposta=resposta))

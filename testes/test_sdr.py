@@ -608,3 +608,22 @@ def test_prospeccao_por_cnae(cliente, tmp_path):
     assert _cnaes_do_formulario(F(cnaes_lista=["6319400"], cnaes_outros="6311-9/00, 70.20-4-00, 12")) == \
         ["6319400", "6311900", "7020400"]
     assert "Pesquisar por CNAE" in cliente.get("/prospeccao").text
+
+
+def test_segmento_novo_de_internet_reclassifica_a_base(cliente):
+    from app import modelos, modelos_segmento
+    from app.base_receita import EmpresaReceita
+
+    with sessao() as db:
+        db.execute(select(Categoria).where(Categoria.codigo == "internet")).scalars().one().ativa = True
+        db.delete(db.execute(select(Categoria).where(Categoria.codigo == "internet")).scalars().one())
+        tec = db.execute(select(Categoria).where(Categoria.codigo == "tecnologia")).scalars().one()
+        tec.cnaes = "6204000,6209100,6319400"
+        db.add(EmpresaReceita(cnpj="77000001000100", cnpj_basico="77000001", cnae="6319400", categoria="tecnologia",
+                              uf="PE", municipio="RECIFE", municipio_chave="recife"))
+        db.flush()
+        modelos._categorias_novas(db)
+        assert db.execute(select(Categoria).where(Categoria.codigo == "internet")).scalars().one().cnaes == "6319400"
+        assert "6319400" not in tec.cnaes
+        assert db.get(EmpresaReceita, "77000001000100").categoria == "internet"
+    assert len(modelos_segmento.modelos_do_segmento("internet")) == 15

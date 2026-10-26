@@ -74,6 +74,13 @@ SEGMENTOS = {
         dor="um projeto travado na integração por falta de certificado",
         ganho="entregas mais rápidas e uma receita extra por indicação",
         papel="muitas soluções de tecnologia dependem de um certificado válido do cliente"),
+    "internet": dict(
+        rotulo="Portais e internet", quem="portais e empresas de serviços de informação na internet",
+        clientes="as empresas que usam o portal",
+        momento="para emitir notas, assinar documentos e acessar os serviços digitais do governo",
+        dor="o cliente perdendo tempo para resolver o certificado sem ter a quem recorrer",
+        ganho="um serviço a mais para o público do portal e uma receita extra por indicação",
+        papel="o portal já fala todos os dias com empresas que precisam de certificado digital"),
     "associacao": dict(
         rotulo="Associações", quem="associações empresariais", clientes="os associados",
         momento="no dia a dia fiscal e no acesso aos serviços públicos digitais",
