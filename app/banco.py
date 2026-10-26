@@ -168,7 +168,11 @@ _trava_preparo = threading.Lock()
 def _versao_do_esquema() -> str:
     from . import base_receita, modelos  # noqa: F401
 
+    from . import config, modelos_segmento
+
     partes = sorted(f"{t.name}.{c.name}" for t in Base.metadata.tables.values() for c in t.columns)
+    # dados padrão também contam: segmento ou modelo novo faz a nuvem preparar o banco de novo
+    partes += [c["codigo"] for c in config.CATEGORIAS_PADRAO] + sorted(modelos_segmento.SEGMENTOS)
     return hashlib.sha256("|".join(partes).encode()).hexdigest()[:16]
 
 
