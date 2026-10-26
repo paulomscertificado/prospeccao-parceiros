@@ -13,17 +13,31 @@
 
   <div class="cartao">
     <h2 class="passo-titulo"><span class="numero-passo">1</span> O que você procura?</h2>
-    <div class="cartoes-escolha">
-      {% for c in categorias|sort(attribute='aderencia', reverse=True) if c.codigo != 'outros' %}
-      <label class="escolha">
-        <input type="checkbox" name="categorias" value="{{ c.codigo }}" {{ 'checked' if c.codigo in marcadas }}>
-        <span class="escolha-corpo">
-          <b>{{ c.nome }}</b>
-          <span class="escolha-qtd" data-categoria="{{ c.codigo }}">{{ contagem.get(c.codigo, '') if contagem else '' }}</span>
-        </span>
-      </label>
-      {% endfor %}
+    {% set grupos = [
+      ('Contabilidade e finanças', ['contabil', 'bpo', 'rh', 'despachante', 'consultoria']),
+      ('Software e tecnologia', ['nf', 'software_contabil', 'erp', 'tecnologia', 'internet']),
+      ('Redes e serviços para empresas', ['condominio', 'associacao', 'coworking', 'franquia', 'servicos_pme']),
+    ] %}
+    {% set usados = [] %}
+    {% for titulo, codigos in grupos %}
+    <div class="grupo-escolha">
+      <div class="grupo-escolha-titulo">{{ titulo }}</div>
+      <div class="cartoes-escolha">
+        {% for c in categorias if c.codigo in codigos %}{% set _ = usados.append(c.codigo) %}
+        {% include "_escolha_categoria.html" %}
+        {% endfor %}
+      </div>
     </div>
+    {% endfor %}
+    {% set resto = categorias|rejectattr('codigo', 'in', usados)|rejectattr('codigo', 'equalto', 'outros')|list %}
+    {% if resto %}
+    <div class="grupo-escolha">
+      <div class="grupo-escolha-titulo">Outros segmentos</div>
+      <div class="cartoes-escolha">
+        {% for c in resto %}{% include "_escolha_categoria.html" %}{% endfor %}
+      </div>
+    </div>
+    {% endif %}
   </div>
 
   <div class="cartao">

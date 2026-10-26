@@ -1,0 +1,8 @@
+<label class="escolha">
+  <input type="checkbox" name="categorias" value="{{ c.codigo }}" {{ 'checked' if c.codigo in marcadas }}>
+  <span class="escolha-corpo">
+    <span class="escolha-marca" aria-hidden="true">✓</span>
+    <b>{{ c.nome }}</b>
+    <span class="escolha-qtd" data-categoria="{{ c.codigo }}">{{ contagem.get(c.codigo, '') if contagem else '' }}</span>
+  </span>
+</label>

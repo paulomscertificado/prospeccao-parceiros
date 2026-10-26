@@ -229,6 +229,7 @@ def test_campanha_completa_com_aprovacao_e_fila(cliente, tmp_path, monkeypatch):
     monkeypatch.setattr(campanhas, "gerar_em_segundo_plano", campanhas.gerar)  # roda na hora no teste
     r = cliente.get("/campanhas/nova?pedido=Quero+parceiros+entre+administradoras+de+condom%C3%ADnio+em+Recife")
     assert r.status_code == 200 and 'value="condominio" checked' in r.text and 'value="Recife"' in r.text
+    assert "Software e tecnologia" in r.text and r.text.count('<label class="escolha">') == 15  # agrupado, sem repetir
     csrf = r.text.split('name="csrf" content="')[1].split('"')[0]
     r = cliente.post("/campanhas/nova", data={"csrf": csrf, "nome": "Admins Recife", "cidade": "Recife", "estado": "PE",
                                               "quantidade": "5", "categorias": ["condominio"], "canais": ["email"],
