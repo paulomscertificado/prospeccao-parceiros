@@ -65,22 +65,26 @@
     <p class="ajuda">A IA pesquisa o dobro e fica com as melhores.</p>
   </div>
 
-  <button class="btn btn-verde btn-grande">Pesquisar empresas</button>
-
-  <details class="cartao" style="margin-top:16px">
-    <summary><b>Opções avançadas</b> <span class="suave pequeno">(não precisa mexer)</span></summary>
+  <div class="cartao">
+    <h2 class="passo-titulo"><span class="numero-passo">4</span> Como a IA vai abordar?</h2>
+    <p class="ajuda" style="margin-top:0">Confira e ajuste cada item. A campanha só é criada depois que você revisar esta parte.</p>
     <div class="campos" style="margin-top:12px">
-      <div class="largo"><label>Nome da campanha</label><input type="text" name="nome" placeholder="Automático (segmento + cidade)"></div>
-      <div><label>Canais</label>
-        {% for c in ['whatsapp', 'email', 'linkedin'] %}<label class="marcar"><input type="checkbox" name="canais" value="{{ c }}" {{ 'checked' if c == 'whatsapp' }}> {{ CANAIS[c] }}</label>{% endfor %}</div>
-      <div><label>Tom</label><select name="tom">{% for k, v in config.TONS.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
-      <div><label>Cadência</label><select name="cadencia_id">{% for c in cadencias %}<option value="{{ c.id }}" {{ 'selected' if cadencia_sdr and c.id == cadencia_sdr.id }}>{{ c.nome }}</option>{% endfor %}</select></div>
-      <div><label>Início</label><input type="date" name="inicio" value="{{ hoje.isoformat() }}"></div>
+      <div class="largo"><label for="nome-campanha">Nome da campanha *</label>
+        <input id="nome-campanha" type="text" name="nome" required placeholder="Ex.: Escritórios contábeis – Belo Horizonte"></div>
+      <div><label>Canais *</label>
+        {% for c in ['whatsapp', 'email'] %}<label class="marcar"><input type="checkbox" name="canais" value="{{ c }}" {{ 'checked' if c == 'whatsapp' }}> {{ CANAIS[c] }}</label>{% endfor %}</div>
+      <div><label>Tom *</label><select name="tom" required>{% for k, v in config.TONS.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
+      <div><label>Cadência *</label><select name="cadencia_id" required>{% for c in cadencias %}<option value="{{ c.id }}" {{ 'selected' if cadencia_sdr and c.id == cadencia_sdr.id }}>{{ c.nome }}</option>{% endfor %}</select></div>
+      <div><label>Início *</label><input type="date" name="inicio" required value="{{ hoje.isoformat() }}" min="{{ hoje.isoformat() }}"></div>
       <div class="largo"><label>Pergunta final (CTA)</label><select name="cta"><option value="">A IA escolhe a mais natural para cada empresa</option>{% for c in config.CTAS %}<option>{{ c }}</option>{% endfor %}</select>
         <input type="text" name="cta_livre" placeholder="ou escreva a sua" style="margin-top:6px"></div>
-      <div><label>Objetivo</label><input type="text" name="objetivo" value="Encontrar parceiros"></div>
+      <div class="largo"><label>Objetivo *</label><input type="text" name="objetivo" required value="Encontrar parceiros"></div>
     </div>
-  </details>
+    <label class="marcar" style="margin-top:12px"><input type="checkbox" id="revisei" required>
+      <b>Revisei o nome, os canais, o tom, a cadência e o objetivo desta campanha.</b></label>
+  </div>
+
+  <button class="btn btn-verde btn-grande">Pesquisar empresas</button>
 </form>
 {% endblock %}
 {% block scripts %}
@@ -139,6 +143,7 @@ estado.addEventListener('change', atualizar);
 atualizar();
 document.getElementById('assistente').addEventListener('submit', ev => {
   if (!document.querySelector('input[name="categorias"]:checked')) { ev.preventDefault(); aviso('Escolha pelo menos um tipo de empresa.'); }
+  else if (!document.querySelector('input[name="canais"]:checked')) { ev.preventDefault(); aviso('No passo 4, escolha pelo menos um canal (WhatsApp ou e-mail).'); }
 });
 </script>
 {% endblock %}
