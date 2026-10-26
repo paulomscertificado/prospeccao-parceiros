@@ -303,3 +303,5 @@ input:focus, select:focus, textarea:focus { outline: 2px solid rgba(60, 199, 122
                          background: var(--verde-marca); margin-top: 12px; }
 .login .capa p { color: #dbe6f0; margin-top: 12px; }
 .login .capa .etiqueta { background: transparent; color: #dbe6f0; border-color: rgba(219, 230, 240, .3); }
+
+[hidden] { display: none !important; }

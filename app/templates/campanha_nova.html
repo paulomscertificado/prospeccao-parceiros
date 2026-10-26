@@ -42,9 +42,13 @@
 
   <div class="cartao">
     <h2 class="passo-titulo"><span class="numero-passo">2</span> Onde?</h2>
-    <div class="campos" style="max-width:520px;grid-template-columns:1fr 120px">
-      <div><label for="cidade">Cidade</label><input id="cidade" type="text" name="cidade" value="{{ cidade_inicial }}" required></div>
+    <div class="campos" style="max-width:640px;grid-template-columns:120px 1fr">
       <div><label for="estado">Estado</label><select id="estado" name="estado" required>{% for u in config.UFS %}<option {{ 'selected' if uf_inicial == u }}>{{ u }}</option>{% endfor %}</select></div>
+      <div><label for="lista-cidades">Cidade</label>
+        <select id="lista-cidades" hidden><option value="">Carregando cidades…</option></select>
+        <input id="cidade" type="text" name="cidade" value="{{ cidade_inicial }}" required placeholder="Digite o nome da cidade"
+               style="margin-top:6px">
+        <a href="#" id="voltar-lista" class="pequeno" hidden></a></div>
     </div>
     <p class="ajuda" id="total-cidade"></p>
   </div>
@@ -101,6 +105,36 @@ async function atualizar() {
   } catch (e) { /* sem contagem, segue normal */ }
 }
 cidade.addEventListener('input', () => { clearTimeout(espera); espera = setTimeout(atualizar, 400); });
+// Lista de cidades do estado (IBGE) + opção de digitar outra
+const lista = document.getElementById('lista-cidades'), voltar = document.getElementById('voltar-lista');
+const OUTRA = '__outra__';
+const semAcento = t => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+function modoDigitar(sim) {
+  cidade.hidden = !sim; voltar.hidden = true;
+  if (sim) { lista.value = OUTRA; cidade.focus(); }
+}
+async function carregarCidades() {
+  lista.hidden = false; lista.innerHTML = '<option value="">Carregando cidades…</option>';
+  try {
+    const r = await fetch('https://servicodados.ibge.gov.br/api/v1/localidades/estados/' + estado.value + '/municipios?orderBy=nome');
+    const nomes = (await r.json()).map(m => m.nome);
+    lista.innerHTML = '<option value="">Escolha a cidade…</option>' + nomes.map(n => '<option></option>').join('')
+      + '<option value="' + OUTRA + '">✏️ Outra cidade (digitar)</option>';
+    nomes.forEach((n, i) => { lista.options[i + 1].value = n; lista.options[i + 1].textContent = n; });
+    lista.required = true;
+    const achada = nomes.find(n => semAcento(n) === semAcento(cidade.value));
+    if (achada) { lista.value = achada; cidade.value = achada; cidade.hidden = true; voltar.hidden = true; }
+    else if (cidade.value.trim()) { modoDigitar(true); }
+    else { cidade.hidden = true; voltar.hidden = true; }
+  } catch (e) { lista.hidden = true; lista.required = false; cidade.hidden = false; }  // sem internet: só o campo de digitar
+}
+lista.addEventListener('change', () => {
+  if (lista.value === OUTRA) { cidade.value = ''; modoDigitar(true); return; }
+  cidade.value = lista.value; cidade.hidden = true; voltar.hidden = true; atualizar();
+});
+voltar.addEventListener('click', ev => { ev.preventDefault(); lista.value = ''; cidade.value = ''; cidade.hidden = true; voltar.hidden = true; });
+estado.addEventListener('change', () => { cidade.value = ''; carregarCidades(); });
+carregarCidades();
 estado.addEventListener('change', atualizar);
 atualizar();
 document.getElementById('assistente').addEventListener('submit', ev => {
