@@ -769,7 +769,7 @@ def test_minha_fila_mostra_hora_e_envia_agora(cliente, monkeypatch):
         db.commit()
         tid = t.id
     r = cliente.get("/fila")
-    assert "14:13" in r.text and "Enviar agora" in r.text
+    assert "14:13" in r.text and "Enviar por e-mail" in r.text
     csrf = r.text.split('name="csrf" content="')[1].split('"')[0]
     cliente.post(f"/fila/enviar/{tid}", data={"csrf": csrf})
     assert enviados == ["agora@envioagora.com.br"]
@@ -790,4 +790,25 @@ def test_minha_fila_filtro_whatsapp_mostra_toque_de_email_com_versao_whatsapp(cl
                       data=date.today() + timedelta(days=1), acao="email", mensagem="Oi", mensagem_whatsapp="Oi zap"))
         db.commit()
     r = cliente.get("/fila?canal=whatsapp")
-    assert "Versao Reserva Ltda" in r.text and "tem versão WhatsApp" in r.text
+    assert "Versao Reserva Ltda" in r.text and "Enviar por WhatsApp" in r.text and "Enviar por e-mail" in r.text
+
+
+
+def test_enviar_toque_de_email_pelo_whatsapp_troca_o_canal(monkeypatch):
+    monkeypatch.setattr(mensagens, "dentro_do_horario", lambda db, momento=None: True)
+    monkeypatch.setattr(sdr, "enviar_whatsapp_conectado", lambda db, texto, usuario, lead=None, tarefa=None, **k:
+                        setattr(tarefa, "status", "feita"))
+    with sessao() as db:
+        lead = _novo_lead(db, "Troca Canal Ltda", email="t@trocacanal.com.br", whatsapp="81999990002")
+        camp = Campanha(nome="Troca", categorias="contabil", cidade="Recife", estado="PE", status="ativa",
+                        aprovado_em=agora())
+        db.add(camp)
+        db.flush()
+        t = Tarefa(lead_id=lead.id, campanha_id=camp.id, canal="email", status="pendente", tipo="prospeccao",
+                   data=date.today(), acao="email", mensagem="Texto e-mail", assunto="A", mensagem_whatsapp="Texto zap")
+        db.add(t)
+        db.flush()
+        assert campanhas.canais_do_toque(t) == ["email", "whatsapp"]
+        assert campanhas.enviar_toque_agora(db, t, _admin(db), "whatsapp") == ""
+        assert t.canal == "whatsapp" and t.mensagem == "Texto zap" and t.mensagem_email == "Texto e-mail"
+        db.rollback()

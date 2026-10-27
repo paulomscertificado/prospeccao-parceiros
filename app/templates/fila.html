@@ -12,6 +12,8 @@
   .cab-fila { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: #6b7686; border-top: 0; padding-top: 0; }
   .motivo { color: #4b5a6b; }
   .atrasado { color: var(--erro); font-weight: 600; }
+  .canais-toque { display: flex; flex-wrap: wrap; gap: 4px; align-items: flex-start; }
+  .canais-toque .pequeno { width: 100%; }
   @media (max-width: 760px) { .linha-fila { grid-template-columns: 1fr 1fr; } .cab-fila { display: none; } }
 </style>
 <div class="cabecalho">
@@ -65,17 +67,19 @@
   <div class="linha-fila cab-fila"><div>Data</div><div>Canal</div><div>Empresa</div><div>Campanha</div><div>Situação</div></div>
   {% for p in pendentes %}{% set t = p.t %}
   <div class="linha-fila"><div class="quando {{ 'atrasado' if p.atrasado }}">{{ t.data.strftime('%d/%m/%Y') }}<br><b>{{ t.hora or '09:00' }}</b>{% if p.atrasado %}<br>atrasado{% endif %}</div>
-    <div>{{ CANAIS.get(t.canal, t.canal) }}
-      {% set outro = 'whatsapp' if t.canal == 'email' else 'email' %}
-      {% if (t.mensagem_whatsapp if outro == 'whatsapp' else t.mensagem_email) %}<div class="pequeno suave">tem versão {{ CANAIS.get(outro) }}</div>{% endif %}</div>
+    {% set canais_t = canais_do_toque(t) %}
+    <div class="canais-toque">{% for c in canais_t %}<span class="selo {{ 'selo-azul' if c == t.canal else '' }}" title="{{ 'canal marcado' if c == t.canal else 'versão pronta' }}">{{ '✉️ E-mail' if c == 'email' else '💬 WhatsApp' }}</span>{% endfor %}
+      {% if canais_t|length > 1 %}<div class="pequeno suave">marcado: {{ CANAIS.get(t.canal) }}</div>{% endif %}</div>
     <div>{% if t.lead %}<a href="/leads/{{ t.lead.id }}">{{ t.lead.empresa }}</a>{% else %}—{% endif %}
       <div class="pequeno suave">{{ config.ANGULOS.get(t.angulo, t.acao) }}</div></div>
     <div><a href="/campanhas/{{ t.campanha_id }}">{{ nomes_camp.get(t.campanha_id, '') }}</a></div>
     <div class="motivo">{{ p.motivo }}
-      <form method="post" action="/fila/enviar/{{ t.id }}" style="margin-top:4px"
-            data-confirmar="Enviar agora esta mensagem para {{ t.lead.empresa if t.lead else 'a empresa' }} pelo {{ CANAIS.get(t.canal, t.canal) }}?">
-        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar_para" value="/fila{{ '?' ~ request.url.query if request.url.query }}">
-        <button class="btn btn-pequeno btn-verde">Enviar agora</button></form></div></div>
+      <div class="grupo-btn" style="margin-top:4px">{% for c in canais_t %}
+      <form class="inline" method="post" action="/fila/enviar/{{ t.id }}"
+            data-confirmar="Enviar agora esta mensagem para {{ t.lead.empresa if t.lead else 'a empresa' }} por {{ CANAIS.get(c) }}?">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="canal" value="{{ c }}">
+        <input type="hidden" name="voltar_para" value="/fila{{ '?' ~ request.url.query if request.url.query }}">
+        <button class="btn btn-pequeno {{ 'btn-verde' if c == 'whatsapp' else 'btn-primario' }}">{{ 'Enviar por WhatsApp' if c == 'whatsapp' else 'Enviar por e-mail' }}</button></form>{% endfor %}</div></div></div>
   {% endfor %}
   {% else %}<p class="suave">Nenhum envio pendente nas campanhas ativas.</p>{% endif %}
 </div>

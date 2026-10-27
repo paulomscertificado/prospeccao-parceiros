@@ -117,7 +117,7 @@ def minha_fila(request: Request, de: str = "", canal: str = "", usuario: Usuario
         "leads_por_id": leads_por_id, "nomes_camp": nomes_camp, "STATUS_ENVIO": STATUS_ENVIO, "hoje": hoje,
         "no_horario": no_horario, "pessoas": pessoas, "filtro_de": "todos" if alvo_id is None else str(alvo_id),
         "filtro_canal": canal, "horario": (ler_config(db, "horario_envio_inicio"), ler_config(db, "horario_envio_fim")),
-        "CANAIS": config.CANAIS,
+        "CANAIS": config.CANAIS, "canais_do_toque": campanhas.canais_do_toque,
     })
 
 
@@ -135,7 +135,8 @@ async def enviar_agora(request: Request, tid: int, usuario: Usuario = Depends(eq
     if t.status not in ("pendente", "feita") or camp.status != "ativa":
         avisar(request, "Este toque não pode mais ser enviado (campanha parada ou toque cancelado).", "erro")
         return voltar(str(form.get("voltar_para") or "/fila"))
-    erro = campanhas.enviar_toque_agora(db, t, usuario)
+    canal = str(form.get("canal") or "")
+    erro = campanhas.enviar_toque_agora(db, t, usuario, canal if canal in ("email", "whatsapp") else "")
     if erro:
         avisar(request, f"Não saiu: {erro}", "alerta")
     else:

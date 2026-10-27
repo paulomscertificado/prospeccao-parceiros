@@ -639,12 +639,47 @@ def para_disparar(db, camp: Campanha) -> dict[str, list[Tarefa]]:
     return feito
 
 
-def enviar_toque_agora(db, t: Tarefa, usuario: Usuario) -> str:
+def trocar_canal(t: Tarefa, canal: str) -> None:
+    """Passa o toque para o outro canal usando a versão reserva; o texto do canal antigo fica guardado como reserva."""
+    if t.canal == canal:
+        return
+    assunto, texto = _texto_do_canal(t, canal)
+    if t.canal == "email" and not t.mensagem_email:
+        t.mensagem_email, t.assunto_email = t.mensagem, t.assunto
+    if t.canal == "whatsapp" and not t.mensagem_whatsapp:
+        t.mensagem_whatsapp = t.mensagem
+    t.canal, t.mensagem, t.assunto = canal, texto, assunto
+
+
+def canais_do_toque(t: Tarefa) -> list[str]:
+    """Canais em que o toque tem mensagem pronta (o marcado primeiro)."""
+    outros = [c for c in ("email", "whatsapp") if c != t.canal]
+    return [c for c in [t.canal] + outros if c in ("email", "whatsapp") and _texto_do_canal(t, c)[1]]
+
+
+def enviar_toque_agora(db, t: Tarefa, usuario: Usuario, canal: str = "") -> str:
     """Clique em "Enviar agora" / "Enviar de novo" (Minha fila): manda este toque já, pelo canal dele, com as mesmas
     regras (horário, limites, controle de frequência, opt-out). Devolve "" se saiu ou o motivo de não ter saído."""
     lead = t.lead
-    if t.canal not in ("email", "whatsapp"):
+    canal = canal or t.canal
+    if canal not in ("email", "whatsapp"):
         return "Este toque não é de e-mail nem de WhatsApp."
+    if not _texto_do_canal(t, canal)[1]:
+        return f"Este toque não tem versão de {'e-mail' if canal == 'email' else 'WhatsApp'}."
+    if canal == "whatsapp" and not (lead and (lead.whatsapp or lead.telefone)):
+        return "Este lead não tem WhatsApp/telefone cadastrado."
+    if canal == "email" and not (lead and lead.email):
+        return "Este lead não tem e-mail."
+    original = (t.canal, t.mensagem, t.assunto, t.mensagem_whatsapp, t.mensagem_email, t.assunto_email)
+    trocar_canal(t, canal)
+    erro = _enviar_toque(db, t, usuario)
+    if erro:  # não saiu: o toque volta ao canal que estava
+        t.canal, t.mensagem, t.assunto, t.mensagem_whatsapp, t.mensagem_email, t.assunto_email = original
+    return erro
+
+
+def _enviar_toque(db, t: Tarefa, usuario: Usuario) -> str:
+    lead = t.lead
     if not lead or not sdr.automacao_ativa(lead):
         return "A automação está parada para este lead (respondeu, opt-out ou está com alguém)."
     if not _texto_do_canal(t, t.canal)[1]:
@@ -681,13 +716,7 @@ def disparar(db, camp: Campanha, usuario: Usuario, canal: str) -> dict:
         return feito
     for t in para_disparar(db, camp)[canal]:
         lead = t.lead
-        assunto, texto = _texto_do_canal(t, canal)
-        if t.canal != canal:  # troca o canal do toque, guardando o texto do canal antigo no modelo reserva
-            if t.canal == "email" and not t.mensagem_email:
-                t.mensagem_email, t.assunto_email = t.mensagem, t.assunto
-            if t.canal == "whatsapp" and not t.mensagem_whatsapp:
-                t.mensagem_whatsapp = t.mensagem
-            t.canal, t.mensagem, t.assunto = canal, texto, assunto
+        trocar_canal(t, canal)
         bloqueio = mensagens.bloqueio_de_envio(db, lead, canal, t.campanha_id)
         if bloqueio:
             feito["bloqueados"] += 1
