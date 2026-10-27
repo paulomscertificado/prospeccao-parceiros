@@ -52,7 +52,7 @@
   </div>
   {% if o.status == 'nova' %}
   <div class="grupo-btn" style="margin-top:10px">
-    <form class="inline" method="post" action="/leads/{{ l.id }}/assumir"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar_para" value="/leads/{{ l.id }}#handoff"><button class="btn btn-verde">ASSUMIR LEAD</button></form>
+    <form class="inline" method="post" action="/leads/{{ l.id }}/assumir"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar_para" value="/oportunidades"><button class="btn btn-verde">ASSUMIR LEAD</button></form>
     <a class="btn btn-primario" href="/leads/{{ l.id }}/agendar">AGENDAR REUNIÃO</a>
     {% if l.whatsapp %}<a class="btn" href="{{ l.whatsapp|whats }}" target="_blank" rel="noopener">INICIAR WHATSAPP</a>{% endif %}
     {% if l.telefone or l.whatsapp %}<a class="btn" href="tel:{{ l.telefone or l.whatsapp }}">INICIAR LIGAÇÃO {{ l.telefone or l.whatsapp }}</a>{% endif %}

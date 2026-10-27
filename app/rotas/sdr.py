@@ -56,7 +56,7 @@ def oportunidades(request: Request, ver: str = "novas", usuario: Usuario = Depen
         for o in db.execute(select(Oportunidade).where(Oportunidade.lead_id.in_(ids))).scalars() if ids else []:
             ops_do_lead.setdefault(o.lead_id, o)
         lista = []
-    return tela(request, "oportunidades.html", {
+    resposta = tela(request, "oportunidades.html", {
         "oportunidades": lista, "ver": ver, "respostas": respostas, "ops_do_lead": ops_do_lead,
         "leads_resposta": {l.id: l for l in db.execute(select(Lead).where(Lead.id.in_({m.lead_id for m in respostas})))
                            .scalars()} if respostas else {},
@@ -64,6 +64,8 @@ def oportunidades(request: Request, ver: str = "novas", usuario: Usuario = Depen
         "ve_tudo": ve_tudo(usuario),
         "resumos": {o.id: sdr.resumo_handoff(db, o.lead) for o in lista},
     })
+    resposta.headers["Cache-Control"] = "no-store"  # voltar no navegador recarrega (sem cartão já assumido)
+    return resposta
 
 
 @rotas.post("/oportunidades/{oid:int}/descartar", dependencies=[Depends(verificar_csrf)])
@@ -71,6 +73,9 @@ def descartar(request: Request, oid: int, usuario: Usuario = Depends(equipe), db
     op = db.get(Oportunidade, oid)
     if not op or (usuario.perfil in config.PERFIS_SO_PROPRIOS and op.lead.vendedor_id not in (None, usuario.id)):
         raise HTTPException(404)
+    for o in db.execute(select(Oportunidade).where(Oportunidade.lead_id == op.lead_id,
+                                                   Oportunidade.status == "nova")).scalars():  # cartões repetidos juntos
+        o.status, o.responsavel_id, o.assumida_em = "descartada", usuario.id, agora()
     op.status, op.responsavel_id, op.assumida_em = "descartada", usuario.id, agora()
     historico(db, op.lead_id, "sistema", f"Oportunidade descartada por {usuario.nome}.", usuario)
     db.commit()
@@ -86,7 +91,9 @@ def assumir(request: Request, lead_id: int, voltar_para: str = Form(""), usuario
     sdr.assumir_lead(db, lead, usuario)
     registrar_log(db, usuario, "assumiu_lead", "lead", lead.id, request=request)
     db.commit()
-    avisar(request, f"Você assumiu {lead.empresa}. A automação deste lead foi parada.")
+    avisar(request, f"Você assumiu {lead.empresa}. A automação deste lead foi parada"
+                    + (" e a oportunidade saiu das novas (está em Assumidas/descartadas)." if voltar_para == "/oportunidades"
+                       else "."))
     return voltar(voltar_para if voltar_para.startswith("/") else f"/leads/{lead_id}#handoff")
 
 

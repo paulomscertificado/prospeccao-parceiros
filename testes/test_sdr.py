@@ -875,3 +875,18 @@ def test_varias_respostas_do_mesmo_lead_ficam_numa_oportunidade():
         ops = db.execute(select(Oportunidade).where(Oportunidade.lead_id == lead.id)).scalars().all()
         assert len(ops) == 1 and "amanhã" in ops[0].resposta
         db.rollback()
+
+
+def test_assumir_pela_tela_de_oportunidades_tira_o_cartao(cliente):
+    with sessao() as db:
+        lead = _novo_lead(db, "Assume Some Ltda")
+        db.add_all([Oportunidade(lead_id=lead.id, temperatura="morna", classificacao="RESPOSTA INDEFINIDA",
+                                 resposta=f"oi {i}") for i in range(2)])
+        db.commit()
+        lid = lead.id
+    r = cliente.get("/oportunidades")
+    assert "Assume Some Ltda" in r.text and r.headers.get("cache-control") == "no-store"
+    csrf = r.text.split('name="csrf" content="')[1].split('"')[0]
+    r = cliente.post(f"/leads/{lid}/assumir", data={"csrf": csrf, "voltar_para": "/oportunidades"}, follow_redirects=False)
+    assert r.headers["location"].endswith("/oportunidades")
+    assert "· Assume Some Ltda" not in cliente.get("/oportunidades").text  # cartão saiu (só o aviso cita)
