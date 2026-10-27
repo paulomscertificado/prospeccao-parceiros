@@ -458,6 +458,8 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
         for t in db.execute(select(Tarefa).where(Tarefa.campanha_id == cid, Tarefa.lead_id == lead_id,
                                                  Tarefa.status.in_(["rascunho", "pendente"]))).scalars():
             t.status, t.concluida_em, t.resultado = "cancelada", agora(), "Removido da campanha"
+            if t.lead and t.lead.status == "Abordagem criada":
+                t.lead.status = "Pesquisando" if t.lead.pesquisado_em else "Novo"
         avisar(request, "Empresa removida da campanha.")
     db.commit()
     return voltar(f"/campanhas/{cid}")

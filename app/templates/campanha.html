@@ -171,7 +171,8 @@
   <div class="tabela-rolagem"><table>
     <tr><th>Empresa</th><th>Toques</th><th>Resposta</th></tr>
     {% for l in andamento %}
-    <tr><td><a href="/leads/{{ l.lead.id }}">{{ l.lead.empresa }}</a><div class="pequeno suave">{{ l.lead.status }}</div></td>
+    <tr {% if l.removida %}style="opacity:.55"{% endif %}><td><a href="/leads/{{ l.lead.id }}">{% if l.removida %}<s>{{ l.lead.empresa }}</s>{% else %}{{ l.lead.empresa }}{% endif %}</a>
+      <div class="pequeno suave">{% if l.removida %}<span class="selo selo-erro">tirada da campanha · não recebe nada</span>{% else %}{{ l.lead.status }}{% endif %}</div></td>
       <td>{% for t in l.toques %}{% set cls = {'enviado': 'selo-ok', 'na_fila': 'selo-azul', 'programado': 'selo-azul', 'falhou': 'selo-erro'}.get(t.situacao, '') %}
         <span class="selo {{ cls }}" title="{{ config.ANGULOS.get(t.angulo, '') }} · {{ t.situacao }} · {{ (t.quando.strftime('%d/%m %H:%M') if t.quando else t.data|data) }}{{ ' · ' ~ t.erro if t.erro }}">{{ '✉' if t.canal == 'email' else ('💬' if t.canal == 'whatsapp' else '•') }} {{ t.data.strftime('%d/%m') }}</span>
       {% endfor %}</td>

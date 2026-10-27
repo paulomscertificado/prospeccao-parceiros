@@ -465,7 +465,11 @@ def andamento(db, camp: Campanha) -> list[dict]:
                         "pulada": "cancelado"}.get(t.status, t.status)
         linha["toques"].append({"canal": t.canal, "data": t.data, "angulo": t.angulo, "situacao": situacao,
                                 "quando": m.criado_em if m else None, "erro": m.erro if m else ""})
-    return list(linhas.values())
+        linha.setdefault("tarefas", []).append(t)
+    for linha in linhas.values():  # tirada da campanha: nada mais sai para ela
+        linha["removida"] = all(t.status == "cancelada" and (t.resultado or "") == "Removido da campanha"
+                                for t in linha.pop("tarefas"))
+    return sorted(linhas.values(), key=lambda l: l["removida"])
 
 
 def mensagens_para_teste(db, campanhas_ids: list[int]) -> dict[int, dict[str, int]]:
