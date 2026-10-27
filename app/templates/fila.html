@@ -112,16 +112,42 @@
   {% if historico %}
   <div class="linha-fila cab-fila"><div>Quando</div><div>Canal</div><div>Empresa</div><div>Situação</div><div>Detalhe</div></div>
   {% for m in historico %}{% set l = leads_por_id.get(m.lead_id) %}{% set st = STATUS_ENVIO.get(m.status, (m.status, '')) %}
-  <div class="linha-fila"><div class="quando">{{ m.criado_em|datahora }}</div><div>{{ CANAIS.get(m.canal, m.canal) }}</div>
+  {% set t = tarefas_por_id.get(m.tarefa_id) %}{% set pode = t and m.campanha_id and not m.respondida %}
+  {% set canais_t = canais_do_toque(t) if pode else [m.canal] %}
+  <div class="linha-fila"><div class="quando">{{ m.criado_em|datahora }}</div>
+    <div class="canais-toque">{% for c in canais_t %}
+      {% if pode %}{% set at = texto_do_canal(t, c) %}
+      <button type="button" class="selo selo-botao {{ 'selo-azul' if c == m.canal else '' }}" onclick="document.getElementById('hist-{{ m.id }}-{{ c }}').showModal()"
+              title="Ver, editar e reenviar a mensagem de {{ CANAIS.get(c) }}">{{ '✉️ E-mail' if c == 'email' else '💬 WhatsApp' }}</button>
+      <dialog class="popup-msg" id="hist-{{ m.id }}-{{ c }}">
+        <form method="post" action="/fila/enviar/{{ t.id }}">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="canal" value="{{ c }}">
+          <input type="hidden" name="voltar_para" value="/fila{{ '?' ~ request.url.query if request.url.query }}">
+          <h3>{{ '✉️ E-mail' if c == 'email' else '💬 WhatsApp' }} · {{ l.empresa if l else '' }}</h3>
+          <p class="pequeno suave">{{ config.ANGULOS.get(t.angulo, t.acao) }} · {{ 'saiu por este canal em ' ~ (m.criado_em|datahora) if c == m.canal else 'versão reserva (ainda não enviada por este canal)' }}</p>
+          {% if c == 'email' %}<label>Assunto</label><input type="text" name="assunto" value="{{ at[0] }}" maxlength="200">{% endif %}
+          <label>Mensagem</label>
+          <textarea name="texto" rows="12" required>{{ at[1] }}</textarea>
+          <p class="ajuda">Pode ajustar o texto antes de reenviar. Continua valendo a regra das 20 horas por canal.</p>
+          <div class="grupo-btn" style="margin-top:10px;justify-content:flex-end">
+            <button type="button" class="btn" onclick="this.closest('dialog').close()">Fechar</button>
+            <button class="btn {{ 'btn-verde' if c == 'whatsapp' else 'btn-primario' }}">Reenviar por {{ CANAIS.get(c) }}</button>
+          </div>
+        </form>
+      </dialog>
+      {% else %}<span class="selo">{{ '✉️ E-mail' if c == 'email' else '💬 WhatsApp' }}</span>{% endif %}{% endfor %}
+      {% if pode and canais_t|length > 1 %}<div class="pequeno suave">saiu por: {{ CANAIS.get(m.canal) }}</div>{% endif %}</div>
     <div>{% if l %}<a href="/leads/{{ l.id }}">{{ l.empresa }}</a>{% else %}—{% endif %}
       {% if m.campanha_id %}<div class="pequeno suave">{{ nomes_camp.get(m.campanha_id, '') }}</div>{% endif %}</div>
     <div><span class="selo {{ st[1] }}">{{ st[0] }}</span>{% if m.respondida %} <span class="selo selo-alerta">respondeu</span>{% endif %}</div>
     <div class="motivo">{% if m.status == 'falhou' and m.erro %}<b style="color:var(--erro)">{{ m.erro }}</b>{% else %}{{ m.assunto or (m.corpo or '')[:90] }}{% endif %}
-      {% if m.tarefa_id and m.campanha_id and not m.respondida %}
-      <form method="post" action="/fila/enviar/{{ m.tarefa_id }}" style="margin-top:4px"
-            data-confirmar="Enviar esta mensagem de novo{{ ' para ' ~ l.empresa if l }} pelo {{ CANAIS.get(m.canal, m.canal) }}?">
-        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar_para" value="/fila{{ '?' ~ request.url.query if request.url.query }}">
-        <button class="btn btn-pequeno {{ 'btn-verde' if m.status == 'falhou' else '' }}">{{ 'Tentar de novo' if m.status == 'falhou' else 'Enviar de novo' }}</button></form>{% endif %}</div></div>
+      {% if pode %}
+      <div class="grupo-btn" style="margin-top:4px">{% for c in canais_t %}
+      <form class="inline" method="post" action="/fila/enviar/{{ t.id }}"
+            data-confirmar="Enviar de novo{{ ' para ' ~ l.empresa if l }} por {{ CANAIS.get(c) }}?">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="canal" value="{{ c }}">
+        <input type="hidden" name="voltar_para" value="/fila{{ '?' ~ request.url.query if request.url.query }}">
+        <button class="btn btn-pequeno {{ 'btn-verde' if c == 'whatsapp' else 'btn-primario' }}">{{ ('Tentar de novo' if m.status == 'falhou' and c == m.canal else 'Reenviar') }} por {{ CANAIS.get(c) }}</button></form>{% endfor %}</div>{% endif %}</div></div>
   {% endfor %}
   {% else %}<p class="suave">Nenhum envio nos últimos 7 dias.</p>{% endif %}
 </div>

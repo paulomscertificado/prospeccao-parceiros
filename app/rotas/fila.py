@@ -107,6 +107,8 @@ def minha_fila(request: Request, de: str = "", canal: str = "", usuario: Usuario
         "email_hoje": mensagens.enviadas_hoje(db, "email"), "email_limite": mensagens.limite_diario(db, "email"),
         "whats_hoje": mensagens.enviadas_hoje(db, "whatsapp"), "whats_limite": mensagens.limite_diario(db, "whatsapp"),
     }
+    ids_t = {m.tarefa_id for m in historico if m.tarefa_id}
+    tarefas_por_id = {t.id: t for t in db.execute(select(Tarefa).where(Tarefa.id.in_(ids_t))).scalars()} if ids_t else {}
     ids = {m.lead_id for m in envios if m.lead_id}
     leads_por_id = {l.id: l for l in db.execute(select(Lead).where(Lead.id.in_(ids))).scalars()} if ids else {}
     nomes_camp = {c.id: c.nome for c in db.execute(select(Campanha)).scalars()}
@@ -118,7 +120,7 @@ def minha_fila(request: Request, de: str = "", canal: str = "", usuario: Usuario
         "no_horario": no_horario, "pessoas": pessoas, "filtro_de": "todos" if alvo_id is None else str(alvo_id),
         "filtro_canal": canal, "horario": (ler_config(db, "horario_envio_inicio"), ler_config(db, "horario_envio_fim")),
         "CANAIS": config.CANAIS, "canais_do_toque": campanhas.canais_do_toque,
-        "texto_do_canal": campanhas.texto_do_canal,
+        "texto_do_canal": campanhas.texto_do_canal, "tarefas_por_id": tarefas_por_id,
     })
 
 
@@ -137,7 +139,11 @@ async def enviar_agora(request: Request, tid: int, usuario: Usuario = Depends(eq
         avisar(request, "Este toque não pode mais ser enviado (campanha parada ou toque cancelado).", "erro")
         return voltar(str(form.get("voltar_para") or "/fila"))
     canal = str(form.get("canal") or "")
-    erro = campanhas.enviar_toque_agora(db, t, usuario, canal if canal in ("email", "whatsapp") else "")
+    canal = canal if canal in ("email", "whatsapp") else ""
+    texto = str(form.get("texto") or "").strip()
+    if texto and canal:  # popup do Histórico: o texto editado vale para este reenvio
+        campanhas.editar_texto_do_canal(t, canal, texto[:5000], str(form.get("assunto") or ""))
+    erro = campanhas.enviar_toque_agora(db, t, usuario, canal)
     if erro:
         avisar(request, f"Não saiu: {erro}", "alerta")
     else:

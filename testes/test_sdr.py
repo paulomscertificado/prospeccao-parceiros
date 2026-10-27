@@ -775,7 +775,8 @@ def test_minha_fila_mostra_hora_e_envia_agora(cliente, monkeypatch):
     assert enviados == ["agora@envioagora.com.br"]
     with sessao() as db:
         assert db.get(Tarefa, tid).status == "feita"
-    assert "Enviar de novo" in cliente.get("/fila").text
+    pagina = cliente.get("/fila").text
+    assert "Reenviar por E-mail" in pagina and f"hist-" in pagina
 
 
 def test_minha_fila_filtro_whatsapp_mostra_toque_de_email_com_versao_whatsapp(cliente):
