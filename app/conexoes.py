@@ -124,6 +124,22 @@ def para_enviar(db, quem: Usuario | None) -> str:
                     "(ou peça ao administrador para compartilhar um número).")
 
 
+def da_campanha(db, campanha: Campanha | None) -> str:
+    """Número fixado pelo administrador na campanha ("" = automático, pelo responsável). Desconectado: avisa."""
+    if campanha is None or not campanha.conexao_id:
+        return ""
+    c = db.get(ConexaoWhatsApp, campanha.conexao_id)
+    if c is None:
+        return ""
+    base = whatsapp_leads.status()
+    if not base.get("disponivel"):
+        raise SemNumero(base.get("erro") or "O computador com o WhatsApp Leads está desligado.")
+    if not situacao(c.id, base).get("conectado"):
+        raise SemNumero(f"O número escolhido para esta campanha ({c.nome}) está desconectado. Conecte em WhatsApp "
+                        "ou troque o número na página da campanha.")
+    return c.id
+
+
 def para_o_menu(db, usuario: Usuario) -> dict:
     """Bolinha do item WhatsApp do menu: o número da própria pessoa (ou o primeiro que ela pode usar)."""
     base = whatsapp_leads.status()

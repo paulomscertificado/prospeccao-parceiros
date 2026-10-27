@@ -96,6 +96,11 @@ preço nem comissão e não fecha parceria.
 **E-mail:** as campanhas saem do e-mail @mscertificados.com.br configurado em **Configurações > E-mail**
 (e-mail + senha de app do Google + "Enviar e-mail de teste").
 
+**Número que dispara (só administrador):** no passo 4 da campanha (ou depois, na página da campanha), o
+administrador escolhe **"WhatsApp que vai disparar"**. Em "Automático", cada mensagem sai pelo número do responsável
+pelo lead. Escolhendo um número, todas as mensagens de WhatsApp da campanha saem por ele (se ele estiver
+desconectado, as mensagens esperam e o sistema avisa).
+
 **WhatsApp:** deixe o **WhatsApp Leads** aberto e conectado. Na Agenda e na ficha do lead aparece o botão
 **Enviar pelo WhatsApp conectado** (sai pelo seu número, com as pausas e o limite do WhatsApp Leads), e as
 respostas dos parceiros chegam sozinhas na IA SDR. O rodapé do menu mostra se o WhatsApp está conectado.

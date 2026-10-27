@@ -78,6 +78,14 @@
       <div><label>Início *</label><input type="date" name="inicio" required value="{{ hoje.isoformat() }}" min="{{ hoje.isoformat() }}"></div>
       <div class="largo"><label>Pergunta final (CTA)</label><select name="cta"><option value="">A IA escolhe a mais natural para cada empresa</option>{% for c in config.CTAS %}<option>{{ c }}</option>{% endfor %}</select>
         <input type="text" name="cta_livre" placeholder="ou escreva a sua" style="margin-top:6px"></div>
+      {% if numeros_admin %}{% set atual = '' %}
+      <div class="largo"><label for="conexao_id">WhatsApp que vai disparar <span class="selo">só admin</span></label>
+        <select name="conexao_id" id="conexao_id">
+          <option value="">Automático (número do responsável por cada lead)</option>
+          {% for n in numeros_admin %}<option value="{{ n.id }}" {{ 'selected' if atual == n.id }}>{{ n.nome }} — {{ 'conectado' if n.conectado else 'desconectado' }}</option>{% endfor %}
+        </select>
+        <p class="ajuda">Escolha um número para todas as mensagens de WhatsApp desta campanha saírem por ele.</p></div>
+      {% endif %}
       <div class="largo"><label>Objetivo *</label><input type="text" name="objetivo" required value="Encontrar parceiros"></div>
     </div>
     <label class="marcar" style="margin-top:12px"><input type="checkbox" id="revisei" required>

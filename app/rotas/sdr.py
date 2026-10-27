@@ -219,6 +219,7 @@ def nova_campanha(request: Request, pedido: str = "", usuario: Usuario = Depends
         contagem = base_receita.contar(db, uf, cidade)
     return tela(request, "campanha_nova.html", {
         "pedido": pedido, "entendido": entendido, "contagem": contagem,
+        "numeros_admin": _numeros_para_admin(db, usuario),
         "ultima_cidade": ultima.cidade if ultima else "", "ultima_uf": ultima.estado if ultima else "",
         "categorias": db.execute(select(Categoria).where(Categoria.ativa.is_(True)).order_by(Categoria.prioridade)).scalars().all(),
         "cadencias": db.execute(select(Cadencia).where(Cadencia.ativa.is_(True))).scalars().all(),
@@ -252,6 +253,7 @@ async def criar_campanha(request: Request, usuario: Usuario = Depends(equipe), d
         quantidade=max(1, min(util.para_int(form.get("quantidade")) or util.para_int(form.get("quantidade_outra")) or 20, 500)), canais=",".join(canais),
         objetivo=str(form.get("objetivo") or "Encontrar parceiros")[:200], tom=str(form.get("tom") or "consultivo"),
         cta=cta[:200], cadencia_id=util.para_int(form.get("cadencia_id")), usuario_id=usuario.id,
+        conexao_id=_numero_escolhido(db, usuario, form),
         inicio=util.para_data(form.get("inicio")) or date.today(), status="gerando", personalizar_ia=ia.disponivel(),
     )
     db.add(camp)
@@ -260,6 +262,28 @@ async def criar_campanha(request: Request, usuario: Usuario = Depends(equipe), d
     db.commit()
     campanhas.gerar_em_segundo_plano(camp.id)
     return voltar(f"/campanhas/{camp.id}")
+
+
+def _numeros_para_admin(db: Session, usuario: Usuario) -> list[dict]:
+    """Números de WhatsApp que o administrador pode escolher para disparar a campanha (com a situação de cada um)."""
+    from .. import conexoes
+    from ..integracoes import whatsapp_leads
+
+    if usuario.perfil != "admin":
+        return []
+    base = whatsapp_leads.status()
+    return [{"id": c.id, "nome": c.nome, "conectado": bool(conexoes.situacao(c.id, base).get("conectado"))}
+            for c in conexoes.todas(db)]
+
+
+def _numero_escolhido(db: Session, usuario: Usuario, form) -> str:
+    """Só o administrador escolhe o número; vazio = automático (número do responsável pelo lead)."""
+    from .. import conexoes
+
+    escolhido = str(form.get("conexao_id") or "")
+    if usuario.perfil != "admin" or not escolhido or db.get(conexoes.ConexaoWhatsApp, escolhido) is None:
+        return ""
+    return escolhido
 
 
 def _nome_automatico(db: Session, cats: list[str], cidade: str) -> str:
@@ -278,7 +302,8 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(equipe),
     numero, sem_numero = "", ""
     if whatsapp_hoje:
         try:
-            numero_id = conexoes.para_enviar(db, conexoes.responsavel(db, None, usuario))
+            numero_id = (conexoes.da_campanha(db, camp)
+                         or conexoes.para_enviar(db, conexoes.responsavel(db, None, usuario)))
             numero = (db.get(conexoes.ConexaoWhatsApp, numero_id).nome if db.get(conexoes.ConexaoWhatsApp, numero_id)
                       else numero_id)
         except conexoes.SemNumero as erro:
@@ -299,6 +324,7 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(equipe),
         "so_fixo": so_fixo,
         "andamento": campanhas.andamento(db, camp) if camp.status not in ("gerando", "erro") else [],
         "whatsapp_hoje": whatsapp_hoje, "numero_whatsapp": numero, "sem_numero": sem_numero,
+        "numeros_admin": _numeros_para_admin(db, usuario),
         "pode_gerenciar": ve_tudo(usuario) or camp.usuario_id == usuario.id,
         "dono": db.get(Usuario, camp.usuario_id) if camp.usuario_id else None,
         "c": camp, "resumo": campanhas.resumo_aprovacao(db, camp), "nomes_categorias": nomes,
@@ -421,6 +447,12 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
                                 f"{'e-mail' if canal == 'email' else 'WhatsApp'} para testar. Escolha o outro canal.", "alerta")
         db.commit()
         return voltar(f"/campanhas/{cid}#testar")
+    elif acao == "numero":
+        if usuario.perfil != "admin":
+            avisar(request, "Só o administrador escolhe o número da campanha.", "erro")
+        else:
+            camp.conexao_id = _numero_escolhido(db, usuario, form)
+            avisar(request, "Número da campanha atualizado.")
     elif acao == "remover-lead":
         lead_id = util.para_int(form.get("lead_id"))
         for t in db.execute(select(Tarefa).where(Tarefa.campanha_id == cid, Tarefa.lead_id == lead_id,

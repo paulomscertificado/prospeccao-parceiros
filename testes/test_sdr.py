@@ -628,3 +628,30 @@ def test_segmento_novo_de_internet_reclassifica_a_base(cliente):
         assert "6319400" not in tec.cnaes
         assert db.get(EmpresaReceita, "77000001000100").categoria == "internet"
     assert len(modelos_segmento.modelos_do_segmento("internet")) == 15
+
+
+def test_admin_escolhe_o_numero_da_campanha(cliente, monkeypatch):
+    from app import conexoes
+    from app.integracoes import whatsapp_leads
+
+    with sessao() as db:
+        principal = conexoes.garantir_principal(db)
+        camp = Campanha(nome="Numero fixo", categorias="contabil", cidade="Recife", estado="PE", status="ativa",
+                        usuario_id=_admin(db).id)
+        db.add(camp)
+        db.commit()
+        cid, numero = camp.id, principal.id
+        assert conexoes.da_campanha(db, camp) == ""  # automático
+    r = cliente.get(f"/campanhas/{cid}")
+    assert "WhatsApp que dispara esta campanha" in r.text
+    csrf = r.text.split('name="csrf" content="')[1].split('"')[0]
+    cliente.post(f"/campanhas/{cid}/numero", data={"csrf": csrf, "conexao_id": numero})
+    with sessao() as db:
+        camp = db.get(Campanha, cid)
+        assert camp.conexao_id == numero
+        monkeypatch.setattr(whatsapp_leads, "status", lambda: {"disponivel": True,
+                                                               "conexoes": {numero: {"conectado": True}}})
+        assert conexoes.da_campanha(db, camp) == numero
+        monkeypatch.setattr(whatsapp_leads, "status", lambda: {"disponivel": True, "conexoes": {}})
+        with pytest.raises(conexoes.SemNumero):
+            conexoes.da_campanha(db, camp)  # desconectado: avisa em vez de sair por outro número

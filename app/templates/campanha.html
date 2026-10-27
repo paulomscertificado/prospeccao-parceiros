@@ -16,6 +16,18 @@
 </div>
 {% if dono %}<p class="pequeno suave" style="margin-top:-8px">Campanha de <b>{{ dono.nome }}</b>{% if c.arquivada %} · <span class="selo">arquivada</span>{% endif %}</p>{% endif %}
 
+{% if numeros_admin %}{% set atual = c.conexao_id %}
+<form class="cartao" method="post" action="/campanhas/{{ c.id }}/numero" style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div style="flex:1;min-width:260px"><label for="conexao_id">WhatsApp que dispara esta campanha <span class="selo">só admin</span></label>
+    <select name="conexao_id" id="conexao_id">
+          <option value="">Automático (número do responsável por cada lead)</option>
+          {% for n in numeros_admin %}<option value="{{ n.id }}" {{ 'selected' if atual == n.id }}>{{ n.nome }} — {{ 'conectado' if n.conectado else 'desconectado' }}</option>{% endfor %}
+        </select></div>
+  <button class="btn btn-primario">Salvar número</button>
+</form>
+{% endif %}
+
 {% if rodando %}
 <div class="aviso aviso-info"><b>Montando a campanha...</b> {{ c.etapa }} Esta página se atualiza sozinha.</div>
 {% elif c.status == 'erro' %}

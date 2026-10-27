@@ -20,7 +20,7 @@ from sqlalchemy import select
 from . import config, ia, mensagens, util
 from .banco import agora, ler_config
 from .leads_servico import cancelar_tarefas_de_prospeccao, historico, mudar_status, registrar_opt_out
-from .modelos import Conhecimento, Lead, Mensagem, Notificacao, Oportunidade, Tarefa, Usuario
+from .modelos import Campanha, Conhecimento, Lead, Mensagem, Notificacao, Oportunidade, Tarefa, Usuario
 
 log = logging.getLogger(__name__)
 
@@ -515,7 +515,9 @@ def enviar_whatsapp_conectado(db, texto: str, usuario: Usuario | None, lead: Lea
         raise EnvioRecusado(bloqueio)
     if not conexao:
         try:
-            conexao = conexoes.para_enviar(db, conexoes.responsavel(db, lead, usuario, tarefa))
+            conexao = (conexoes.da_campanha(db, db.get(Campanha, tarefa.campanha_id) if tarefa and tarefa.campanha_id
+                                            else None)
+                       or conexoes.para_enviar(db, conexoes.responsavel(db, lead, usuario, tarefa)))
         except conexoes.SemNumero as erro:
             raise EnvioRecusado(str(erro)) from None
     try:

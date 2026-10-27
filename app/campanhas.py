@@ -508,7 +508,7 @@ def enviar_teste(db, camp: Campanha, usuario: Usuario, canal: str, destino: str,
     numero = ""
     if canal == "whatsapp" and escolhidas:
         try:
-            numero = conexoes.para_enviar(db, usuario)
+            numero = conexoes.da_campanha(db, camp) or conexoes.para_enviar(db, usuario)
         except conexoes.SemNumero as erro:
             feito["erros"].append(f"WhatsApp: {erro}")
             return feito

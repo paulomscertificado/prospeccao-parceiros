@@ -77,7 +77,8 @@ sessão em `dados/sessoes/<id>.db`; o principal continua em `dados/sessao_whatsa
 diário próprios; só o principal dispara as automações/Atendente IA de lá (SAIR vale em todos). O status chega em
 `status.conexoes`; pedidos e envios levam `conexao`. A IA SDR envia pelo número do responsável pelo lead
 (`conexoes.responsavel` → `para_enviar`: o próprio ou um compartilhado com ele); sem número, a fila espera e
-avisa a pessoa (1 vez por dia). Dono e administrador compartilham (`/whatsapp/compartilhar`: toda a equipe ou
+avisa a pessoa (1 vez por dia). Se o administrador fixou um número na campanha (`Campanha.conexao_id`, passo 4 ou página da
+campanha), ele vale para todos os WhatsApps dela (`conexoes.da_campanha`; desconectado = espera e avisa, não troca de número). Dono e administrador compartilham (`/whatsapp/compartilhar`: toda a equipe ou
 pessoas escolhidas). Conversas filtram por número acessível.
 
 **Tela Conversas** (`rotas/conversas.py`, menu "Conversas"): a troca manda `desde_conversas` e o retorno traz
