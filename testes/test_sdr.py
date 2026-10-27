@@ -692,3 +692,27 @@ def test_tirar_da_campanha_exige_e_guarda_o_motivo(cliente):
         t = db.execute(select(Tarefa).where(Tarefa.campanha_id == cid)).scalar_one()
         assert t.status == "cancelada" and t.resultado.endswith("Já fiz campanha")
         assert campanhas.andamento(db, db.get(Campanha, cid))[0]["motivo"] == "Já fiz campanha"
+
+
+def test_disparar_campanha_por_email_e_contar_whatsapp(monkeypatch):
+    enviados = []
+    monkeypatch.setattr(mensagens, "dentro_do_horario", lambda db: True)
+    monkeypatch.setattr(email_smtp, "enviar", lambda para, assunto, texto, **k: enviados.append(para) or "id-1")
+    with sessao() as db:
+        lead = _novo_lead(db, "Disparo Clique Ltda", email="contato@disparoclique.com.br", whatsapp="81999990001")
+        camp = Campanha(nome="Disparo", categorias="contabil", cidade="Recife", estado="PE", status="ativa",
+                        aprovado_em=agora())
+        db.add(camp)
+        db.flush()
+        db.add(Tarefa(lead_id=lead.id, campanha_id=camp.id, canal="whatsapp", status="pendente", data=date.today(),
+                      tipo="prospeccao", acao="whatsapp", mensagem="Oi pelo WhatsApp",
+                      mensagem_email="Oi por e-mail", assunto_email="Parceria"))
+        db.commit()
+        assert {k: len(v) for k, v in campanhas.para_disparar(db, camp).items()} == {"whatsapp": 1, "email": 1}
+        r = campanhas.disparar(db, camp, _admin(db), "email")
+        db.commit()
+        assert r["enviados"] == 1 and enviados == ["contato@disparoclique.com.br"]
+        t = db.execute(select(Tarefa).where(Tarefa.campanha_id == camp.id)).scalar_one()
+        assert t.status == "feita" and t.canal == "email" and t.mensagem == "Oi por e-mail"
+        assert t.mensagem_whatsapp == "Oi pelo WhatsApp"  # o modelo do outro canal fica guardado
+        assert campanhas.para_disparar(db, camp)["email"] == []  # não manda de novo

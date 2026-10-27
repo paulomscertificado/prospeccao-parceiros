@@ -96,6 +96,10 @@ preço nem comissão e não fecha parceria.
 **E-mail:** as campanhas saem do e-mail @mscertificados.com.br configurado em **Configurações > E-mail**
 (e-mail + senha de app do Google + "Enviar e-mail de teste").
 
+**Disparar campanha (qualquer pessoa da equipe):** na página da campanha ativa, **🚀 Disparar campanha** tem os
+botões **Disparar campanha WhatsApp** e **Disparar campanha e-mail**. Eles mandam na hora o toque de hoje de cada
+empresa pelo canal escolhido, um por vez, com horário, limites, controle de frequência e opt-out.
+
 **Número que dispara (só administrador):** no passo 4 da campanha (ou depois, na página da campanha), o
 administrador escolhe **"WhatsApp que vai disparar"**. Em "Automático", cada mensagem sai pelo número do responsável
 pelo lead. Escolhendo um número, todas as mensagens de WhatsApp da campanha saem por ele (se ele estiver

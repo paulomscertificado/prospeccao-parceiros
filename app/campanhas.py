@@ -586,20 +586,99 @@ def processar_fila(db, maximo: int = 25) -> dict:
             if "limite" in bloqueio.lower() and "domínio" not in bloqueio:
                 break  # limite do canal/campanha: o resto espera a próxima rodada
             continue
-        try:
-            id_externo = email_smtp.enviar(lead.email, t.assunto or "MS Certificação Digital", t.mensagem,
-                                           lead_id=lead.id)
-        except email_smtp.ErroEmail as erro:
-            mensagens.registrar(db, lead.id, "email", t.mensagem, None, modo="api", status="falhou", assunto=t.assunto,
-                                tarefa_id=t.id, erro=str(erro), campanha_id=t.campanha_id, angulo=t.angulo,
-                                categoria_id=lead.categoria_id)
+        if not _enviar_email_da_tarefa(db, t, None, "Enviado automaticamente pela fila"):
             feito["erros"] += 1
             break  # problema no servidor de e-mail: não insiste agora
-        mensagens.registrar(db, lead.id, "email", t.mensagem, None, modo="api", status="enviada", assunto=t.assunto,
-                            tarefa_id=t.id, id_externo=id_externo, campanha_id=t.campanha_id, angulo=t.angulo,
+        feito["enviados"] += 1
+    return feito
+
+
+def _enviar_email_da_tarefa(db, t: Tarefa, usuario: Usuario | None, resultado: str) -> bool:
+    """Envia o e-mail do toque e registra (enviada ou falhou). False = o servidor de e-mail recusou."""
+    from .integracoes import email_smtp
+
+    lead = t.lead
+    try:
+        id_externo = email_smtp.enviar(lead.email, t.assunto or "MS Certificação Digital", t.mensagem,
+                                       lead_id=lead.id)
+    except email_smtp.ErroEmail as erro:
+        mensagens.registrar(db, lead.id, "email", t.mensagem, usuario, modo="api", status="falhou", assunto=t.assunto,
+                            tarefa_id=t.id, erro=str(erro), campanha_id=t.campanha_id, angulo=t.angulo,
                             categoria_id=lead.categoria_id)
-        t.status, t.concluida_em, t.resultado = "feita", agora(), "Enviado automaticamente pela fila"
-        registrar_contato(db, lead, "email", f"E-mail enviado pela IA SDR ({config.ANGULOS.get(t.angulo, t.acao)}).", None)
+        return False
+    mensagens.registrar(db, lead.id, "email", t.mensagem, usuario, modo="api", status="enviada", assunto=t.assunto,
+                        tarefa_id=t.id, id_externo=id_externo, campanha_id=t.campanha_id, angulo=t.angulo,
+                        categoria_id=lead.categoria_id)
+    t.status, t.concluida_em, t.resultado = "feita", agora(), resultado
+    registrar_contato(db, lead, "email", f"E-mail enviado pela IA SDR ({config.ANGULOS.get(t.angulo, t.acao)}).",
+                      usuario)
+    return True
+
+
+def para_disparar(db, camp: Campanha) -> dict[str, list[Tarefa]]:
+    """Toques de hoje (ou atrasados) da campanha ativa que podem sair por clique, por canal: 1 por empresa. Usa o
+    modelo guardado do outro canal quando o toque está marcado no outro canal."""
+    feito: dict[str, list[Tarefa]] = {"whatsapp": [], "email": []}
+    if camp.status != "ativa":
+        return feito
+    tarefas = db.execute(select(Tarefa).where(Tarefa.campanha_id == camp.id, Tarefa.status == "pendente",
+                                              Tarefa.data <= date.today())
+                         .order_by(Tarefa.data, Tarefa.hora, Tarefa.id)).scalars().all()
+    vistos: dict[str, set] = {"whatsapp": set(), "email": set()}
+    for t in tarefas:
+        lead = t.lead
+        if not lead or not sdr.automacao_ativa(lead):
+            continue
+        for canal in ("whatsapp", "email"):
+            contato = (lead.whatsapp or celular_do_lead(lead)) if canal == "whatsapp" else lead.email
+            if contato and _texto_do_canal(t, canal)[1] and t.lead_id not in vistos[canal]:
+                vistos[canal].add(t.lead_id)
+                feito[canal].append(t)
+    return feito
+
+
+def disparar(db, camp: Campanha, usuario: Usuario, canal: str) -> dict:
+    """Clique em "Disparar campanha" (WhatsApp ou e-mail): manda AGORA, pelo canal escolhido, o toque de hoje de
+    cada empresa. Continua 1 a 1, com horário, limites, controle de frequência e opt-out; o WhatsApp entra na fila
+    do WhatsApp Leads (pausas e limite diário de lá). O que não sair agora continua programado."""
+    feito = {"enviados": 0, "bloqueados": 0, "erros": [], "parou": ""}
+    if canal not in ("whatsapp", "email"):
+        return feito
+    if not mensagens.dentro_do_horario(db):
+        feito["parou"] = "fora do horário de envio (Configurações). Tente de novo no horário comercial"
+        return feito
+    for t in para_disparar(db, camp)[canal]:
+        lead = t.lead
+        assunto, texto = _texto_do_canal(t, canal)
+        if t.canal != canal:  # troca o canal do toque, guardando o texto do canal antigo no modelo reserva
+            if t.canal == "email" and not t.mensagem_email:
+                t.mensagem_email, t.assunto_email = t.mensagem, t.assunto
+            if t.canal == "whatsapp" and not t.mensagem_whatsapp:
+                t.mensagem_whatsapp = t.mensagem
+            t.canal, t.mensagem, t.assunto = canal, texto, assunto
+        bloqueio = mensagens.bloqueio_de_envio(db, lead, canal, t.campanha_id)
+        if bloqueio:
+            feito["bloqueados"] += 1
+            if "limite" in bloqueio.lower() and "domínio" not in bloqueio:
+                feito["parou"] = bloqueio
+                break
+            continue
+        if canal == "email":
+            if not _enviar_email_da_tarefa(db, t, usuario, f"Disparado por {usuario.nome}"):
+                feito["erros"].append("O servidor de e-mail recusou o envio. Confira Configurações > E-mail")
+                break
+        else:
+            try:
+                sdr.enviar_whatsapp_conectado(db, t.mensagem, usuario, lead=lead, tarefa=t)
+            except sdr.EnvioRecusado as erro:
+                texto_erro = str(erro)
+                if any(p in texto_erro.lower() for p in ("limite", "desligado", "não conectou", "desconectado",
+                                                           "whatsapp leads")):
+                    feito["parou"] = texto_erro
+                    break
+                feito["bloqueados"] += 1
+                continue
+            t.resultado = f"Disparado por {usuario.nome}"
         feito["enviados"] += 1
     return feito
 

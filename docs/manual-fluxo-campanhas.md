@@ -101,6 +101,28 @@ Pela regra do WhatsApp, **uma pessoa precisa clicar para enviar**.
 
 ---
 
+## 4.1 Botões "Disparar campanha" (envio na hora, pelo canal que você escolher)
+
+Na página da campanha ativa, o quadro **🚀 Disparar campanha** tem dois botões:
+
+- **💬 Disparar campanha WhatsApp (N):** coloca agora, na fila do WhatsApp, o toque de hoje de cada empresa que tem
+  WhatsApp.
+- **✉️ Disparar campanha e-mail (N):** envia agora, por e-mail, o toque de hoje de cada empresa que tem e-mail.
+
+O número entre parênteses mostra quantas empresas têm toque hoje (ou atrasado) naquele canal. Se o toque estava
+marcado no outro canal, o sistema usa o modelo guardado do canal escolhido.
+
+Continua valendo:
+- 1 mensagem por vez;
+- horário de envio;
+- limites diários;
+- controle de 20 horas;
+- opt-out.
+
+O que não sair agora continua programado. Os próximos toques (Dia 3, 7 e 12) seguem nas datas deles.
+
+---
+
 ## 5. Controle de frequência
 
 - O sistema **não deixa mandar duas mensagens do mesmo canal para o mesmo lead em menos de 20 horas**.

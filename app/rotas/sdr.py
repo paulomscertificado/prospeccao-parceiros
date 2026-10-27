@@ -324,6 +324,7 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(equipe),
         "so_fixo": so_fixo,
         "andamento": campanhas.andamento(db, camp) if camp.status not in ("gerando", "erro") else [],
         "whatsapp_hoje": whatsapp_hoje, "numero_whatsapp": numero, "sem_numero": sem_numero,
+        "disparar": {k: len(v) for k, v in campanhas.para_disparar(db, camp).items()},
         "numeros_admin": _numeros_para_admin(db, usuario),
         "pode_gerenciar": ve_tudo(usuario) or camp.usuario_id == usuario.id,
         "dono": db.get(Usuario, camp.usuario_id) if camp.usuario_id else None,
@@ -444,6 +445,24 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
                                 f"{'e-mail' if canal == 'email' else 'WhatsApp'} para testar. Escolha o outro canal.", "alerta")
         db.commit()
         return voltar(f"/campanhas/{cid}#testar")
+    elif acao in ("disparar-whatsapp", "disparar-email"):
+        canal = acao.split("-")[1]
+        nome = "WhatsApp" if canal == "whatsapp" else "e-mail"
+        if camp.status != "ativa":
+            avisar(request, "Só dá para disparar uma campanha aprovada e ativa.", "erro")
+            return voltar(f"/campanhas/{cid}")
+        r = campanhas.disparar(db, camp, usuario, canal)
+        partes = [f"{r['enviados']} mensagem(ns) de {nome} "
+                  + ("na fila do WhatsApp (sai uma por vez, com pausas)" if canal == "whatsapp" else "enviada(s)")]
+        if r["bloqueados"]:
+            partes.append(f"{r['bloqueados']} não saíram agora (controle de frequência ou opt-out)")
+        if r["parou"]:
+            partes.append("Parou: " + r["parou"])
+        partes += r["erros"]
+        registrar_log(db, usuario, f"disparou_campanha_{canal}", "campanha", cid, f"{r['enviados']} enviadas", request)
+        avisar(request, ". ".join(partes) + ".", "ok" if r["enviados"] and not (r["parou"] or r["erros"]) else "alerta")
+        db.commit()
+        return voltar(f"/campanhas/{cid}#disparar")
     elif acao == "numero":
         if usuario.perfil != "admin":
             avisar(request, "Só o administrador escolhe o número da campanha.", "erro")

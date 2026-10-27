@@ -86,6 +86,25 @@
 </script>
 {% endif %}
 
+{% if c.status == 'ativa' %}
+<div class="cartao" id="disparar">
+  <h2>🚀 Disparar campanha</h2>
+  <p class="pequeno suave">Envia agora, pelo canal escolhido, o toque de hoje de cada empresa. Sai uma por vez, respeitando
+    horário, limites, controle de frequência e opt-out. Os próximos toques continuam programados.</p>
+  <div class="grupo-btn">
+    <form class="inline" method="post" action="/campanhas/{{ c.id }}/disparar-whatsapp"
+          data-confirmar="Disparar {{ disparar.whatsapp }} mensagem(ns) desta campanha pelo WhatsApp agora?">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn btn-verde" {{ 'disabled' if not disparar.whatsapp }}>💬 Disparar campanha WhatsApp ({{ disparar.whatsapp }})</button></form>
+    <form class="inline" method="post" action="/campanhas/{{ c.id }}/disparar-email"
+          data-confirmar="Disparar {{ disparar.email }} e-mail(s) desta campanha agora?">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn btn-primario" {{ 'disabled' if not disparar.email }}>✉️ Disparar campanha e-mail ({{ disparar.email }})</button></form>
+  </div>
+  {% if not disparar.whatsapp and not disparar.email %}<p class="ajuda">Nada para hoje: os próximos toques aparecem aqui no dia deles.</p>{% endif %}
+</div>
+{% endif %}
+
 {% if whatsapp_hoje %}
 <div class="cartao" id="whatsapp-hoje">
   <h2>WhatsApp de hoje <span class="selo selo-ok">{{ whatsapp_hoje|length }} para enviar</span></h2>
