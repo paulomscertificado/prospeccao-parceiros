@@ -106,7 +106,7 @@
     <details class="cartao" open>
       <summary><h2 style="display:inline">Como funcionam os disparos</h2></summary>
       <ul class="regras pequeno" style="padding-left:18px;margin-top:10px">
-        <li><b>Só depois da aprovação.</b> A campanha monta as mensagens e espera um administrador ou gestor aprovar.</li>
+        <li><b>Só depois da aprovação.</b> A campanha monta as mensagens e espera alguém da equipe aprovar.</li>
         <li><b>4 toques por empresa</b>, cada um com um assunto diferente: dia 1 (apresentação), dia 3, dia 7 e dia 12. Se a empresa responder, os próximos toques são cancelados e o lead vai para Oportunidades. Sem resposta {{ regras.dias_sem_resposta }} dias depois do último, vira "Sem resposta".</li>
         <li><b>E-mail sai sozinho</b>{% if regras.enviar_email_automatico != '1' %} (desligado agora em Configurações){% endif %}: a cada minuto o sistema olha a fila e manda o que estiver na hora, em <b>dias úteis das {{ regras.horario_envio_inicio }} às {{ regras.horario_envio_fim }}</b>.</li>
         <li><b>Limites de e-mail:</b> até <b>{{ regras.limite_hora_email }} por hora</b> e <b>{{ regras.limite_diario_email }} por dia</b>; no máximo {{ regras.limite_diario_dominio }} por dia para a mesma empresa (domínio) e {{ regras.limite_diario_campanha }} por dia por campanha.</li>

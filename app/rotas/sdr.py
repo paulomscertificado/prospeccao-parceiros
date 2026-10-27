@@ -328,7 +328,7 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(equipe),
         "pode_gerenciar": ve_tudo(usuario) or camp.usuario_id == usuario.id,
         "dono": db.get(Usuario, camp.usuario_id) if camp.usuario_id else None,
         "c": camp, "resumo": campanhas.resumo_aprovacao(db, camp), "nomes_categorias": nomes,
-        "rodando": camp.status == "gerando", "pode_aprovar": ve_tudo(usuario),
+        "rodando": camp.status == "gerando", "pode_aprovar": True,
         "aprovador": db.get(Usuario, camp.aprovado_por_id) if camp.aprovado_por_id else None,
     })
 
@@ -357,9 +357,6 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
         db.commit()
         avisar(request, "Campanha arquivada (veja em Arquivadas)." if camp.arquivada else "Campanha de volta à lista.")
         return voltar("/campanhas" if camp.arquivada else f"/campanhas/{cid}")
-    if acao in ("aprovar", "cancelar") and not ve_tudo(usuario):
-        avisar(request, "Só administrador ou gestor aprovam ou cancelam campanhas.", "erro")
-        return voltar(f"/campanhas/{cid}")
     if acao == "aprovar" and camp.status == "aguardando_aprovacao":
         n = campanhas.aprovar(db, camp, usuario)
         registrar_log(db, usuario, "aprovou_campanha", "campanha", cid, f"{n} tarefas", request)

@@ -153,7 +153,7 @@ pessoas. Só o dono do número e o administrador compartilham, pausam ou desliga
 | Campanhas repetindo as mesmas empresas | Não acontece mais: cada campanha pula as empresas que já estão em outra campanha ativa (ou já contatadas) e busca mais fundo na base. Cancelar uma campanha libera as empresas dela |
 | Campanha com "erro" ao montar | Leia o motivo na campanha. Região sem empresas: confira cidade/bairro e estado (bairro funciona, ex.: "Boa Viagem" / PE). Uma empresa com site quebrado não para mais a campanha: ela segue com os dados da Receita |
 | A campanha não manda e-mails sozinha | Configure o SMTP no `.env` e confira em Configurações se "fila envia e-mails sozinha" = 1; o envio só acontece em dias úteis, no horário configurado |
-| "APROVAÇÃO NECESSÁRIA" não some | Só administrador ou gestor aprovam campanhas |
+| "APROVAÇÃO NECESSÁRIA" não some | Clique em APROVAR CAMPANHA (qualquer pessoa da equipe pode aprovar) |
 | Nenhum horário para reunião | Confira o expediente da pessoa em Configurações > Usuários |
 | "Os servidores do OpenStreetMap estão ocupados" | Tente de novo em alguns minutos ou use a base da Receita |
 | "O limite diário... foi atingido" | Continue amanhã ou aumente o limite em Configurações |
