@@ -655,3 +655,17 @@ def test_admin_escolhe_o_numero_da_campanha(cliente, monkeypatch):
         monkeypatch.setattr(whatsapp_leads, "status", lambda: {"disponivel": True, "conexoes": {}})
         with pytest.raises(conexoes.SemNumero):
             conexoes.da_campanha(db, camp)  # desconectado: avisa em vez de sair por outro número
+
+
+def test_teste_de_whatsapp_usa_o_modelo_guardado_em_toque_de_email():
+    with sessao() as db:
+        lead = _novo_lead(db, "Modelo Duplo Ltda")
+        camp = Campanha(nome="So email", categorias="contabil", cidade="Recife", estado="PE",
+                        status="aguardando_aprovacao")
+        db.add(camp)
+        db.flush()
+        db.add(Tarefa(lead_id=lead.id, campanha_id=camp.id, canal="email", status="rascunho", data=date.today(),
+                      acao="email", mensagem="Texto do e-mail", assunto="Assunto",
+                      mensagem_whatsapp="Texto do WhatsApp"))
+        db.commit()
+        assert campanhas.mensagens_para_teste(db, [camp.id])[camp.id] == {"email": 1, "whatsapp": 1}

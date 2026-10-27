@@ -473,13 +473,24 @@ def mensagens_para_teste(db, campanhas_ids: list[int]) -> dict[int, dict[str, in
     contagem: dict[int, dict[str, int]] = {i: {"email": 0, "whatsapp": 0} for i in campanhas_ids}
     if not campanhas_ids:
         return contagem
-    linhas = db.execute(select(Tarefa.campanha_id, Tarefa.canal, func.count(Tarefa.id))
-                        .where(Tarefa.campanha_id.in_(campanhas_ids), Tarefa.canal.in_(["email", "whatsapp"]),
-                               Tarefa.status.in_(["rascunho", "pendente"]))
-                        .group_by(Tarefa.campanha_id, Tarefa.canal)).all()
-    for cid, canal, n in linhas:
-        contagem[cid][canal] = n
+    tarefas = db.execute(select(Tarefa).where(Tarefa.campanha_id.in_(campanhas_ids),
+                                              Tarefa.status.in_(["rascunho", "pendente"]))).scalars()
+    for t in tarefas:
+        for canal in ("email", "whatsapp"):
+            if _texto_do_canal(t, canal)[1]:
+                contagem[t.campanha_id][canal] += 1
     return contagem
+
+
+def _texto_do_canal(t: Tarefa, canal: str) -> tuple[str, str]:
+    """(assunto, texto) do toque no canal pedido: a mensagem principal ou o modelo guardado do outro canal."""
+    if t.canal == canal and (t.mensagem or "").strip():
+        return t.assunto or "", t.mensagem
+    if canal == "whatsapp":
+        return "", (t.mensagem_whatsapp or "").strip()
+    if canal == "email":
+        return t.assunto_email or t.assunto or "", (t.mensagem_email or "").strip()
+    return "", ""
 
 
 def enviar_teste(db, camp: Campanha, usuario: Usuario, canal: str, destino: str,
@@ -490,12 +501,12 @@ def enviar_teste(db, camp: Campanha, usuario: Usuario, canal: str, destino: str,
     from . import conexoes
     from .integracoes import email_smtp, whatsapp_leads
 
-    tarefas = db.execute(select(Tarefa).where(Tarefa.campanha_id == camp.id, Tarefa.canal == canal,
+    tarefas = db.execute(select(Tarefa).where(Tarefa.campanha_id == camp.id,
                                               Tarefa.status.in_(["rascunho", "pendente"]))
                          .order_by(Tarefa.lead_id, Tarefa.data, Tarefa.id)).scalars().all()
     escolhidas, leads = [], []
     for t in tarefas:
-        if not (t.mensagem or "").strip():
+        if not _texto_do_canal(t, canal)[1]:
             continue
         if t.lead_id not in leads:
             if len(leads) >= max(1, min(empresas, 5)):
@@ -515,12 +526,13 @@ def enviar_teste(db, camp: Campanha, usuario: Usuario, canal: str, destino: str,
     for t in escolhidas:
         empresa = t.lead.empresa if t.lead else "empresa"
         rotulo = f"[TESTE · {empresa} · {config.ANGULOS.get(t.angulo, t.acao)}]"
+        assunto, texto = _texto_do_canal(t, canal)
         try:
             if canal == "email":
-                email_smtp.enviar(destino, f"[TESTE] {t.assunto or 'MS Certificação Digital'}",
-                                  f"{rotulo}\n\n{t.mensagem}", lead_id=None)
+                email_smtp.enviar(destino, f"[TESTE] {assunto or 'MS Certificação Digital'}",
+                                  f"{rotulo}\n\n{texto}", lead_id=None)
             else:
-                whatsapp_leads.enviar(destino, "Teste", f"{rotulo}\n\n{t.mensagem}", db=db, manual=True,
+                whatsapp_leads.enviar(destino, "Teste", f"{rotulo}\n\n{texto}", db=db, manual=True,
                                       usuario_id=usuario.id, conexao=numero)
             feito["enviadas"] += 1
         except (email_smtp.ErroEmail, whatsapp_leads.ErroWhatsAppLeads) as erro:
