@@ -228,7 +228,15 @@
           {% endif %}
         </div>
         {% if t.status in ('rascunho', 'pendente') %}<button class="btn btn-pequeno" style="margin-top:4px">Salvar textos</button>
-          {% if tem_outro %}<button class="btn btn-pequeno" formaction="/campanhas/{{ c.id }}/trocar-canal">Enviar este toque por {{ 'WhatsApp' if t.canal == 'email' else 'e-mail' }}</button>{% endif %}{% endif %}
+          {% if tem_outro %}<button class="btn btn-pequeno" formaction="/campanhas/{{ c.id }}/trocar-canal"
+            title="Só muda o canal deste toque; nada é enviado agora">Mudar este toque para {{ 'WhatsApp' if t.canal == 'email' else 'e-mail' }}</button>{% endif %}
+          {% if t.status == 'pendente' and c.status == 'ativa' %}
+          <input type="hidden" name="voltar_para" value="/campanhas/{{ c.id }}">
+          <button class="btn btn-pequeno btn-primario" formaction="/fila/enviar/{{ t.id }}" name="canal" value="email"
+                  data-confirmar="Enviar agora este toque por e-mail? (salve os textos antes, se mudou algo)">✉️ Enviar agora por e-mail</button>
+          {% if tem_outro or t.canal == 'whatsapp' %}<button class="btn btn-pequeno btn-verde" formaction="/fila/enviar/{{ t.id }}" name="canal" value="whatsapp"
+                  data-confirmar="Enviar agora este toque pelo WhatsApp? (salve os textos antes, se mudou algo)">💬 Enviar agora por WhatsApp</button>{% endif %}
+          {% elif t.status == 'rascunho' %}<span class="pequeno suave">Para enviar, aprove a campanha: depois aparecem os botões "Enviar agora por e-mail / WhatsApp".</span>{% endif %}{% endif %}
       </form></details>
   {% else %}<p class="vazio">Nenhuma mensagem.</p>{% endfor %}
 </div>

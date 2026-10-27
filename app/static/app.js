@@ -67,7 +67,7 @@
 
   // Confirmação antes de ações importantes.
   document.addEventListener('submit', (ev) => {
-    const msg = ev.target.dataset.confirmar;
+    const msg = (ev.submitter && ev.submitter.dataset.confirmar) || ev.target.dataset.confirmar;
     if (msg && !confirm(msg)) ev.preventDefault();
   });
 
