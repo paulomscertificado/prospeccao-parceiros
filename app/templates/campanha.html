@@ -228,8 +228,11 @@
           {% endif %}
         </div>
         {% if t.status in ('rascunho', 'pendente') %}<button class="btn btn-pequeno" style="margin-top:4px">Salvar textos</button>
-          {% if tem_outro %}<button class="btn btn-pequeno" formaction="/campanhas/{{ c.id }}/trocar-canal"
-            title="Só muda o canal deste toque; nada é enviado agora">Mudar este toque para {{ 'WhatsApp' if t.canal == 'email' else 'e-mail' }}</button>{% endif %}
+          {% if tem_outro %}<span class="pequeno" style="margin-left:8px">Este toque sai por:</span>
+          {% for cn, rot in [('email', '✉️ E-mail'), ('whatsapp', '💬 WhatsApp')] %}
+          {% if cn == t.canal %}<span class="btn btn-pequeno btn-primario" aria-current="true" style="cursor:default">{{ rot }} ✓</span>
+          {% else %}<button class="btn btn-pequeno" formaction="/campanhas/{{ c.id }}/trocar-canal"
+            title="Passa este toque para {{ rot }} (nada é enviado agora)">{{ rot }}</button>{% endif %}{% endfor %}{% endif %}
           {% if t.status == 'pendente' and c.status == 'ativa' %}
           <input type="hidden" name="voltar_para" value="/campanhas/{{ c.id }}">
           <button class="btn btn-pequeno btn-primario" formaction="/fila/enviar/{{ t.id }}" name="canal" value="email"
