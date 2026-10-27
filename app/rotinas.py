@@ -36,6 +36,8 @@ def responder_automaticamente(db, lead: Lead, canal: str, analise: dict, conexao
     if db.execute(select(Mensagem.id).where(Mensagem.lead_id == lead.id, Mensagem.angulo == "resposta",
                                             Mensagem.criado_em >= agora() - timedelta(hours=24)).limit(1)).first():
         return False  # a SDR responde 1 vez por dia, no máximo: nunca entra em conversa sem fim (ex.: com robô)
+    if canal == "whatsapp" and mensagens.enviadas_hoje(db, "whatsapp") >= mensagens.limite_diario(db, "whatsapp"):
+        return False  # resposta automática também respeita o limite diário de WhatsApp
     try:
         if canal == "email" and lead.email and email_smtp.configurado():
             id_externo = email_smtp.enviar(lead.email, "Re: parceria MS Certificação Digital", texto, com_rodape=False)

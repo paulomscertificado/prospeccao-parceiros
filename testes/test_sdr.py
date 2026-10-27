@@ -890,3 +890,17 @@ def test_assumir_pela_tela_de_oportunidades_tira_o_cartao(cliente):
     r = cliente.post(f"/leads/{lid}/assumir", data={"csrf": csrf, "voltar_para": "/oportunidades"}, follow_redirects=False)
     assert r.headers["location"].endswith("/oportunidades")
     assert "· Assume Some Ltda" not in cliente.get("/oportunidades").text  # cartão saiu (só o aviso cita)
+
+
+def test_agente_de_ia_com_assinatura_e_reconhecido_e_resposta_respeita_limite(monkeypatch):
+    from app import rotinas
+
+    assert sdr.e_resposta_automatica("\u200e*Sofia:*\n\nOi, tudo bem? Aqui é a Sofia, da Exatos.")
+    assert not sdr.e_resposta_automatica("Oi Jefferson, tenho interesse sim, me liga amanhã")
+    with sessao() as db:
+        lead = _novo_lead(db, "Limite Resposta Ltda", whatsapp="81999990005")
+        db.flush()
+        monkeypatch.setattr(mensagens, "enviadas_hoje", lambda db, canal: 40)
+        monkeypatch.setattr(mensagens, "limite_diario", lambda db, canal: 40)
+        assert rotinas.responder_automaticamente(db, lead, "whatsapp", {"resposta_sugerida": "Obrigado!"}) is False
+        db.rollback()

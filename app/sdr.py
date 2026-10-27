@@ -303,19 +303,29 @@ FRASES_AUTOMATICAS = [
 ]
 
 
+# Assinatura de agente de IA/atendimento no começo da mensagem: "*Sofia:*", "Sofia (assistente):"
+ASSINATURA_DE_AGENTE = re.compile(r"^[\s\u200e\u200f\u200b]*\*[^*\n]{2,40}:\*")
+
+
 def e_resposta_automatica(texto: str) -> bool:
-    """Parece mensagem de robô/chatbot/ausência (e não de uma pessoa)?"""
+    """Parece mensagem de robô/chatbot/agente de IA/ausência (e não de uma pessoa)?"""
+    if ASSINATURA_DE_AGENTE.match(texto or ""):
+        return True
     t = util.chave_texto(texto)
     return any(util.chave_texto(f) in t for f in FRASES_AUTOMATICAS)
 
 
+
 def _rajada_de_mensagens(db, lead: Lead) -> bool:
-    """3 ou mais mensagens do lead em 2 minutos: menu de robô (pessoas não respondem assim)."""
+    """3+ mensagens do lead em 2 minutos (menu de robô) ou 4+ em 10 minutos (agente de IA conversando sem parar)."""
     from datetime import timedelta
 
-    return (db.execute(select(func.count(Mensagem.id)).where(
-        Mensagem.lead_id == lead.id, Mensagem.status == "recebida",
-        Mensagem.criado_em >= agora() - timedelta(minutes=2))).scalar() or 0) >= 3
+    def contar(minutos: int) -> int:
+        return db.execute(select(func.count(Mensagem.id)).where(
+            Mensagem.lead_id == lead.id, Mensagem.status == "recebida",
+            Mensagem.criado_em >= agora() - timedelta(minutes=minutos))).scalar() or 0
+
+    return contar(2) >= 3 or contar(10) >= 4
 
 
 def classificar_resposta(db, lead: Lead, texto: str) -> dict:

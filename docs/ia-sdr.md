@@ -147,3 +147,4 @@ Prospecção por CNAE: `Busca.cnaes` + `base_receita.buscar(cnaes=...)` filtra p
 viram a classe `config.CLASSE_AUTOMATICA`: `processar_resposta` só registra (`_resposta_de_robo`), sem resposta da SDR,
 sem oportunidade e sem cancelar a sequência. A IA também pode devolver essa classe. `rotinas.responder_automaticamente`
 responde no máximo 1 vez a cada 24 h por lead. `criar_oportunidade` junta novas respostas na oportunidade "nova" do lead.
+Agente de IA do lead: assinatura "*Nome:*" no começo (`ASSINATURA_DE_AGENTE`) ou 4+ mensagens em 10 min também contam como robô. A resposta automática da SDR respeita o limite diário de WhatsApp.
