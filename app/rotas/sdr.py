@@ -455,9 +455,16 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
             avisar(request, "Número da campanha atualizado.")
     elif acao == "remover-lead":
         lead_id = util.para_int(form.get("lead_id"))
+        motivo = str(form.get("motivo", ""))
+        if motivo not in config.MOTIVOS_RETIRADA:
+            avisar(request, "Escolha o motivo para tirar a empresa da campanha.", "erro")
+            return voltar(f"/campanhas/{cid}")
+        from ..leads_servico import historico as registrar_historico
+
+        registrar_historico(db, lead_id, "campanha", f"Tirada da campanha \"{camp.nome}\". Motivo: {motivo}", usuario)
         for t in db.execute(select(Tarefa).where(Tarefa.campanha_id == cid, Tarefa.lead_id == lead_id,
                                                  Tarefa.status.in_(["rascunho", "pendente"]))).scalars():
-            t.status, t.concluida_em, t.resultado = "cancelada", agora(), "Removido da campanha"
+            t.status, t.concluida_em, t.resultado = "cancelada", agora(), f"Removido da campanha: {motivo}"
             if t.lead and t.lead.status == "Abordagem criada":
                 t.lead.status = "Pesquisando" if t.lead.pesquisado_em else "Novo"
         avisar(request, "Empresa removida da campanha.")

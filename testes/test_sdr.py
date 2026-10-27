@@ -669,3 +669,26 @@ def test_teste_de_whatsapp_usa_o_modelo_guardado_em_toque_de_email():
                       mensagem_whatsapp="Texto do WhatsApp"))
         db.commit()
         assert campanhas.mensagens_para_teste(db, [camp.id])[camp.id] == {"email": 1, "whatsapp": 1}
+
+
+def test_tirar_da_campanha_exige_e_guarda_o_motivo(cliente):
+    with sessao() as db:
+        lead = _novo_lead(db, "Retirada Motivo Ltda")
+        camp = Campanha(nome="Com retirada", categorias="contabil", cidade="Recife", estado="PE",
+                        status="aguardando_aprovacao")
+        db.add(camp)
+        db.flush()
+        db.add(Tarefa(lead_id=lead.id, campanha_id=camp.id, canal="email", status="rascunho", data=date.today(),
+                      acao="email", mensagem="Oi"))
+        db.commit()
+        cid, lid = camp.id, lead.id
+    r = cliente.get(f"/campanhas/{cid}")
+    csrf = r.text.split('name="csrf" content="')[1].split('"')[0]
+    cliente.post(f"/campanhas/{cid}/remover-lead", data={"csrf": csrf, "lead_id": lid})  # sem motivo: não tira
+    with sessao() as db:
+        assert db.execute(select(Tarefa).where(Tarefa.campanha_id == cid)).scalar_one().status == "rascunho"
+    cliente.post(f"/campanhas/{cid}/remover-lead", data={"csrf": csrf, "lead_id": lid, "motivo": "Já fiz campanha"})
+    with sessao() as db:
+        t = db.execute(select(Tarefa).where(Tarefa.campanha_id == cid)).scalar_one()
+        assert t.status == "cancelada" and t.resultado.endswith("Já fiz campanha")
+        assert campanhas.andamento(db, db.get(Campanha, cid))[0]["motivo"] == "Já fiz campanha"

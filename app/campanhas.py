@@ -467,8 +467,10 @@ def andamento(db, camp: Campanha) -> list[dict]:
                                 "quando": m.criado_em if m else None, "erro": m.erro if m else ""})
         linha.setdefault("tarefas", []).append(t)
     for linha in linhas.values():  # tirada da campanha: nada mais sai para ela
-        linha["removida"] = all(t.status == "cancelada" and (t.resultado or "") == "Removido da campanha"
-                                for t in linha.pop("tarefas"))
+        tarefas = linha.pop("tarefas")
+        linha["removida"] = all(t.status == "cancelada" and (t.resultado or "").startswith("Removido da campanha")
+                                for t in tarefas)
+        linha["motivo"] = (tarefas[0].resultado or "").partition(": ")[2] if linha["removida"] else ""
     return sorted(linhas.values(), key=lambda l: l["removida"])
 
 

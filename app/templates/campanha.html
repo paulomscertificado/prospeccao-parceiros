@@ -172,7 +172,7 @@
     <tr><th>Empresa</th><th>Toques</th><th>Resposta</th></tr>
     {% for l in andamento %}
     <tr {% if l.removida %}style="opacity:.55"{% endif %}><td><a href="/leads/{{ l.lead.id }}">{% if l.removida %}<s>{{ l.lead.empresa }}</s>{% else %}{{ l.lead.empresa }}{% endif %}</a>
-      <div class="pequeno suave">{% if l.removida %}<span class="selo selo-erro">tirada da campanha · não recebe nada</span>{% else %}{{ l.lead.status }}{% endif %}</div></td>
+      <div class="pequeno suave">{% if l.removida %}<span class="selo selo-erro">tirada da campanha · não recebe nada</span>{% if l.motivo %} <span class="pequeno">Motivo: {{ l.motivo }}</span>{% endif %}{% else %}{{ l.lead.status }}{% endif %}</div></td>
       <td>{% for t in l.toques %}{% set cls = {'enviado': 'selo-ok', 'na_fila': 'selo-azul', 'programado': 'selo-azul', 'falhou': 'selo-erro'}.get(t.situacao, '') %}
         <span class="selo {{ cls }}" title="{{ config.ANGULOS.get(t.angulo, '') }} · {{ t.situacao }} · {{ (t.quando.strftime('%d/%m %H:%M') if t.quando else t.data|data) }}{{ ' · ' ~ t.erro if t.erro }}">{{ '✉' if t.canal == 'email' else ('💬' if t.canal == 'whatsapp' else '•') }} {{ t.data.strftime('%d/%m') }}</span>
       {% endfor %}</td>
@@ -188,7 +188,10 @@
   {% for t in resumo.tarefas %}
     {% if t.lead_id != ns.lead %}{% set ns.lead = t.lead_id %}
       <hr><h3><a href="/leads/{{ t.lead.id }}">{{ t.lead.empresa }}</a> <span class="pequeno suave">{{ t.lead.categoria.nome if t.lead.categoria else '' }} · score {{ t.lead.score }} · {{ t.lead.fit }}</span>
-        {% if t.status in ('rascunho', 'pendente') %}<form class="inline" method="post" action="/campanhas/{{ c.id }}/remover-lead"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="lead_id" value="{{ t.lead_id }}"><button class="btn btn-pequeno btn-perigo">Tirar da campanha</button></form>{% endif %}</h3>
+        {% if t.status in ('rascunho', 'pendente') %}<form class="inline" method="post" action="/campanhas/{{ c.id }}/remover-lead"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="lead_id" value="{{ t.lead_id }}">
+          <select name="motivo" required aria-label="Motivo da retirada" style="width:auto;display:inline-block;padding:2px 6px;font-size:.8rem">
+            <option value="">Motivo da retirada…</option>{% for m in config.MOTIVOS_RETIRADA %}<option>{{ m }}</option>{% endfor %}</select>
+          <button class="btn btn-pequeno btn-perigo">Tirar da campanha</button></form>{% endif %}</h3>
       {% if t.lead.motivo_potencial %}<p class="pequeno suave">Motivo: {{ t.lead.motivo_potencial }}</p>{% endif %}
     {% endif %}
     <details {{ 'open' if loop.first }}><summary>{{ t.data|data }} · {{ CANAIS.get(t.canal, t.canal) }} · {{ config.ANGULOS.get(t.angulo, t.acao) }} <span class="selo">{{ t.status }}</span></summary>

@@ -255,6 +255,9 @@ CONFIG_PADRAO = {
 }
 
 # Categorias de parceiros (o administrador cria outras na tela Categorias).
+# Motivos para tirar uma empresa de uma campanha (obrigatório escolher um; fica guardado no toque e no histórico do lead)
+MOTIVOS_RETIRADA = ["Já fiz campanha", "Já entramos em contato", "Não condiz com os objetivos da MS"]
+
 # CNAEs que dá para escolher na Prospecção (filtro direto na base da Receita), em grupos de atividades parecidas
 CNAES_BUSCA = {
     "Internet, dados e software": [
