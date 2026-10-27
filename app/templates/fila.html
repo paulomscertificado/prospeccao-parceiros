@@ -64,12 +64,16 @@
   {% if pendentes %}
   <div class="linha-fila cab-fila"><div>Data</div><div>Canal</div><div>Empresa</div><div>Campanha</div><div>Situação</div></div>
   {% for p in pendentes %}{% set t = p.t %}
-  <div class="linha-fila"><div class="quando {{ 'atrasado' if p.atrasado }}">{{ t.data.strftime('%d/%m/%Y') }}{% if p.atrasado %}<br>atrasado{% endif %}</div>
+  <div class="linha-fila"><div class="quando {{ 'atrasado' if p.atrasado }}">{{ t.data.strftime('%d/%m/%Y') }}<br><b>{{ t.hora or '09:00' }}</b>{% if p.atrasado %}<br>atrasado{% endif %}</div>
     <div>{{ CANAIS.get(t.canal, t.canal) }}</div>
     <div>{% if t.lead %}<a href="/leads/{{ t.lead.id }}">{{ t.lead.empresa }}</a>{% else %}—{% endif %}
       <div class="pequeno suave">{{ config.ANGULOS.get(t.angulo, t.acao) }}</div></div>
     <div><a href="/campanhas/{{ t.campanha_id }}">{{ nomes_camp.get(t.campanha_id, '') }}</a></div>
-    <div class="motivo">{{ p.motivo }}</div></div>
+    <div class="motivo">{{ p.motivo }}
+      <form method="post" action="/fila/enviar/{{ t.id }}" style="margin-top:4px"
+            data-confirmar="Enviar agora esta mensagem para {{ t.lead.empresa if t.lead else 'a empresa' }} pelo {{ CANAIS.get(t.canal, t.canal) }}?">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar_para" value="/fila{{ '?' ~ request.url.query if request.url.query }}">
+        <button class="btn btn-pequeno btn-verde">Enviar agora</button></form></div></div>
   {% endfor %}
   {% else %}<p class="suave">Nenhum envio pendente nas campanhas ativas.</p>{% endif %}
 </div>
@@ -83,7 +87,12 @@
     <div>{% if l %}<a href="/leads/{{ l.id }}">{{ l.empresa }}</a>{% else %}—{% endif %}
       {% if m.campanha_id %}<div class="pequeno suave">{{ nomes_camp.get(m.campanha_id, '') }}</div>{% endif %}</div>
     <div><span class="selo {{ st[1] }}">{{ st[0] }}</span>{% if m.respondida %} <span class="selo selo-alerta">respondeu</span>{% endif %}</div>
-    <div class="motivo">{% if m.status == 'falhou' and m.erro %}<b style="color:var(--erro)">{{ m.erro }}</b>{% else %}{{ m.assunto or (m.corpo or '')[:90] }}{% endif %}</div></div>
+    <div class="motivo">{% if m.status == 'falhou' and m.erro %}<b style="color:var(--erro)">{{ m.erro }}</b>{% else %}{{ m.assunto or (m.corpo or '')[:90] }}{% endif %}
+      {% if m.tarefa_id and m.campanha_id and not m.respondida %}
+      <form method="post" action="/fila/enviar/{{ m.tarefa_id }}" style="margin-top:4px"
+            data-confirmar="Enviar esta mensagem de novo{{ ' para ' ~ l.empresa if l }} pelo {{ CANAIS.get(m.canal, m.canal) }}?">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar_para" value="/fila{{ '?' ~ request.url.query if request.url.query }}">
+        <button class="btn btn-pequeno {{ 'btn-verde' if m.status == 'falhou' else '' }}">{{ 'Tentar de novo' if m.status == 'falhou' else 'Enviar de novo' }}</button></form>{% endif %}</div></div>
   {% endfor %}
   {% else %}<p class="suave">Nenhum envio nos últimos 7 dias.</p>{% endif %}
 </div>

@@ -639,6 +639,36 @@ def para_disparar(db, camp: Campanha) -> dict[str, list[Tarefa]]:
     return feito
 
 
+def enviar_toque_agora(db, t: Tarefa, usuario: Usuario) -> str:
+    """Clique em "Enviar agora" / "Enviar de novo" (Minha fila): manda este toque já, pelo canal dele, com as mesmas
+    regras (horário, limites, controle de frequência, opt-out). Devolve "" se saiu ou o motivo de não ter saído."""
+    lead = t.lead
+    if t.canal not in ("email", "whatsapp"):
+        return "Este toque não é de e-mail nem de WhatsApp."
+    if not lead or not sdr.automacao_ativa(lead):
+        return "A automação está parada para este lead (respondeu, opt-out ou está com alguém)."
+    if not _texto_do_canal(t, t.canal)[1]:
+        return "Este toque está sem mensagem."
+    if not mensagens.dentro_do_horario(db):
+        return "Fora do horário de envio (Configurações). Tente de novo no horário comercial."
+    if t.canal == "email" and not lead.email:
+        return "Este lead não tem e-mail."
+    bloqueio = mensagens.bloqueio_de_envio(db, lead, t.canal, t.campanha_id)
+    if bloqueio:
+        return bloqueio
+    t.status = "pendente"
+    if t.canal == "email":
+        if not _enviar_email_da_tarefa(db, t, usuario, f"Enviado por {usuario.nome} (Minha fila)"):
+            return "O servidor de e-mail recusou o envio. Confira Configurações > E-mail."
+        return ""
+    try:
+        sdr.enviar_whatsapp_conectado(db, t.mensagem, usuario, lead=lead, tarefa=t)
+    except sdr.EnvioRecusado as erro:
+        return str(erro)
+    t.resultado = f"Enviado por {usuario.nome} (Minha fila)"
+    return ""
+
+
 def disparar(db, camp: Campanha, usuario: Usuario, canal: str) -> dict:
     """Clique em "Disparar campanha" (WhatsApp ou e-mail): manda AGORA, pelo canal escolhido, o toque de hoje de
     cada empresa. Continua 1 a 1, com horário, limites, controle de frequência e opt-out; o WhatsApp entra na fila

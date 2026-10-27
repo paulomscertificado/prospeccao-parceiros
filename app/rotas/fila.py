@@ -4,15 +4,15 @@ gestor podem ver a fila de outra pessoa ou da equipe toda."""
 
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from .. import campanhas, config, mensagens, sdr, util
 from ..banco import agora, ler_config, obter_db
 from ..modelos import Campanha, Lead, LogAuditoria, Mensagem, Tarefa, Usuario
-from ..seguranca import equipe, ve_tudo
-from ..web import tela
+from ..seguranca import equipe, registrar_log, ve_tudo, verificar_csrf
+from ..web import avisar, tela, voltar
 from .envios import STATUS_ENVIO
 
 rotas = APIRouter()
@@ -22,7 +22,7 @@ def _motivo_pendente(db, t: Tarefa, hoje: date, no_horario: bool, liberados: dic
     """Por que o toque ainda não saiu, em linguagem simples."""
     lead = t.lead
     if t.data > hoje:
-        return f"Programado para {t.data:%d/%m}"
+        return f"Programado para {t.data:%d/%m} às {t.hora or '09:00'}"
     if not lead or not sdr.automacao_ativa(lead):
         return "Automação parada para este lead (respondeu, opt-out ou está com alguém)"
     if t.canal == "email":
@@ -30,7 +30,11 @@ def _motivo_pendente(db, t: Tarefa, hoje: date, no_horario: bool, liberados: dic
             return "Sem e-mail cadastrado"
         if ler_config(db, "enviar_email_automatico") != "1":
             return "Envio automático de e-mail desligado: use Disparar campanha e-mail"
-        return "Aguardando o horário de envio" if not no_horario else "Sai na próxima rodada da fila (a cada minuto)"
+        if not no_horario:
+            return "Aguardando o horário de envio"
+        if t.data == hoje and (t.hora or "00:00") > agora().strftime("%H:%M"):
+            return f"Programado para hoje às {t.hora}"
+        return "Sai na próxima rodada da fila (a cada minuto)"
     if not (lead.whatsapp or campanhas.celular_do_lead(lead)):
         return "Sem WhatsApp: pesquise o número na campanha"
     if lead.id not in liberados:
@@ -110,3 +114,28 @@ def minha_fila(request: Request, de: str = "", canal: str = "", usuario: Usuario
         "filtro_canal": canal, "horario": (ler_config(db, "horario_envio_inicio"), ler_config(db, "horario_envio_fim")),
         "CANAIS": config.CANAIS,
     })
+
+
+@rotas.post("/fila/enviar/{tid:int}", dependencies=[Depends(verificar_csrf)])
+async def enviar_agora(request: Request, tid: int, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+    """Botão "Enviar agora" (pendente) ou "Enviar de novo" (não saiu) da Minha fila."""
+    form = await request.form()
+    t = db.get(Tarefa, tid)
+    camp = db.get(Campanha, t.campanha_id) if t and t.campanha_id else None
+    if t is None or camp is None:
+        raise HTTPException(404)
+    lead = t.lead
+    if usuario.perfil in config.PERFIS_SO_PROPRIOS and usuario.id not in (camp.usuario_id, lead.vendedor_id if lead else None):
+        raise HTTPException(404)
+    if t.status not in ("pendente", "feita") or camp.status != "ativa":
+        avisar(request, "Este toque não pode mais ser enviado (campanha parada ou toque cancelado).", "erro")
+        return voltar(str(form.get("voltar_para") or "/fila"))
+    erro = campanhas.enviar_toque_agora(db, t, usuario)
+    if erro:
+        avisar(request, f"Não saiu: {erro}", "alerta")
+    else:
+        registrar_log(db, usuario, f"disparou_campanha_{t.canal}", "campanha", camp.id,
+                      f"1 envio manual ({lead.empresa if lead else ''})", request)
+        avisar(request, "Mensagem colocada na fila do WhatsApp." if t.canal == "whatsapp" else "E-mail enviado.")
+    db.commit()
+    return voltar(str(form.get("voltar_para") or "/fila"))

@@ -750,3 +750,29 @@ def test_horario_das_mensagens_e_quebrado_e_fora_do_almoco():
     for h in horas:
         minutos = int(h[:2]) * 60 + int(h[3:])
         assert minutos % 5 != 0 and not (720 <= minutos < 810) and 8 * 60 + 30 <= minutos <= 18 * 60, h
+
+
+def test_minha_fila_mostra_hora_e_envia_agora(cliente, monkeypatch):
+    enviados = []
+    monkeypatch.setattr(mensagens, "dentro_do_horario", lambda db, momento=None: True)
+    monkeypatch.setattr(email_smtp, "enviar", lambda para, assunto, texto, **k: enviados.append(para) or "id-2")
+    with sessao() as db:
+        admin = _admin(db)
+        lead = _novo_lead(db, "Envio Agora Ltda", email="agora@envioagora.com.br")
+        camp = Campanha(nome="Campanha agora", categorias="contabil", cidade="Recife", estado="PE", status="ativa",
+                        aprovado_em=agora(), usuario_id=admin.id)
+        db.add(camp)
+        db.flush()
+        t = Tarefa(lead_id=lead.id, campanha_id=camp.id, canal="email", status="pendente", tipo="prospeccao",
+                   data=date.today() + timedelta(days=2), hora="14:13", acao="email", mensagem="Oi", assunto="Oi")
+        db.add(t)
+        db.commit()
+        tid = t.id
+    r = cliente.get("/fila")
+    assert "14:13" in r.text and "Enviar agora" in r.text
+    csrf = r.text.split('name="csrf" content="')[1].split('"')[0]
+    cliente.post(f"/fila/enviar/{tid}", data={"csrf": csrf})
+    assert enviados == ["agora@envioagora.com.br"]
+    with sessao() as db:
+        assert db.get(Tarefa, tid).status == "feita"
+    assert "Enviar de novo" in cliente.get("/fila").text
