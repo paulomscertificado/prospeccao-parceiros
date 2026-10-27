@@ -96,6 +96,14 @@ preço nem comissão e não fecha parceria.
 **E-mail:** as campanhas saem do e-mail @mscertificados.com.br configurado em **Configurações > E-mail**
 (e-mail + senha de app do Google + "Enviar e-mail de teste").
 
+**Minha fila (menu):** mostra os seus disparos num lugar só:
+- o que está na fila do WhatsApp agora;
+- o que ainda vai sair, com o motivo (ex.: "Aguardando seu clique", "Aguardando o horário de envio", "Sem WhatsApp");
+- o histórico dos últimos 7 dias, com o erro de quem não saiu;
+- o registro dos disparos e testes.
+
+Admin e gestor podem ver a fila de outra pessoa ou da equipe toda.
+
 **Disparar campanha (qualquer pessoa da equipe):** na página da campanha ativa, **🚀 Disparar campanha** tem os
 botões **Disparar campanha WhatsApp** e **Disparar campanha e-mail**. Eles mandam na hora o toque de hoje de cada
 empresa pelo canal escolhido, um por vez, com horário, limites, controle de frequência e opt-out.

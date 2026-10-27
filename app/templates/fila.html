@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block titulo %}Minha fila{% endblock %}
+{% block conteudo %}
+<style>
+  .kpis-fila { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); margin-bottom: 16px; }
+  .filtros-fila { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  .filtros-fila select { width: auto; }
+  .linha-fila { display: grid; grid-template-columns: 92px 86px minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.6fr); gap: 10px;
+                align-items: start; padding: 9px 0; border-top: 1px solid var(--borda); font-size: .86rem; }
+  .linha-fila:first-of-type { border-top: 0; }
+  .linha-fila .quando { font-family: var(--fonte-mono); font-size: .74rem; color: #6b7686; }
+  .cab-fila { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: #6b7686; border-top: 0; padding-top: 0; }
+  .motivo { color: #4b5a6b; }
+  .atrasado { color: var(--erro); font-weight: 600; }
+  @media (max-width: 760px) { .linha-fila { grid-template-columns: 1fr 1fr; } .cab-fila { display: none; } }
+</style>
+<div class="cabecalho">
+  <div><h1>Minha fila de disparos</h1>
+    <div class="suave">O que está na fila, o que ainda vai sair (e por quê), o que saiu ou falhou e o registro dos seus disparos.</div></div>
+  <a class="btn" href="/envios">Ver todos os envios</a>
+</div>
+
+<form class="filtros-fila" method="get">
+  {% if pessoas %}
+  <select name="de" onchange="this.form.submit()" aria-label="De quem">
+    {% for p in pessoas %}<option value="{{ p.id }}" {{ 'selected' if filtro_de == p.id|string }}>{{ p.nome }}{{ ' (você)' if p.id == usuario.id }}</option>{% endfor %}
+    <option value="todos" {{ 'selected' if filtro_de == 'todos' }}>Toda a equipe</option>
+  </select>{% endif %}
+  <select name="canal" onchange="this.form.submit()" aria-label="Canal">
+    <option value="">WhatsApp e e-mail</option>
+    <option value="whatsapp" {{ 'selected' if filtro_canal == 'whatsapp' }}>Só WhatsApp</option>
+    <option value="email" {{ 'selected' if filtro_canal == 'email' }}>Só e-mail</option>
+  </select>
+  <span class="pequeno suave">Horário de envio: {{ horario[0] }} às {{ horario[1] }} ·
+    {% if no_horario %}<span class="selo selo-ok">dentro do horário</span>{% else %}<span class="selo selo-alerta">fora do horário: nada sai agora</span>{% endif %}</span>
+</form>
+
+<div class="kpis-fila">
+  <div class="kpi destaque"><div class="rotulo">Para sair hoje</div><div class="valor">{{ resumo.hoje }}</div><div class="detalhe">toques de hoje e atrasados</div></div>
+  <div class="kpi"><div class="rotulo">Atrasados</div><div class="valor" style="{{ 'color:var(--erro)' if resumo.atrasados }}">{{ resumo.atrasados }}</div><div class="detalhe">de dias anteriores</div></div>
+  <div class="kpi"><div class="rotulo">Na fila do WhatsApp</div><div class="valor">{{ resumo.na_fila }}</div><div class="detalhe">saindo um por vez</div></div>
+  <div class="kpi"><div class="rotulo">Enviadas hoje</div><div class="valor">{{ resumo.enviadas_hoje }}</div><div class="detalhe">nesta fila</div></div>
+  <div class="kpi"><div class="rotulo">Não saíram</div><div class="valor" style="{{ 'color:var(--erro)' if resumo.falharam }}">{{ resumo.falharam }}</div><div class="detalhe">últimos 7 dias</div></div>
+  <div class="kpi"><div class="rotulo">Limite do dia (MS)</div><div class="valor" style="font-size:1rem">✉️ {{ resumo.email_hoje }}/{{ resumo.email_limite }} · 💬 {{ resumo.whats_hoje }}/{{ resumo.whats_limite }}</div><div class="detalhe">e-mail · WhatsApp</div></div>
+</div>
+
+<div class="cartao">
+  <h2>💬 Na fila do WhatsApp agora <span class="selo selo-azul">{{ na_fila|length }}</span></h2>
+  {% if na_fila %}
+  <div class="linha-fila cab-fila"><div>Entrou</div><div>Canal</div><div>Empresa</div><div>Campanha</div><div>Mensagem</div></div>
+  {% for m in na_fila %}{% set l = leads_por_id.get(m.lead_id) %}
+  <div class="linha-fila"><div class="quando">{{ m.criado_em|datahora }}</div><div>WhatsApp</div>
+    <div>{% if l %}<a href="/leads/{{ l.id }}">{{ l.empresa }}</a>{% else %}—{% endif %}</div>
+    <div>{% if m.campanha_id %}<a href="/campanhas/{{ m.campanha_id }}">{{ nomes_camp.get(m.campanha_id, '') }}</a>{% else %}—{% endif %}</div>
+    <div class="motivo">{{ (m.corpo or '')[:110] }}{{ '…' if (m.corpo or '')|length > 110 }}</div></div>
+  {% endfor %}
+  <p class="ajuda">Saem pelo WhatsApp Leads, uma de cada vez, com pausas e o limite diário do número. Se o computador do WhatsApp estiver desligado, esperam.</p>
+  {% else %}<p class="suave">Nada na fila agora.</p>{% endif %}
+</div>
+
+<div class="cartao">
+  <h2>⏳ Ainda vão sair <span class="selo">{{ pendentes|length }}</span></h2>
+  <p class="pequeno suave">Toques das campanhas ativas (atrasados, de hoje e dos próximos 7 dias) e o motivo de ainda não terem saído.</p>
+  {% if pendentes %}
+  <div class="linha-fila cab-fila"><div>Data</div><div>Canal</div><div>Empresa</div><div>Campanha</div><div>Situação</div></div>
+  {% for p in pendentes %}{% set t = p.t %}
+  <div class="linha-fila"><div class="quando {{ 'atrasado' if p.atrasado }}">{{ t.data.strftime('%d/%m/%Y') }}{% if p.atrasado %}<br>atrasado{% endif %}</div>
+    <div>{{ CANAIS.get(t.canal, t.canal) }}</div>
+    <div>{% if t.lead %}<a href="/leads/{{ t.lead.id }}">{{ t.lead.empresa }}</a>{% else %}—{% endif %}
+      <div class="pequeno suave">{{ config.ANGULOS.get(t.angulo, t.acao) }}</div></div>
+    <div><a href="/campanhas/{{ t.campanha_id }}">{{ nomes_camp.get(t.campanha_id, '') }}</a></div>
+    <div class="motivo">{{ p.motivo }}</div></div>
+  {% endfor %}
+  {% else %}<p class="suave">Nenhum envio pendente nas campanhas ativas.</p>{% endif %}
+</div>
+
+<div class="cartao">
+  <h2>📋 Histórico dos envios <span class="pequeno suave">(últimos 7 dias)</span></h2>
+  {% if historico %}
+  <div class="linha-fila cab-fila"><div>Quando</div><div>Canal</div><div>Empresa</div><div>Situação</div><div>Detalhe</div></div>
+  {% for m in historico %}{% set l = leads_por_id.get(m.lead_id) %}{% set st = STATUS_ENVIO.get(m.status, (m.status, '')) %}
+  <div class="linha-fila"><div class="quando">{{ m.criado_em|datahora }}</div><div>{{ CANAIS.get(m.canal, m.canal) }}</div>
+    <div>{% if l %}<a href="/leads/{{ l.id }}">{{ l.empresa }}</a>{% else %}—{% endif %}
+      {% if m.campanha_id %}<div class="pequeno suave">{{ nomes_camp.get(m.campanha_id, '') }}</div>{% endif %}</div>
+    <div><span class="selo {{ st[1] }}">{{ st[0] }}</span>{% if m.respondida %} <span class="selo selo-alerta">respondeu</span>{% endif %}</div>
+    <div class="motivo">{% if m.status == 'falhou' and m.erro %}<b style="color:var(--erro)">{{ m.erro }}</b>{% else %}{{ m.assunto or (m.corpo or '')[:90] }}{% endif %}</div></div>
+  {% endfor %}
+  {% else %}<p class="suave">Nenhum envio nos últimos 7 dias.</p>{% endif %}
+</div>
+
+<div class="cartao">
+  <h2>🧾 Registro dos disparos <span class="pequeno suave">(últimos 30 dias)</span></h2>
+  {% if logs %}
+  {% for g in logs %}
+  <div class="linha-fila" style="grid-template-columns:130px 1fr 2fr"><div class="quando">{{ g.criado_em|datahora }}</div>
+    <div><b>{{ g.usuario_nome or '—' }}</b></div>
+    <div>{% if g.acao == 'testou_campanha' %}🧪 Testou a campanha{% elif g.acao.endswith('whatsapp') %}💬 Disparou a campanha pelo WhatsApp{% else %}✉️ Disparou a campanha por e-mail{% endif %}
+      {% if g.entidade_id %}<a href="/campanhas/{{ g.entidade_id }}">{{ nomes_camp.get(g.entidade_id, '#' ~ g.entidade_id) }}</a>{% endif %}
+      <span class="pequeno suave">{{ g.detalhes }}</span></div></div>
+  {% endfor %}
+  {% else %}<p class="suave">Nenhum disparo ou teste registrado.</p>{% endif %}
+</div>
+{% endblock %}

@@ -716,3 +716,26 @@ def test_disparar_campanha_por_email_e_contar_whatsapp(monkeypatch):
         assert t.status == "feita" and t.canal == "email" and t.mensagem == "Oi por e-mail"
         assert t.mensagem_whatsapp == "Oi pelo WhatsApp"  # o modelo do outro canal fica guardado
         assert campanhas.para_disparar(db, camp)["email"] == []  # não manda de novo
+
+
+def test_minha_fila_mostra_pendentes_fila_e_historico(cliente):
+    with sessao() as db:
+        admin = _admin(db)
+        lead = _novo_lead(db, "Fila Visivel Ltda", email="fila@visivel.com.br")
+        camp = Campanha(nome="Campanha da fila", categorias="contabil", cidade="Recife", estado="PE", status="ativa",
+                        aprovado_em=agora(), usuario_id=admin.id)
+        db.add(camp)
+        db.flush()
+        db.add(Tarefa(lead_id=lead.id, campanha_id=camp.id, canal="whatsapp", status="pendente", tipo="prospeccao",
+                      data=date.today() - timedelta(days=1), acao="whatsapp", mensagem="Oi"))
+        db.add(Mensagem(lead_id=lead.id, canal="whatsapp", corpo="Na fila agora", status="na_fila",
+                        campanha_id=camp.id, usuario_id=admin.id))
+        db.add(Mensagem(lead_id=lead.id, canal="email", corpo="x", assunto="Parceria", status="falhou",
+                        erro="Caixa cheia", campanha_id=camp.id, usuario_id=admin.id))
+        db.commit()
+    r = cliente.get("/fila")
+    assert r.status_code == 200
+    for texto in ("Minha fila de disparos", "Fila Visivel Ltda", "Na fila agora", "Caixa cheia", "atrasado",
+                  "Sem WhatsApp: pesquise o número na campanha"):
+        assert texto in r.text, texto
+    assert cliente.get("/fila?de=todos&canal=email").status_code == 200

@@ -160,6 +160,7 @@ O que não sair agora continua programado. Os próximos toques (Dia 3, 7 e 12) s
 | **Campanha → Andamento por empresa** | Uma bolinha por toque: 🟢 enviado · 🔵 na fila/programado · 🔴 não saiu (passe o mouse para ver o motivo) · ⚪ rascunho/cancelado · empresa riscada = tirada da campanha |
 | **Campanha → WhatsApp de hoje** | Os WhatsApps do dia para enviar com um clique |
 | **Agenda** | As suas tarefas do dia, inclusive os WhatsApps da campanha |
+| **Minha fila** | A sua fila: o que está saindo agora, o que ainda vai sair (e por quê), o que falhou e o registro dos seus disparos |
 | **Envios** | Todos os e-mails e WhatsApps enviados |
 | **Oportunidades** | Quem respondeu com interesse |
 

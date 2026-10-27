@@ -32,6 +32,7 @@ MENU_EQUIPE = [
     ("/", "Dashboard", "grafico"),
     ("/campanhas", "IA SDR (campanhas)", "megafone"),
     ("/envios", "Envios", "enviar"),
+    ("/fila", "Minha fila", "relogio"),
     ("/oportunidades", "Oportunidades", "fogo"),
     ("/prospeccao", "Prospecção", "lupa"),
     ("/leads", "Leads", "pessoas"),
