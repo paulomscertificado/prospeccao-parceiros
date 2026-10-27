@@ -65,7 +65,9 @@
   <div class="linha-fila cab-fila"><div>Data</div><div>Canal</div><div>Empresa</div><div>Campanha</div><div>Situação</div></div>
   {% for p in pendentes %}{% set t = p.t %}
   <div class="linha-fila"><div class="quando {{ 'atrasado' if p.atrasado }}">{{ t.data.strftime('%d/%m/%Y') }}<br><b>{{ t.hora or '09:00' }}</b>{% if p.atrasado %}<br>atrasado{% endif %}</div>
-    <div>{{ CANAIS.get(t.canal, t.canal) }}</div>
+    <div>{{ CANAIS.get(t.canal, t.canal) }}
+      {% set outro = 'whatsapp' if t.canal == 'email' else 'email' %}
+      {% if (t.mensagem_whatsapp if outro == 'whatsapp' else t.mensagem_email) %}<div class="pequeno suave">tem versão {{ CANAIS.get(outro) }}</div>{% endif %}</div>
     <div>{% if t.lead %}<a href="/leads/{{ t.lead.id }}">{{ t.lead.empresa }}</a>{% else %}—{% endif %}
       <div class="pequeno suave">{{ config.ANGULOS.get(t.angulo, t.acao) }}</div></div>
     <div><a href="/campanhas/{{ t.campanha_id }}">{{ nomes_camp.get(t.campanha_id, '') }}</a></div>

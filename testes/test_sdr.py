@@ -776,3 +776,18 @@ def test_minha_fila_mostra_hora_e_envia_agora(cliente, monkeypatch):
     with sessao() as db:
         assert db.get(Tarefa, tid).status == "feita"
     assert "Enviar de novo" in cliente.get("/fila").text
+
+
+def test_minha_fila_filtro_whatsapp_mostra_toque_de_email_com_versao_whatsapp(cliente):
+    with sessao() as db:
+        admin = _admin(db)
+        lead = _novo_lead(db, "Versao Reserva Ltda", email="r@versaoreserva.com.br")
+        camp = Campanha(nome="Reserva", categorias="contabil", cidade="Recife", estado="PE", status="ativa",
+                        aprovado_em=agora(), usuario_id=admin.id)
+        db.add(camp)
+        db.flush()
+        db.add(Tarefa(lead_id=lead.id, campanha_id=camp.id, canal="email", status="pendente", tipo="prospeccao",
+                      data=date.today() + timedelta(days=1), acao="email", mensagem="Oi", mensagem_whatsapp="Oi zap"))
+        db.commit()
+    r = cliente.get("/fila?canal=whatsapp")
+    assert "Versao Reserva Ltda" in r.text and "tem versão WhatsApp" in r.text

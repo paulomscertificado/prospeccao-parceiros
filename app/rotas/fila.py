@@ -66,7 +66,12 @@ def minha_fila(request: Request, de: str = "", canal: str = "", usuario: Usuario
 
     # 1) Pendentes: toques das campanhas ativas que ainda não saíram (atrasados, hoje e próximos 7 dias)
     pend_q = (select(Tarefa).join(Campanha, Tarefa.campanha_id == Campanha.id).outerjoin(Lead, Tarefa.lead_id == Lead.id)
-              .where(Tarefa.status == "pendente", Tarefa.canal.in_(canais), Campanha.status == "ativa",
+              .where(Tarefa.status == "pendente", Campanha.status == "ativa",
+                     # toque do canal, ou de outro canal mas com a versão reserva deste canal pronta
+                     or_(Tarefa.canal.in_(canais),
+                         *([Tarefa.mensagem_whatsapp != ""] if "whatsapp" in canais else []),
+                         *([Tarefa.mensagem_email != ""] if "email" in canais else [])),
+                     Tarefa.canal.in_(["email", "whatsapp"]),
                      Tarefa.data <= hoje + timedelta(days=7)))
     pendentes = db.execute(do_alvo_tarefa(pend_q).order_by(Tarefa.data, Tarefa.hora, Tarefa.id).limit(300)).scalars().all()
     no_horario = mensagens.dentro_do_horario(db)
