@@ -3,9 +3,29 @@
 {% block conteudo %}
 <div class="cabecalho">
   <div><h1>Novas oportunidades</h1><div class="suave">Leads que responderam: a IA parou e entregou para o time humano.</div></div>
-  <div class="acoes"><a class="btn {{ 'btn-primario' if ver == 'novas' }}" href="?ver=novas">Novas</a><a class="btn {{ 'btn-primario' if ver != 'novas' }}" href="?ver=tratadas">Assumidas/descartadas</a></div>
+  <div class="acoes"><a class="btn {{ 'btn-primario' if ver == 'novas' }}" href="?ver=novas">Novas</a><a class="btn {{ 'btn-primario' if ver == 'tratadas' }}" href="?ver=tratadas">Assumidas/descartadas</a>{% if ve_tudo %}<a class="btn {{ 'btn-primario' if ver == 'respostas' }}" href="?ver=respostas">Todas as respostas</a>{% endif %}</div>
 </div>
 <div class="passos-ia"><span>A IA encontra</span><span>pesquisa</span><span>qualifica</span><span>faz o 1º contato</span><span>identifica a resposta</span><span>→ você conversa, negocia e fecha</span></div>
+
+{% if ver == 'respostas' and ve_tudo %}
+<div class="cartao">
+  <h2>Todas as respostas dos contatos <span class="selo">{{ respostas|length }}</span></h2>
+  <p class="pequeno suave">Tudo o que os leads responderam, por e-mail ou WhatsApp, inclusive "sem interesse" e "pediu para sair"
+    (esses não viram oportunidade). Só administrador e gestor veem esta lista.</p>
+  {% for m in respostas %}{% set l = leads_resposta.get(m.lead_id) %}{% set o = ops_do_lead.get(m.lead_id) %}
+  <div style="border-top:1px solid var(--borda);padding:10px 0">
+    <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+      <div><b>{% if l %}<a href="/leads/{{ l.id }}">{{ l.empresa }}</a>{% else %}—{% endif %}</b>
+        <span class="pequeno suave">· {{ '✉️ E-mail' if m.canal == 'email' else '💬 WhatsApp' }} · {{ m.criado_em|datahora }}
+        {% if m.campanha_id %} · {{ nomes_camp.get(m.campanha_id, '') }}{% endif %}</span></div>
+      <div>{% if l and l.classificacao_resposta %}<span class="selo {{ 'selo-ok' if l.classificacao_resposta in config.CLASSES_QUENTES else ('selo-erro' if l.classificacao_resposta in ('OPT-OUT', 'SEM INTERESSE') else 'selo-alerta') }}">{{ l.classificacao_resposta }}</span>{% endif %}
+        {% if o %}<span class="selo">{{ 'oportunidade nova' if o.status == 'nova' else ('assumida' if o.status == 'assumida' else o.status) }}</span>{% endif %}</div>
+    </div>
+    <div class="corpo" style="white-space:pre-wrap;background:#f6f9fc;border-radius:8px;padding:8px 12px;margin-top:6px;font-size:.88rem">{{ (m.corpo or '')[:1500] }}</div>
+  </div>
+  {% else %}<p class="suave">Nenhuma resposta recebida ainda.</p>{% endfor %}
+</div>
+{% endif %}
 
 {% for o in oportunidades %}{% set l = o.lead %}{% set r = resumos[o.id] %}
 <div class="cartao op-card {{ o.temperatura }}" id="op-{{ o.id }}">
@@ -40,7 +60,7 @@
   </div>
   {% endif %}
 </div>
-{% else %}
-<div class="cartao vazio">Nenhuma oportunidade {{ 'nova' if ver == 'novas' else 'tratada' }}. Quando um lead responder com interesse, ele aparece aqui na hora (e você recebe um aviso).</div>
+{% else %}{% if ver != 'respostas' %}
+<div class="cartao vazio">Nenhuma oportunidade {{ 'nova' if ver == 'novas' else 'tratada' }}. Quando um lead responder com interesse, ele aparece aqui na hora (e você recebe um aviso).</div>{% endif %}
 {% endfor %}
 {% endblock %}

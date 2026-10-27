@@ -837,3 +837,15 @@ def test_minha_fila_popup_edita_a_versao_whatsapp(cliente):
     with sessao() as db:
         t = db.get(Tarefa, tid)
         assert (t.mensagem_whatsapp, t.mensagem, t.assunto, t.canal) == ("Texto zap novo", "E-mail novo", "B", "email")
+
+
+def test_admin_ve_todas_as_respostas_inclusive_sem_interesse(cliente):
+    with sessao() as db:
+        lead = _novo_lead(db, "Sem Interesse Resposta Ltda")
+        lead.classificacao_resposta = "SEM INTERESSE"
+        db.add(Mensagem(lead_id=lead.id, canal="email", corpo="Não temos interesse, obrigado.", status="recebida",
+                        direcao="entrada"))
+        db.commit()
+    r = cliente.get("/oportunidades?ver=respostas")
+    assert "Todas as respostas dos contatos" in r.text and "Não temos interesse, obrigado." in r.text
+    assert "Sem Interesse Resposta Ltda" in r.text

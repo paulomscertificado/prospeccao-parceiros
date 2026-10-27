@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from .. import agenda_horarios, campanhas, config, ia, metricas, sdr, util
 from ..banco import agora, obter_db
 from ..leads_servico import historico, pode_ver
-from ..modelos import (Cadencia, Campanha, Categoria, Conhecimento, Lead, Notificacao, Oportunidade, Tarefa,
+from ..modelos import (Cadencia, Campanha, Categoria, Conhecimento, Lead, Mensagem, Notificacao, Oportunidade, Tarefa,
                        Usuario)
 from ..seguranca import admin, equipe, ferramentas, gestao, registrar_log, ve_tudo, verificar_csrf
 from ..web import avisar, tela, voltar
@@ -47,8 +47,21 @@ def oportunidades(request: Request, ver: str = "novas", usuario: Usuario = Depen
                                                   Notificacao.link.like("/oportunidades%"))).scalars():
         n.lida = True
     db.commit()
+    respostas, ops_do_lead = [], {}
+    if ver == "respostas" and ve_tudo(usuario):
+        # Admin/gestor: TODAS as respostas que chegaram (inclusive sem interesse e opt-out, que não viram oportunidade)
+        respostas = db.execute(select(Mensagem).where(Mensagem.status == "recebida", Mensagem.lead_id.is_not(None))
+                               .order_by(Mensagem.criado_em.desc()).limit(300)).scalars().all()
+        ids = {m.lead_id for m in respostas}
+        for o in db.execute(select(Oportunidade).where(Oportunidade.lead_id.in_(ids))).scalars() if ids else []:
+            ops_do_lead.setdefault(o.lead_id, o)
+        lista = []
     return tela(request, "oportunidades.html", {
-        "oportunidades": lista, "ver": ver,
+        "oportunidades": lista, "ver": ver, "respostas": respostas, "ops_do_lead": ops_do_lead,
+        "leads_resposta": {l.id: l for l in db.execute(select(Lead).where(Lead.id.in_({m.lead_id for m in respostas})))
+                           .scalars()} if respostas else {},
+        "nomes_camp": {c.id: c.nome for c in db.execute(select(Campanha)).scalars()} if respostas else {},
+        "ve_tudo": ve_tudo(usuario),
         "resumos": {o.id: sdr.resumo_handoff(db, o.lead) for o in lista},
     })
 
