@@ -812,3 +812,27 @@ def test_enviar_toque_de_email_pelo_whatsapp_troca_o_canal(monkeypatch):
         assert campanhas.enviar_toque_agora(db, t, _admin(db), "whatsapp") == ""
         assert t.canal == "whatsapp" and t.mensagem == "Texto zap" and t.mensagem_email == "Texto e-mail"
         db.rollback()
+
+
+def test_minha_fila_popup_edita_a_versao_whatsapp(cliente):
+    with sessao() as db:
+        admin = _admin(db)
+        lead = _novo_lead(db, "Popup Edita Ltda", email="p@popupedita.com.br")
+        camp = Campanha(nome="Popup", categorias="contabil", cidade="Recife", estado="PE", status="ativa",
+                        aprovado_em=agora(), usuario_id=admin.id)
+        db.add(camp)
+        db.flush()
+        t = Tarefa(lead_id=lead.id, campanha_id=camp.id, canal="email", status="pendente", tipo="prospeccao",
+                   data=date.today() + timedelta(days=1), acao="email", mensagem="Texto e-mail", assunto="A",
+                   mensagem_whatsapp="Texto zap antigo")
+        db.add(t)
+        db.commit()
+        tid = t.id
+    r = cliente.get("/fila")
+    assert f'id="msg-{tid}-whatsapp"' in r.text and "Texto zap antigo" in r.text
+    csrf = r.text.split('name="csrf" content="')[1].split('"')[0]
+    cliente.post(f"/fila/mensagem/{tid}", data={"csrf": csrf, "canal": "whatsapp", "texto": "Texto zap novo"})
+    cliente.post(f"/fila/mensagem/{tid}", data={"csrf": csrf, "canal": "email", "texto": "E-mail novo", "assunto": "B"})
+    with sessao() as db:
+        t = db.get(Tarefa, tid)
+        assert (t.mensagem_whatsapp, t.mensagem, t.assunto, t.canal) == ("Texto zap novo", "E-mail novo", "B", "email")

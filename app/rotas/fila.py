@@ -118,6 +118,7 @@ def minha_fila(request: Request, de: str = "", canal: str = "", usuario: Usuario
         "no_horario": no_horario, "pessoas": pessoas, "filtro_de": "todos" if alvo_id is None else str(alvo_id),
         "filtro_canal": canal, "horario": (ler_config(db, "horario_envio_inicio"), ler_config(db, "horario_envio_fim")),
         "CANAIS": config.CANAIS, "canais_do_toque": campanhas.canais_do_toque,
+        "texto_do_canal": campanhas.texto_do_canal,
     })
 
 
@@ -145,3 +146,30 @@ async def enviar_agora(request: Request, tid: int, usuario: Usuario = Depends(eq
         avisar(request, "Mensagem colocada na fila do WhatsApp." if t.canal == "whatsapp" else "E-mail enviado.")
     db.commit()
     return voltar(str(form.get("voltar_para") or "/fila"))
+
+
+@rotas.post("/fila/mensagem/{tid:int}", dependencies=[Depends(verificar_csrf)])
+async def editar_mensagem(request: Request, tid: int, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+    """Popup da Minha fila: altera o texto da versão de e-mail ou de WhatsApp de um toque que ainda não saiu."""
+    form = await request.form()
+    t = db.get(Tarefa, tid)
+    camp = db.get(Campanha, t.campanha_id) if t and t.campanha_id else None
+    if t is None or camp is None:
+        raise HTTPException(404)
+    lead = t.lead
+    if usuario.perfil in config.PERFIS_SO_PROPRIOS and usuario.id not in (camp.usuario_id, lead.vendedor_id if lead else None):
+        raise HTTPException(404)
+    canal = str(form.get("canal") or "")
+    texto = str(form.get("texto") or "")
+    destino = str(form.get("voltar_para") or "/fila")
+    if canal not in ("email", "whatsapp") or t.status not in ("pendente", "rascunho"):
+        avisar(request, "Esta mensagem não pode mais ser alterada (já saiu ou foi cancelada).", "erro")
+        return voltar(destino)
+    if not texto.strip():
+        avisar(request, "A mensagem não pode ficar vazia.", "erro")
+        return voltar(destino)
+    campanhas.editar_texto_do_canal(t, canal, texto[:5000], str(form.get("assunto") or ""))
+    registrar_log(db, usuario, "editou_mensagem", "tarefa", t.id, f"{canal} ({lead.empresa if lead else ''})", request)
+    avisar(request, f"Mensagem de {'e-mail' if canal == 'email' else 'WhatsApp'} alterada.")
+    db.commit()
+    return voltar(destino)

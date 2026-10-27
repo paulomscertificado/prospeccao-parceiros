@@ -651,6 +651,23 @@ def trocar_canal(t: Tarefa, canal: str) -> None:
     t.canal, t.mensagem, t.assunto = canal, texto, assunto
 
 
+def texto_do_canal(t: Tarefa, canal: str) -> tuple[str, str]:
+    return _texto_do_canal(t, canal)
+
+
+def editar_texto_do_canal(t: Tarefa, canal: str, texto: str, assunto: str = "") -> None:
+    """Grava o texto (e o assunto, no e-mail) da versão daquele canal: a principal ou a reserva."""
+    texto = texto.strip()
+    if t.canal == canal:
+        t.mensagem = texto
+        if canal == "email":
+            t.assunto = assunto[:200]
+    elif canal == "whatsapp":
+        t.mensagem_whatsapp = texto
+    else:
+        t.mensagem_email, t.assunto_email = texto, assunto[:200]
+
+
 def canais_do_toque(t: Tarefa) -> list[str]:
     """Canais em que o toque tem mensagem pronta (o marcado primeiro)."""
     outros = [c for c in ("email", "whatsapp") if c != t.canal]
