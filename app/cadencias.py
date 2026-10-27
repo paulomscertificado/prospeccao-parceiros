@@ -1,5 +1,6 @@
 """Cadências: transformam uma sequência (Dia 1 WhatsApp, Dia 2 ligação...) em tarefas na agenda."""
 
+import random
 from datetime import date, timedelta
 
 from sqlalchemy import select
@@ -9,6 +10,31 @@ from . import config, mensagens
 from .banco import ler_config
 from .leads_servico import historico
 from .modelos import Cadencia, Lead, Tarefa, Usuario
+
+
+def _minutos(hhmm: str, padrao: int) -> int:
+    try:
+        h, m = hhmm.strip().split(":")
+        return int(h) * 60 + int(m)
+    except (ValueError, AttributeError):
+        return padrao
+
+
+def hora_natural(db: Session) -> str:
+    """Horário "quebrado" e diferente para cada mensagem de campanha (ex.: 09:47, 14:13), dentro do horário de envio
+    e fora do almoço (12:00–13:30): mensagens em horário redondo, todas juntas, parecem disparo automático."""
+    inicio = _minutos(ler_config(db, "horario_envio_inicio") or "08:30", 8 * 60 + 30)
+    fim = _minutos(ler_config(db, "horario_envio_fim") or "18:00", 18 * 60) - 20  # folga para sair antes do fim
+    if fim <= inicio:
+        fim = inicio + 60
+    for _ in range(20):
+        minuto = random.randint(inicio, fim)
+        if minuto % 5 == 0:
+            minuto += random.randint(1, 4)  # nada de 09:00, 10:15, 14:30...
+        if not (12 * 60 <= minuto < 13 * 60 + 30) and minuto <= fim + 4:
+            return f"{minuto // 60:02d}:{minuto % 60:02d}"
+    minuto = inicio + 7
+    return f"{minuto // 60:02d}:{minuto % 60:02d}"
 
 
 def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario, inicio: date | None = None,
@@ -75,7 +101,7 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
             db.add(Tarefa(
                 tipo="prospeccao", lead_id=lead.id, passo_id=passo.id, campanha_id=campanha_id,
                 usuario_id=responsavel.id if responsavel else None, canal=canal, data=data,
-                hora=passo.hora or "09:00", acao=passo.acao or f"Contato por {canal}",
+                hora=hora_natural(db) if campanha_id else (passo.hora or "09:00"), acao=passo.acao or f"Contato por {canal}",
                 assunto=assunto, mensagem=corpo, angulo=passo.angulo or "", status=status_tarefa, **modelos,
             ))
             resultado["tarefas"] += 1

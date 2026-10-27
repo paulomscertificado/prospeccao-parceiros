@@ -739,3 +739,14 @@ def test_minha_fila_mostra_pendentes_fila_e_historico(cliente):
                   "Sem WhatsApp: pesquise o número na campanha"):
         assert texto in r.text, texto
     assert cliente.get("/fila?de=todos&canal=email").status_code == 200
+
+
+def test_horario_das_mensagens_e_quebrado_e_fora_do_almoco():
+    from app import cadencias
+
+    with sessao() as db:
+        horas = {cadencias.hora_natural(db) for _ in range(300)}
+    assert len(horas) > 50  # cada mensagem num horário diferente
+    for h in horas:
+        minutos = int(h[:2]) * 60 + int(h[3:])
+        assert minutos % 5 != 0 and not (720 <= minutos < 810) and 8 * 60 + 30 <= minutos <= 18 * 60, h

@@ -49,6 +49,9 @@ Na página da campanha, antes de aprovar, você pode:
 - **🔎 Pesquisar WhatsApp** das empresas que só têm telefone fixo: procure o WhatsApp da empresa na internet e salve
   na campanha.
 
+Cada mensagem ganha um **horário quebrado e diferente** dentro do horário de envio (ex.: 09:47, 14:13, 16:22), fora do
+almoço (12:00–13:30). Assim as mensagens não saem todas juntas em hora redonda, e o contato fica mais natural.
+
 Quando estiver tudo certo, clique em **APROVAR CAMPANHA**. Qualquer pessoa da equipe pode aprovar.
 
 ---

@@ -408,6 +408,8 @@ def aprovar(db, camp: Campanha, usuario: Usuario) -> int:
         atraso = max(0, (date.today() - primeiro).days)
         for t in rascunhos:
             t.status = "pendente"
+            if (t.hora or "09:00").endswith(("0", "5")):  # campanha montada antes: horário redondo vira natural
+                t.hora = cadencias.hora_natural(db)
             t.data = util.proximo_dia_util(t.data + timedelta(days=atraso)) if atraso else t.data
     camp.status = "ativa"
     camp.aprovado_por_id = usuario.id if usuario else None
