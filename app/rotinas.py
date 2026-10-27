@@ -26,6 +26,16 @@ def responder_automaticamente(db, lead: Lead, canal: str, analise: dict, conexao
     texto = analise.get("resposta_sugerida", "")
     if ler_config(db, "sdr_resposta_automatica") != "1" or not texto or not sdr.texto_seguro(texto):
         return False
+    from datetime import timedelta
+
+    from sqlalchemy import select
+
+    from .banco import agora
+    from .modelos import Mensagem
+
+    if db.execute(select(Mensagem.id).where(Mensagem.lead_id == lead.id, Mensagem.angulo == "resposta",
+                                            Mensagem.criado_em >= agora() - timedelta(hours=24)).limit(1)).first():
+        return False  # a SDR responde 1 vez por dia, no máximo: nunca entra em conversa sem fim (ex.: com robô)
     try:
         if canal == "email" and lead.email and email_smtp.configurado():
             id_externo = email_smtp.enviar(lead.email, "Re: parceria MS Certificação Digital", texto, com_rodape=False)

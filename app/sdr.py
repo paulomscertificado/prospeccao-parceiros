@@ -15,7 +15,7 @@ import json
 import logging
 import re
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from . import config, ia, mensagens, util
 from .banco import agora, ler_config
@@ -287,8 +287,45 @@ ESQUEMA_RESPOSTA = {
 }
 
 
+# Frases típicas de chatbot, URA de WhatsApp Business e resposta de ausência (comparadas sem acento e em minúsculas)
+FRASES_AUTOMATICAS = [
+    "recebemos sua mensagem", "recebemos a sua mensagem", "aguarde um momento", "aguarde um instante",
+    "aguarde alguns instantes", "em breve retornaremos", "retornaremos em breve", "retornaremos o contato",
+    "logo retornaremos", "em breve um de nossos", "em breve um atendente", "um atendente ira", "um de nossos atendentes",
+    "mensagem automatica", "resposta automatica", "atendimento automatico", "assistente virtual", "sou a assistente",
+    "sou o assistente", "sou um robo", "chatbot", "nosso horario de atendimento", "horario de atendimento e",
+    "fora do horario de atendimento", "estamos fora do horario", "no momento nao estamos", "no momento estamos ausentes",
+    "estou ausente", "estou de ferias", "out of office", "digite 1", "digite o numero", "digite a opcao",
+    "escolha uma das opcoes", "escolha uma opcao", "selecione uma opcao", "responda com o numero",
+    "obrigado por entrar em contato", "obrigada por entrar em contato", "agradecemos o seu contato",
+    "agradecemos seu contato", "agradecemos o contato", "seja bem-vindo", "seja bem vindo", "seja muito bem-vindo",
+    "como posso ajudar", "como podemos ajudar", "em que posso ajudar",
+]
+
+
+def e_resposta_automatica(texto: str) -> bool:
+    """Parece mensagem de robô/chatbot/ausência (e não de uma pessoa)?"""
+    t = util.chave_texto(texto)
+    return any(util.chave_texto(f) in t for f in FRASES_AUTOMATICAS)
+
+
+def _rajada_de_mensagens(db, lead: Lead) -> bool:
+    """3 ou mais mensagens do lead em 2 minutos: menu de robô (pessoas não respondem assim)."""
+    from datetime import timedelta
+
+    return (db.execute(select(func.count(Mensagem.id)).where(
+        Mensagem.lead_id == lead.id, Mensagem.status == "recebida",
+        Mensagem.criado_em >= agora() - timedelta(minutes=2))).scalar() or 0) >= 3
+
+
 def classificar_resposta(db, lead: Lead, texto: str) -> dict:
     regras = classificar_por_regras(texto)
+    if regras["classe"] != "OPT-OUT" and not mensagens.pede_opt_out(texto) and (
+            e_resposta_automatica(texto) or _rajada_de_mensagens(db, lead)):
+        regras.update(classe=config.CLASSE_AUTOMATICA, interesse="nenhum", fonte="regras",
+                      resumo="Resposta automática (robô/chatbot ou ausência) do lado da empresa.",
+                      proximo_passo="Nada: a SDR não responde robô; a sequência continua")
+        return regras
     if regras["classe"] == "OPT-OUT" or mensagens.pede_opt_out(texto):
         regras["classe"] = "OPT-OUT"
         return regras  # pedido de saída é respeitado sem depender da IA
@@ -299,6 +336,8 @@ def classificar_resposta(db, lead: Lead, texto: str) -> dict:
     pedido = (
         "Classifique a resposta de um possível parceiro a uma prospecção da MS Certificação Digital.\n"
         f"Classes possíveis: {', '.join(config.CLASSES_RESPOSTA)}.\n"
+        f"Use {config.CLASSE_AUTOMATICA} quando a mensagem for de robô/chatbot/URA/ausência (ex.: 'recebemos sua "
+        "mensagem, aguarde', menu de opções, horário de atendimento), e não de uma pessoa.\n"
         "resumo: 1–2 frases para o time humano (só com o que a pessoa disse e o que sabemos da empresa). "
         "pergunta_basica: se a pessoa fez uma pergunta simples (o que é a MS, como funciona, como valida), copie a "
         "pergunta; senão vazio. contato_indicado: se indicou outra pessoa/contato, copie; senão vazio.\n\n"
@@ -369,6 +408,8 @@ def processar_resposta(db, lead: Lead, texto: str, canal: str, usuario: Usuario 
     """Registra e interpreta a resposta do lead. Interesse → para tudo e entrega ao humano."""
     analise = classificar_resposta(db, lead, texto)
     classe = analise["classe"]
+    if classe == config.CLASSE_AUTOMATICA:
+        return _resposta_de_robo(db, lead, texto, canal, usuario, registrar_entrada, analise)
     enviada = ultima_mensagem_enviada(db, lead.id)
     if enviada:
         enviada.respondida = True
@@ -409,8 +450,37 @@ def processar_resposta(db, lead: Lead, texto: str, canal: str, usuario: Usuario 
     return analise
 
 
+def _resposta_de_robo(db, lead: Lead, texto: str, canal: str, usuario, registrar_entrada: bool, analise: dict) -> dict:
+    """Robô/chatbot/ausência respondeu: só registra. Sem resposta da SDR, sem oportunidade e a sequência continua
+    (a próxima mensagem pode chegar numa pessoa)."""
+    if registrar_entrada:
+        entrada = mensagens.registrar(db, lead.id, canal, texto, usuario, status="recebida")
+        entrada.direcao = "entrada"
+        enviada = ultima_mensagem_enviada(db, lead.id)
+        entrada.campanha_id = enviada.campanha_id if enviada else None
+        entrada.categoria_id = lead.categoria_id
+    historico(db, lead.id, "resposta", f"Resposta automática (robô/ausência), ignorada pela SDR: {texto[:500]}",
+              usuario, canal)
+    analise["resposta_sugerida"] = ""  # nunca responder robô (evita conversa de robô com robô)
+    analise["oportunidade_id"] = None
+    analise["automatica"] = True
+    return analise
+
+
 def criar_oportunidade(db, lead: Lead, analise: dict, texto: str, canal: str, enviada: Mensagem | None,
                        temperatura: str) -> Oportunidade:
+    aberta = db.execute(select(Oportunidade).where(Oportunidade.lead_id == lead.id, Oportunidade.status == "nova")
+                        .order_by(Oportunidade.criado_em.desc()).limit(1)).scalars().first()
+    if aberta:  # o lead mandou mais mensagens: junta na mesma oportunidade (sem cartão repetido)
+        aberta.resposta = (aberta.resposta + "\n---\n" + texto)[-3000:]
+        aberta.resumo = analise.get("resumo", "")[:2000] or aberta.resumo
+        aberta.classificacao, aberta.interesse = analise["classe"], analise.get("interesse", "") or aberta.interesse
+        aberta.proximo_passo = analise.get("proximo_passo", "")[:250] or aberta.proximo_passo
+        if temperatura == "quente" and aberta.temperatura != "quente":
+            aberta.temperatura = "quente"
+            notificar(db, lead, f"🔥 NOVO LEAD QUENTE: {lead.empresa} ({analise['classe'].lower()})",
+                      f"/oportunidades#op-{aberta.id}")
+        return aberta
     oportunidade = Oportunidade(
         lead_id=lead.id, temperatura=temperatura, classificacao=analise["classe"], canal=canal,
         mensagem_enviada=enviada.corpo if enviada else "", resposta=texto[:3000],

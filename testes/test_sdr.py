@@ -849,3 +849,29 @@ def test_admin_ve_todas_as_respostas_inclusive_sem_interesse(cliente):
     r = cliente.get("/oportunidades?ver=respostas")
     assert "Todas as respostas dos contatos" in r.text and "Não temos interesse, obrigado." in r.text
     assert "Sem Interesse Resposta Ltda" in r.text
+
+
+def test_resposta_de_robo_nao_vira_oportunidade_nem_recebe_resposta():
+    with sessao() as db:
+        lead = _novo_lead(db, "Robo Responde Ltda", whatsapp="81999990003")
+        db.add(Tarefa(lead_id=lead.id, canal="whatsapp", status="pendente", tipo="prospeccao",
+                      data=date.today() + timedelta(days=2), acao="whatsapp", mensagem="Oi"))
+        db.flush()
+        antes = db.execute(select(func.count(Oportunidade.id))).scalar()
+        analise = sdr.processar_resposta(db, lead, "Recebemos sua mensagem. Aguarde um momento, por favor", "whatsapp")
+        assert analise["classe"] == config.CLASSE_AUTOMATICA and analise["resposta_sugerida"] == ""
+        assert db.execute(select(func.count(Oportunidade.id))).scalar() == antes
+        assert db.execute(select(Tarefa).where(Tarefa.lead_id == lead.id)).scalar_one().status == "pendente"
+        assert not lead.automacao_pausada
+        db.rollback()
+
+
+def test_varias_respostas_do_mesmo_lead_ficam_numa_oportunidade():
+    with sessao() as db:
+        lead = _novo_lead(db, "Responde Duas Vezes Ltda", whatsapp="81999990004")
+        db.flush()
+        sdr.processar_resposta(db, lead, "Tenho interesse, me explica melhor", "whatsapp")
+        sdr.processar_resposta(db, lead, "Pode ser amanhã à tarde?", "whatsapp")
+        ops = db.execute(select(Oportunidade).where(Oportunidade.lead_id == lead.id)).scalars().all()
+        assert len(ops) == 1 and "amanhã" in ops[0].resposta
+        db.rollback()

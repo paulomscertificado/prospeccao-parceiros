@@ -140,3 +140,10 @@ Dois modelos: cada toque da campanha da IA guarda o texto de WhatsApp e o de e-m
 `app/modelos_segmento.py`: 15 modelos por segmento (8 WhatsApp + 7 e-mail, cobrindo os 4 toques), 14 segmentos = 210 modelos, criados na partida por `garantir` (só os que faltam; editados não são sobrescritos). `Template.categoria`/`Template.angulo`. Aparecem no lead do segmento (antes dos gerais), em Cadências > Templates com filtro por segmento, e nas campanhas sem IA (`sdr._usar_modelos_do_segmento`, um modelo por toque escolhido pelo id da empresa).
 
 Prospecção por CNAE: `Busca.cnaes` + `base_receita.buscar(cnaes=...)` filtra pela atividade principal no lugar da categoria. Lista pronta em `config.CNAES_BUSCA`; contagem guardada em `contagem_cnaes` (`atualizar_contagem_cnaes`, roda ao fim da importação).
+
+## Resposta automática (robô) do lado do lead
+
+`sdr.e_resposta_automatica` (frases em `FRASES_AUTOMATICAS`) ou 3+ mensagens recebidas em 2 minutos (`_rajada_de_mensagens`)
+viram a classe `config.CLASSE_AUTOMATICA`: `processar_resposta` só registra (`_resposta_de_robo`), sem resposta da SDR,
+sem oportunidade e sem cancelar a sequência. A IA também pode devolver essa classe. `rotinas.responder_automaticamente`
+responde no máximo 1 vez a cada 24 h por lead. `criar_oportunidade` junta novas respostas na oportunidade "nova" do lead.

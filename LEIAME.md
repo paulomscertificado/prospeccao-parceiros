@@ -96,6 +96,11 @@ preço nem comissão e não fecha parceria.
 **E-mail:** as campanhas saem do e-mail @mscertificados.com.br configurado em **Configurações > E-mail**
 (e-mail + senha de app do Google + "Enviar e-mail de teste").
 
+**Resposta de robô:** quando quem responde é um robô da empresa (ex.: "Recebemos sua mensagem, aguarde um
+momento", menu "digite 1", aviso de ausência), a IA SDR **não responde**, **não cria oportunidade** e a sequência
+continua normalmente. Além disso, a SDR responde no máximo 1 vez por dia para o mesmo contato, para nunca entrar
+numa conversa sem fim. Se o mesmo lead mandar várias mensagens, tudo fica na mesma oportunidade.
+
 **Minha fila (menu):** mostra os seus disparos num lugar só:
 - o que está na fila do WhatsApp agora;
 - o que ainda vai sair, com o motivo (ex.: "Aguardando seu clique", "Aguardando o horário de envio", "Sem WhatsApp");

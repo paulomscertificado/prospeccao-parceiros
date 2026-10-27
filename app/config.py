@@ -168,8 +168,11 @@ COLUNAS_PIPELINE = [(s.lower().replace(" ", "-"), s, [s]) for s in STATUS_LEAD]
 CLASSES_RESPOSTA = [
     "INTERESSADO", "MUITO INTERESSADO", "QUER SABER MAIS", "QUER REUNIÃO", "QUER LIGAÇÃO", "QUER PROPOSTA",
     "QUER PREÇO", "JÁ POSSUI PARCEIRO", "SEM INTERESSE", "NÃO É RESPONSÁVEL", "PEDIU PARA ENVIAR E-MAIL",
-    "PEDIU PARA ENVIAR WHATSAPP", "OBJEÇÃO", "OPT-OUT", "RESPOSTA INDEFINIDA",
+    "PEDIU PARA ENVIAR WHATSAPP", "OBJEÇÃO", "OPT-OUT", "RESPOSTA INDEFINIDA", "RESPOSTA AUTOMÁTICA",
 ]
+# Mensagem de robô/chatbot/ausência do lado do lead: não é resposta de gente. A SDR não responde (evita conversa
+# de robô com robô), não vira oportunidade e a sequência continua.
+CLASSE_AUTOMATICA = "RESPOSTA AUTOMÁTICA"
 # Estas classes param a automação e viram oportunidade para o time humano.
 CLASSES_QUENTES = ["INTERESSADO", "MUITO INTERESSADO", "QUER SABER MAIS", "QUER REUNIÃO", "QUER LIGAÇÃO",
                    "QUER PROPOSTA", "QUER PREÇO"]

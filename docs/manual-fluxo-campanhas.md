@@ -143,6 +143,7 @@ O que não sair agora continua programado. Os próximos toques (Dia 3, 7 e 12) s
 | Interessado / quer reunião | Vai para **Oportunidades** 🔥 com um resumo. Clique em **Assumir lead** e continue a conversa |
 | Pediu para sair | Opt-out: sai de todas as campanhas e nunca mais recebe nada |
 | Outras | Ficam registradas no histórico do lead |
+| Robô / resposta automática ("Recebemos sua mensagem, aguarde…", menu "digite 1", ausência) | A IA percebe que não é uma pessoa: **não responde**, **não cria oportunidade** e a sequência continua |
 
 > A IA **nunca negocia preço, comissão, desconto ou exclusividade**. Ela só faz o primeiro contato e entrega o
 > interessado para você.
