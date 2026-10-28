@@ -144,3 +144,11 @@ Configurações > E-mail na nuvem (fica guardado criptografado no banco) > *Envi
 ## Atualizar
 Cada envio para o GitHub publica sozinho. Mudanças de tabelas são aplicadas no primeiro acesso (versão do
 esquema guardada em `configuracoes.versao_esquema`).
+
+## Economia de processamento na Vercel (27/10/2026)
+
+- `dados/chamar_cron.ps1`: pula se chamou há menos de 50 s (a tarefa tem 2 gatilhos repetindo a cada minuto) e,
+  fora do horário comercial (antes das 07:30, depois das 19:00 e fim de semana), chama só a cada 15 min.
+- Ponte do WhatsApp Leads (`whatsapp-leads/app/ponte_nuvem.py`): parada, troca a cada 60 s no horário comercial e
+  300 s fora dele (mínimo 5 s com a tela aberta); a segunda chamada (`/api/ponte/retorno`) só sai quando há novidade
+  (ou a cada 10 min).
