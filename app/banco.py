@@ -176,6 +176,27 @@ def _versao_do_esquema() -> str:
     return hashlib.sha256("|".join(partes).encode()).hexdigest()[:16]
 
 
+def proteger_tabelas() -> int:
+    """Supabase: liga o RLS (sem regras = ninguém entra) e tira o acesso das chaves públicas (anon/authenticated) em
+    todas as tabelas. O sistema entra como dono do banco, que não depende do RLS. Devolve quantas tabelas viu."""
+    if not config.DATABASE_URL.startswith("postgres"):
+        return 0
+    with motor.begin() as con:
+        tabelas = [t for (t,) in con.exec_driver_sql(
+            "SELECT tablename FROM pg_tables WHERE schemaname = 'public'")]
+        papeis = {r for (r,) in con.exec_driver_sql(
+            "SELECT rolname FROM pg_roles WHERE rolname IN ('anon', 'authenticated')")}
+        for t in tabelas:
+            con.exec_driver_sql(f'ALTER TABLE public."{t}" ENABLE ROW LEVEL SECURITY')
+            for papel in papeis:
+                con.exec_driver_sql(f'REVOKE ALL ON public."{t}" FROM {papel}')
+        for papel in papeis:  # tabelas criadas no futuro também nascem fechadas para as chaves públicas
+            con.exec_driver_sql(f"REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM {papel}")
+            con.exec_driver_sql(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM {papel}")
+            con.exec_driver_sql(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON SEQUENCES FROM {papel}")
+    return len(tabelas)
+
+
 def preparar_banco_na_nuvem() -> None:
     """Na nuvem: cria/atualiza as tabelas uma vez por versão do sistema (e não a cada cópia que liga)."""
     global _banco_pronto
@@ -192,6 +213,7 @@ def preparar_banco_na_nuvem() -> None:
             pronta = False
         if not pronta:
             criar_tabelas()
+            proteger_tabelas()
             with sessao() as db:
                 gravar_config(db, "versao_esquema", versao)
         _banco_pronto = True
