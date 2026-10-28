@@ -904,3 +904,17 @@ def test_agente_de_ia_com_assinatura_e_reconhecido_e_resposta_respeita_limite(mo
         monkeypatch.setattr(mensagens, "limite_diario", lambda db, canal: 40)
         assert rotinas.responder_automaticamente(db, lead, "whatsapp", {"resposta_sugerida": "Obrigado!"}) is False
         db.rollback()
+
+
+def test_pedido_para_parar_no_meio_do_texto_vira_opt_out():
+    for texto in ("*Sofia:*\n\nPeço que **não enviem mais mensagens** para este número.",
+                  "Não autorizo contato do seu time comercial por aqui", "Por favor, remova meu número da lista"):
+        assert mensagens.pede_opt_out(texto), texto
+    assert not mensagens.pede_opt_out("Tenho interesse, pode me mandar mais detalhes")
+    with sessao() as db:
+        lead = _novo_lead(db, "Pede Para Parar Ltda", whatsapp="81999990006")
+        db.flush()
+        analise = sdr.processar_resposta(db, lead, "*Sofia:*\n\nPeço que não enviem mais mensagens para este número.",
+                                         "whatsapp")
+        assert analise["classe"] == "OPT-OUT" and lead.opt_out
+        db.rollback()

@@ -175,6 +175,18 @@ PALAVRAS_SAIR = {"sair", "parar", "pare", "cancelar", "descadastrar", "remover",
                  "nao quero receber", "não me mande mais"}
 
 
+# Pedidos para parar no meio do texto (comparados sem acento e em minúsculas)
+FRASES_SAIR = [
+    "nao enviem mais", "nao envie mais", "nao mandem mais", "nao mande mais", "parem de enviar", "pare de enviar",
+    "parem de mandar", "pare de mandar", "nao quero receber", "nao quero mais receber", "nao desejo receber",
+    "nao autorizo", "nao entre em contato", "nao entrem em contato", "nao entrem mais em contato",
+    "nao me procure", "nao nos procure", "remova meu numero", "remover meu numero", "remova nosso numero",
+    "tirem meu numero", "tire meu numero", "retire meu numero", "retirem meu numero", "me tira da lista",
+    "me tire da lista", "nao me chame mais", "nao chamem mais",
+]
+
+
 def pede_opt_out(texto: str) -> bool:
     t = util.chave_texto(texto)
-    return any(t == p or t.startswith(p + " ") for p in map(util.chave_texto, PALAVRAS_SAIR)) or "descadastr" in t
+    return (any(t == p or t.startswith(p + " ") for p in map(util.chave_texto, PALAVRAS_SAIR)) or "descadastr" in t
+            or any(f in t for f in FRASES_SAIR))
