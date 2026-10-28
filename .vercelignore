@@ -12,3 +12,4 @@ docker-compose.yml
 .env.local
 .vercel/
 supabase/
+requirements-dev.txt

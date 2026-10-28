@@ -12,4 +12,3 @@ python-dotenv==1.2.4
 cryptography==50.0.2
 # Banco PostgreSQL (sistema na nuvem)
 psycopg[binary]==3.2.10
-pytest==9.1.1

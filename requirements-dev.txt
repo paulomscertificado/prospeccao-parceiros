@@ -1,0 +1,3 @@
+-r requirements.txt
+# So para os testes (testar.bat); nao vai para a nuvem
+pytest==9.1.1

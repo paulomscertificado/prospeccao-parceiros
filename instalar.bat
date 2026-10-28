@@ -22,7 +22,7 @@ if not exist ".venv\Scripts\python.exe" (
 echo.
 echo [2/3] Instalando as bibliotecas (pode demorar alguns minutos)...
 ".venv\Scripts\python.exe" -m pip install --upgrade pip >nul
-".venv\Scripts\python.exe" -m pip install --upgrade -r requirements.txt
+".venv\Scripts\python.exe" -m pip install --upgrade -r requirements-dev.txt
 if errorlevel 1 goto erro
 echo.
 echo [3/3] Criando o arquivo de configuracao...
