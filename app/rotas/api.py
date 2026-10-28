@@ -10,7 +10,7 @@ import time
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 
 from .. import config, sdr, trabalhos, util
 from ..rotinas import responder_automaticamente, rodada
@@ -90,6 +90,11 @@ def cron(request: Request):
         finally:
             trabalhos.soltar_trava("rodada")
     resultado["etapas"] = trabalhos.rodar_pendentes(prazo)
+    from ..modelos import Trabalho
+
+    with sessao() as db:  # o agendador do Windows usa isto: com trabalho na fila, chama a cada minuto mesmo à noite
+        resultado["pendentes"] = db.execute(select(func.count(Trabalho.id)).where(
+            Trabalho.status.in_(["na_fila", "rodando"]))).scalar() or 0
     return resultado
 
 
