@@ -20,6 +20,12 @@ SEGMENTOS = {
         dor="um certificado vencido travando uma entrega importante do cliente",
         ganho="uma receita extra e recorrente, sem mudar a rotina do escritório",
         papel="o escritório é quem o cliente procura quando o certificado vence"),
+    "restaurante": dict(
+        rotulo="Restaurantes", quem="restaurantes e lanchonetes", clientes="os fornecedores e outros donos de restaurante",
+        momento="para emitir NFC-e no caixa, no eSocial dos funcionários e a cada renovação do e-CNPJ",
+        dor="o certificado vencer e o caixa parar de emitir nota no meio do movimento",
+        ganho="certificado sem dor de cabeça e uma renda extra indicando outros restaurantes",
+        papel="o restaurante conversa todo dia com fornecedores e com outros donos do ramo"),
     "condominio": dict(
         rotulo="Condomínios", quem="administradoras de condomínios", clientes="os condomínios administrados",
         momento="na troca de síndico, no eSocial dos funcionários e nas obrigações do condomínio",

@@ -370,6 +370,13 @@ CATEGORIAS_PADRAO = [
      "estrategia": "Abordagem genérica pedindo o responsável por parcerias.",
      "abertura": "Vi que a {{empresa}} trabalha diretamente com empresas.",
      "gancho": "estamos ampliando nossa rede de parceiros B2B."},
+    {"codigo": "restaurante", "nome": "Restaurantes e lanchonetes", "prioridade": 80, "aderencia": 6,
+     "recorrente": False, "cnaes": "5611201,5611203", "cnaes_com_palavra": "", "palavras_chave": "",
+     "motivo": "Restaurantes e lanchonetes (CNAE 5611-2/01 e 5611-2/03) emitem NFC-e e precisam de e-CNPJ; conhecem "
+               "fornecedores e outros donos de restaurante que também precisam.",
+     "estrategia": "Falar com o dono ou o gerente; foco na NFC-e e no certificado que não pode vencer no meio do mês.",
+     "abertura": "Vi que a {{empresa}} trabalha com alimentação aqui na região.",
+     "gancho": "estamos ampliando nossa rede de parceiros no setor de alimentação."},
     {"codigo": "outros", "nome": "Outros", "prioridade": 99, "aderencia": 0, "recorrente": False,
      "cnaes": "", "cnaes_com_palavra": "", "palavras_chave": "",
      "motivo": "Sem motivo específico identificado.",

@@ -148,3 +148,6 @@ viram a classe `config.CLASSE_AUTOMATICA`: `processar_resposta` só registra (`_
 sem oportunidade e sem cancelar a sequência. A IA também pode devolver essa classe. `rotinas.responder_automaticamente`
 responde no máximo 1 vez a cada 24 h por lead. `criar_oportunidade` junta novas respostas na oportunidade "nova" do lead.
 Agente de IA do lead: assinatura "*Nome:*" no começo (`ASSINATURA_DE_AGENTE`) ou 4+ mensagens em 10 min também contam como robô. A resposta automática da SDR respeita o limite diário de WhatsApp.
+
+**Restaurantes e lanchonetes** (CNAE 5611-2/01 e 5611-2/03): segmento novo; na base da Receita só entram os da Região
+Metropolitana do Recife (importação própria, para não estourar o espaço do banco gratuito).
