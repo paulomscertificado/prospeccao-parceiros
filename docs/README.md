@@ -18,3 +18,4 @@ Manual da usuária final: [`../LEIAME.md`](../LEIAME.md).
 Ao mudar o código: rode `testar.bat` e atualize o documento correspondente.
 
 - [manual-fluxo-campanhas.md](manual-fluxo-campanhas.md) — manual da equipe: envios de e-mail e WhatsApp depois da aprovação (apresentação em PDF: `Apresentacao - Fluxo das campanhas.pdf`, fonte em `apresentacao/`)
+- `Plataforma de Prospeccao - O que faz.pdf` — visão geral do que a plataforma faz e suas habilidades (fonte em `apresentacao/plataforma.html`)

@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Plataforma de Prospecção de Parceiros – MS Certificados</title>
+<style>
+  @page { size: A4; margin: 16mm 16mm 18mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Arial, sans-serif; color: #1d2b3a; font-size: 10.5pt; line-height: 1.5; margin: 0; }
+  .capa { height: 255mm; display: flex; flex-direction: column; justify-content: center; page-break-after: always;
+          background: #0f3d63; color: #fff; margin: -16mm -16mm 0; padding: 0 22mm; }
+  .capa .verde { width: 40mm; height: 3mm; background: #1f9d55; margin-bottom: 8mm; }
+  .capa h1 { font-size: 30pt; margin: 0 0 4mm; color: #fff; line-height: 1.15; }
+  .capa p { color: #cfe0ef; font-size: 13pt; margin: 0 0 3mm; }
+  h2 { color: #0f3d63; font-size: 16pt; margin: 9mm 0 3mm; padding-bottom: 2mm; border-bottom: 2px solid #1f9d55; page-break-after: avoid; }
+  h3 { color: #0f3d63; font-size: 12pt; margin: 5mm 0 2mm; page-break-after: avoid; }
+  p { margin: 0 0 2.5mm; }
+  ul { margin: 0 0 3mm; padding-left: 5mm; }
+  li { margin-bottom: 1.2mm; }
+  b { color: #0f3d63; }
+  table { width: 100%; border-collapse: collapse; margin: 2mm 0 4mm; font-size: 9.8pt; page-break-inside: avoid; }
+  th { background: #0f3d63; color: #fff; text-align: left; padding: 2mm 3mm; font-weight: 600; }
+  td { padding: 2mm 3mm; border-bottom: 1px solid #e2e8ee; vertical-align: top; }
+  .caixa { background: #f2f7fb; border-left: 2mm solid #2f6fb0; border-radius: 2mm; padding: 3mm 5mm; margin: 3mm 0 4mm; page-break-inside: avoid; }
+  .caixa.ok { border-left-color: #1f9d55; background: #eef8f2; }
+  .caixa.alerta { border-left-color: #c98a12; background: #fdf6ea; }
+  .grade { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; margin: 3mm 0; }
+  .grade .caixa { margin: 0; }
+  .indice li { margin-bottom: .6mm; }
+  .rodape { margin-top: 10mm; font-size: 9pt; color: #6b7886; border-top: 1px solid #e2e8ee; padding-top: 3mm; }
+</style>
+</head>
+<body>
+
+<section class="capa">
+  <div class="verde"></div>
+  <h1>Plataforma de Prospecção<br>de Parceiros</h1>
+  <p>O que a plataforma faz e suas habilidades</p>
+  <p style="font-size:11pt;margin-top:8mm">MS Certificados · mscertificados.com.br · Outubro de 2026</p>
+</section>
+
+<h2>1. Em uma frase</h2>
+<p>A plataforma <b>encontra empresas que podem virar parceiras da MS</b> (escritórios contábeis, administradoras,
+empresas de software, restaurantes e outros segmentos), <b>faz o primeiro contato por e-mail e WhatsApp com a ajuda de
+uma IA</b> e <b>entrega para a equipe quem respondeu com interesse</b>, para a pessoa conversar, negociar e fechar.</p>
+<div class="caixa ok"><b>O caminho:</b> a IA encontra → pesquisa → qualifica → faz o 1º contato → identifica a resposta →
+<b>a equipe conversa, negocia e fecha</b>.</div>
+
+<h3>Os dois sistemas que trabalham juntos</h3>
+<table>
+  <tr><th style="width:30%">Sistema</th><th>Onde roda</th><th>Para que serve</th></tr>
+  <tr><td><b>Prospecção de Parceiros</b></td><td>Na nuvem (prospeccao-parceiros.vercel.app), acesso de qualquer lugar com login</td>
+      <td>Campanhas, leads, oportunidades, envios, relatórios, parceiros e configurações</td></tr>
+  <tr><td><b>WhatsApp Leads</b></td><td>No computador da MS, ligado à nuvem por uma "ponte"</td>
+      <td>Mantém os WhatsApps da equipe conectados (QR code), envia as mensagens com pausas e traz as respostas</td></tr>
+</table>
+
+<h2>2. Encontrar empresas (Prospecção)</h2>
+<ul>
+  <li><b>Base oficial da Receita Federal</b> importada: cerca de <b>830 mil empresas ativas</b>, com nome, endereço,
+    telefone, e-mail, porte, sócios e regime (Simples Nacional).</li>
+  <li><b>16 segmentos</b> prontos, cada um com seus CNAEs: escritórios contábeis, software contábil, sistemas de nota
+    fiscal, ERP, BPO financeiro, RH/folha, consultorias, despachantes, tecnologia, portais de internet, associações,
+    coworkings, franquias, administradoras de condomínios, serviços para PMEs e <b>restaurantes e lanchonetes</b>
+    (Região Metropolitana do Recife).</li>
+  <li><b>Pesquisa por CNAE</b> específico, inclusive digitando outros códigos.</li>
+  <li><b>Escolha de cidade</b> pela lista oficial do IBGE (todas as cidades de cada estado) ou digitando uma cidade.</li>
+  <li><b>Fontes extras:</b> mapas abertos (OpenStreetMap), Google Places (opcional) e enriquecimento pelo site da
+    empresa e pela BrasilAPI.</li>
+  <li><b>Sem duplicidade:</b> o sistema reconhece a mesma empresa vinda de fontes diferentes.</li>
+  <li><b>Score de potencial</b> (0 a 100) para cada lead, para começar pelos melhores.</li>
+  <li>Aceita o <b>CNPJ alfanumérico</b> (novo formato de 2026).</li>
+</ul>
+
+<h2>3. Campanhas com IA (IA SDR)</h2>
+<h3>Criar em 4 passos</h3>
+<table>
+  <tr><th style="width:8%">Passo</th><th>O que a pessoa escolhe</th></tr>
+  <tr><td>1</td><td><b>O que procura:</b> os segmentos, organizados em grupos (Contabilidade e finanças; Software e tecnologia;
+      Redes e serviços para empresas), com a quantidade de empresas na cidade</td></tr>
+  <tr><td>2</td><td><b>Onde:</b> estado e cidade (lista do IBGE ou cidade digitada)</td></tr>
+  <tr><td>3</td><td><b>Quantas empresas</b> (a IA pesquisa o dobro e fica com as melhores)</td></tr>
+  <tr><td>4</td><td><b>Como abordar (obrigatório):</b> nome, canais (WhatsApp e/ou e-mail), tom, cadência, data de início,
+      pergunta final e objetivo. O administrador também escolhe <b>qual número de WhatsApp dispara</b>.</td></tr>
+</table>
+<h3>O que a IA monta</h3>
+<ul>
+  <li><b>Pesquisa cada empresa</b> (site, atividade, cidade) e escreve uma <b>mensagem diferente para cada uma</b>.</li>
+  <li><b>4 toques</b> por empresa: apresentação (dia 1), praticidade (dia 3), receita extra (dia 7) e encerramento (dia 12).</li>
+  <li><b>Cada toque tem duas versões</b>, WhatsApp e e-mail, e a pessoa escolhe por qual canal ele sai.</li>
+  <li><b>15 modelos de mensagem por segmento</b> (8 de WhatsApp e 7 de e-mail), usados também quando a IA está desligada.</li>
+  <li><b>Horários "quebrados" e naturais</b> (ex.: 09:47, 14:13), diferentes para cada mensagem e fora do almoço.</li>
+  <li>Empresas que só têm telefone fixo entram em <b>"Pesquisar WhatsApp"</b>: a equipe acha o número e cadastra.</li>
+  <li>A IA <b>nunca negocia preço, comissão, desconto ou exclusividade</b>: só faz o primeiro contato.</li>
+</ul>
+<h3>Antes e depois de aprovar</h3>
+<div class="grade">
+  <div class="caixa"><b>Antes de aprovar</b><br>
+    🧪 Testar: as mensagens chegam no e-mail ou WhatsApp de quem testa, com [TESTE], sem nenhum lead receber nada.<br>
+    ✏️ Editar qualquer texto · trocar o canal de cada toque.<br>
+    🚫 Tirar empresa da campanha com motivo obrigatório (já fiz campanha · já entramos em contato · não condiz com os
+    objetivos da MS).<br>
+    Qualquer pessoa da equipe pode <b>aprovar</b>. Nada sai antes disso.</div>
+  <div class="caixa ok"><b>Depois de aprovar</b><br>
+    ✉️ E-mails saem sozinhos, em horário comercial e com limites.<br>
+    💬 WhatsApp sai sozinho para quem já conversou com a MS; para os demais, um clique.<br>
+    🚀 Botões <b>Disparar campanha WhatsApp / e-mail</b> e <b>Enviar agora por e-mail / WhatsApp</b> em cada toque.<br>
+    📊 Andamento por empresa com bolinhas coloridas (enviado, na fila, não saiu, cancelado).</div>
+</div>
+
+<h2>4. Respostas e oportunidades</h2>
+<ul>
+  <li>O sistema <b>lê as respostas</b> de e-mail e WhatsApp sozinho e a IA <b>classifica</b>: interessado, quer reunião,
+    quer preço, sem interesse, pediu para sair, entre outras.</li>
+  <li><b>Interessado:</b> a sequência daquela empresa para na hora e ela vira <b>oportunidade</b> 🔥, com resumo para a equipe.
+    Botões: <b>Assumir lead</b>, <b>Iniciar WhatsApp</b> e <b>Descartar</b>.</li>
+  <li><b>Pediu para sair</b> (inclusive frases como "não enviem mais", "não autorizo contato", "remova meu número"):
+    sai de todas as campanhas e nunca mais recebe nada.</li>
+  <li><b>Robôs e agentes de IA do lado da empresa</b> ("Recebemos sua mensagem, aguarde", menus "digite 1", assinaturas
+    como "*Sofia:*"): a SDR <b>não responde</b> e não cria oportunidade.</li>
+  <li>Várias mensagens do mesmo lead ficam <b>na mesma oportunidade</b>, sem cartões repetidos.</li>
+  <li>Administrador e gestor têm a aba <b>Todas as respostas</b>, com tudo o que os contatos responderam.</li>
+  <li>Sem resposta depois do último toque: o lead vira <b>Perdido – Sem resposta</b> em 3 dias.</li>
+</ul>
+
+<h2>5. Acompanhar os envios</h2>
+<table>
+  <tr><th style="width:28%">Tela</th><th>O que mostra</th></tr>
+  <tr><td><b>Minha fila</b></td><td>O que está na fila do WhatsApp agora, o que ainda vai sair (com data, hora e o motivo
+      de ainda não ter saído), histórico de 7 dias e registro dos disparos. Clique no canal para <b>ver e editar a
+      mensagem</b>; botões <b>Enviar por e-mail / WhatsApp</b>, <b>Reenviar</b> e <b>Tentar de novo</b>.</td></tr>
+  <tr><td><b>Envios</b></td><td>Tudo o que a MS mandou, para quem, quando e se chegou, com os limites do dia</td></tr>
+  <tr><td><b>Oportunidades</b></td><td>Quem respondeu com interesse, assumidas/descartadas e todas as respostas</td></tr>
+  <tr><td><b>Conversas</b></td><td>Cópia das conversas de WhatsApp e envio manual para qualquer número</td></tr>
+  <tr><td><b>Dashboard e Inteligência</b></td><td>Resultados por segmento, canal e mensagem, para saber o que funciona melhor</td></tr>
+  <tr><td><b>Agenda e Pipeline</b></td><td>Tarefas do dia e funil (Kanban) dos leads</td></tr>
+</table>
+
+<h2>6. WhatsApp: um número por pessoa e proteção contra bloqueio</h2>
+<ul>
+  <li>Cada pessoa da equipe <b>conecta o próprio WhatsApp</b> por QR code; o dono e o administrador podem compartilhar números.</li>
+  <li>A mensagem sai pelo número do responsável pelo lead, ou pelo número que o administrador fixou na campanha.</li>
+  <li><b>Modo teste</b> para treinar sem enviar nada de verdade.</li>
+</ul>
+<div class="caixa alerta"><b>Travas para o número não ser bloqueado (seguidas à risca):</b>
+  <ul style="margin-top:1mm">
+    <li>Uma mensagem por vez, com <b>pausa sorteada de 30 a 90 segundos</b>.</li>
+    <li>Até <b>40 mensagens automáticas por dia</b> por número e até 20 respostas da IA por dia.</li>
+    <li>Mesmo lead: no máximo uma mensagem a cada <b>20 horas por canal</b>.</li>
+    <li>Só em <b>horário comercial</b> (08:30 às 18:00).</li>
+    <li>Primeiro contato "frio" sai com um clique de uma pessoa (regra do WhatsApp); sozinho, só para quem já conversou.</li>
+    <li>A SDR responde automaticamente <b>no máximo 1 vez por dia</b> por contato e nunca responde robôs.</li>
+    <li>Opt-out respeitado em todos os canais.</li>
+  </ul></div>
+
+<h2>7. E-mail</h2>
+<ul>
+  <li>Sai do e-mail <b>@mscertificados.com.br</b> (Google Workspace), configurado na própria tela.</li>
+  <li>Limites contra spam: 20 por hora, 80 por dia, 60 por campanha e 3 por dia para o mesmo domínio.</li>
+  <li>O painel confere <b>SPF, DKIM e DMARC</b> do domínio; todo e-mail tem <b>descadastro de 1 clique</b>.</li>
+  <li>Respostas lidas automaticamente, já sem o texto citado da mensagem anterior.</li>
+</ul>
+
+<h2>8. Perfis de acesso</h2>
+<table>
+  <tr><th style="width:22%">Perfil</th><th>O que pode fazer</th></tr>
+  <tr><td><b>Administrador</b></td><td>Tudo: configurações, usuários, número que dispara cada campanha, produtos, comissões, categorias; vê tudo de todos</td></tr>
+  <tr><td><b>Gestor</b></td><td>Vê e acompanha toda a equipe, aprova campanhas, exclui leads (LGPD), usa as ferramentas</td></tr>
+  <tr><td><b>Funcionário MS</b></td><td>Quase tudo, só com os próprios dados: cria, testa, aprova e dispara as próprias campanhas; usa as ferramentas</td></tr>
+  <tr><td><b>Vendedor</b></td><td>Como o Funcionário MS, sem as ferramentas (cadências, modelos, categorias, base de conhecimento)</td></tr>
+  <tr><td><b>Parceiro</b></td><td>Portal próprio com as indicações e comissões dele</td></tr>
+</table>
+
+<h2>9. Parceiros, vendas e vencimentos</h2>
+<ul>
+  <li><b>Cadastro de parceiros</b> e portal do parceiro.</li>
+  <li><b>Vendas e comissões</b> por parceiro (podem ser ligadas ou desligadas no menu).</li>
+  <li><b>Vencimentos de certificados</b> com alertas (90, 60, 30, 15 e 7 dias) para a renovação.</li>
+  <li><b>Relatórios e exportação</b> para planilha.</li>
+</ul>
+
+<h2>10. Segurança e LGPD</h2>
+<ul>
+  <li>Login com senha e perfis; <b>registro de tudo</b> o que cada pessoa faz (aprovações, disparos, edições, exclusões).</li>
+  <li>Cada lead guarda <b>de onde veio</b> e a base legal; exclusão de dados a pedido (LGPD) e prazo de retenção.</li>
+  <li>Chaves e senhas fora do código; e-mail criptografado no banco.</li>
+  <li>Banco protegido (RLS ligado em todas as tabelas, sem acesso pela chave pública).</li>
+  <li>O sistema <b>nunca inventa dados</b> de leads: se a fonte não traz, o campo fica vazio.</li>
+</ul>
+
+<h2>11. Na nuvem, com economia</h2>
+<ul>
+  <li>Hospedagem na <b>Vercel</b> (plano gratuito) e banco no <b>Supabase</b> (plano gratuito).</li>
+  <li>Rotinas automáticas a cada minuto no horário comercial; à noite, a cada 5 minutos (a cada minuto se houver campanha sendo montada).</li>
+  <li>Consumo atual bem abaixo dos limites gratuitos.</li>
+</ul>
+
+<h2>12. Materiais de apoio</h2>
+<ul>
+  <li><b>Manual da equipe</b>: como funcionam os envios das campanhas (docs/manual-fluxo-campanhas.md).</li>
+  <li><b>Apresentação</b>: fluxo das campanhas em 10 slides (docs/Apresentacao - Fluxo das campanhas.pdf).</li>
+  <li><b>LEIAME</b> de cada sistema, com passo a passo e dúvidas comuns.</li>
+</ul>
+
+<p class="rodape">MS Certificados · Plataforma de Prospecção de Parceiros · documento de visão geral · outubro de 2026</p>
+</body>
+</html>
