@@ -1,5 +1,5 @@
 {# Cartão de um número de WhatsApp (tela WhatsApp). Variável: n (ver rotas/whatsapp.py, _cartao). #}
-<div class="cartao numero" data-numero="{{ n.id }}">
+<div class="cartao numero" data-numero="{{ n.id }}" data-gerenciar="{{ '1' if n.gerenciar else '0' }}">
   <div class="topo-numero">
     <div class="icone-numero" style="{{ 'background:var(--verde)' if n.principal }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM11 18h2"/></svg></div>
     <div class="titulo"><b>{{ n.nome }}</b>
@@ -35,6 +35,8 @@
       <button class="btn btn-pequeno btn-perigo">Remover</button></form>
     {% endif %}
   </div>
+  {% endif %}
+  {% if n.compartilhar %}
   <details class="compartilhar">
     <summary>Compartilhar este número</summary>
     <form method="post" action="/whatsapp/compartilhar">

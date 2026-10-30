@@ -84,8 +84,18 @@ def _quando(cab) -> datetime | None:
     return d.astimezone(FUSO_BRASILIA).replace(tzinfo=None)
 
 
+def _acesso(conta) -> tuple[str, int, str, str]:
+    """(servidor, porta, login, senha) da caixa: None = a principal (Configurações > E-mail)."""
+    if conta is None or conta.principal:
+        return config.IMAP_HOST, config.IMAP_PORTA, config.IMAP_USUARIO, config.IMAP_SENHA
+    from .. import contas_email
+
+    c = contas_email.credenciais(conta)
+    return c.imap_host, c.imap_porta, c.login, c.senha
+
+
 def ler_respostas(emails_de_leads: set[str], enviados: set[str] | None = None, ja_processados: set[str] | None = None,
-                  desde: datetime | None = None, maximo: int = 30) -> list[dict]:
+                  desde: datetime | None = None, maximo: int = 30, conta=None) -> list[dict]:
     """[{"de", "assunto", "texto", "message_id", "responde_a"}] dos e-mails recentes de leads (ou que respondem a um
     e-mail enviado pelo sistema) ainda não processados. Não marca nada como lido: a caixa fica como a equipe deixou.
     enviados: Message-IDs dos e-mails que o sistema mandou; ja_processados: Message-IDs já tratados;
@@ -93,7 +103,8 @@ def ler_respostas(emails_de_leads: set[str], enviados: set[str] | None = None, j
     from .. import arquivo_env
 
     arquivo_env.carregar_do_banco(forcar=True)  # na nuvem: a senha salva há pouco já vale aqui
-    if not configurado():
+    servidor, porta, login, senha = _acesso(conta)
+    if not (servidor and login and senha):
         return []
     enviados, ja_processados = enviados or set(), ja_processados or set()
     inicio = datetime.now(FUSO_BRASILIA).replace(tzinfo=None) - timedelta(days=DIAS_DE_LEITURA)
@@ -101,8 +112,8 @@ def ler_respostas(emails_de_leads: set[str], enviados: set[str] | None = None, j
         inicio = desde
     achados = []
     try:
-        with imaplib.IMAP4_SSL(config.IMAP_HOST, config.IMAP_PORTA, timeout=30) as caixa:
-            caixa.login(config.IMAP_USUARIO, config.IMAP_SENHA)
+        with imaplib.IMAP4_SSL(servidor, porta, timeout=30) as caixa:
+            caixa.login(login, senha)
             caixa.select("INBOX", readonly=True)  # só leitura: nada fica marcado como lido
             _, dados = caixa.search(None, "SINCE", _data_imap(inicio))
             for num in dados[0].split()[-300:]:
@@ -127,23 +138,25 @@ def ler_respostas(emails_de_leads: set[str], enviados: set[str] | None = None, j
                 if len(achados) >= maximo:
                     break
     except (imaplib.IMAP4.error, OSError) as erro:
-        log.warning("Leitura IMAP falhou: %s", erro)
+        log.warning("Leitura IMAP falhou (%s): %s", login, erro)
     return achados
 
 
-def testar() -> str:
-    """Entra na caixa e conta os e-mails não lidos. Devolve um texto para a tela (ou lança ErroImap)."""
+def testar(conta=None) -> str:
+    """Entra na caixa e conta os e-mails não lidos. Devolve um texto para a tela (ou lança ErroImap).
+    conta: ContaEmail (None = a principal)."""
     from .. import arquivo_env
 
     arquivo_env.carregar_do_banco(forcar=True)  # na nuvem: a senha salva há pouco já vale aqui
-    if not configurado():
+    servidor, porta, login, senha = _acesso(conta)
+    if not (servidor and login and senha):
         raise ErroImap("A leitura das respostas não está configurada.")
     try:
-        with imaplib.IMAP4_SSL(config.IMAP_HOST, config.IMAP_PORTA, timeout=30) as caixa:
-            caixa.login(config.IMAP_USUARIO, config.IMAP_SENHA)
+        with imaplib.IMAP4_SSL(servidor, porta, timeout=30) as caixa:
+            caixa.login(login, senha)
             caixa.select("INBOX", readonly=True)
             _, dados = caixa.search(None, "UNSEEN")
-            return f"Leitura funcionando: a caixa {config.IMAP_USUARIO} tem {len(dados[0].split())} e-mails não lidos."
+            return f"Leitura funcionando: a caixa {login} tem {len(dados[0].split())} e-mails não lidos."
     except imaplib.IMAP4.error:
         raise ErroImap("O servidor recusou o login de leitura. No Google, use a mesma SENHA DE APP do envio e "
                        "confira se o IMAP está ativado no Gmail (Configurações > Encaminhamento e POP/IMAP).") from None

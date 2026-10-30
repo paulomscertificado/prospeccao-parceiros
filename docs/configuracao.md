@@ -73,11 +73,23 @@ References: vale quando um colega do lead responde de outro endereço). Cada e-m
 Message-ID fica guardado na mensagem recebida). A resposta automática sai no mesmo fio ("Re:" + In-Reply-To).
 Na 1ª leitura depois desta mudança, o sistema começa do zero (`imap_ler_desde`) para não repetir respostas antigas.
 
+### Um e-mail por pessoa (tela E-mail)
+`app/contas_email.py` + tabela `contas_email` + `rotas/email_contas.py`. O principal da MS é uma linha com
+`principal=1` cujos dados de acesso continuam em Configurações > E-mail (`SMTP_*`/`IMAP_*`); as outras contas guardam
+endereço, login e senha de app criptografada (Google Workspace: smtp.gmail.com:587 e imap.gmail.com:993).
+- Conta de envio de um lead (`para_enviar`): a do responsável (ligada) → uma compartilhada com ele → a principal, se
+  liberada para ele (começa liberada para todos). Sem nenhuma: o toque espera e a pessoa recebe um aviso por dia.
+- Compartilhar (`pode_compartilhar`): dono, administrador e gestor. Trocar senha, pausar, remover: dono e administrador.
+- Respostas: `rotinas.ler_respostas_por_email` lê todas as caixas com leitura ligada (`para_ler`); conta nova só lê o
+  que chegou depois de cadastrada. A resposta automática sai pela mesma conta.
+- `Mensagem.conexao` guarda por onde saiu (`email:principal` ou `email:<id>`). Os limites de e-mail continuam da MS
+  inteira (mesmo domínio, mesma reputação).
+
 ### Fila de e-mail: endereço recusado x caixa com problema
 - Endereço do lead inválido ou recusado pelo servidor (`email_smtp.ErroDestinatario`): só aquele toque é cancelado
   (o motivo fica na tarefa e no histórico) e a fila segue com os outros.
-- Erro da caixa de envio (senha, servidor fora do ar): a fila pausa 15 minutos (`fila_email_pausada_ate`) e tenta de
-  novo depois.
+- Erro da caixa de envio (senha, servidor fora do ar): só aquela conta pausa 15 minutos
+  (`fila_email_pausada_ate:email:<conta>`); as outras contas seguem.
 
 ### Regras do WhatsApp para a IA SDR
 - Primeiro contato com quem **não autorizou** receber mensagens: a SDR prepara a mensagem e a pessoa envia com

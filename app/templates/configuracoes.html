@@ -74,6 +74,7 @@
 <form class="cartao" method="post" action="/configuracoes/email">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <h2>E-mail de envio das campanhas</h2>
+  <p class="pequeno suave">Este é o e-mail <b>principal da MS</b>. Cada pessoa também pode cadastrar o próprio e-mail, e você escolhe com quem cada conta é compartilhada na tela <a href="/email">E-mail</a>.</p>
   <p class="suave">As campanhas saem deste e-mail. Ele precisa ser do domínio <b>@{{ email.dominio }}</b>.</p>
   <div class="campo"><label for="e-end">E-mail de envio</label><input id="e-end" type="email" name="endereco" value="{{ email.endereco }}" placeholder="parcerias@{{ email.dominio }}" required></div>
   <div class="campo"><label for="e-login">Conta que faz o login no Google (opcional)</label><input id="e-login" type="email" name="usuario_login" value="{{ email.usuario_login }}" placeholder="vazio = o próprio e-mail de envio">

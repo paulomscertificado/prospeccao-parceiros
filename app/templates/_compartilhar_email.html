@@ -1,0 +1,17 @@
+{# Compartilhar uma conta de e-mail (tela E-mail). Variável: conta (ver rotas/email_contas.py, _cartao). #}
+{% if conta.compartilhar %}
+<details class="compartilhar">
+  <summary>Compartilhar esta conta</summary>
+  <form method="post" action="/email/compartilhar">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="conta" value="{{ conta.id }}">
+    <div class="campo" style="margin-top:8px"><label>Nome da conta</label><input type="text" name="nome" value="{{ conta.nome }}" maxlength="120"></div>
+    <label class="marcar"><input type="checkbox" name="todos" {{ 'checked' if conta.compartilhada_todos }}> <b>Toda a equipe</b> pode enviar por esta conta</label>
+    <p class="pequeno suave" style="margin:6px 0 0">Ou escolha as pessoas:</p>
+    <div class="lista-pessoas">
+      {% for p in equipe if p.nome != conta.dono or conta.principal %}<label class="marcar"><input type="checkbox" name="usuarios" value="{{ p.id }}" {{ 'checked' if p.id in conta.compartilhada_com }}> {{ p.nome }}</label>{% endfor %}
+    </div>
+    <p class="pequeno suave">{% if conta.principal %}Quem não tem e-mail próprio envia as campanhas pelo principal da MS só se estiver liberado aqui.{% else %}Quem recebe o compartilhamento envia as campanhas dos próprios leads por esta conta quando não tiver e-mail próprio.{% endif %}</p>
+    <button class="btn btn-pequeno btn-primario">Salvar compartilhamento</button>
+  </form>
+</details>
+{% endif %}

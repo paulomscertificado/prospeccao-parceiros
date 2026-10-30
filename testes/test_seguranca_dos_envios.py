@@ -23,7 +23,8 @@ def sem_internet(monkeypatch):
     monkeypatch.setattr(arquivo_env, "carregar_do_banco", lambda forcar=False: None)
 
 
-CHAVES_MEXIDAS = ("enviar_email_automatico", "horas_entre_contatos", "limite_hora_email", "fila_email_pausada_ate",
+PAUSA_PRINCIPAL = "fila_email_pausada_ate:email:principal"
+CHAVES_MEXIDAS = ("enviar_email_automatico", "horas_entre_contatos", "limite_hora_email", PAUSA_PRINCIPAL,
                   "sdr_resposta_automatica", "imap_ler_desde")
 
 
@@ -83,7 +84,7 @@ def test_destinatario_recusado_nao_trava_a_fila_e_erro_da_caixa_pausa(cliente, m
         gravar_config(db, "enviar_email_automatico", "1")
         gravar_config(db, "horas_entre_contatos", "0")
         gravar_config(db, "limite_hora_email", "1000")
-        gravar_config(db, "fila_email_pausada_ate", "")
+        gravar_config(db, PAUSA_PRINCIPAL, "")
         camp = Campanha(nome="Fila com e-mail ruim", status="ativa", aprovado_em=agora(), usuario_id=_admin(db).id)
         db.add(camp)
         db.flush()
@@ -100,7 +101,7 @@ def test_destinatario_recusado_nao_trava_a_fila_e_erro_da_caixa_pausa(cliente, m
     with sessao() as db:
         t = db.execute(select(Tarefa).where(Tarefa.campanha_id == camp_id, Tarefa.lead_id == ruim_id)).scalars().one()
         assert t.status == "cancelada" and "recusou" in t.resultado
-        assert ler_config(db, "fila_email_pausada_ate") == ""  # e-mail ruim de um lead não pausa a fila
+        assert ler_config(db, PAUSA_PRINCIPAL) == ""  # e-mail ruim de um lead não pausa a fila
 
         outro = _novo_lead(db, "Contábil Email Depois", email="depois@contabil.com.br")
         db.add(Tarefa(tipo="prospeccao", lead_id=outro.id, canal="email", data=date.today(), hora="00:00",
@@ -109,11 +110,11 @@ def test_destinatario_recusado_nao_trava_a_fila_e_erro_da_caixa_pausa(cliente, m
     with sessao() as db:
         r = campanhas.processar_fila(db)
         assert r["enviados"] == 0 and r["erros"] == 1
-        assert ler_config(db, "fila_email_pausada_ate") > agora().isoformat()
+        assert ler_config(db, PAUSA_PRINCIPAL) > agora().isoformat()
     caixa_quebrada["sim"] = False
     with sessao() as db:
         assert campanhas.processar_fila(db)["enviados"] == 0  # pausada: nem tenta
-        gravar_config(db, "fila_email_pausada_ate", "")
+        gravar_config(db, PAUSA_PRINCIPAL, "")
     with sessao() as db:
         campanhas.processar_fila(db)
     assert "depois@contabil.com.br" in enviados

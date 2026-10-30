@@ -19,7 +19,7 @@ log = logging.getLogger(__name__)
 
 
 def responder_automaticamente(db, lead: Lead, canal: str, analise: dict, conexao: str | None = None,
-                              em_resposta_a: str = "", assunto: str = "") -> bool:
+                              em_resposta_a: str = "", assunto: str = "", conta_email=None) -> bool:
     """Envia a resposta da SDR (ex.: "vou passar para o time comercial") quando o canal permite.
     WhatsApp: só dentro da janela de 24 h aberta pela mensagem do lead (regra da Meta)."""
     from . import mensagens
@@ -44,7 +44,7 @@ def responder_automaticamente(db, lead: Lead, canal: str, analise: dict, conexao
             assunto = assunto.strip()
             assunto = assunto if assunto.lower().startswith("re:") else (f"Re: {assunto}" if assunto
                                                                           else "Re: parceria MS Certificação Digital")
-            id_externo = email_smtp.enviar(lead.email, assunto[:200], texto, com_rodape=False,
+            id_externo = email_smtp.enviar(lead.email, assunto[:200], texto, com_rodape=False, conta=conta_email,
                                            em_resposta_a="" if em_resposta_a.startswith("sem-id:") else em_resposta_a)
         elif canal == "whatsapp" and lead.whatsapp and whatsapp_cloud.configurado():
             id_externo = whatsapp_cloud.enviar_texto(lead.whatsapp, texto)
@@ -84,7 +84,11 @@ def ler_respostas_por_email() -> int:
     from .banco import agora, gravar_config
     from .modelos import Mensagem
 
-    if not email_imap.configurado():
+    from . import contas_email
+
+    with sessao() as db:
+        contas = [(c.id, max(c.criado_em, datetime(2000, 1, 1))) for c in contas_email.para_ler(db)]
+    if not contas:
         return 0
     with sessao() as db:
         try:
@@ -100,7 +104,22 @@ def ler_respostas_por_email() -> int:
             Mensagem.canal == "email", Mensagem.direcao == "entrada", Mensagem.id_externo != "",
             Mensagem.criado_em >= agora() - timedelta(days=email_imap.DIAS_DE_LEITURA + 7)))}
     total = 0
-    for item in email_imap.ler_respostas(emails, set(enviados), ja_processados, desde):
+    for conta_id, criada_em in contas:
+        with sessao() as db:
+            conta = db.get(contas_email.ContaEmail, conta_id)
+            if conta is not None:
+                db.expunge(conta)  # usada fora desta sessão (só leitura dos dados de acesso)
+        if conta is None:
+            continue
+        inicio = desde if conta.principal else max(desde, criada_em)  # conta nova: só o que chegou depois dela
+        total += _ler_caixa(conta, emails, enviados, ja_processados, inicio)
+    return total
+
+
+def _ler_caixa(conta, emails: set[str], enviados: dict, ja_processados: set[str], desde) -> int:
+    total = 0
+    for item in email_imap.ler_respostas(emails, set(enviados), ja_processados, desde, conta=conta):
+        ja_processados.add(item["message_id"])  # o mesmo e-mail em duas caixas é tratado uma vez só
         with sessao() as db:
             lead = db.execute(select(Lead).where(Lead.chave_email == item["de"])).scalars().first()
             if lead is None:
@@ -120,7 +139,7 @@ def ler_respostas_por_email() -> int:
                 continue
             analise = sdr.processar_resposta(db, lead, item["texto"], "email", id_externo=item["message_id"])
             responder_automaticamente(db, lead, "email", analise, em_resposta_a=item["message_id"],
-                                      assunto=item["assunto"])
+                                      assunto=item["assunto"], conta_email=conta)
             total += 1
     return total
 

@@ -14,7 +14,7 @@ from datetime import date, datetime, timedelta
 
 from sqlalchemy import func, select
 
-from . import base_receita, cadencias, config, ia, mensagens, prospeccao, sdr, trabalhos, util
+from . import base_receita, cadencias, config, contas_email, ia, mensagens, prospeccao, sdr, trabalhos, util
 from .banco import agora, gravar_config, ler_config, ler_config_int, sessao
 from .leads_servico import criar_lead, historico, mudar_status, registrar_contato
 from .modelos import Cadencia, Campanha, Categoria, Lead, Tarefa, Usuario
@@ -524,7 +524,13 @@ def enviar_teste(db, camp: Campanha, usuario: Usuario, canal: str, destino: str,
             continue
         escolhidas.append(t)
     feito = {"enviadas": 0, "erros": []}
-    numero = ""
+    numero, conta = "", None
+    if canal == "email" and escolhidas:
+        try:
+            conta = contas_email.para_enviar(db, usuario)
+        except contas_email.SemConta as erro:
+            feito["erros"].append(f"E-mail: {erro}")
+            return feito
     if canal == "whatsapp" and escolhidas:
         try:
             numero = conexoes.da_campanha(db, camp) or conexoes.para_enviar(db, usuario)
@@ -538,7 +544,7 @@ def enviar_teste(db, camp: Campanha, usuario: Usuario, canal: str, destino: str,
         try:
             if canal == "email":
                 email_smtp.enviar(destino, f"[TESTE] {assunto or 'MS Certificação Digital'}",
-                                  f"{rotulo}\n\n{texto}", lead_id=None)
+                                  f"{rotulo}\n\n{texto}", lead_id=None, conta=conta)
             else:
                 whatsapp_leads.enviar(destino, "Teste", f"{rotulo}\n\n{texto}", db=db, manual=True,
                                       usuario_id=usuario.id, conexao=numero)
@@ -567,8 +573,6 @@ def processar_fila(db, maximo: int = 25) -> dict:
         return feito
     if not mensagens.dentro_do_horario(db):
         return feito
-    if ler_config(db, "fila_email_pausada_ate") > agora().isoformat(timespec="seconds"):
-        return feito  # a caixa de envio deu erro há pouco: espera antes de tentar de novo
     hora = agora().strftime("%H:%M")
     consulta = (select(Tarefa).join(Campanha, Tarefa.campanha_id == Campanha.id)
                 .where(Tarefa.status == "pendente", Tarefa.tipo == "prospeccao", Tarefa.canal == "email",
@@ -590,16 +594,25 @@ def processar_fila(db, maximo: int = 25) -> dict:
             if "limite" in bloqueio.lower() and "domínio" not in bloqueio:
                 break  # limite do canal/campanha: o resto espera a próxima rodada
             continue
-        erro = _enviar_email_da_tarefa(db, t, None, "Enviado automaticamente pela fila")
+        try:
+            conta = conta_do_toque(db, t)
+        except contas_email.SemConta as erro:
+            feito["bloqueados"] += 1
+            _avisar_sem_conta(db, t, str(erro))
+            continue  # o responsável ainda não tem e-mail: espera e avisa
+        if ler_config(db, _chave_pausa(conta)) > agora().isoformat(timespec="seconds"):
+            feito["bloqueados"] += 1
+            continue  # esta conta deu erro há pouco: espera antes de tentar de novo (as outras seguem)
+        erro = _enviar_email_da_tarefa(db, t, None, "Enviado automaticamente pela fila", conta)
         if erro == DESTINATARIO_RECUSADO:
             feito["erros"] += 1
             continue  # só o e-mail deste lead não sai: a fila segue com os outros
         if erro:
             feito["erros"] += 1
-            gravar_config(db, "fila_email_pausada_ate",
+            gravar_config(db, _chave_pausa(conta),
                           (agora() + timedelta(minutes=PAUSA_FILA_EMAIL)).isoformat(timespec="seconds"))
-            log.warning("Fila de e-mail pausada por %s min: %s", PAUSA_FILA_EMAIL, erro)
-            break  # problema na caixa de envio: não insiste agora
+            log.warning("Conta de e-mail %s pausada por %s min: %s", contas_email.chave(conta), PAUSA_FILA_EMAIL, erro)
+            continue  # problema nesta caixa de envio: não insiste nela agora
         feito["enviados"] += 1
     return feito
 
@@ -608,27 +621,61 @@ DESTINATARIO_RECUSADO = "destinatario"
 PAUSA_FILA_EMAIL = 15  # minutos sem tentar depois de um erro da caixa de envio
 
 
-def _enviar_email_da_tarefa(db, t: Tarefa, usuario: Usuario | None, resultado: str) -> str:
+def _chave_pausa(conta) -> str:
+    return "fila_email_pausada_ate:" + contas_email.chave(conta)
+
+
+def conta_do_toque(db, t: Tarefa, usuario: Usuario | None = None):
+    """Conta de e-mail por onde sai o toque: a do responsável pelo lead (app/contas_email.py)."""
+    from . import conexoes
+
+    return contas_email.para_enviar(db, conexoes.responsavel(db, t.lead, usuario, t))
+
+
+def _avisar_sem_conta(db, t: Tarefa, motivo: str) -> None:
+    """Responsável sem e-mail para enviar: avisa uma vez por dia (o toque continua esperando)."""
+    from . import conexoes
+    from .modelos import Notificacao
+
+    quem = conexoes.responsavel(db, t.lead, None, t)
+    if quem is None:
+        return
+    marca = f"aviso_sem_email:{quem.id}"
+    if ler_config(db, marca) == date.today().isoformat():
+        return
+    gravar_config(db, marca, date.today().isoformat())
+    db.add(Notificacao(usuario_id=quem.id, link="/email", texto=f"E-mails de campanha esperando: {motivo}"[:300]))
+
+
+def _enviar_email_da_tarefa(db, t: Tarefa, usuario: Usuario | None, resultado: str, conta=None) -> str:
     """Envia o e-mail do toque e registra (enviada ou falhou). Devolve "" se saiu; DESTINATARIO_RECUSADO se o
-    endereço do lead foi recusado (só este toque é cancelado); senão o erro da caixa de envio."""
+    endereço do lead foi recusado (só este toque é cancelado); senão o erro (da caixa de envio ou falta de conta).
+    conta: por onde sai (None = a do responsável pelo lead)."""
     from .integracoes import email_smtp
 
     lead = t.lead
+    if conta is None:
+        try:
+            conta = conta_do_toque(db, t, usuario)
+        except contas_email.SemConta as erro:
+            return str(erro)
     try:
         id_externo = email_smtp.enviar(lead.email, t.assunto or "MS Certificação Digital", t.mensagem,
-                                       lead_id=lead.id)
+                                       lead_id=lead.id, conta=conta)
     except email_smtp.ErroEmail as erro:
-        mensagens.registrar(db, lead.id, "email", t.mensagem, usuario, modo="api", status="falhou", assunto=t.assunto,
-                            tarefa_id=t.id, erro=str(erro), campanha_id=t.campanha_id, angulo=t.angulo,
-                            categoria_id=lead.categoria_id)
+        falha = mensagens.registrar(db, lead.id, "email", t.mensagem, usuario, modo="api", status="falhou",
+                                    assunto=t.assunto, tarefa_id=t.id, erro=str(erro), campanha_id=t.campanha_id,
+                                    angulo=t.angulo, categoria_id=lead.categoria_id)
+        falha.conexao = contas_email.chave(conta)
         if isinstance(erro, email_smtp.ErroDestinatario):
             t.status, t.concluida_em, t.resultado = "cancelada", agora(), f"E-mail não saiu: {str(erro)[:200]}"
             historico(db, lead.id, "sistema", f"E-mail recusado: {erro} Confira o endereço do lead.", usuario, "email")
             return DESTINATARIO_RECUSADO
         return str(erro) or "erro no servidor de e-mail"
-    mensagens.registrar(db, lead.id, "email", t.mensagem, usuario, modo="api", status="enviada", assunto=t.assunto,
-                        tarefa_id=t.id, id_externo=id_externo, campanha_id=t.campanha_id, angulo=t.angulo,
-                        categoria_id=lead.categoria_id)
+    saiu = mensagens.registrar(db, lead.id, "email", t.mensagem, usuario, modo="api", status="enviada",
+                               assunto=t.assunto, tarefa_id=t.id, id_externo=id_externo, campanha_id=t.campanha_id,
+                               angulo=t.angulo, categoria_id=lead.categoria_id)
+    saiu.conexao = contas_email.chave(conta)
     t.status, t.concluida_em, t.resultado = "feita", agora(), resultado
     registrar_contato(db, lead, "email", f"E-mail enviado pela IA SDR ({config.ANGULOS.get(t.angulo, t.acao)}).",
                       usuario)
@@ -733,7 +780,7 @@ def _enviar_toque(db, t: Tarefa, usuario: Usuario) -> str:
             return ("O e-mail deste lead foi recusado (endereço inválido ou inexistente). Corrija o e-mail na ficha "
                     "do lead; este toque foi cancelado.")
         if erro:
-            return "O servidor de e-mail recusou o envio. Confira Configurações > E-mail."
+            return f"O e-mail não saiu: {erro}"
         return ""
     try:
         sdr.enviar_whatsapp_conectado(db, t.mensagem, usuario, lead=lead, tarefa=t)
@@ -769,7 +816,7 @@ def disparar(db, camp: Campanha, usuario: Usuario, canal: str) -> dict:
                 feito["erros"].append(f"{lead.empresa}: e-mail recusado (endereço inválido)")
                 continue
             if erro:
-                feito["erros"].append("O servidor de e-mail recusou o envio. Confira Configurações > E-mail")
+                feito["erros"].append(f"O e-mail não saiu: {erro}")
                 break
         else:
             try:

@@ -472,7 +472,13 @@ def enviar_api(request: Request, lead_id: int, canal: str = Form(...), template_
         elif canal == "email":
             if not lead.email:
                 raise email_smtp.ErroEmail("Este lead não tem e-mail.")
-            id_externo = email_smtp.enviar(lead.email, assunto, corpo, lead_id=lead.id)
+            from .. import conexoes, contas_email
+
+            try:
+                conta = contas_email.para_enviar(db, conexoes.responsavel(db, lead, usuario))
+            except contas_email.SemConta as erro:
+                raise email_smtp.ErroEmail(str(erro)) from None
+            id_externo = email_smtp.enviar(lead.email, assunto, corpo, lead_id=lead.id, conta=conta)
         else:
             raise HTTPException(400)
     except (whatsapp_cloud.ErroWhatsApp, email_smtp.ErroEmail) as erro:

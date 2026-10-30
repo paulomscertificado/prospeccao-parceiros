@@ -44,6 +44,7 @@ Definido em `app/modelos.py` e `app/base_receita.py`.
 
 | Tabela | Para quê | Campos principais |
 |---|---|---|
+| `contas_email` | E-mail de envio de cada pessoa e o principal da MS (`app/contas_email.py`) | dono_id, endereco, senha_cripto, ler_respostas, ativa, compartilhada_todos/com |
 | `usuarios` | Login e perfis | email (único), senha_hash, perfil (admin/gestor/vendedor/parceiro), parceiro_id, versao_sessao, totp_* e versao_2fa (2 etapas) |
 | `leads` | Banco de leads | dados do escritório, critérios do score, status, score, potencial, origem, fonte_url, base_legal, opt_out, datas do funil (contatado_em, respondeu_em, interessado_em, reuniao_em, proposta_em, convertido_em), chaves de dedup (chave_cnpj, chave_dominio, chave_telefone, chave_whatsapp, chave_email) |
 | `historico` | Linha do tempo do lead (registro de tratamento LGPD) | tipo (status, contato, resposta, nota, ia, sistema, reuniao, lgpd), canal, descrição, usuário |

@@ -29,6 +29,7 @@ ACOES = {"conectar": "Conectar", "pausar": "Pausar conexão", "desligar": "Desli
 def _cartao(db: Session, usuario: Usuario, c: ConexaoWhatsApp, base: dict, nomes: dict[int, str]) -> dict:
     return {"id": c.id, "nome": c.nome, "dono": nomes.get(c.dono_id, ""), "minha": c.dono_id == usuario.id,
             "principal": c.id == conexoes.PRINCIPAL, "gerenciar": conexoes.pode_gerenciar(usuario, c),
+            "compartilhar": conexoes.pode_compartilhar(usuario, c),
             "compartilhada_todos": c.compartilhada_todos, "compartilhada_com": conexoes.compartilhada_com(c),
             "situacao": conexoes.situacao(c.id, base)}
 
@@ -39,7 +40,8 @@ def _estado(db: Session, usuario: Usuario) -> dict:
     db.commit()
     base = whatsapp_leads.status(usar_cache=False)
     nomes = {u.id: u.nome for u in db.execute(select(Usuario)).scalars()}
-    cartoes = [_cartao(db, usuario, c, base, nomes) for c in conexoes.acessiveis(db, usuario)]
+    lista = conexoes.todas(db) if usuario.perfil == "gestor" else conexoes.acessiveis(db, usuario)  # gestor compartilha
+    cartoes = [_cartao(db, usuario, c, base, nomes) for c in lista]
     ultimo = db.execute(select(ComandoWhatsApp).where(ComandoWhatsApp.usuario_id == usuario.id)
                         .order_by(ComandoWhatsApp.id.desc()).limit(1)).scalars().first()
     pedido = None
@@ -123,10 +125,10 @@ async def comando_whatsapp(request: Request, acao: str = Form(...), numero: str 
 @rotas.post("/whatsapp/compartilhar", dependencies=[Depends(verificar_csrf)])
 async def compartilhar(request: Request, numero: str = Form(...), usuario: Usuario = Depends(equipe),
                        db: Session = Depends(obter_db)):
-    """Compartilhar um número com toda a equipe ou com pessoas escolhidas (o dono e o administrador)."""
+    """Compartilhar um número com toda a equipe ou com pessoas escolhidas (o dono, o administrador e o gestor)."""
     c = db.get(ConexaoWhatsApp, numero)
-    if c is None or not conexoes.pode_gerenciar(usuario, c):
-        avisar(request, "Só o dono do número (ou o administrador) pode compartilhar.", "erro")
+    if c is None or not conexoes.pode_compartilhar(usuario, c):
+        avisar(request, "Só o dono do número, o administrador ou o gestor podem compartilhar.", "erro")
         return voltar("/whatsapp")
     form = await request.form()
     ids = sorted({int(i) for i in form.getlist("usuarios") if str(i).isdigit() and int(i) != c.dono_id})

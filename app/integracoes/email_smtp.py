@@ -73,19 +73,28 @@ RODAPE_OPT_OUT = rodape(None)
 # ---------------------------------------------------------------- Envio
 
 def enviar(para: str, assunto: str, corpo: str, responder_para: str = "", com_rodape: bool = True,
-           lead_id: int | None = None, em_resposta_a: str = "") -> str:
-    """Envia e devolve o Message-ID. em_resposta_a: Message-ID do e-mail do lead (a resposta fica no mesmo fio)."""
-    from .. import arquivo_env
+           lead_id: int | None = None, em_resposta_a: str = "", conta=None) -> str:
+    """Envia e devolve o Message-ID. em_resposta_a: Message-ID do e-mail do lead (a resposta fica no mesmo fio).
+    conta: ContaEmail por onde sai (app/contas_email.py); None = a principal da MS."""
+    from .. import arquivo_env, contas_email
 
-    arquivo_env.carregar_do_banco(forcar=True)  # na nuvem: a senha salva há pouco já vale aqui
-    problema = problema_de_configuracao()
-    if problema:
-        raise ErroEmail(problema)
+    principal = conta is None or conta.principal
+    if principal:
+        arquivo_env.carregar_do_banco(forcar=True)  # na nuvem: a senha salva há pouco já vale aqui
+        problema = problema_de_configuracao()
+        if problema:
+            raise ErroEmail(problema)
+    c = contas_email.credenciais(conta)
+    if not principal:
+        if not c.host or not c.endereco or not c.senha:
+            raise ErroEmail(f"A conta {c.rotulo} está incompleta: falta a senha de app (tela E-mail).")
+        if not dominio_permitido(c.endereco):
+            raise ErroEmail(f"O remetente precisa ser um e-mail @{config.EMAIL_DOMINIO} (está {c.endereco}).")
     para = (para or "").strip()
     if not ENDERECO_VALIDO.match(para):
         raise ErroDestinatario(f"O e-mail \"{para}\" não é um endereço válido.")
-    remetente = endereco_remetente()
-    nome = parseaddr(config.SMTP_REMETENTE)[0]
+    remetente = c.endereco
+    nome = parseaddr(c.remetente)[0]
     msg = EmailMessage()
     msg["From"] = formataddr((nome, remetente)) if nome else remetente
     msg["To"] = para
@@ -100,42 +109,44 @@ def enviar(para: str, assunto: str, corpo: str, responder_para: str = "", com_ro
         unsubscribe = f"<{link}>, {unsubscribe}"
         msg["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
     msg["List-Unsubscribe"] = unsubscribe
-    responder = responder_para or config.SMTP_RESPONDER_PARA
+    responder = responder_para or c.responder_para
     if responder:
         msg["Reply-To"] = responder
     msg.set_content(corpo + (rodape(lead_id) if com_rodape else ""))
-    usuario = config.SMTP_USUARIO or remetente
+    usuario = c.login or remetente
+    google = "gmail" in c.host or "google" in c.host
+    onde = "Configurações > E-mail" if principal else "a tela E-mail"
     try:
         logado = False
-        if config.SMTP_PORTA == 465:
-            with smtplib.SMTP_SSL(config.SMTP_HOST, 465, context=ssl.create_default_context(), timeout=30) as s:
-                s.login(usuario, config.SMTP_SENHA)
+        if c.porta == 465:
+            with smtplib.SMTP_SSL(c.host, 465, context=ssl.create_default_context(), timeout=30) as s:
+                s.login(usuario, c.senha)
                 logado = True
                 s.send_message(msg)
         else:
-            with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORTA, timeout=30) as s:
-                if config.SMTP_TLS:
+            with smtplib.SMTP(c.host, c.porta, timeout=30) as s:
+                if c.tls:
                     s.starttls(context=ssl.create_default_context())
-                s.login(usuario, config.SMTP_SENHA)
+                s.login(usuario, c.senha)
                 logado = True
                 s.send_message(msg)
     except smtplib.SMTPServerDisconnected as erro:
         # O Google não responde "senha errada": ele fecha a conexão logo depois da senha.
-        if not logado and ("gmail" in config.SMTP_HOST or "google" in config.SMTP_HOST):
+        if not logado and google:
             raise ErroEmail(f"O Google recusou a senha da conta {usuario} (fechou a conexão ao conferir). "
                             "Confira: 1) a senha de app (16 letras) foi criada ESTANDO LOGADO nessa conta, em "
                             "myaccount.google.com/apppasswords; 2) se o e-mail de envio for um apelido (alias) ou grupo, "
                             "preencha \"Conta que faz o login\" com a conta dona dele. A senha normal não funciona.") from None
         raise ErroEmail(f"Não consegui enviar o e-mail ({erro}). Confira a internet e o servidor.") from None
     except smtplib.SMTPAuthenticationError:
-        if "gmail" in config.SMTP_HOST or "google" in config.SMTP_HOST:
-            raise ErroEmail("O Google recusou a senha. Use uma SENHA DE APP (16 letras) criada em "
+        if google:
+            raise ErroEmail(f"O Google recusou a senha de {usuario}. Use uma SENHA DE APP (16 letras) criada em "
                             "myaccount.google.com/apppasswords com a conta do e-mail de envio — a verificação em duas "
                             "etapas precisa estar ligada nessa conta.") from None
-        raise ErroEmail("Usuário ou senha do e-mail recusados. Confira em Configurações > E-mail.") from None
+        raise ErroEmail(f"Usuário ou senha do e-mail recusados. Confira em {onde}.") from None
     except smtplib.SMTPRecipientsRefused as erro:
-        detalhe = "; ".join(f"{c} {m.decode(errors='replace') if isinstance(m, bytes) else m}"
-                            for c, m in erro.recipients.values())
+        detalhe = "; ".join(f"{cod} {m.decode(errors='replace') if isinstance(m, bytes) else m}"
+                            for cod, m in erro.recipients.values())
         raise ErroDestinatario(f"O servidor recusou o endereço {para} ({detalhe[:150]}).") from None
     except smtplib.SMTPSenderRefused:
         raise ErroEmail(f"O servidor não aceitou enviar como {remetente}. O remetente deve ser o próprio e-mail "

@@ -53,7 +53,7 @@
 
 {% set outros = (estado.numeros|rejectattr('id', 'in', minha|map(attribute='id')|list)|list) %}
 {% if outros %}
-<h2 style="margin:4px 0 10px"><span class="etiqueta">{{ 'Todos os números' if usuario.perfil == 'admin' else 'Números compartilhados comigo' }}</span></h2>
+<h2 style="margin:4px 0 10px"><span class="etiqueta">{{ 'Todos os números' if usuario.perfil in ('admin', 'gestor') else 'Números compartilhados comigo' }}</span></h2>
 <div class="numeros" style="margin-bottom:22px">
   {% for n in outros %}{% include "_numero_whatsapp.html" %}{% endfor %}
 </div>
@@ -101,7 +101,7 @@ function mostrar(e) {
     const erro = caixa.querySelector('.erro-numero');
     erro.style.display = s.disponivel && s.erro ? '' : 'none';
     erro.textContent = s.erro || '';
-    const qr = s.disponivel && s.estado_codigo === 'aguardando_qr' && s.qr;
+    const qr = s.disponivel && s.estado_codigo === 'aguardando_qr' && s.qr && caixa.dataset.gerenciar === '1';
     caixa.querySelector('.qr-area').style.display = qr ? '' : 'none';
     if (qr) caixa.querySelector('.qr-area img').src = s.qr;
     const ligado = s.disponivel && s.estado_codigo && !['desconectado', ''].includes(s.estado_codigo);

@@ -84,6 +84,30 @@ class ConexaoWhatsApp(Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
 
 
+class ContaEmail(Base):
+    """Uma conta de e-mail para as campanhas: a principal da MS (dados em Configurações > E-mail) ou a de um
+    usuário (dados aqui, senha criptografada). Ver app/contas_email.py."""
+    __tablename__ = "contas_email"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    principal: Mapped[bool] = mapped_column(Boolean, default=False)
+    nome: Mapped[str] = mapped_column(String(120), default="")
+    dono_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    endereco: Mapped[str] = mapped_column(String(160), default="")
+    nome_remetente: Mapped[str] = mapped_column(String(120), default="")
+    login: Mapped[str] = mapped_column(String(160), default="")  # conta que faz o login (quando o endereço é um apelido)
+    senha_cripto: Mapped[str] = mapped_column(Text, default="")
+    smtp_host: Mapped[str] = mapped_column(String(120), default="smtp.gmail.com")
+    smtp_porta: Mapped[int] = mapped_column(Integer, default=587)
+    imap_host: Mapped[str] = mapped_column(String(120), default="imap.gmail.com")
+    imap_porta: Mapped[int] = mapped_column(Integer, default=993)
+    ler_respostas: Mapped[bool] = mapped_column(Boolean, default=True)
+    ativa: Mapped[bool] = mapped_column(Boolean, default=True)
+    compartilhada_todos: Mapped[bool] = mapped_column(Boolean, default=False)
+    compartilhada_com: Mapped[str] = mapped_column(Text, default="[]")  # JSON com ids de usuários
+    ultimo_erro: Mapped[str] = mapped_column(Text, default="")
+    criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
+
+
 class ContatoWhatsApp(Base):
     """Nome do contato escolhido na tela Conversas (vale mais que o nome que veio do WhatsApp)."""
     __tablename__ = "contatos_whatsapp"

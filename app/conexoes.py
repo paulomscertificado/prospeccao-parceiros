@@ -55,6 +55,11 @@ def pode_gerenciar(usuario: Usuario, c: ConexaoWhatsApp) -> bool:
     return usuario.perfil == "admin" or c.dono_id == usuario.id
 
 
+def pode_compartilhar(usuario: Usuario, c: ConexaoWhatsApp) -> bool:
+    """Escolher com quem o número é compartilhado: o dono, o administrador e o gestor."""
+    return pode_gerenciar(usuario, c) or usuario.perfil == "gestor"
+
+
 def pode_usar(usuario: Usuario, c: ConexaoWhatsApp) -> bool:
     """Ver as conversas e enviar por este número."""
     return pode_gerenciar(usuario, c) or c.compartilhada_todos or usuario.id in compartilhada_com(c)

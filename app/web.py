@@ -48,6 +48,7 @@ MENU_EQUIPE = [
     ("/ia", "IA Comercial", "brilho"),
     ("/conversas", "Conversas", "conversa"),
     ("/whatsapp", "WhatsApp", "celular"),
+    ("/email", "E-mail", "carta"),
     ("/configuracoes", "Configurações", "engrenagem"),
 ]
 # Áreas que só aparecem com a configuração "mostrar_vendas" = 1 (Configurações > Geral)

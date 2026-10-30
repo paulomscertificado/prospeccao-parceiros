@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block titulo %}E-mail{% endblock %}
+{% block conteudo %}
+<style>
+  .contas { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+  .conta { margin: 0; display: flex; flex-direction: column; gap: 10px; }
+  .conta .topo-conta { display: flex; align-items: center; gap: 12px; }
+  .conta .icone-conta { width: 42px; height: 42px; border-radius: 12px; background: var(--azul); color: #fff; display: grid; place-items: center; flex-shrink: 0; }
+  .conta .icone-conta svg { width: 20px; height: 20px; }
+  .conta .titulo { flex: 1; min-width: 0; }
+  .conta .titulo b { display: block; overflow-wrap: anywhere; }
+  .compartilhar { border-top: 1px dashed var(--borda); padding-top: 10px; }
+  .compartilhar summary { cursor: pointer; font-weight: 600; color: var(--azul); font-size: .85rem; }
+  .lista-pessoas { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 2px 10px; margin: 8px 0; }
+  @media (max-width: 420px) { .contas { grid-template-columns: 1fr; } }
+</style>
+{% set icone %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM22 6l-10 7L2 6"/></svg>{% endset %}
+<div class="cabecalho"><div><h1>E-mail</h1><div class="suave">Cada pessoa pode cadastrar o próprio e-mail @{{ dominio }} para as campanhas. As respostas dos leads chegam na caixa de quem enviou.</div></div></div>
+
+{% if por_onde %}<div class="aviso aviso-info">Os e-mails das campanhas dos seus leads saem por <b>{{ por_onde }}</b>.</div>{% endif %}
+
+<h2 style="margin:4px 0 10px"><span class="etiqueta">Meu e-mail</span></h2>
+<div class="contas" style="margin-bottom:22px">
+  <form class="cartao conta" method="post" action="/email/minha">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="topo-conta"><div class="icone-conta">{{ icone }}</div>
+      <div class="titulo"><b>{{ minha.endereco if minha else 'Cadastrar o meu e-mail' }}</b>
+        <span class="pequeno suave">{{ ('Ligado' if minha.ativa else 'Pausado') if minha else 'Conta Google Workspace da MS' }}</span></div></div>
+    <div class="campo"><label>Seu e-mail</label><input type="email" name="endereco" required value="{{ minha.endereco if minha else '' }}" placeholder="nome@{{ dominio }}"></div>
+    <div class="campo"><label>Nome que aparece para o lead</label><input type="text" name="nome_remetente" maxlength="120" value="{{ minha.nome_remetente if minha else usuario.nome ~ ' | MS Certificação Digital' }}"></div>
+    <div class="campo"><label>Senha de app do Google (16 letras){% if minha %} — deixe vazio para manter{% endif %}</label>
+      <input type="password" name="senha" autocomplete="new-password" placeholder="abcd efgh ijkl mnop" {{ '' if minha else 'required' }}></div>
+    <details class="pequeno"><summary>Como criar a senha de app</summary>
+      <ol style="padding-left:18px;margin:6px 0">
+        <li>Entre no seu e-mail @{{ dominio }} no navegador.</li>
+        <li>Abra <b>myaccount.google.com/apppasswords</b> (a verificação em 2 etapas do Google precisa estar ligada).</li>
+        <li>Dê o nome "Prospecção" e clique em <b>Criar</b>. Copie as 16 letras e cole aqui.</li></ol>
+      <div class="campo"><label>Conta que faz o login (só se o e-mail acima for um apelido)</label>
+        <input type="email" name="usuario_login" value="{{ minha.login if minha and minha.login != minha.endereco else '' }}"></div>
+    </details>
+    <label class="marcar"><input type="checkbox" name="ler_respostas" {{ 'checked' if (not minha or minha.ler_respostas) }}> A IA SDR lê as respostas dos leads nesta caixa</label>
+    {% set c = contas|selectattr('minha')|first %}
+    {% if c and c.ultimo_erro %}<div class="aviso aviso-erro" style="margin:0">{{ c.ultimo_erro }}</div>{% endif %}
+    <div class="grupo-btn"><button class="btn btn-primario btn-pequeno">Salvar</button></div>
+  </form>
+  {% if minha %}
+  <div class="cartao conta">
+    <b>Ações</b>
+    <div class="grupo-btn">
+      <form class="inline" method="post" action="/email/{{ minha.id }}/testar"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn btn-pequeno btn-primario">Enviar e-mail de teste</button></form>
+      <form class="inline" method="post" action="/email/{{ minha.id }}/ligar"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="ativa" value="{{ '0' if minha.ativa else '1' }}">
+        <button class="btn btn-pequeno">{{ 'Pausar' if minha.ativa else 'Ligar de novo' }}</button></form>
+      <form class="inline" method="post" action="/email/{{ minha.id }}/remover"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn btn-pequeno btn-perigo" data-confirmar="Remover o seu e-mail do sistema? As campanhas dos seus leads passam a sair por outra conta liberada para você (ou esperam).">Remover</button></form>
+    </div>
+    <p class="pequeno suave">O teste vai para {{ usuario.email }}. Pausada, a conta não envia: os e-mails dos seus leads saem por outra conta liberada para você.</p>
+    {% if c %}{% set conta = c %}{% include "_compartilhar_email.html" %}{% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% set outras = contas|rejectattr('minha')|list %}
+{% if outras %}
+<h2 style="margin:4px 0 10px"><span class="etiqueta">{{ 'Todas as contas' if usuario.perfil in ('admin', 'gestor') else 'Compartilhadas comigo' }}</span></h2>
+<div class="contas">
+  {% for conta in outras %}
+  <div class="cartao conta">
+    <div class="topo-conta"><div class="icone-conta" style="{{ 'background:var(--verde)' if conta.principal }}">{{ icone }}</div>
+      <div class="titulo"><b>{{ conta.nome }}</b>
+        <span class="pequeno suave">{{ conta.endereco or 'ainda não configurado' }} · {{ 'principal da MS' if conta.principal else 'de ' ~ (conta.dono or '—') }}</span></div>
+      <span class="selo {{ 'selo-ok' if conta.ativa else 'selo-alerta' }}">{{ 'Ligada' if conta.ativa else ('Pausada' if not conta.principal else 'Não configurado') }}</span></div>
+    <div class="pequeno suave">{% if conta.compartilhada_todos %}Liberada para toda a equipe{% elif conta.compartilhada_com %}Liberada para {{ conta.compartilhada_com|length }} pessoa(s){% else %}Não compartilhada{% endif %}
+      {% if conta.le_respostas %} · a IA lê as respostas desta caixa{% endif %}{% if conta.usar %} · você pode usar{% endif %}</div>
+    {% if conta.ultimo_erro %}<div class="aviso aviso-erro" style="margin:0">{{ conta.ultimo_erro }}</div>{% endif %}
+    <div class="grupo-btn">
+      {% if conta.usar or conta.gerenciar %}<form class="inline" method="post" action="/email/{{ conta.id }}/testar"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn btn-pequeno">Enviar e-mail de teste</button></form>{% endif %}
+      {% if conta.principal and usuario.perfil == 'admin' %}<a class="btn btn-pequeno" href="/configuracoes?aba=email">Configurar o principal</a>{% endif %}
+      {% if conta.gerenciar and not conta.principal %}
+      <form class="inline" method="post" action="/email/{{ conta.id }}/ligar"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="ativa" value="{{ '0' if conta.ativa else '1' }}"><button class="btn btn-pequeno">{{ 'Pausar' if conta.ativa else 'Ligar' }}</button></form>
+      <form class="inline" method="post" action="/email/{{ conta.id }}/remover"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn btn-pequeno btn-perigo" data-confirmar="Remover esta conta de e-mail do sistema?">Remover</button></form>
+      {% endif %}
+    </div>
+    {% include "_compartilhar_email.html" %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
