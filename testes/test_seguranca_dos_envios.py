@@ -106,11 +106,22 @@ def test_destinatario_recusado_nao_trava_a_fila_e_erro_da_caixa_pausa(cliente, m
         outro = _novo_lead(db, "Contábil Email Depois", email="depois@contabil.com.br")
         db.add(Tarefa(tipo="prospeccao", lead_id=outro.id, canal="email", data=date.today(), hora="00:00",
                       campanha_id=camp_id, angulo="apresentacao", mensagem="Olá!", assunto="Parceria"))
+        outro_id = outro.id
     caixa_quebrada["sim"] = True
     with sessao() as db:
         r = campanhas.processar_fila(db)
         assert r["enviados"] == 0 and r["erros"] == 1
         assert ler_config(db, PAUSA_PRINCIPAL) > agora().isoformat()
+        # senha/caixa com erro não suja a lista com "Não saiu": o toque espera e o admin recebe 1 aviso
+        assert not db.execute(select(Mensagem).where(Mensagem.lead_id == outro_id)).scalars().all()
+        avisos = db.execute(select(Notificacao).where(Notificacao.texto.like("E-mails de campanha parados%"))
+                            ).scalars().all()
+        assert avisos
+        gravar_config(db, PAUSA_PRINCIPAL, "")
+    with sessao() as db:
+        campanhas.processar_fila(db)  # falha de novo no mesmo dia: não repete o aviso
+        assert len(db.execute(select(Notificacao).where(Notificacao.texto.like("E-mails de campanha parados%"))
+                              ).scalars().all()) == len(avisos)
     caixa_quebrada["sim"] = False
     with sessao() as db:
         assert campanhas.processar_fila(db)["enviados"] == 0  # pausada: nem tenta

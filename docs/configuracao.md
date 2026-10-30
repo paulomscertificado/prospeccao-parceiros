@@ -89,7 +89,11 @@ endereço, login e senha de app criptografada (Google Workspace: smtp.gmail.com:
 - Endereço do lead inválido ou recusado pelo servidor (`email_smtp.ErroDestinatario`): só aquele toque é cancelado
   (o motivo fica na tarefa e no histórico) e a fila segue com os outros.
 - Erro da caixa de envio (senha, servidor fora do ar): só aquela conta pausa 15 minutos
-  (`fila_email_pausada_ate:email:<conta>`); as outras contas seguem.
+  (`fila_email_pausada_ate:email:<conta>`); as outras contas seguem. Na fila automática esse erro **não** vira
+  "Não saiu" em Envios a cada tentativa: o toque continua esperando e sai sozinho quando a caixa voltar. Quem cuida
+  da conta (responsável pelo lead e, na principal, quem tem `email.gerenciar_todas`) recebe **um aviso por dia**
+  (`campanhas._avisar_caixa_com_erro`, marca `aviso_caixa_email:<conta>:<usuário>`). No envio por clique o erro
+  continua aparecendo na hora e fica registrado.
 
 ### Regras do WhatsApp para a IA SDR
 - Primeiro contato com quem **não autorizou** receber mensagens: a SDR prepara a mensagem e a pessoa envia com

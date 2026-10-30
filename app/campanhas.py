@@ -603,7 +603,8 @@ def processar_fila(db, maximo: int = 25) -> dict:
         if ler_config(db, _chave_pausa(conta)) > agora().isoformat(timespec="seconds"):
             feito["bloqueados"] += 1
             continue  # esta conta deu erro há pouco: espera antes de tentar de novo (as outras seguem)
-        erro = _enviar_email_da_tarefa(db, t, None, "Enviado automaticamente pela fila", conta)
+        erro = _enviar_email_da_tarefa(db, t, None, "Enviado automaticamente pela fila", conta,
+                                       registrar_erro_da_caixa=False)
         if erro == DESTINATARIO_RECUSADO:
             feito["erros"] += 1
             continue  # só o e-mail deste lead não sai: a fila segue com os outros
@@ -612,6 +613,7 @@ def processar_fila(db, maximo: int = 25) -> dict:
             gravar_config(db, _chave_pausa(conta),
                           (agora() + timedelta(minutes=PAUSA_FILA_EMAIL)).isoformat(timespec="seconds"))
             log.warning("Conta de e-mail %s pausada por %s min: %s", contas_email.chave(conta), PAUSA_FILA_EMAIL, erro)
+            _avisar_caixa_com_erro(db, t, conta, erro)
             continue  # problema nesta caixa de envio: não insiste nela agora
         feito["enviados"] += 1
     return feito
@@ -632,6 +634,32 @@ def conta_do_toque(db, t: Tarefa, usuario: Usuario | None = None):
     return contas_email.para_enviar(db, conexoes.responsavel(db, t.lead, usuario, t))
 
 
+def _avisar_caixa_com_erro(db, t: Tarefa, conta, erro: str) -> None:
+    """A caixa de envio recusou (senha errada, servidor fora): um aviso por dia para cada pessoa que cuida dela —
+    o responsável pelo lead e quem pode trocar a senha da conta (principal: os administradores)."""
+    from . import autorizacao, conexoes
+    from .modelos import Notificacao
+
+    hoje = date.today().isoformat()
+    pessoas = {}
+    quem = conexoes.responsavel(db, t.lead, None, t)
+    if quem is not None:
+        pessoas[quem.id] = quem
+    if conta is None or conta.principal:
+        for u in db.execute(select(Usuario).where(Usuario.ativo.is_(True))).scalars():
+            if autorizacao.pode(u, "email.gerenciar_todas"):
+                pessoas[u.id] = u
+    elif conta.dono_id:
+        pessoas.setdefault(conta.dono_id, None)
+    for uid in pessoas:
+        marca = f"aviso_caixa_email:{contas_email.chave(conta)}:{uid}"
+        if ler_config(db, marca) == hoje:
+            continue
+        gravar_config(db, marca, hoje)
+        db.add(Notificacao(usuario_id=uid, link="/email",
+                           texto=f"E-mails de campanha parados (eles esperam na fila): {erro}"[:300]))
+
+
 def _avisar_sem_conta(db, t: Tarefa, motivo: str) -> None:
     """Responsável sem e-mail para enviar: avisa uma vez por dia (o toque continua esperando)."""
     from . import conexoes
@@ -647,10 +675,13 @@ def _avisar_sem_conta(db, t: Tarefa, motivo: str) -> None:
     db.add(Notificacao(usuario_id=quem.id, link="/email", texto=f"E-mails de campanha esperando: {motivo}"[:300]))
 
 
-def _enviar_email_da_tarefa(db, t: Tarefa, usuario: Usuario | None, resultado: str, conta=None) -> str:
+def _enviar_email_da_tarefa(db, t: Tarefa, usuario: Usuario | None, resultado: str, conta=None,
+                            registrar_erro_da_caixa: bool = True) -> str:
     """Envia o e-mail do toque e registra (enviada ou falhou). Devolve "" se saiu; DESTINATARIO_RECUSADO se o
     endereço do lead foi recusado (só este toque é cancelado); senão o erro (da caixa de envio ou falta de conta).
-    conta: por onde sai (None = a do responsável pelo lead)."""
+    conta: por onde sai (None = a do responsável pelo lead).
+    registrar_erro_da_caixa=False (fila automática): erro da caixa de envio (senha, servidor) não vira "Não saiu" a
+    cada tentativa; o toque só continua esperando e quem cuida da conta recebe um aviso por dia."""
     from .integracoes import email_smtp
 
     lead = t.lead
@@ -663,11 +694,14 @@ def _enviar_email_da_tarefa(db, t: Tarefa, usuario: Usuario | None, resultado: s
         id_externo = email_smtp.enviar(lead.email, t.assunto or "MS Certificação Digital", t.mensagem,
                                        lead_id=lead.id, conta=conta)
     except email_smtp.ErroEmail as erro:
+        do_lead = isinstance(erro, email_smtp.ErroDestinatario)
+        if not do_lead and not registrar_erro_da_caixa:
+            return str(erro) or "erro no servidor de e-mail"
         falha = mensagens.registrar(db, lead.id, "email", t.mensagem, usuario, modo="api", status="falhou",
                                     assunto=t.assunto, tarefa_id=t.id, erro=str(erro), campanha_id=t.campanha_id,
                                     angulo=t.angulo, categoria_id=lead.categoria_id)
         falha.conexao = contas_email.chave(conta)
-        if isinstance(erro, email_smtp.ErroDestinatario):
+        if do_lead:
             t.status, t.concluida_em, t.resultado = "cancelada", agora(), f"E-mail não saiu: {str(erro)[:200]}"
             historico(db, lead.id, "sistema", f"E-mail recusado: {erro} Confira o endereço do lead.", usuario, "email")
             return DESTINATARIO_RECUSADO
