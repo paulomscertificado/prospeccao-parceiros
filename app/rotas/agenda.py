@@ -7,11 +7,11 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .. import cadencias, config, ia, leads_servico, mensagens, util
+from .. import autorizacao, cadencias, config, ia, leads_servico, mensagens, util
 from ..banco import agora, ler_config, obter_db, sessao
-from ..leads_servico import historico, pode_ver
+from ..leads_servico import historico
 from ..modelos import Cadencia, Campanha, Lead, PassoCadencia, Tarefa, Template, Usuario
-from ..seguranca import equipe, ferramentas, gestao, registrar_log, ve_tudo, verificar_csrf
+from ..seguranca import exige, registrar_log, ve_tudo, verificar_csrf
 from ..web import avisar, tela, voltar
 
 rotas = APIRouter()
@@ -21,7 +21,7 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------- Cadências
 
 @rotas.get("/cadencias")
-def lista_cadencias(request: Request, segmento: str = "", usuario: Usuario = Depends(equipe),
+def lista_cadencias(request: Request, segmento: str = "", usuario: Usuario = Depends(exige("cadencias.ver")),
                     db: Session = Depends(obter_db)):
     from .. import modelos_segmento
 
@@ -48,7 +48,7 @@ def lista_cadencias(request: Request, segmento: str = "", usuario: Usuario = Dep
 
 
 @rotas.get("/cadencias/{cad_id:int}")
-def editar_cadencia_tela(request: Request, cad_id: int, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def editar_cadencia_tela(request: Request, cad_id: int, usuario: Usuario = Depends(exige("cadencias.ver")), db: Session = Depends(obter_db)):
     cad = db.get(Cadencia, cad_id) if cad_id else Cadencia(nome="", descricao="", ativa=True)
     if cad is None:
         raise HTTPException(404)
@@ -57,7 +57,7 @@ def editar_cadencia_tela(request: Request, cad_id: int, usuario: Usuario = Depen
 
 
 @rotas.post("/cadencias/{cad_id:int}", dependencies=[Depends(verificar_csrf)])
-async def salvar_cadencia(request: Request, cad_id: int, usuario: Usuario = Depends(ferramentas), db: Session = Depends(obter_db)):
+async def salvar_cadencia(request: Request, cad_id: int, usuario: Usuario = Depends(exige("cadencias.editar")), db: Session = Depends(obter_db)):
     form = await request.form()
     cad = db.get(Cadencia, cad_id) if cad_id else Cadencia()
     if cad is None:
@@ -91,7 +91,7 @@ async def salvar_cadencia(request: Request, cad_id: int, usuario: Usuario = Depe
 # ---------------------------------------------------------------- Templates
 
 @rotas.get("/templates/{tid:int}")
-def template_tela(request: Request, tid: int, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def template_tela(request: Request, tid: int, usuario: Usuario = Depends(exige("templates.ver")), db: Session = Depends(obter_db)):
     t = db.get(Template, tid) if tid else Template(nome="", canal="whatsapp", assunto="", corpo="", ativo=True, nome_meta="")
     if t is None:
         raise HTTPException(404)
@@ -105,7 +105,7 @@ def template_tela(request: Request, tid: int, usuario: Usuario = Depends(equipe)
 @rotas.post("/templates/{tid:int}", dependencies=[Depends(verificar_csrf)])
 def salvar_template(request: Request, tid: int, nome: str = Form(...), canal: str = Form(...), assunto: str = Form(""),
                     corpo: str = Form(...), nome_meta: str = Form(""), ativo: str = Form(""),
-                    usuario: Usuario = Depends(ferramentas), db: Session = Depends(obter_db)):
+                    usuario: Usuario = Depends(exige("templates.editar")), db: Session = Depends(obter_db)):
     t = db.get(Template, tid) if tid else Template()
     if t is None:
         raise HTTPException(404)
@@ -121,7 +121,7 @@ def salvar_template(request: Request, tid: int, nome: str = Form(...), canal: st
 
 
 @rotas.post("/templates/criar-com-ia", dependencies=[Depends(verificar_csrf)])
-def template_ia(request: Request, canal: str = Form(...), objetivo: str = Form(...), usuario: Usuario = Depends(ferramentas),
+def template_ia(request: Request, canal: str = Form(...), objetivo: str = Form(...), usuario: Usuario = Depends(exige("templates.editar")),
                 db: Session = Depends(obter_db)):
     try:
         dados = ia.criar_template(db, canal, objetivo)
@@ -138,17 +138,15 @@ def template_ia(request: Request, canal: str = Form(...), objetivo: str = Form(.
 # ---------------------------------------------------------------- Agenda
 
 def _consulta_agenda(usuario: Usuario, filtro_usuario: int | None):
-    consulta = select(Tarefa)
-    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
-        consulta = consulta.where(Tarefa.usuario_id == usuario.id)
-    elif filtro_usuario:
+    consulta = autorizacao.filtrar(select(Tarefa), usuario, "agenda.ver", Tarefa.usuario_id)
+    if filtro_usuario:
         consulta = consulta.where(Tarefa.usuario_id == filtro_usuario)
     return consulta
 
 
 @rotas.get("/agenda")
 def agenda(request: Request, ver: str = "hoje", canal: str = "", tipo: str = "", responsavel: str = "",
-           usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+           usuario: Usuario = Depends(exige("agenda.ver")), db: Session = Depends(obter_db)):
     hoje = date.today()
     responsavel = None if responsavel == "todos" else (util.para_int(responsavel) or usuario.id)  # padrão: a pessoa da conta
     consulta = _consulta_agenda(usuario, responsavel)
@@ -178,27 +176,27 @@ def agenda(request: Request, ver: str = "hoje", canal: str = "", tipo: str = "",
                    and ler_config(db, "enviar_whatsapp_automatico") == "1" and whatsapp_liberado(db, t.lead)}
     return tela(request, "agenda.html", {
         "tarefas": tarefas, "automaticas": automaticas, "ver": ver, "canal": canal, "tipo": tipo, "pendentes_hoje": pendentes_hoje,
-        "usuarios": usuarios if ve_tudo(usuario) else [], "responsavel": responsavel, "bloqueios": bloqueios,
+        "usuarios": usuarios if ve_tudo(usuario, "agenda.ver") else [], "responsavel": responsavel, "bloqueios": bloqueios,
         "limites": {c: (mensagens.enviadas_hoje(db, c), mensagens.limite_diario(db, c)) for c in ("whatsapp", "email")},
     })
 
 
 def _tarefa(db: Session, tarefa_id: int, usuario: Usuario) -> Tarefa:
     t = db.get(Tarefa, tarefa_id)
-    if not t or (usuario.perfil in config.PERFIS_SO_PROPRIOS and t.usuario_id != usuario.id
-                 and not (t.lead and pode_ver(usuario, t.lead))):
-        raise HTTPException(404)
+    autorizacao.garantir(usuario, "tarefas.editar", t)
     return t
 
 
 @rotas.post("/agenda/{tarefa_id:int}/{acao}", dependencies=[Depends(verificar_csrf)])
 def acao_tarefa(request: Request, tarefa_id: int, acao: str, resultado: str = Form(""), data: str = Form(""),
-                hora: str = Form(""), voltar_para: str = Form("/agenda"), usuario: Usuario = Depends(equipe),
+                hora: str = Form(""), voltar_para: str = Form("/agenda"), usuario: Usuario = Depends(exige("tarefas.editar")),
                 db: Session = Depends(obter_db)):
     t = _tarefa(db, tarefa_id, usuario)
     lead = t.lead
     if not voltar_para.startswith("/"):
         voltar_para = "/agenda"
+    if voltar_para.startswith("/agenda") and not autorizacao.pode(usuario, "agenda.ver"):
+        voltar_para = "/fila"  # Agenda desligada: volta para a Minha fila
     if acao == "feita":
         t.status, t.concluida_em, t.resultado = "feita", agora(), resultado
         if lead:

@@ -9,22 +9,19 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .. import agenda_horarios, campanhas, config, ia, metricas, sdr, util
+from .. import agenda_horarios, autorizacao, campanhas, config, ia, metricas, sdr, util
 from ..banco import agora, obter_db
-from ..leads_servico import historico, pode_ver
+from ..leads_servico import historico
 from ..modelos import (Cadencia, Campanha, Categoria, Conhecimento, Lead, Mensagem, Notificacao, Oportunidade, Tarefa,
                        Usuario)
-from ..seguranca import admin, equipe, ferramentas, gestao, registrar_log, ve_tudo, verificar_csrf
+from ..seguranca import exige, registrar_log, ve_tudo, verificar_csrf
 from ..web import avisar, tela, voltar
 
 rotas = APIRouter()
 
 
-def _lead(db: Session, lead_id: int, usuario: Usuario) -> Lead:
-    lead = db.get(Lead, lead_id)
-    if not lead or not pode_ver(usuario, lead):
-        raise HTTPException(404)
-    return lead
+def _lead(db: Session, lead_id: int, usuario: Usuario, permissao: str = "leads.editar") -> Lead:
+    return autorizacao.garantir(usuario, permissao, db.get(Lead, lead_id))
 
 
 def _equipe(db: Session):
@@ -35,10 +32,9 @@ def _equipe(db: Session):
 # ---------------------------------------------------------------- Novas oportunidades (handoff)
 
 @rotas.get("/oportunidades")
-def oportunidades(request: Request, ver: str = "novas", usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
-    consulta = select(Oportunidade).join(Lead, Oportunidade.lead_id == Lead.id)
-    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
-        consulta = consulta.where((Lead.vendedor_id == usuario.id) | (Lead.vendedor_id.is_(None)))
+def oportunidades(request: Request, ver: str = "novas", usuario: Usuario = Depends(exige("oportunidades.ver")), db: Session = Depends(obter_db)):
+    consulta = autorizacao.filtrar(select(Oportunidade).join(Lead, Oportunidade.lead_id == Lead.id), usuario,
+                                   "oportunidades.ver", Lead.vendedor_id, sem_dono=True)
     consulta = consulta.where(Oportunidade.status == "nova") if ver == "novas" else consulta.where(
         Oportunidade.status != "nova")
     lista = db.execute(consulta.order_by(Oportunidade.temperatura, Oportunidade.criado_em.desc()).limit(200)).scalars().all()
@@ -48,7 +44,7 @@ def oportunidades(request: Request, ver: str = "novas", usuario: Usuario = Depen
         n.lida = True
     db.commit()
     respostas, ops_do_lead = [], {}
-    if ver == "respostas" and ve_tudo(usuario):
+    if ver == "respostas" and autorizacao.pode(usuario, "oportunidades.respostas"):
         # Admin/gestor: TODAS as respostas que chegaram (inclusive sem interesse e opt-out, que não viram oportunidade)
         respostas = db.execute(select(Mensagem).where(Mensagem.status == "recebida", Mensagem.lead_id.is_not(None))
                                .order_by(Mensagem.criado_em.desc()).limit(300)).scalars().all()
@@ -61,7 +57,7 @@ def oportunidades(request: Request, ver: str = "novas", usuario: Usuario = Depen
         "leads_resposta": {l.id: l for l in db.execute(select(Lead).where(Lead.id.in_({m.lead_id for m in respostas})))
                            .scalars()} if respostas else {},
         "nomes_camp": {c.id: c.nome for c in db.execute(select(Campanha)).scalars()} if respostas else {},
-        "ve_tudo": ve_tudo(usuario),
+        "ve_tudo": autorizacao.pode(usuario, "oportunidades.respostas"),
         "resumos": {o.id: sdr.resumo_handoff(db, o.lead) for o in lista},
     })
     resposta.headers["Cache-Control"] = "no-store"  # voltar no navegador recarrega (sem cartão já assumido)
@@ -69,9 +65,9 @@ def oportunidades(request: Request, ver: str = "novas", usuario: Usuario = Depen
 
 
 @rotas.post("/oportunidades/{oid:int}/descartar", dependencies=[Depends(verificar_csrf)])
-def descartar(request: Request, oid: int, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def descartar(request: Request, oid: int, usuario: Usuario = Depends(exige("oportunidades.ver")), db: Session = Depends(obter_db)):
     op = db.get(Oportunidade, oid)
-    if not op or (usuario.perfil in config.PERFIS_SO_PROPRIOS and op.lead.vendedor_id not in (None, usuario.id)):
+    if not op or not autorizacao.pode(usuario, "oportunidades.ver", op, sem_dono=True):
         raise HTTPException(404)
     for o in db.execute(select(Oportunidade).where(Oportunidade.lead_id == op.lead_id,
                                                    Oportunidade.status == "nova")).scalars():  # cartões repetidos juntos
@@ -83,11 +79,9 @@ def descartar(request: Request, oid: int, usuario: Usuario = Depends(equipe), db
 
 
 @rotas.post("/leads/{lead_id:int}/assumir", dependencies=[Depends(verificar_csrf)])
-def assumir(request: Request, lead_id: int, voltar_para: str = Form(""), usuario: Usuario = Depends(equipe),
+def assumir(request: Request, lead_id: int, voltar_para: str = Form(""), usuario: Usuario = Depends(exige("oportunidades.ver")),
             db: Session = Depends(obter_db)):
-    lead = db.get(Lead, lead_id)
-    if not lead or (usuario.perfil in config.PERFIS_SO_PROPRIOS and lead.vendedor_id not in (None, usuario.id)):
-        raise HTTPException(404)
+    lead = autorizacao.garantir(usuario, "oportunidades.ver", db.get(Lead, lead_id), sem_dono=True)
     sdr.assumir_lead(db, lead, usuario)
     registrar_log(db, usuario, "assumiu_lead", "lead", lead.id, request=request)
     db.commit()
@@ -98,11 +92,9 @@ def assumir(request: Request, lead_id: int, voltar_para: str = Form(""), usuario
 
 
 @rotas.get("/leads/{lead_id:int}/agendar")
-def agendar_tela(request: Request, lead_id: int, responsavel: int | None = None, usuario: Usuario = Depends(equipe),
+def agendar_tela(request: Request, lead_id: int, responsavel: int | None = None, usuario: Usuario = Depends(exige("leads.editar")),
                  db: Session = Depends(obter_db)):
-    lead = _lead(db, lead_id, usuario) if usuario.perfil in config.PERFIS_SO_PROPRIOS else db.get(Lead, lead_id)
-    if not lead:
-        raise HTTPException(404)
+    lead = _lead(db, lead_id, usuario)
     resp = db.get(Usuario, responsavel or lead.humano_id or lead.vendedor_id or usuario.id) or usuario
     return tela(request, "agendar.html", {"lead": lead, "responsavel": resp, "equipe": _equipe(db),
                                           "horarios": agenda_horarios.horarios_livres(db, resp, dias=10, quantidade=30),
@@ -111,11 +103,11 @@ def agendar_tela(request: Request, lead_id: int, responsavel: int | None = None,
 
 @rotas.post("/leads/{lead_id:int}/agendar", dependencies=[Depends(verificar_csrf)])
 def agendar(request: Request, lead_id: int, responsavel_id: int = Form(...), quando: str = Form(...),
-            canal: str = Form("video"), pauta: str = Form(""), usuario: Usuario = Depends(equipe),
+            canal: str = Form("video"), pauta: str = Form(""), usuario: Usuario = Depends(exige("leads.editar")),
             db: Session = Depends(obter_db)):
-    lead = db.get(Lead, lead_id)
+    lead = _lead(db, lead_id, usuario)  # antes não conferia de quem era o lead
     resp = db.get(Usuario, responsavel_id)
-    if not lead or not resp:
+    if not resp:
         raise HTTPException(404)
     try:
         momento = datetime.fromisoformat(quando)
@@ -134,7 +126,7 @@ def agendar(request: Request, lead_id: int, responsavel_id: int = Form(...), qua
 
 @rotas.post("/leads/{lead_id:int}/enviar-whatsapp", dependencies=[Depends(verificar_csrf)])
 def enviar_whatsapp(request: Request, lead_id: int, texto: str = Form(...), angulo: str = Form(""),
-                    usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+                    usuario: Usuario = Depends(exige("leads.editar")), db: Session = Depends(obter_db)):
     lead = _lead(db, lead_id, usuario)
     try:
         msg = sdr.enviar_whatsapp_conectado(db, texto, usuario, lead=lead)
@@ -147,7 +139,7 @@ def enviar_whatsapp(request: Request, lead_id: int, texto: str = Form(...), angu
 
 
 @rotas.post("/leads/{lead_id:int}/pesquisar", dependencies=[Depends(verificar_csrf)])
-def pesquisar(request: Request, lead_id: int, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def pesquisar(request: Request, lead_id: int, usuario: Usuario = Depends(exige("leads.editar")), db: Session = Depends(obter_db)):
     from ..pesquisa import pesquisar_lead
 
     lead = _lead(db, lead_id, usuario)
@@ -159,7 +151,7 @@ def pesquisar(request: Request, lead_id: int, usuario: Usuario = Depends(equipe)
 
 @rotas.post("/leads/{lead_id:int}/abordagem-sdr", dependencies=[Depends(verificar_csrf)])
 def abordagem_sdr(request: Request, lead_id: int, cta: str = Form(""), tom: str = Form("consultivo"),
-                  usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+                  usuario: Usuario = Depends(exige("leads.editar")), db: Session = Depends(obter_db)):
     lead = _lead(db, lead_id, usuario)
     if not lead.pesquisado_em:
         from ..pesquisa import pesquisar_lead
@@ -183,25 +175,25 @@ FILTROS_CAMPANHA = {"todas": "Todas", "aprovacao": "Aguardando aprovação", "at
                     "erro": "Com erro", "arquivadas": "Arquivadas"}
 
 
-def _campanha(db: Session, cid: int, usuario: Usuario) -> Campanha:
+def _campanha(db: Session, cid: int, usuario: Usuario, permissao: str = "campanhas.ver") -> Campanha:
     """A campanha, se a pessoa pode vê-la: cada um vê as próprias; administrador e gestor veem todas."""
     camp = db.get(Campanha, cid)
-    if not camp or (usuario.perfil in config.PERFIS_SO_PROPRIOS and camp.usuario_id != usuario.id):
+    if not camp or not autorizacao.pode(usuario, permissao, camp):
         raise HTTPException(404)
     return camp
 
 
 @rotas.get("/campanhas")
-def lista_campanhas(request: Request, ver: str = "todas", de: str = "", usuario: Usuario = Depends(equipe),
+def lista_campanhas(request: Request, ver: str = "todas", de: str = "", usuario: Usuario = Depends(exige("campanhas.ver")),
                     db: Session = Depends(obter_db)):
-    consulta = select(Campanha)
-    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
-        consulta = consulta.where(Campanha.usuario_id == usuario.id)  # cada um com as suas campanhas
-    elif de in ("", "minhas"):
-        de = "minhas"  # padrão: as campanhas de quem está usando a conta
-        consulta = consulta.where(Campanha.usuario_id == usuario.id)
-    elif util.para_int(de):
-        consulta = consulta.where(Campanha.usuario_id == util.para_int(de))
+    # cada um com as suas campanhas (ou as da equipe); quem vê todas escolhe de quem
+    consulta = autorizacao.filtrar(select(Campanha), usuario, "campanhas.ver", Campanha.usuario_id)
+    if ve_tudo(usuario, "campanhas.ver"):
+        if de in ("", "minhas"):
+            de = "minhas"  # padrão: as campanhas de quem está usando a conta
+            consulta = consulta.where(Campanha.usuario_id == usuario.id)
+        elif util.para_int(de):
+            consulta = consulta.where(Campanha.usuario_id == util.para_int(de))
     consulta = consulta.where(Campanha.arquivada.is_(ver == "arquivadas"))
     if ver == "aprovacao":
         consulta = consulta.where(Campanha.status == "aguardando_aprovacao")
@@ -216,7 +208,7 @@ def lista_campanhas(request: Request, ver: str = "todas", de: str = "", usuario:
                                           .group_by(Tarefa.status)).all())
     nomes_cat = {c.codigo: c.nome for c in db.execute(select(Categoria)).scalars()}
     pessoas = {u.id: u.nome for u in db.execute(select(Usuario)).scalars()}
-    equipe_ = ([] if usuario.perfil in config.PERFIS_SO_PROPRIOS else
+    equipe_ = ([] if not ve_tudo(usuario, "campanhas.ver") else
                sorted({c.usuario_id for c in db.execute(select(Campanha)).scalars() if c.usuario_id},
                       key=lambda i: pessoas.get(i, "")))
     return tela(request, "campanhas.html", {"campanhas": lista, "contagens": contagens, "ver": ver, "de": de,
@@ -225,7 +217,7 @@ def lista_campanhas(request: Request, ver: str = "todas", de: str = "", usuario:
 
 
 @rotas.get("/campanhas/nova")
-def nova_campanha(request: Request, pedido: str = "", usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def nova_campanha(request: Request, pedido: str = "", usuario: Usuario = Depends(exige("campanhas.criar")), db: Session = Depends(obter_db)):
     from .. import base_receita
 
     entendido = campanhas.interpretar_pedido(db, pedido) if pedido else None
@@ -248,7 +240,7 @@ def nova_campanha(request: Request, pedido: str = "", usuario: Usuario = Depends
 
 
 @rotas.get("/api/contagem")
-def contagem_cidade(cidade: str = "", uf: str = "", usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def contagem_cidade(cidade: str = "", uf: str = "", usuario: Usuario = Depends(exige("campanhas.criar")), db: Session = Depends(obter_db)):
     """Quantas empresas de cada categoria existem na cidade (para a tela de nova campanha)."""
     from .. import base_receita
 
@@ -258,7 +250,7 @@ def contagem_cidade(cidade: str = "", uf: str = "", usuario: Usuario = Depends(e
 
 
 @rotas.post("/campanhas/nova", dependencies=[Depends(verificar_csrf)])
-async def criar_campanha(request: Request, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+async def criar_campanha(request: Request, usuario: Usuario = Depends(exige("campanhas.criar")), db: Session = Depends(obter_db)):
     form = await request.form()
     cats = [c for c in form.getlist("categorias") if c]
     cidade, uf = str(form.get("cidade", "")).strip(), str(form.get("estado", "")).strip().upper()
@@ -289,7 +281,7 @@ def _numeros_para_admin(db: Session, usuario: Usuario) -> list[dict]:
     from .. import conexoes
     from ..integracoes import whatsapp_leads
 
-    if usuario.perfil != "admin":
+    if not autorizacao.pode(usuario, "campanhas.escolher_numero"):
         return []
     base = whatsapp_leads.status()
     return [{"id": c.id, "nome": c.nome, "conectado": bool(conexoes.situacao(c.id, base).get("conectado"))}
@@ -301,7 +293,7 @@ def _numero_escolhido(db: Session, usuario: Usuario, form) -> str:
     from .. import conexoes
 
     escolhido = str(form.get("conexao_id") or "")
-    if usuario.perfil != "admin" or not escolhido or db.get(conexoes.ConexaoWhatsApp, escolhido) is None:
+    if not autorizacao.pode(usuario, "campanhas.escolher_numero") or not escolhido or db.get(conexoes.ConexaoWhatsApp, escolhido) is None:
         return ""
     return escolhido
 
@@ -313,7 +305,7 @@ def _nome_automatico(db: Session, cats: list[str], cidade: str) -> str:
 
 
 @rotas.get("/campanhas/{cid:int}")
-def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(exige("campanhas.ver")), db: Session = Depends(obter_db)):
     from .. import conexoes
 
     camp = _campanha(db, cid, usuario)
@@ -333,8 +325,7 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(equipe),
     testaveis_q = (select(Campanha).where(Campanha.arquivada.is_(False),
                                           Campanha.status.in_(["aguardando_aprovacao", "ativa", "pausada"]))
                    .order_by(Campanha.criado_em.desc()).limit(50))
-    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
-        testaveis_q = testaveis_q.where(Campanha.usuario_id == usuario.id)
+    testaveis_q = autorizacao.filtrar(testaveis_q, usuario, "campanhas.ver", Campanha.usuario_id)
     testaveis = db.execute(testaveis_q).scalars().all()
     if camp not in testaveis:
         testaveis.insert(0, camp)
@@ -346,7 +337,7 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(equipe),
         "whatsapp_hoje": whatsapp_hoje, "numero_whatsapp": numero, "sem_numero": sem_numero,
         "disparar": {k: len(v) for k, v in campanhas.para_disparar(db, camp).items()},
         "numeros_admin": _numeros_para_admin(db, usuario),
-        "pode_gerenciar": ve_tudo(usuario) or camp.usuario_id == usuario.id,
+        "pode_gerenciar": autorizacao.pode(usuario, "campanhas.gerenciar", camp),
         "dono": db.get(Usuario, camp.usuario_id) if camp.usuario_id else None,
         "c": camp, "resumo": campanhas.resumo_aprovacao(db, camp), "nomes_categorias": nomes,
         "rodando": camp.status == "gerando", "pode_aprovar": True,
@@ -355,16 +346,16 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(equipe),
 
 
 @rotas.post("/campanhas/{cid:int}/{acao}", dependencies=[Depends(verificar_csrf)])
-async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario = Depends(equipe),
+async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario = Depends(exige("campanhas.gerenciar")),
                         db: Session = Depends(obter_db)):
-    camp = _campanha(db, cid, usuario)
+    camp = _campanha(db, cid, usuario, "campanhas.gerenciar")
     form = await request.form()
     if acao in ("arquivar", "desarquivar", "excluir"):
-        if not (ve_tudo(usuario) or camp.usuario_id == usuario.id):
+        if not autorizacao.pode(usuario, "campanhas.gerenciar", camp):
             avisar(request, "Só quem criou a campanha (ou o administrador/gestor) pode arquivar ou excluir.", "erro")
             return voltar(f"/campanhas/{cid}")
         if acao == "excluir":
-            if camp.status in ("ativa", "pausada") and not ve_tudo(usuario):
+            if camp.status in ("ativa", "pausada") and not autorizacao.pode(usuario, "campanhas.excluir_andamento"):
                 avisar(request, "Esta campanha está em andamento: peça ao administrador ou gestor para excluir.", "erro")
                 return voltar(f"/campanhas/{cid}")
             nome = camp.nome
@@ -484,7 +475,7 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
         db.commit()
         return voltar(f"/campanhas/{cid}#disparar")
     elif acao == "numero":
-        if usuario.perfil != "admin":
+        if not autorizacao.pode(usuario, "campanhas.escolher_numero"):
             avisar(request, "Só o administrador escolhe o número da campanha.", "erro")
         else:
             camp.conexao_id = _numero_escolhido(db, usuario, form)
@@ -512,7 +503,7 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
 
 @rotas.get("/inteligencia")
 def inteligencia(request: Request, periodo: str = "90d", uf: str = "", cidade: str = "",
-                 usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+                 usuario: Usuario = Depends(exige("inteligencia.ver")), db: Session = Depends(obter_db)):
     p = metricas.periodo(periodo)
     return tela(request, "inteligencia.html", {
         "p": p, "periodo": periodo, "uf": uf, "cidade": cidade, **metricas.inteligencia(db, usuario, p),
@@ -533,7 +524,7 @@ ESQUEMA_CATEGORIAS = {
 
 
 @rotas.post("/inteligencia/sugerir-categorias", dependencies=[Depends(verificar_csrf)])
-def sugerir_categorias(request: Request, usuario: Usuario = Depends(ferramentas), db: Session = Depends(obter_db)):
+def sugerir_categorias(request: Request, usuario: Usuario = Depends(exige("categorias.sugerir")), db: Session = Depends(obter_db)):
     if not ia.disponivel():
         avisar(request, "Para a IA sugerir novas categorias, configure ANTHROPIC_API_KEY no .env.", "alerta")
         return voltar("/inteligencia")
@@ -556,7 +547,7 @@ def sugerir_categorias(request: Request, usuario: Usuario = Depends(ferramentas)
 # ---------------------------------------------------------------- Categorias e base de conhecimento
 
 @rotas.get("/categorias")
-def categorias(request: Request, usuario: Usuario = Depends(ferramentas), db: Session = Depends(obter_db)):
+def categorias(request: Request, usuario: Usuario = Depends(exige("categorias.ver")), db: Session = Depends(obter_db)):
     from .. import base_receita
 
     return tela(request, "categorias.html", {
@@ -568,7 +559,7 @@ def categorias(request: Request, usuario: Usuario = Depends(ferramentas), db: Se
 
 
 @rotas.post("/categorias/{cid:int}", dependencies=[Depends(verificar_csrf)])
-async def salvar_categoria(request: Request, cid: int, usuario: Usuario = Depends(admin), db: Session = Depends(obter_db)):
+async def salvar_categoria(request: Request, cid: int, usuario: Usuario = Depends(exige("categorias.editar")), db: Session = Depends(obter_db)):
     form = await request.form()
     c = Categoria() if cid == 0 else db.get(Categoria, cid)
     if c is None:
@@ -606,13 +597,13 @@ async def salvar_categoria(request: Request, cid: int, usuario: Usuario = Depend
 
 
 @rotas.get("/conhecimento")
-def conhecimento(request: Request, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def conhecimento(request: Request, usuario: Usuario = Depends(exige("conhecimento.ver")), db: Session = Depends(obter_db)):
     return tela(request, "conhecimento.html", {"itens": db.execute(select(Conhecimento).order_by(Conhecimento.id)).scalars().all()})
 
 
 @rotas.post("/conhecimento/{kid:int}", dependencies=[Depends(verificar_csrf)])
 def salvar_conhecimento(request: Request, kid: int, pergunta: str = Form(...), resposta: str = Form(...),
-                        ativa: str = Form(""), excluir: str = Form(""), usuario: Usuario = Depends(ferramentas),
+                        ativa: str = Form(""), excluir: str = Form(""), usuario: Usuario = Depends(exige("conhecimento.editar")),
                         db: Session = Depends(obter_db)):
     item = Conhecimento() if kid == 0 else db.get(Conhecimento, kid)
     if item is None:
@@ -635,7 +626,7 @@ def salvar_conhecimento(request: Request, kid: int, pergunta: str = Form(...), r
 
 
 @rotas.get("/notificacoes")
-def notificacoes(request: Request, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def notificacoes(request: Request, usuario: Usuario = Depends(exige("painel.ver")), db: Session = Depends(obter_db)):
     lista = db.execute(select(Notificacao).where(Notificacao.usuario_id == usuario.id)
                        .order_by(Notificacao.criado_em.desc()).limit(100)).scalars().all()
     for n in lista:

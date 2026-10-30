@@ -157,6 +157,9 @@ def criar_tabelas() -> None:
     migrar_colunas()
     with sessao() as db:
         modelos.dados_iniciais(db)
+        from . import autorizacao
+
+        autorizacao.preparar(db)
         migrar_status(db)
         base_receita.ajustar_base_antiga(db)
 
@@ -173,6 +176,9 @@ def _versao_do_esquema() -> str:
     partes = sorted(f"{t.name}.{c.name}" for t in Base.metadata.tables.values() for c in t.columns)
     # dados padrão também contam: segmento ou modelo novo faz a nuvem preparar o banco de novo
     partes += [c["codigo"] for c in config.CATEGORIAS_PADRAO] + sorted(modelos_segmento.SEGMENTOS)
+    from .autorizacao import CATALOGO
+
+    partes += [f"{p.codigo}:{p.padrao}" for p in CATALOGO]  # permissão nova: a nuvem dá o padrão aos papéis
     return hashlib.sha256("|".join(partes).encode()).hexdigest()[:16]
 
 

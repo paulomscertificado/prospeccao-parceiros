@@ -7,10 +7,10 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from .. import config, mensagens, util
+from .. import autorizacao, mensagens, util
 from ..banco import agora, ler_config, obter_db
 from ..modelos import Campanha, Lead, Mensagem, Tarefa, Usuario
-from ..seguranca import equipe
+from ..seguranca import exige
 from ..web import tela
 
 rotas = APIRouter()
@@ -22,15 +22,16 @@ PERIODOS = {"hoje": ("Hoje", 0), "7d": ("7 dias", 7), "30d": ("30 dias", 30), "9
 
 
 def _so_dele(consulta, usuario: Usuario):
-    """Funcionário/vendedor: só os envios dos próprios leads (ou feitos por ele)."""
-    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
-        return consulta.where(or_(Lead.vendedor_id == usuario.id, Mensagem.usuario_id == usuario.id))
-    return consulta
+    """Só os envios dos leads que a pessoa alcança (ou feitos por ela)."""
+    ids = autorizacao.donos_visiveis(usuario, "envios.ver")
+    if ids is None:
+        return consulta
+    return consulta.where(or_(Lead.vendedor_id.in_(sorted(ids)), Mensagem.usuario_id == usuario.id))
 
 
 @rotas.get("/envios")
 def tela_envios(request: Request, canal: str = "", status: str = "", campanha: str = "", periodo: str = "7d",
-                lead: str = "", busca: str = "", usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+                lead: str = "", busca: str = "", usuario: Usuario = Depends(exige("envios.ver")), db: Session = Depends(obter_db)):
     hoje = date.today()
     dias = PERIODOS.get(periodo, PERIODOS["7d"])[1]
     desde = agora().replace(hour=0, minute=0, second=0) - timedelta(days=dias)
@@ -59,8 +60,9 @@ def tela_envios(request: Request, canal: str = "", status: str = "", campanha: s
     proximos_q = (select(Tarefa).join(Campanha, Tarefa.campanha_id == Campanha.id).outerjoin(Lead, Tarefa.lead_id == Lead.id)
                   .where(Tarefa.status == "pendente", Tarefa.canal.in_(["email", "whatsapp"]),
                          Campanha.status == "ativa", Tarefa.data <= hoje + timedelta(days=3)))
-    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
-        proximos_q = proximos_q.where(or_(Lead.vendedor_id == usuario.id, Campanha.usuario_id == usuario.id))
+    ids = autorizacao.donos_visiveis(usuario, "envios.ver")
+    if ids is not None:
+        proximos_q = proximos_q.where(or_(Lead.vendedor_id.in_(sorted(ids)), Campanha.usuario_id.in_(sorted(ids))))
     if canal in ("email", "whatsapp"):
         proximos_q = proximos_q.where(Tarefa.canal == canal)
     if busca.strip():
@@ -88,8 +90,7 @@ def tela_envios(request: Request, canal: str = "", status: str = "", campanha: s
         "limite_diario_campanha", "limite_diario_dominio", "horas_entre_contatos", "horario_envio_inicio",
         "horario_envio_fim", "enviar_email_automatico", "enviar_whatsapp_automatico", "dias_sem_resposta")}
     camp_q = select(Campanha).where(Campanha.arquivada.is_(False)).order_by(Campanha.criado_em.desc()).limit(100)
-    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
-        camp_q = camp_q.where(Campanha.usuario_id == usuario.id)
+    camp_q = autorizacao.filtrar(camp_q, usuario, "envios.ver", Campanha.usuario_id)
     lead_obj = db.get(Lead, util.para_int(lead)) if util.para_int(lead) else None
     ids = {m.lead_id for m in lista if m.lead_id} | {t.lead_id for t in proximos if t.lead_id}
     leads_por_id = {l.id: l for l in db.execute(select(Lead).where(Lead.id.in_(ids))).scalars()} if ids else {}

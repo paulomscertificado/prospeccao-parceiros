@@ -15,7 +15,7 @@ from email.utils import formataddr, parseaddr
 
 from sqlalchemy import select
 
-from . import config
+from . import autorizacao, config
 from .modelos import ContaEmail, Usuario
 
 GOOGLE = {"smtp_host": "smtp.gmail.com", "smtp_porta": 587, "imap_host": "imap.gmail.com", "imap_porta": 993}
@@ -74,12 +74,12 @@ def compartilhada_com(c: ContaEmail) -> list[int]:
 
 def pode_gerenciar(usuario: Usuario, c: ContaEmail) -> bool:
     """Trocar senha, pausar, remover: o dono e o administrador (a principal: só o administrador)."""
-    return usuario.perfil == "admin" or (not c.principal and c.dono_id == usuario.id)
+    return (not c.principal and c.dono_id == usuario.id) or autorizacao.pode(usuario, "email.gerenciar_todas")
 
 
 def pode_compartilhar(usuario: Usuario, c: ContaEmail) -> bool:
     """Escolher com quem a conta é compartilhada: o dono, o administrador e o gestor."""
-    return pode_gerenciar(usuario, c) or usuario.perfil == "gestor"
+    return pode_gerenciar(usuario, c) or autorizacao.pode(usuario, "email.compartilhar_todas")
 
 
 def pode_usar(usuario: Usuario, c: ContaEmail) -> bool:
@@ -106,7 +106,8 @@ def todas(db) -> list[ContaEmail]:
 
 def visiveis(db, usuario: Usuario) -> list[ContaEmail]:
     """Na tela E-mail: admin e gestor veem todas (para compartilhar); os outros, as que podem usar."""
-    return [c for c in todas(db) if usuario.perfil in ("admin", "gestor") or pode_usar(usuario, c)]
+    ve_todas = autorizacao.pode(usuario, "email.compartilhar_todas") or autorizacao.pode(usuario, "email.gerenciar_todas")
+    return [c for c in todas(db) if ve_todas or pode_usar(usuario, c)]
 
 
 def minha(db, usuario: Usuario) -> ContaEmail | None:

@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block titulo %}Permissões{% endblock %}
+{% block conteudo %}
+<div class="cabecalho"><div><h1>Permissões</h1>
+  <div class="suave">Quem pode fazer o quê. Vale nesta ordem: módulo desligado → NEGAR da pessoa → PERMITIR da pessoa → papel → não pode.</div></div>
+  <a class="btn" href="/configuracoes?aba=usuarios">Usuários</a></div>
+<div class="abas">
+  {% for c, n in [("papeis","Papéis"),("usuarios","Exceções e acesso real"),("equipes","Equipes"),("modulos","Módulos")] %}<a class="{{ 'ativa' if aba == c }}" href="?aba={{ c }}">{{ n }}</a>{% endfor %}
+</div>
+
+{% if aba == 'papeis' %}
+<div class="cartao">
+  <div class="grupo-btn" style="flex-wrap:wrap">{% for p in papeis %}<a class="btn btn-pequeno {{ 'btn-primario' if papel and p.id == papel.id }}" href="?papel={{ p.codigo }}">{{ p.nome }} <span class="suave">({{ usuarios_no_papel(p) }})</span></a>{% endfor %}</div>
+  <details style="margin-top:10px"><summary class="btn btn-pequeno">+ Novo papel</summary>
+    <form method="post" action="/permissoes/papel/novo" class="campos" style="margin-top:8px">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div><label>Nome do papel</label><input type="text" name="nome" placeholder="Ex.: Vendedor sênior" required></div>
+      <div><label>Copiar as permissões de</label><select name="copiar_de">{% for p in bases_copiaveis %}<option value="{{ p.codigo }}">{{ p.nome }}</option>{% endfor %}</select></div>
+      <div><button class="btn btn-primario" style="margin-top:22px">Criar</button></div>
+    </form></details>
+</div>
+
+{% if papel %}
+<form class="cartao" method="post" action="/permissoes/papel/{{ papel.id }}">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>{{ papel.nome }} {% if papel.sistema %}<span class="selo">papel do sistema</span>{% endif %}</h2>
+  {% if not papel.sistema %}<div class="campos"><div><label>Nome</label><input type="text" name="nome" value="{{ papel.nome }}"></div></div>
+  <p class="pequeno suave">{{ papel.descricao }}</p>{% endif %}
+  {% if papel.codigo == 'admin' %}<div class="aviso aviso-info">O Administrador tem sempre acesso a tudo. Para limitar alguém, use outro papel ou uma exceção.</div>{% endif %}
+  {% if papel.codigo == 'parceiro' %}<p class="pequeno suave">O parceiro só usa o portal (vê apenas a carteira do próprio escritório).</p>{% endif %}
+  <p class="pequeno suave">"Só os próprios" = registros em que a pessoa é a responsável. "Só a equipe" = de quem é da mesma equipe (sem equipe, vale como só os próprios). Mudanças valem no próximo clique da pessoa.</p>
+  <div class="tabela-rolagem"><table>
+    <tr><th>Permissão</th><th>Código</th><th>Pode?</th></tr>
+    {% for grupo, itens in grupos %}
+    <tr><td colspan="3"><span class="etiqueta">{{ grupo }}</span></td></tr>
+    {% for p in itens %}{% set atual = do_papel.get(p.codigo, '') %}
+    <tr><td>{{ p.nome }}{% if p.modulo %} <span class="pequeno suave">· módulo {{ modulos_info[p.modulo][0] }}</span>{% endif %}</td>
+      <td class="pequeno"><code>{{ p.codigo }}</code></td>
+      <td>{% if p.com_escopo %}<select name="p__{{ p.codigo }}" aria-label="{{ p.nome }}" {{ 'disabled' if papel.codigo == 'admin' }}>
+          <option value="">Não</option>{% for c, n in escopos.items() %}<option value="{{ c }}" {{ 'selected' if atual == c }}>{{ n }}</option>{% endfor %}</select>
+        {% else %}<label class="marcar"><input type="checkbox" name="p__{{ p.codigo }}" value="tudo" {{ 'checked' if atual }} {{ 'disabled' if papel.codigo == 'admin' }}> Sim</label>{% endif %}</td></tr>
+    {% endfor %}{% endfor %}
+  </table></div>
+  {% if papel.codigo != 'admin' %}<div style="margin-top:12px" class="grupo-btn"><button class="btn btn-primario">Salvar permissões do papel</button></div>{% endif %}
+</form>
+{% if not papel.sistema %}
+<form method="post" action="/permissoes/papel/{{ papel.id }}/excluir" data-confirmar="Excluir o papel {{ papel.nome }}?"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-pequeno btn-perigo">Excluir este papel</button></form>
+{% endif %}
+{% endif %}
+
+{% elif aba == 'usuarios' %}
+<div class="cartao">
+  <form method="get" class="grupo-btn"><input type="hidden" name="aba" value="usuarios">
+    <select name="pessoa" aria-label="Pessoa" onchange="this.form.submit()"><option value="">Escolha a pessoa…</option>{% for u in usuarios %}<option value="{{ u.id }}" {{ 'selected' if alvo and alvo.id == u.id }}>{{ u.nome }} · {{ u.perfil_nome }}{{ '' if u.ativo else ' (inativo)' }}</option>{% endfor %}</select>
+    <button class="btn">Ver</button></form>
+</div>
+{% if alvo %}
+<div class="grade-2">
+<div class="cartao">
+  <h2>Exceções de {{ alvo.nome }}</h2>
+  <p class="pequeno suave">Papel: <b>{{ papel_do_alvo.nome if papel_do_alvo else alvo.perfil_nome }}</b>{% if alvo.equipe %} · Equipe: <b>{{ alvo.equipe.nome }}</b>{% endif %}. A exceção vale só para esta pessoa e sempre vence o papel (o NEGAR vence tudo).</p>
+  {% if excecoes %}<table>
+    <tr><th>Regra</th><th>Até</th><th>Motivo</th><th></th></tr>
+    {% for e in excecoes %}<tr><td><b>{{ e.efeito|upper }}</b> {{ todas_por_codigo[e.permissao].nome if e.permissao in todas_por_codigo else e.permissao }}{% if e.escopo %} <span class="suave">({{ escopos[e.escopo] }})</span>{% endif %}</td>
+      <td>{{ e.ate|data if e.ate else 'sem prazo' }}{% if e.ate and e.ate < hoje %} <span class="selo">vencida</span>{% endif %}</td>
+      <td class="pequeno">{{ e.motivo }}<div class="suave">por {{ nomes.get(e.criado_por_id, '?') }} em {{ e.criado_em|datahora }}</div></td>
+      <td><form method="post" action="/permissoes/excecao/{{ e.id }}/remover"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-pequeno">Remover</button></form></td></tr>{% endfor %}
+  </table>{% else %}<p class="suave">Nenhuma exceção: vale só o que o papel permite.</p>{% endif %}
+  <h3 style="margin-top:16px">Nova exceção</h3>
+  <form method="post" action="/permissoes/excecao" class="campos">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="usuario_id" value="{{ alvo.id }}">
+    <div class="largo"><label>Permissão</label><select name="permissao" required>{% for p in todas %}<option value="{{ p.codigo }}">{{ p.grupo }} · {{ p.nome }}</option>{% endfor %}</select></div>
+    <div><label>Regra</label><select name="efeito"><option value="permitir">PERMITIR</option><option value="negar">NEGAR</option></select></div>
+    <div><label>Alcance (só no PERMITIR)</label><select name="escopo"><option value="">O do papel</option>{% for c, n in escopos.items() %}<option value="{{ c }}">{{ n }}</option>{% endfor %}</select></div>
+    <div><label>Até (opcional)</label><input type="date" name="ate"></div>
+    <div class="largo"><label>Motivo</label><input type="text" name="motivo" placeholder="Ex.: cobrindo as férias da Ana"></div>
+    <div><button class="btn btn-primario">Salvar exceção</button></div>
+  </form>
+</div>
+<div class="cartao">
+  <h2>Acesso real de {{ alvo.nome }}</h2>
+  <p class="pequeno suave">O que a pessoa consegue fazer agora, e por quê.</p>
+  <div class="tabela-rolagem"><table>
+    {% for grupo, linhas in acesso %}
+    <tr><td colspan="2"><span class="etiqueta">{{ grupo }}</span></td></tr>
+    {% for l in linhas %}<tr><td>{{ l.p.nome }}</td>
+      <td>{% if l.escopo %}<b style="color:#116b40">✔ {{ escopos[l.escopo] if l.p.com_escopo else 'Sim' }}</b>{% else %}<span class="suave">✖ Não</span>{% endif %}<div class="pequeno suave">{{ l.motivo }}</div></td></tr>{% endfor %}
+    {% endfor %}
+  </table></div>
+</div>
+</div>
+{% endif %}
+
+{% elif aba == 'equipes' %}
+<div class="cartao" style="max-width:720px">
+  <h2>Equipes</h2>
+  <p class="pequeno suave">Opcional. Servem para o alcance "Só a equipe" (ex.: um gestor de unidade que vê só os leads do time dele). Quem faz parte de cada equipe se escolhe em Configurações &gt; Usuários.</p>
+  <table>
+    <tr><th>Equipe</th><th class="num">Pessoas</th><th></th></tr>
+    {% for e in equipes %}<tr>
+      <td><input form="eq-{{ e.id }}" type="text" name="nome" value="{{ e.nome }}" aria-label="Nome da equipe"></td>
+      <td class="num">{{ membros.get(e.id, 0) }}</td>
+      <td><form id="eq-{{ e.id }}" method="post" action="/permissoes/equipes/{{ e.id }}" class="grupo-btn"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn btn-pequeno">Salvar</button>
+        <button class="btn btn-pequeno btn-perigo" name="excluir" value="1" data-confirmar="Excluir a equipe {{ e.nome }}?">Excluir</button></form></td></tr>
+    {% else %}<tr><td colspan="3" class="suave">Nenhuma equipe ainda.</td></tr>{% endfor %}
+  </table>
+  <form method="post" action="/permissoes/equipes/0" class="campos" style="margin-top:12px"><input type="hidden" name="csrf" value="{{ csrf }}">
+    <div><label>Nova equipe</label><input type="text" name="nome" placeholder="Ex.: Unidade Recife" required></div>
+    <div><button class="btn btn-primario" style="margin-top:22px">Criar</button></div></form>
+</div>
+
+{% elif aba == 'modulos' %}
+<form class="cartao" method="post" action="/permissoes/modulos" style="max-width:720px">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>Módulos</h2>
+  <p class="pequeno suave">Módulo desligado some do menu e fica bloqueado para todos, até para quem tem a permissão. O que já está rodando sozinho (ex.: uma campanha aprovada) continua: para parar, pause a campanha.</p>
+  {% for codigo, (nome, chave) in modulos_info.items() %}
+  <label class="marcar"><input type="checkbox" name="m__{{ codigo }}" {{ 'checked' if modulos[codigo] }}> {{ nome }}</label>
+  {% endfor %}
+  <div style="margin-top:12px"><button class="btn btn-primario">Salvar módulos</button></div>
+</form>
+{% endif %}
+{% endblock %}

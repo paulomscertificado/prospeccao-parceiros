@@ -141,6 +141,27 @@ Configure as categorias em Configurações > **Categorias de parceiros** e o que
 
 Crie usuários em **Configurações > Usuários** (o perfil padrão é Funcionário MS).
 
+### Permissões (menu Permissões, só o administrador)
+
+Cada perfil acima é um **papel**. No menu **Permissões** você pode:
+
+1. **Papéis:** ver e mudar o que cada papel pode fazer. Em cada item escolha **Não**, **Só os próprios** (só o que é
+   da pessoa), **Só a equipe** ou **Tudo**. Clique em **Salvar permissões do papel**. O Administrador tem sempre tudo.
+2. **Novo papel:** clique em **+ Novo papel**, dê um nome (ex.: "Vendedor sênior"), escolha de qual papel copiar e
+   ajuste. Depois escolha esse papel para a pessoa em Configurações > Usuários.
+3. **Exceções e acesso real:** escolha uma pessoa para dar uma exceção só para ela:
+   - **PERMITIR** libera algo que o papel não dá (ex.: cobrir as férias de alguém, até uma data);
+   - **NEGAR** tira algo do papel (ex.: não exportar planilhas). O NEGAR sempre vence.
+   Ao lado aparece o **acesso real** da pessoa: o que ela consegue fazer agora e por quê.
+4. **Equipes:** crie equipes (ex.: "Unidade Recife") e escolha a equipe de cada pessoa em Configurações > Usuários.
+   Serve para o alcance "Só a equipe" (ex.: um líder que vê os leads do time dele).
+5. **Módulos:** ligue ou desligue partes inteiras (Vendas, Agenda, IA SDR, Prospecção, Conversas, IA Comercial,
+   Portal). Desligado some do menu **e fica bloqueado para todos**.
+
+Se alguém tentar abrir um lead, parceiro, cliente ou venda de outra pessoa trocando o número no endereço, o sistema
+responde "Página não encontrada". Toda mudança de permissão fica no **Registro de atividades**. Quem receber poder de
+administrar (usuários, configurações ou permissões) passa a entrar também com o código do celular.
+
 **Verificação em 2 etapas (administrador e gestor):** além da senha, o sistema pede um código de 6 números do
 celular.
 1. Instale no celular o app **Google Authenticator** ou **Microsoft Authenticator** (grátis).

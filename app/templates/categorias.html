@@ -15,7 +15,7 @@
   <div class="largo"><label>Estratégia sugerida</label><textarea name="estrategia" style="min-height:50px">{{ c.estrategia or '' }}</textarea></div>
   <div class="largo"><label>Abertura da mensagem (use {{ '{{empresa}}' }} e {{ '{{cidade}}' }})</label><input type="text" name="abertura" value="{{ c.abertura or '' }}"></div>
   <div class="largo"><label>Gancho da parceria</label><input type="text" name="gancho" value="{{ c.gancho or '' }}"></div>
-  {% if usuario.perfil == 'admin' %}<div><button class="btn btn-primario">Salvar</button></div>{% endif %}
+  {% if pode('categorias.editar') %}<div><button class="btn btn-primario">Salvar</button></div>{% endif %}
 </form>
 {% endmacro %}
 {% block conteudo %}
@@ -29,7 +29,7 @@
     <td class="num">{{ '{:,}'.format(contagem.get(c.codigo, 0)).replace(',', '.') }}</td>
     <td><details><summary class="btn btn-pequeno">Editar</summary>{{ formulario(c) }}</details></td></tr>{% endfor %}
 </table></div></div>
-{% if usuario.perfil == 'admin' %}
+{% if pode('categorias.editar') %}
 <div class="cartao" id="nova"><h2>Nova categoria</h2>
   {{ formulario({'nome': nova, 'motivo': motivo_novo, 'palavras_chave': palavras_novas, 'estrategia': estrategia_nova, 'prioridade': 50, 'aderencia': 10, 'ativa': True}, True) }}
   <p class="ajuda">Depois de criar ou mudar CNAEs, importe a base da Receita de novo para trazer as empresas da categoria.</p></div>

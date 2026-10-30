@@ -18,7 +18,7 @@
   </table></div>
   <div class="grupo-btn" style="margin-top:10px">
     <button type="button" class="btn" id="mais-passo">+ Adicionar passo</button>
-    {% if usuario.perfil in config.PERFIS_FERRAMENTAS %}<button class="btn btn-primario">Salvar cadência</button>{% else %}<span class="suave">Só administrador e gestor alteram cadências.</span>{% endif %}
+    {% if pode('cadencias.editar') %}<button class="btn btn-primario">Salvar cadência</button>{% else %}<span class="suave">Só administrador e gestor alteram cadências.</span>{% endif %}
   </div>
   <p class="ajuda">Dia 1 = data de início da campanha. Sábados e domingos são pulados (ajuste em Configurações).</p>
   <template id="modelo-passo">{% set p = none %}{% include "_passo.html" %}</template>

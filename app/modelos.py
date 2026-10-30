@@ -150,10 +150,62 @@ class Usuario(Base):
     totp_ultimo_passo: Mapped[int] = mapped_column(Integer, default=0)
     totp_recuperacao: Mapped[str] = mapped_column(Text, default="")
     versao_2fa: Mapped[int] = mapped_column(Integer, default=1)
+    # Permissões (app/autorizacao.py): "perfil" é o tipo base (admin, gestor, funcionario, vendedor, parceiro).
+    # papel_id só é usado em papéis criados pelo administrador; sem ele vale o papel do sistema com o código do perfil.
+    papel_id: Mapped[int | None] = mapped_column(ForeignKey("papeis.id"), nullable=True)
+    equipe_id: Mapped[int | None] = mapped_column(ForeignKey("equipes.id"), nullable=True)
+    papel = relationship("Papel", foreign_keys=[papel_id], lazy="joined")
+    equipe = relationship("Equipe", foreign_keys=[equipe_id])
 
     @property
     def perfil_nome(self) -> str:
+        if self.papel is not None:
+            return self.papel.nome
         return config.PERFIS.get(self.perfil, self.perfil)
+
+
+class Equipe(Base):
+    """Equipe (unidade) da empresa. Serve para o alcance "só a equipe" das permissões."""
+    __tablename__ = "equipes"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nome: Mapped[str] = mapped_column(String(120), unique=True)
+    criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
+
+
+class Papel(Base):
+    """Papel (conjunto de permissões). Os 5 do sistema têm o código do perfil; os outros são criados na tela."""
+    __tablename__ = "papeis"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    codigo: Mapped[str] = mapped_column(String(40), unique=True)
+    nome: Mapped[str] = mapped_column(String(120))
+    base: Mapped[str] = mapped_column(String(20), default="vendedor")    # perfil base (tipo de usuário)
+    sistema: Mapped[bool] = mapped_column(Boolean, default=False)
+    descricao: Mapped[str] = mapped_column(Text, default="")
+    # Permissões do catálogo já consideradas: as que entram em versões novas recebem o padrão do perfil base.
+    permissoes_conhecidas: Mapped[str] = mapped_column(Text, default="")
+    criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
+
+
+class PermissaoPapel(Base):
+    __tablename__ = "permissoes_papel"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    papel_id: Mapped[int] = mapped_column(ForeignKey("papeis.id"), index=True)
+    permissao: Mapped[str] = mapped_column(String(60))
+    escopo: Mapped[str] = mapped_column(String(10), default="tudo")      # tudo | equipe | proprios
+
+
+class ExcecaoPermissao(Base):
+    """Exceção de um usuário: PERMITIR ou NEGAR uma permissão (o NEGAR sempre vence)."""
+    __tablename__ = "excecoes_permissao"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), index=True)
+    permissao: Mapped[str] = mapped_column(String(60))
+    efeito: Mapped[str] = mapped_column(String(10))                       # permitir | negar
+    escopo: Mapped[str] = mapped_column(String(10), default="")           # vazio = o do papel
+    ate: Mapped[date | None] = mapped_column(Date, nullable=True)         # vazio = sem prazo
+    motivo: Mapped[str] = mapped_column(String(300), default="")
+    criado_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"), nullable=True)
+    criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
 
 
 class Categoria(Base):

@@ -13,11 +13,11 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import config, conexoes
+from .. import autorizacao, config, conexoes
 from ..banco import agora, gravar_config, obter_db
 from ..integracoes import whatsapp_leads
 from ..modelos import ComandoWhatsApp, ConexaoWhatsApp, Usuario
-from ..seguranca import equipe, registrar_log, verificar_csrf
+from ..seguranca import exige, registrar_log, verificar_csrf
 from ..web import avisar, tela, voltar
 
 rotas = APIRouter()
@@ -40,7 +40,8 @@ def _estado(db: Session, usuario: Usuario) -> dict:
     db.commit()
     base = whatsapp_leads.status(usar_cache=False)
     nomes = {u.id: u.nome for u in db.execute(select(Usuario)).scalars()}
-    lista = conexoes.todas(db) if usuario.perfil == "gestor" else conexoes.acessiveis(db, usuario)  # gestor compartilha
+    lista = (conexoes.todas(db) if autorizacao.pode(usuario, "whatsapp.compartilhar_todos")
+             else conexoes.acessiveis(db, usuario))  # quem compartilha os números de todos vê todos
     cartoes = [_cartao(db, usuario, c, base, nomes) for c in lista]
     ultimo = db.execute(select(ComandoWhatsApp).where(ComandoWhatsApp.usuario_id == usuario.id)
                         .order_by(ComandoWhatsApp.id.desc()).limit(1)).scalars().first()
@@ -56,7 +57,7 @@ def _estado(db: Session, usuario: Usuario) -> dict:
 
 
 @rotas.get("/whatsapp")
-def tela_whatsapp(request: Request, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def tela_whatsapp(request: Request, usuario: Usuario = Depends(exige("whatsapp.ver")), db: Session = Depends(obter_db)):
     estado = _estado(db, usuario)
     equipe_ = [{"id": u.id, "nome": u.nome} for u in db.execute(
         select(Usuario).where(Usuario.perfil != "parceiro", Usuario.ativo.is_(True)).order_by(Usuario.nome)).scalars()]
@@ -65,13 +66,13 @@ def tela_whatsapp(request: Request, usuario: Usuario = Depends(equipe), db: Sess
 
 
 @rotas.get("/whatsapp/estado")
-def estado_whatsapp(usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def estado_whatsapp(usuario: Usuario = Depends(exige("whatsapp.ver")), db: Session = Depends(obter_db)):
     return JSONResponse(_estado(db, usuario))
 
 
 @rotas.post("/whatsapp/comando", dependencies=[Depends(verificar_csrf)])
 async def comando_whatsapp(request: Request, acao: str = Form(...), numero: str = Form(""),
-                           usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+                           usuario: Usuario = Depends(exige("whatsapp.ver")), db: Session = Depends(obter_db)):
     if not config.WHATSAPP_PONTE:
         avisar(request, "Neste computador, use a tela WhatsApp do próprio WhatsApp Leads.", "alerta")
         return voltar("/whatsapp")
@@ -81,7 +82,7 @@ async def comando_whatsapp(request: Request, acao: str = Form(...), numero: str 
     form = await request.form()
     dados: dict = {}
     if acao == "salvar_regras":
-        if usuario.perfil != "admin":
+        if not autorizacao.pode(usuario, "whatsapp.regras"):
             avisar(request, "Só o administrador muda as regras de envio.", "erro")
             return voltar("/whatsapp")
         dados = {c: str(form.get(c, "")).strip() for c in ("intervalo_min_seg", "intervalo_max_seg", "limite_diario",
@@ -123,7 +124,7 @@ async def comando_whatsapp(request: Request, acao: str = Form(...), numero: str 
 
 
 @rotas.post("/whatsapp/compartilhar", dependencies=[Depends(verificar_csrf)])
-async def compartilhar(request: Request, numero: str = Form(...), usuario: Usuario = Depends(equipe),
+async def compartilhar(request: Request, numero: str = Form(...), usuario: Usuario = Depends(exige("whatsapp.ver")),
                        db: Session = Depends(obter_db)):
     """Compartilhar um número com toda a equipe ou com pessoas escolhidas (o dono, o administrador e o gestor)."""
     c = db.get(ConexaoWhatsApp, numero)

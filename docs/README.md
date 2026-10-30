@@ -8,6 +8,7 @@
 | [deploy-vercel.md](deploy-vercel.md) | **Publicar na Vercel**: o que muda na nuvem, trabalhos em etapas, agendador, ponte do WhatsApp, passo a passo |
 | [deploy.md](deploy.md) | 10. Como colocar o sistema em produção (Docker + PostgreSQL + HTTPS) |
 | [arquitetura.md](arquitetura.md) | Decisões técnicas, fluxo, banco de dados (schema), segurança |
+| [permissoes.md](permissoes.md) | **Permissões em camadas**: papéis, permissões `recurso.acao`, alcance, exceções, equipes, módulos, como proteger uma rota nova |
 | [api.md](api.md) | Rotas (telas e API JSON), webhooks, formatos de importação/exportação |
 | [componentes.md](componentes.md) | O que cada arquivo/módulo do código faz |
 | [design-system.md](design-system.md) | Cores, componentes visuais, tom de voz das mensagens |

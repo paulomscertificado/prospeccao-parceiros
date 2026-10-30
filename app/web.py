@@ -9,7 +9,7 @@ from fastapi.responses import RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup
 
-from . import config, score, util
+from . import autorizacao, config, score, util
 from .seguranca import token_csrf
 
 PASTA = Path(__file__).resolve().parent
@@ -28,6 +28,18 @@ f["json"] = lambda v: Markup(json.dumps(v, ensure_ascii=False, default=str).repl
 f["primeiro_nome"] = util.primeiro_nome
 modelos_html.env.globals.update(config=config, CANAIS=config.CANAIS, PERFIS=config.PERFIS)
 
+# Cada item aparece só para quem tem a permissão (e com o módulo ligado). A proteção de verdade é a da rota.
+PERMISSAO_DO_MENU = {
+    "/": "painel.ver", "/campanhas": "campanhas.ver", "/envios": "envios.ver", "/fila": "fila.ver",
+    "/oportunidades": "oportunidades.ver", "/prospeccao": "prospeccao.buscar", "/leads": "leads.ver",
+    "/agenda": "agenda.ver", "/cadencias": "cadencias.ver", "/parceiros": "parceiros.ver", "/clientes": "clientes.ver",
+    "/vencimentos": "vencimentos.ver", "/vendas": "vendas.ver", "/comissoes": "comissoes.ver",
+    "/relatorios": "relatorios.ver", "/inteligencia": "inteligencia.ver", "/ia": "ia.usar", "/conversas": "conversas.ver",
+    "/whatsapp": "whatsapp.ver", "/email": "email.ver", "/permissoes": "permissoes.gerenciar",
+    "/configuracoes": "configuracoes.ver",
+    "/portal": "portal.usar", "/portal/indicar": "portal.usar", "/portal/clientes": "portal.usar",
+    "/portal/vencimentos": "portal.usar",
+}
 MENU_EQUIPE = [
     ("/", "Dashboard", "grafico"),
     ("/campanhas", "IA SDR (campanhas)", "megafone"),
@@ -49,10 +61,9 @@ MENU_EQUIPE = [
     ("/conversas", "Conversas", "conversa"),
     ("/whatsapp", "WhatsApp", "celular"),
     ("/email", "E-mail", "carta"),
+    ("/permissoes", "Permissões", "cadeado"),
     ("/configuracoes", "Configurações", "engrenagem"),
 ]
-# Áreas que só aparecem com a configuração "mostrar_vendas" = 1 (Configurações > Geral)
-AREAS_DE_VENDAS = {"/vencimentos", "/vendas", "/comissoes"}
 MENU_PARCEIRO = [
     ("/portal", "Meu painel", "grafico"),
     ("/portal/indicar", "Indicar cliente", "pessoas"),
@@ -88,6 +99,8 @@ def tela(request: Request, nome: str, contexto: dict | None = None, status_code:
         with FabricaSessao() as db:
             wl = conexoes.para_o_menu(db, usuario)
             db.commit()
+    permissoes = autorizacao.efetivas(usuario) if usuario else {}
+    menu = MENU_PARCEIRO if usuario and usuario.perfil == "parceiro" else MENU_EQUIPE
     dados = {
         "request": request,
         "usuario": usuario,
@@ -95,9 +108,10 @@ def tela(request: Request, nome: str, contexto: dict | None = None, status_code:
         "wl": wl,
         "csrf": token_csrf(request),
         "avisos": request.session.pop("avisos", []),
-        "menu": (MENU_PARCEIRO if usuario.perfil == "parceiro" else
-                 [m for m in MENU_EQUIPE if (mostrar_vendas or m[0] not in AREAS_DE_VENDAS)
-                  and (mostrar_agenda or m[0] != "/agenda")]) if usuario else [],
+        "menu": [m for m in menu if PERMISSAO_DO_MENU[m[0]] in permissoes] if usuario else [],
+        # nas telas: {% if pode('leads.atribuir') %} (só esconde o botão; a rota confere de novo)
+        "pode": lambda codigo: codigo in permissoes,
+        "ve_tudo_em": lambda codigo: permissoes.get(codigo) == autorizacao.TUDO,
         "mostrar_vendas": mostrar_vendas,
         "mostrar_agenda": mostrar_agenda,
         "caminho": request.url.path,

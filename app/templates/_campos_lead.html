@@ -20,7 +20,7 @@
   <div><label>Especialidade</label><input type="text" name="especialidade" value="{{ lead.especialidade or '' }}" list="lista-especialidades"></div>
   <div><label>Categoria de parceiro</label><select name="categoria_id"><option value="">—</option>{% for c in categorias or [] %}<option value="{{ c.id }}" {{ 'selected' if lead.categoria_id == c.id }}>{{ c.nome }}</option>{% endfor %}</select></div>
   <div><label>Origem do lead</label><input type="text" name="origem" value="{{ lead.origem or '' }}"></div>
-  {% if usuario.perfil in ['admin','gestor'] %}
+  {% if pode('leads.atribuir') %}
   <div><label>Vendedor responsável</label><select name="vendedor_id"><option value="">—</option>{% for v in vendedores %}<option value="{{ v.id }}" {{ 'selected' if lead.vendedor_id == v.id }}>{{ v.nome }}</option>{% endfor %}</select></div>
   {% endif %}
   <div><label>Próximo contato</label><input type="date" name="proximo_contato" value="{{ lead.proximo_contato.isoformat() if lead.proximo_contato else '' }}"></div>

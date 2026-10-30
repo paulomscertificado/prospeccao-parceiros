@@ -27,7 +27,7 @@
   <div class="campo"><label>Arquivo (.csv ou .xlsx, até 10 MB)</label><input type="file" name="arquivo" accept=".csv,.xlsx" required></div>
   <div class="campo"><label>Origem dos leads</label><input type="text" name="origem" placeholder="Ex.: Lista do evento CRC-PE 2026 (deixe vazio para usar o nome do arquivo)"></div>
   <div class="campo"><label>Base legal (LGPD)</label><input type="text" name="base_legal" value="Legítimo interesse (contato B2B)"></div>
-  {% if usuario.perfil in ['admin','gestor'] %}
+  {% if pode('leads.atribuir') %}
   <div class="campo"><label>Vendedor responsável</label><select name="vendedor_id"><option value="">Sem vendedor</option>{% for v in vendedores %}<option value="{{ v.id }}">{{ v.nome }}</option>{% endfor %}</select></div>{% endif %}
   <button class="btn btn-primario">Importar</button>
 </form>

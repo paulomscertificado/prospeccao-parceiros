@@ -63,7 +63,7 @@
 
 {% set outras = contas|rejectattr('minha')|list %}
 {% if outras %}
-<h2 style="margin:4px 0 10px"><span class="etiqueta">{{ 'Todas as contas' if usuario.perfil in ('admin', 'gestor') else 'Compartilhadas comigo' }}</span></h2>
+<h2 style="margin:4px 0 10px"><span class="etiqueta">{{ 'Todas as contas' if (pode('email.compartilhar_todas') or pode('email.gerenciar_todas')) else 'Compartilhadas comigo' }}</span></h2>
 <div class="contas">
   {% for conta in outras %}
   <div class="cartao conta">
@@ -77,7 +77,7 @@
     <div class="grupo-btn">
       {% if conta.usar or conta.gerenciar %}<form class="inline" method="post" action="/email/{{ conta.id }}/testar"><input type="hidden" name="csrf" value="{{ csrf }}">
         <button class="btn btn-pequeno">Enviar e-mail de teste</button></form>{% endif %}
-      {% if conta.principal and usuario.perfil == 'admin' %}<a class="btn btn-pequeno" href="/configuracoes?aba=email">Configurar o principal</a>{% endif %}
+      {% if conta.principal and pode('configuracoes.alterar') %}<a class="btn btn-pequeno" href="/configuracoes?aba=email">Configurar o principal</a>{% endif %}
       {% if conta.gerenciar and not conta.principal %}
       <form class="inline" method="post" action="/email/{{ conta.id }}/ligar"><input type="hidden" name="csrf" value="{{ csrf }}">
         <input type="hidden" name="ativa" value="{{ '0' if conta.ativa else '1' }}"><button class="btn btn-pequeno">{{ 'Pausar' if conta.ativa else 'Ligar' }}</button></form>

@@ -18,7 +18,7 @@ from ..banco import agora, gravar_config, obter_db
 from ..integracoes import whatsapp_leads
 from ..leads_servico import historico, pode_ver
 from ..modelos import ComandoWhatsApp, ContatoWhatsApp, MensagemWhatsApp, PonteWhatsApp, Usuario
-from ..seguranca import equipe, verificar_csrf
+from ..seguranca import exige, verificar_csrf
 from ..web import tela
 
 rotas = APIRouter()
@@ -67,7 +67,7 @@ def _tela_vista(db: Session) -> None:
 
 
 @rotas.get("/conversas")
-def tela_conversas(request: Request, telefone: str = "", usuario: Usuario = Depends(equipe),
+def tela_conversas(request: Request, telefone: str = "", usuario: Usuario = Depends(exige("conversas.ver")),
                    db: Session = Depends(obter_db)):
     _tela_vista(db)
     base = whatsapp_leads.status()
@@ -80,7 +80,7 @@ def tela_conversas(request: Request, telefone: str = "", usuario: Usuario = Depe
 
 
 @rotas.get("/conversas/api/lista")
-def lista(busca: str = "", numero: str = "", usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def lista(busca: str = "", numero: str = "", usuario: Usuario = Depends(exige("conversas.ver")), db: Session = Depends(obter_db)):
     _tela_vista(db)
     numeros = _numeros(db, usuario, numero)
     nomes_numeros = {c.id: c.nome for c in conexoes.todas(db)}
@@ -133,7 +133,7 @@ def _situacao(db: Session, numero: str) -> dict:
 
 
 @rotas.get("/conversas/api/conversa/{telefone}")
-def conversa(telefone: str, numero: str = "", usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def conversa(telefone: str, numero: str = "", usuario: Usuario = Depends(exige("conversas.ver")), db: Session = Depends(obter_db)):
     _tela_vista(db)
     chave = _chave(telefone)
     numero = numero if numero in _numeros(db, usuario) else _numero_padrao(db, usuario)
@@ -169,7 +169,7 @@ def conversa(telefone: str, numero: str = "", usuario: Usuario = Depends(equipe)
 
 
 @rotas.post("/conversas/api/enviar", dependencies=[Depends(verificar_csrf)])
-async def enviar(request: Request, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+async def enviar(request: Request, usuario: Usuario = Depends(exige("conversas.enviar")), db: Session = Depends(obter_db)):
     dados = await request.json()
     texto = str(dados.get("texto", "")).strip()
     chave = util.normalizar_telefone(str(dados.get("telefone", "")))
@@ -201,7 +201,7 @@ async def enviar(request: Request, usuario: Usuario = Depends(equipe), db: Sessi
 
 
 @rotas.post("/conversas/api/nome", dependencies=[Depends(verificar_csrf)])
-async def editar_nome(request: Request, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+async def editar_nome(request: Request, usuario: Usuario = Depends(exige("conversas.enviar")), db: Session = Depends(obter_db)):
     """Editar o nome do contato (vale na tela Conversas e no WhatsApp Leads)."""
     dados = await request.json()
     chave = _chave(str(dados.get("telefone", "")))

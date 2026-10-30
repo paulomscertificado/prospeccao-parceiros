@@ -7,7 +7,8 @@ prospeccao-parceiros/
 │   ├── config.py          lê o .env; status, perfis, canais, UFs, configurações e produtos padrão
 │   ├── banco.py           conexão (SQLite/PostgreSQL), sessões, configurações gravadas no banco
 │   ├── modelos.py         tabelas (schema) + templates, cadência e produtos iniciais
-│   ├── seguranca.py       hash de senha, criptografia, CSRF, limites, login, permissões, auditoria
+│   ├── seguranca.py       hash de senha, criptografia, CSRF, limites, login, auditoria
+│   ├── autorizacao.py     permissões em camadas: catálogo recurso.acao, papéis, alcance, exceções, módulos, pode()/exige()
 │   ├── util.py            CNPJ (inclusive alfanumérico), telefone, domínio, datas, moeda
 │   ├── score.py           lead scoring (critérios, pesos, faixas)
 │   ├── leads_servico.py   criar/deduplicar lead, mudar status (histórico + datas do funil), opt-out,
@@ -35,6 +36,7 @@ prospeccao-parceiros/
 │   │   └── email_imap.py      leitura das respostas dos leads (IMAP)
 │   ├── rotas/
 │   │   ├── auth.py        login, primeiro acesso, troca de senha
+│   │   ├── permissoes.py  tela Permissões: papéis, exceções por usuário, acesso real, equipes e módulos
 │   │   ├── painel.py      dashboard, relatórios, exportações, IA Comercial
 │   │   ├── leads.py       leads, pipeline, ficha, mensagens, importação, prospecção
 │   │   ├── agenda.py      cadências, templates, agenda, personalização de campanha com IA

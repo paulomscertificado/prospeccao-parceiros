@@ -6,11 +6,11 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import config, ia, metricas, planilhas, util
+from .. import autorizacao, ia, metricas, planilhas, util
 from ..banco import obter_db
 from ..leads_servico import filtrar_por_usuario
 from ..modelos import Certificado, Cliente, Lead, Parceiro, Usuario, Venda
-from ..seguranca import equipe, registrar_log, ve_tudo, verificar_csrf
+from ..seguranca import SemPermissao, exige, registrar_log, usuario_logado, ve_tudo, verificar_csrf
 from ..vendas_servico import receita_renovacao_estimada
 from ..web import TIPOS_ARQUIVO, arquivo, tela
 
@@ -29,15 +29,16 @@ def _vendedores(db: Session):
 
 @rotas.get("/")
 def dashboard(request: Request, periodo: str = "30d", vendedor: str = "",
-              usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+              usuario: Usuario = Depends(exige("painel.ver")), db: Session = Depends(obter_db)):
     p = metricas.periodo(periodo)
     # padrão: os números de quem está usando a conta; "todos" = toda a equipe
-    vendedor = (None if vendedor == "todos" else (util.para_int(vendedor) or usuario.id)) if ve_tudo(usuario) else None
+    vendedor = ((None if vendedor == "todos" else (util.para_int(vendedor) or usuario.id))
+                if ve_tudo(usuario, metricas.NUMEROS) else None)
     ind = metricas.indicadores(db, usuario, p, vendedor)
     ranking = sorted(metricas.ranking_parceiros(db, usuario, p, vendedor), key=lambda r: (-r["certificados"], -r["faturamento"]))
     top = [r for r in ranking if r["certificados"]][:10]
     regioes = metricas.por_grupo(db, usuario, p, "estado", vendedor)[:10]
-    vendedores = metricas.por_vendedor(db, usuario, p) if ve_tudo(usuario) else []
+    vendedores = metricas.por_vendedor(db, usuario, p) if ve_tudo(usuario, metricas.NUMEROS) else []
     graficos = {
         "tempo": metricas.leads_por_tempo(db, usuario, vendedor),
         "funil": metricas.funil(ind),
@@ -54,7 +55,7 @@ def dashboard(request: Request, periodo: str = "30d", vendedor: str = "",
         Certificado.data_vencimento <= hoje + timedelta(days=30)).order_by(Certificado.data_vencimento).limit(8)).scalars().all()
     return tela(request, "dashboard.html", {
         "ind": ind, "p": p, "periodo": periodo, "graficos": graficos, "ranking": ranking[:5], "regioes": regioes,
-        "vendedores_perf": vendedores, "vendedores": _vendedores(db) if ve_tudo(usuario) else [],
+        "vendedores_perf": vendedores, "vendedores": _vendedores(db) if ve_tudo(usuario, metricas.NUMEROS) else [],
         "vendedor_sel": vendedor, "followups": metricas.contar_followups_hoje(db, usuario),
         "parados": metricas.parceiros_parados(db, usuario), "vencendo": vencendo,
     })
@@ -81,7 +82,7 @@ def _dados_relatorio(db: Session, usuario: Usuario, p: metricas.Periodo):
     ]
     return {
         "ind": ind, "metricas": metr, "funil": metricas.funil(ind),
-        "vendedores": metricas.por_vendedor(db, usuario, p) if ve_tudo(usuario) else [],
+        "vendedores": metricas.por_vendedor(db, usuario, p) if ve_tudo(usuario, metricas.NUMEROS) else [],
         "estados": metricas.por_grupo(db, usuario, p, "estado"),
         "cidades": metricas.por_grupo(db, usuario, p, "cidade")[:20],
         "origens": metricas.por_grupo(db, usuario, p, "origem"),
@@ -92,7 +93,7 @@ def _dados_relatorio(db: Session, usuario: Usuario, p: metricas.Periodo):
 
 
 @rotas.get("/relatorios")
-def relatorios(request: Request, periodo: str = "30d", usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def relatorios(request: Request, periodo: str = "30d", usuario: Usuario = Depends(exige("relatorios.ver")), db: Session = Depends(obter_db)):
     p = metricas.periodo(periodo)
     return tela(request, "relatorios.html", {"p": p, "periodo": periodo, **_dados_relatorio(db, usuario, p)})
 
@@ -104,7 +105,7 @@ def _tabela_grupo(titulo, linhas):
 
 
 @rotas.get("/relatorios/exportar.{formato}")
-def relatorio_exportar(request: Request, formato: str, periodo: str = "30d", usuario: Usuario = Depends(equipe),
+def relatorio_exportar(request: Request, formato: str, periodo: str = "30d", usuario: Usuario = Depends(exige("relatorios.exportar")),
                        db: Session = Depends(obter_db)):
     if formato not in TIPOS_ARQUIVO:
         raise HTTPException(404)
@@ -142,7 +143,7 @@ def relatorio_exportar(request: Request, formato: str, periodo: str = "30d", usu
 # ---------------------------------------------------------------- Exportações gerais
 
 def _export_leads(db, usuario):
-    leads = db.execute(filtrar_por_usuario(select(Lead).where(Lead.anonimizado.is_(False)), usuario)
+    leads = db.execute(filtrar_por_usuario(select(Lead).where(Lead.anonimizado.is_(False)), usuario, "leads.exportar")
                        .order_by(Lead.score.desc())).scalars().all()
     colunas = ["Empresa", "CNPJ", "Responsável", "Cargo", "Telefone", "WhatsApp", "E-mail", "Site", "Instagram",
                "LinkedIn", "Cidade", "UF", "Especialidade", "Status", "Score", "Potencial", "Origem", "Fonte",
@@ -155,7 +156,8 @@ def _export_leads(db, usuario):
 
 
 def _export_parceiros(db, usuario):
-    ranking = metricas.ranking_parceiros(db, usuario)
+    ranking = [r for r in metricas.ranking_parceiros(db, usuario)
+               if autorizacao.pode(usuario, "parceiros.exportar", r["parceiro"])]
     colunas = ["Escritório", "Responsável", "CNPJ", "Telefone", "E-mail", "Cidade", "UF", "Entrada", "Status",
                "Indicados", "Certificados", "Receita", "Comissão acumulada", "Última venda"]
     linhas = [[r["parceiro"].escritorio, r["parceiro"].responsavel, r["parceiro"].cnpj, r["parceiro"].telefone,
@@ -166,8 +168,9 @@ def _export_parceiros(db, usuario):
 
 def _export_clientes(db, usuario):
     consulta = select(Cliente).order_by(Cliente.nome)
-    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
-        consulta = consulta.join(Parceiro, Cliente.parceiro_id == Parceiro.id).where(Parceiro.vendedor_id == usuario.id)
+    if not ve_tudo(usuario, "clientes.exportar"):
+        consulta = autorizacao.filtrar(consulta.join(Parceiro, Cliente.parceiro_id == Parceiro.id), usuario,
+                                       "clientes.exportar", Parceiro.vendedor_id)
     clientes = db.execute(consulta).scalars().all()
     return "Clientes", ["Cliente", "CNPJ/CPF", "Contato", "Telefone", "E-mail", "Parceiro", "Status", "Cadastro"], [
         [c.nome, c.cnpj, c.contato, c.telefone, c.email, c.parceiro.escritorio if c.parceiro else "", c.status, c.criado_em]
@@ -175,9 +178,8 @@ def _export_clientes(db, usuario):
 
 
 def _export_vendas(db, usuario, so_comissao=False):
-    consulta = select(Venda).order_by(Venda.data.desc())
-    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
-        consulta = consulta.where(Venda.vendedor_id == usuario.id)
+    consulta = autorizacao.filtrar(select(Venda).order_by(Venda.data.desc()), usuario,
+                                   "comissoes.exportar" if so_comissao else "vendas.exportar", Venda.vendedor_id)
     if so_comissao:
         consulta = consulta.where(Venda.comissao > 0)
     vendas = db.execute(consulta).scalars().all()
@@ -190,7 +192,9 @@ def _export_vendas(db, usuario, so_comissao=False):
 
 
 def _export_vencimentos(db, usuario):
-    certs = db.execute(select(Certificado).order_by(Certificado.data_vencimento)).scalars().all()
+    # Antes saía tudo para qualquer perfil; agora, como na tela, só os da carteira (e os sem parceiro)
+    certs = [c for c in db.execute(select(Certificado).order_by(Certificado.data_vencimento)).scalars()
+             if autorizacao.pode(usuario, "vencimentos.exportar", c, sem_dono=True)]
     hoje = date.today()
     return "Vencimentos", ["Cliente", "CNPJ/CPF", "Tipo", "Emissão", "Vencimento", "Dias", "Parceiro", "Status"], [
         [c.cliente_nome, c.cnpj, c.tipo, c.data_emissao, c.data_vencimento, (c.data_vencimento - hoje).days,
@@ -205,9 +209,11 @@ EXPORTADORES = {
 
 
 @rotas.get("/exportar/{tipo}.{formato}")
-def exportar(request: Request, tipo: str, formato: str, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def exportar(request: Request, tipo: str, formato: str, usuario: Usuario = Depends(usuario_logado), db: Session = Depends(obter_db)):
     if tipo not in EXPORTADORES or formato not in TIPOS_ARQUIVO:
         raise HTTPException(404)
+    if not autorizacao.pode(usuario, f"{tipo}.exportar"):
+        raise SemPermissao(autorizacao.mensagem_sem_permissao(db, f"{tipo}.exportar"))
     titulo, colunas, linhas = EXPORTADORES[tipo](db, usuario)
     registrar_log(db, usuario, "exportou", tipo, None, f"{formato}, {len(linhas)} linhas", request)
     db.commit()
@@ -223,7 +229,7 @@ def exportar(request: Request, tipo: str, formato: str, usuario: Usuario = Depen
 # ---------------------------------------------------------------- IA Comercial
 
 @rotas.get("/ia")
-def ia_comercial(request: Request, pergunta: str = "", usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def ia_comercial(request: Request, pergunta: str = "", usuario: Usuario = Depends(exige("ia.usar")), db: Session = Depends(obter_db)):
     resposta = metricas.responder_pronta(db, usuario, pergunta) if pergunta else None
     titulo = dict(metricas.PERGUNTAS).get(pergunta, "")
     return tela(request, "ia.html", {"perguntas": metricas.PERGUNTAS, "resposta": resposta, "titulo_pergunta": titulo,
@@ -231,7 +237,7 @@ def ia_comercial(request: Request, pergunta: str = "", usuario: Usuario = Depend
 
 
 @rotas.post("/ia", dependencies=[Depends(verificar_csrf)])
-def ia_pergunta_livre(request: Request, texto: str = Form(...), usuario: Usuario = Depends(equipe),
+def ia_pergunta_livre(request: Request, texto: str = Form(...), usuario: Usuario = Depends(exige("ia.usar")),
                       db: Session = Depends(obter_db)):
     resposta_ia, erro = "", ""
     try:

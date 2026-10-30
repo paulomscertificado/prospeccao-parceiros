@@ -13,7 +13,7 @@ from .. import config, contas_email, util
 from ..banco import obter_db
 from ..integracoes import email_imap, email_smtp
 from ..modelos import ContaEmail, Usuario
-from ..seguranca import criptografar, equipe, registrar_log, verificar_csrf
+from ..seguranca import criptografar, exige, registrar_log, verificar_csrf
 from ..web import avisar, tela, voltar
 
 rotas = APIRouter()
@@ -32,7 +32,7 @@ def _cartao(usuario: Usuario, c: ContaEmail, nomes: dict[int, str]) -> dict:
 
 
 @rotas.get("/email")
-def tela_email(request: Request, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def tela_email(request: Request, usuario: Usuario = Depends(exige("email.ver")), db: Session = Depends(obter_db)):
     nomes = {u.id: u.nome for u in db.execute(select(Usuario)).scalars()}
     contas = [_cartao(usuario, c, nomes) for c in contas_email.visiveis(db, usuario)]
     db.commit()  # a principal é criada no primeiro acesso
@@ -57,7 +57,7 @@ def _conta(db: Session, conta_id: int) -> ContaEmail:
 @rotas.post("/email/minha", dependencies=[Depends(verificar_csrf)])
 def salvar_minha(request: Request, endereco: str = Form(...), nome_remetente: str = Form(""), senha: str = Form(""),
                  usuario_login: str = Form(""), ler_respostas: str = Form(""),
-                 usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+                 usuario: Usuario = Depends(exige("email.ver")), db: Session = Depends(obter_db)):
     """Cadastra ou atualiza o e-mail da própria pessoa (Google Workspace: senha de app de 16 letras)."""
     endereco = endereco.strip().lower()
     login = usuario_login.strip().lower() or endereco
@@ -101,7 +101,7 @@ def salvar_minha(request: Request, endereco: str = Form(...), nome_remetente: st
 
 
 @rotas.post("/email/{conta_id:int}/testar", dependencies=[Depends(verificar_csrf)])
-def testar(request: Request, conta_id: int, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def testar(request: Request, conta_id: int, usuario: Usuario = Depends(exige("email.ver")), db: Session = Depends(obter_db)):
     c = _conta(db, conta_id)
     if not (contas_email.pode_gerenciar(usuario, c) or contas_email.pode_usar(usuario, c)):
         raise HTTPException(403)
@@ -127,7 +127,7 @@ def testar(request: Request, conta_id: int, usuario: Usuario = Depends(equipe), 
 
 
 @rotas.post("/email/{conta_id:int}/ligar", dependencies=[Depends(verificar_csrf)])
-def ligar(request: Request, conta_id: int, ativa: str = Form(""), usuario: Usuario = Depends(equipe),
+def ligar(request: Request, conta_id: int, ativa: str = Form(""), usuario: Usuario = Depends(exige("email.ver")),
           db: Session = Depends(obter_db)):
     c = _conta(db, conta_id)
     if c.principal or not contas_email.pode_gerenciar(usuario, c):
@@ -142,7 +142,7 @@ def ligar(request: Request, conta_id: int, ativa: str = Form(""), usuario: Usuar
 
 
 @rotas.post("/email/{conta_id:int}/remover", dependencies=[Depends(verificar_csrf)])
-def remover(request: Request, conta_id: int, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def remover(request: Request, conta_id: int, usuario: Usuario = Depends(exige("email.ver")), db: Session = Depends(obter_db)):
     c = _conta(db, conta_id)
     if c.principal or not contas_email.pode_gerenciar(usuario, c):
         avisar(request, "Só o dono da conta (ou o administrador) pode remover. O principal não pode ser removido.", "erro")
@@ -155,7 +155,7 @@ def remover(request: Request, conta_id: int, usuario: Usuario = Depends(equipe),
 
 
 @rotas.post("/email/compartilhar", dependencies=[Depends(verificar_csrf)])
-async def compartilhar(request: Request, conta: int = Form(...), usuario: Usuario = Depends(equipe),
+async def compartilhar(request: Request, conta: int = Form(...), usuario: Usuario = Depends(exige("email.ver")),
                        db: Session = Depends(obter_db)):
     """Com toda a equipe ou com pessoas escolhidas: o dono, o administrador e o gestor."""
     c = _conta(db, conta)

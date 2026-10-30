@@ -14,6 +14,7 @@ import json
 
 from sqlalchemy import select
 
+from . import autorizacao
 from .integracoes import whatsapp_leads
 from .modelos import Campanha, ConexaoWhatsApp, Lead, Tarefa, Usuario
 
@@ -52,12 +53,12 @@ def compartilhada_com(c: ConexaoWhatsApp) -> list[int]:
 
 def pode_gerenciar(usuario: Usuario, c: ConexaoWhatsApp) -> bool:
     """Conectar, pausar, desligar e compartilhar: o dono e o administrador."""
-    return usuario.perfil == "admin" or c.dono_id == usuario.id
+    return c.dono_id == usuario.id or autorizacao.pode(usuario, "whatsapp.gerenciar_todos")
 
 
 def pode_compartilhar(usuario: Usuario, c: ConexaoWhatsApp) -> bool:
     """Escolher com quem o número é compartilhado: o dono, o administrador e o gestor."""
-    return pode_gerenciar(usuario, c) or usuario.perfil == "gestor"
+    return pode_gerenciar(usuario, c) or autorizacao.pode(usuario, "whatsapp.compartilhar_todos")
 
 
 def pode_usar(usuario: Usuario, c: ConexaoWhatsApp) -> bool:

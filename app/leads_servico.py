@@ -6,7 +6,7 @@ from datetime import date, timedelta
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from . import config, score, util
+from . import autorizacao, config, score, util
 from .banco import agora, ler_config_int
 from .modelos import Historico, Lead, Parceiro, Tarefa, Usuario
 
@@ -79,7 +79,7 @@ def criar_lead(db: Session, dados: dict, usuario: Usuario | None, origem: str = 
         from .modelos import Categoria
 
         lead.categoria = db.execute(select(Categoria).where(Categoria.codigo == dados["categoria"])).scalars().first()
-    if lead.vendedor_id is None and usuario and usuario.perfil in config.PERFIS_SO_PROPRIOS:
+    if lead.vendedor_id is None and usuario and usuario.perfil != "parceiro" and not autorizacao.ve_tudo(usuario, "leads.ver"):
         lead.vendedor_id = usuario.id
     score.atualizar(db, lead)
     db.add(lead)
@@ -224,15 +224,13 @@ def registrar_resposta(db: Session, lead: Lead, canal: str, texto: str, usuario:
         cancelar_tarefas_de_prospeccao(db, lead.id, "o lead respondeu")
 
 
-def filtrar_por_usuario(consulta, usuario: Usuario):
-    """Vendedor vê só os próprios leads; administrador e gestor veem todos."""
-    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
-        return consulta.where(Lead.vendedor_id == usuario.id)
-    return consulta
+def filtrar_por_usuario(consulta, usuario: Usuario, permissao: str = "leads.ver"):
+    """Só os leads que a pessoa alcança (todos, os da equipe ou os próprios; ver app/autorizacao.py)."""
+    return autorizacao.filtrar(consulta, usuario, permissao, Lead.vendedor_id)
 
 
-def pode_ver(usuario: Usuario, lead: Lead) -> bool:
-    return usuario.perfil in ("admin", "gestor") or (usuario.perfil in config.PERFIS_SO_PROPRIOS and lead.vendedor_id == usuario.id)
+def pode_ver(usuario: Usuario, lead: Lead, permissao: str = "leads.ver") -> bool:
+    return autorizacao.pode(usuario, permissao, lead)
 
 
 def anonimizar(lead: Lead, manter_bloqueio: bool = False) -> None:

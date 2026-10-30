@@ -33,7 +33,7 @@
       <div><label>Estado</label><select name="estado"><option value=""></option>{% for u in config.UFS %}<option {{ 'selected' if p.estado == u }}>{{ u }}</option>{% endfor %}</select></div>
       <div><label>Data de entrada</label><input type="date" name="data_entrada" value="{{ p.data_entrada.isoformat() if p.data_entrada else '' }}"></div>
       <div><label>Status</label><select name="status">{% for s in config.STATUS_PARCEIRO %}<option {{ 'selected' if p.status == s }}>{{ s }}</option>{% endfor %}</select></div>
-      {% if usuario.perfil in ['admin','gestor'] %}
+      {% if pode('parceiros.comercial') %}
       <div><label>Vendedor responsável</label><select name="vendedor_id"><option value="">—</option>{% for v in vendedores %}<option value="{{ v.id }}" {{ 'selected' if p.vendedor_id == v.id }}>{{ v.nome }}</option>{% endfor %}</select></div>
       <div><label>Comissão própria</label><select name="comissao_tipo"><option value="" {{ 'selected' if not p.comissao_tipo }}>Usar regra de cada produto</option><option value="percentual" {{ 'selected' if p.comissao_tipo == 'percentual' }}>% do valor da venda</option><option value="fixo" {{ 'selected' if p.comissao_tipo == 'fixo' }}>Valor fixo por certificado (R$)</option></select></div>
       <div><label>Valor da comissão</label><input type="text" name="comissao_valor" value="{{ (p.comissao_valor|string).replace('.', ',') if p.comissao_tipo else '' }}"></div>
@@ -46,7 +46,7 @@
   </form>
 
   {% if not novo %}
-  <div class="cartao"><h2>Vendas <a class="btn btn-pequeno" href="/vendas?parceiro={{ p.id }}">Registrar venda</a></h2>
+  <div class="cartao"><h2>Vendas {% if pode('vendas.criar') %}<a class="btn btn-pequeno" href="/vendas?parceiro={{ p.id }}">Registrar venda</a>{% endif %}</h2>
     <div class="tabela-rolagem"><table><tr><th>Data</th><th>Cliente</th><th>Produto</th><th class="num">Valor</th><th class="num">Comissão</th><th>Paga</th></tr>
     {% for v in vendas %}<tr><td>{{ v.data|data }}</td><td>{{ v.cliente.nome }}</td><td>{{ v.produto.nome if v.produto else '' }}{{ ' (renovação)' if v.tipo == 'renovacao' }}</td><td class="num">{{ v.valor|moeda }}</td><td class="num">{{ v.comissao|moeda }}</td><td>{{ 'Sim' if v.comissao_paga else 'Não' }}</td></tr>
     {% else %}<tr><td colspan="6" class="vazio">Nenhuma venda ainda.</td></tr>{% endfor %}</table></div>

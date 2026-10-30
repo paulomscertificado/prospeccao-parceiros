@@ -241,11 +241,11 @@
       <b>Cadastro:</b> {{ lead.criado_em|datahora }} · <b>Base legal:</b> {{ lead.base_legal }}</p>
     <div class="grupo-btn">
     {% if lead.opt_out %}
-      {% if usuario.perfil in ['admin','gestor'] %}<form method="post" action="/leads/{{ lead.id }}/opt-out" data-confirmar="O contato autorizou receber mensagens de novo?"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="desfazer" value="1"><button class="btn btn-pequeno">Desfazer opt-out</button></form>{% endif %}
+      {% if pode('leads.liberar_contato') %}<form method="post" action="/leads/{{ lead.id }}/opt-out" data-confirmar="O contato autorizou receber mensagens de novo?"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="desfazer" value="1"><button class="btn btn-pequeno">Desfazer opt-out</button></form>{% endif %}
     {% else %}
       <form method="post" action="/leads/{{ lead.id }}/opt-out" data-confirmar="Registrar que este contato não quer mais receber mensagens?"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-pequeno btn-perigo">Registrar opt-out</button></form>
     {% endif %}
-    {% if usuario.perfil in ['admin','gestor'] %}
+    {% if pode('leads.excluir') %}
       <form method="post" action="/leads/{{ lead.id }}/excluir" data-confirmar="Excluir os dados deste lead (pedido LGPD)? Isso não pode ser desfeito."><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-pequeno btn-perigo">Excluir dados (LGPD)</button></form>
     {% endif %}
     </div>

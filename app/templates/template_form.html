@@ -14,7 +14,7 @@
     <div class="largo"><label>Nome do template aprovado na Meta (só para envio pela API oficial do WhatsApp)</label><input type="text" name="nome_meta" value="{{ t.nome_meta }}" placeholder="ex.: parceria_primeiro_contato">
       <div class="ajuda">A Meta só permite iniciar conversa com templates aprovados. O template na Meta deve ter 3 variáveis no corpo: {{ '{{1}}' }} nome, {{ '{{2}}' }} empresa, {{ '{{3}}' }} vendedor.</div></div>
   </div>
-  {% if usuario.perfil in ['admin','gestor'] %}<button class="btn btn-primario" style="margin-top:12px">Salvar</button>{% endif %}
+  {% if pode('templates.editar') %}<button class="btn btn-primario" style="margin-top:12px">Salvar</button>{% endif %}
 </form>
 <div class="cartao">
   <h2>Variáveis disponíveis</h2>

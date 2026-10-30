@@ -132,10 +132,8 @@ PERFIS = {
     "vendedor": "Vendedor",
     "parceiro": "Parceiro",
 }
-# Perfis que veem e trabalham só os próprios dados (leads, campanhas, oportunidades, conversas) e os compartilhados.
-PERFIS_SO_PROPRIOS = ("funcionario", "vendedor")
-# Ferramentas de trabalho (cadências, templates, categorias, conhecimento): todos menos o vendedor.
-PERFIS_FERRAMENTAS = ("admin", "gestor", "funcionario")
+# O que cada perfil (papel) pode fazer e com que alcance (tudo / equipe / só os próprios) fica em app/autorizacao.py
+# e na tela Permissões. Os perfis acima são os 5 papéis do sistema e o "tipo" de cada usuário.
 
 # Funil do CRM da IA SDR (a IA trabalha até "Interessado"; daí em diante é o time humano).
 STATUS_LEAD = [

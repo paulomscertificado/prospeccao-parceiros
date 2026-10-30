@@ -41,8 +41,9 @@ Migrações: no MVP as tabelas são criadas com `create_all`. Ao mudar colunas e
 ## 7. Como criar usuários
 
 Configurações > **Usuários** (só administrador):
-- Preencha nome, e-mail, perfil e senha inicial → **Criar**. Passe a senha à pessoa por um canal seguro;
-  ela troca em **Minha conta**.
+- Preencha nome, e-mail, papel (perfil), equipe (opcional) e senha inicial → **Criar**. Passe a senha à pessoa por
+  um canal seguro; ela troca em **Minha conta**.
+- O que cada papel pode, papéis novos, exceções de uma pessoa e equipes: menu **Permissões** (`docs/permissoes.md`).
 - Perfil **Parceiro**: escolha também o parceiro (escritório) ligado ao login. Ele verá só o portal.
 - Desativar: desmarque "Ativo" e salve (a pessoa sai na hora).
 - Esqueceu a senha e não há outro admin: `redefinir_senha.bat`.

@@ -18,7 +18,7 @@
   <select name="potencial"><option value="">Todo potencial</option>{% for p in potenciais %}<option {{ 'selected' if filtros.potencial==p }}>{{ p }}</option>{% endfor %}</select>
   <select name="uf"><option value="">UF</option>{% for u in config.UFS %}<option {{ 'selected' if filtros.uf==u }}>{{ u }}</option>{% endfor %}</select>
   <input type="text" name="cidade" value="{{ filtros.cidade }}" placeholder="Cidade" style="min-width:110px">
-  {% if usuario.perfil in ['admin','gestor'] %}
+  {% if ve_tudo_em('leads.ver') %}
   <select name="vendedor"><option value="">Todos os vendedores</option><option value="sem" {{ 'selected' if filtros.vendedor=='sem' }}>Sem vendedor</option>
     {% for v in vendedores %}<option value="{{ v.id }}" {{ 'selected' if filtros.vendedor==v.id|string }}>{{ v.nome }}</option>{% endfor %}</select>{% endif %}
   <select name="origem"><option value="">Toda origem</option>{% for o in origens %}<option {{ 'selected' if filtros.origem==o }}>{{ o }}</option>{% endfor %}</select>
@@ -31,13 +31,13 @@
   <div class="filtros" style="padding:12px 14px 0">
     <select name="acao">
       <option value="cadencia">Iniciar cadência (campanha)</option>
-      {% if usuario.perfil in ['admin','gestor'] %}<option value="vendedor">Atribuir vendedor</option>{% endif %}
+      {% if pode('leads.atribuir') %}<option value="vendedor">Atribuir vendedor</option>{% endif %}
       <option value="status">Mudar status</option>
       <option value="recalcular">Recalcular score</option>
     </select>
     <select name="cadencia_id" title="Cadência">{% for c in cadencias %}<option value="{{ c.id }}">{{ c.nome }}</option>{% endfor %}</select>
     <input type="date" name="inicio" value="{{ hoje.isoformat() }}" title="Início da cadência">
-    {% if usuario.perfil in ['admin','gestor'] %}<select name="vendedor_id" title="Vendedor"><option value="">(vendedor)</option>{% for v in vendedores %}<option value="{{ v.id }}">{{ v.nome }}</option>{% endfor %}</select>{% endif %}
+    {% if pode('leads.atribuir') %}<select name="vendedor_id" title="Vendedor"><option value="">(vendedor)</option>{% for v in vendedores %}<option value="{{ v.id }}">{{ v.nome }}</option>{% endfor %}</select>{% endif %}
     <select name="status" title="Status"><option value="">(status)</option>{% for s in config.STATUS_LEAD %}<option>{{ s }}</option>{% endfor %}</select>
     <button class="btn">Aplicar aos marcados</button>
   </div>

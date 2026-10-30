@@ -53,13 +53,13 @@
 
 {% set outros = (estado.numeros|rejectattr('id', 'in', minha|map(attribute='id')|list)|list) %}
 {% if outros %}
-<h2 style="margin:4px 0 10px"><span class="etiqueta">{{ 'Todos os números' if usuario.perfil in ('admin', 'gestor') else 'Números compartilhados comigo' }}</span></h2>
+<h2 style="margin:4px 0 10px"><span class="etiqueta">{{ 'Todos os números' if pode('whatsapp.compartilhar_todos') else 'Números compartilhados comigo' }}</span></h2>
 <div class="numeros" style="margin-bottom:22px">
   {% for n in outros %}{% include "_numero_whatsapp.html" %}{% endfor %}
 </div>
 {% endif %}
 
-{% if usuario.perfil == 'admin' %}
+{% if pode('whatsapp.regras') %}
 <form class="cartao" method="post" action="/whatsapp/comando">
   <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="acao" value="salvar_regras">
   <h2>Regras de envio (contra bloqueio)</h2>

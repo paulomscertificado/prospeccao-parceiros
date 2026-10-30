@@ -6,11 +6,10 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from .. import config, metricas, planilhas, util
+from .. import autorizacao, config, metricas, planilhas, util
 from ..banco import agora, ler_config_int, obter_db
 from ..modelos import Certificado, Cliente, Lead, Parceiro, Produto, Tarefa, Usuario, Venda
-from ..seguranca import (admin, criptografar, descriptografar, equipe, gestao, registrar_log, ve_tudo,
-                         verificar_csrf)
+from ..seguranca import criptografar, descriptografar, exige, registrar_log, ve_tudo, verificar_csrf
 from ..vendas_servico import calcular, descrever_regra, processar_vencimentos, registrar_venda
 from ..web import avisar, tela, voltar
 
@@ -22,24 +21,28 @@ def _vendedores(db):
                                                  Usuario.ativo.is_(True)).order_by(Usuario.nome)).scalars())
 
 
-def _parceiros_visiveis(db: Session, usuario: Usuario):
-    consulta = select(Parceiro).order_by(Parceiro.escritorio)
-    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
-        consulta = consulta.where(Parceiro.vendedor_id == usuario.id)
+def _parceiros_visiveis(db: Session, usuario: Usuario, permissao: str = "parceiros.ver"):
+    consulta = autorizacao.filtrar(select(Parceiro).order_by(Parceiro.escritorio), usuario, permissao,
+                                   Parceiro.vendedor_id)
     return list(db.execute(consulta).scalars())
 
 
-def _parceiro(db: Session, pid: int, usuario: Usuario) -> Parceiro:
-    p = db.get(Parceiro, pid)
-    if not p or (usuario.perfil in config.PERFIS_SO_PROPRIOS and p.vendedor_id != usuario.id):
-        raise HTTPException(404)
-    return p
+def _parceiro(db: Session, pid: int, usuario: Usuario, permissao: str = "parceiros.ver") -> Parceiro:
+    return autorizacao.garantir(usuario, permissao, db.get(Parceiro, pid))
+
+
+def _clientes_visiveis(db: Session, consulta, usuario: Usuario, permissao: str = "clientes.ver"):
+    """Clientes dos parceiros que a pessoa alcança (o dono do cliente é o vendedor do parceiro)."""
+    if ve_tudo(usuario, permissao):
+        return consulta
+    ids = [p.id for p in _parceiros_visiveis(db, usuario, permissao)]
+    return consulta.where(Cliente.parceiro_id.in_(ids))
 
 
 # ---------------------------------------------------------------- Parceiros
 
 @rotas.get("/parceiros")
-def parceiros(request: Request, status: str = "", q: str = "", aba: str = "lista", usuario: Usuario = Depends(equipe),
+def parceiros(request: Request, status: str = "", q: str = "", aba: str = "lista", usuario: Usuario = Depends(exige("parceiros.ver")),
               db: Session = Depends(obter_db)):
     ranking = metricas.ranking_parceiros(db, usuario)
     if status:
@@ -58,7 +61,7 @@ def parceiros(request: Request, status: str = "", q: str = "", aba: str = "lista
 
 
 @rotas.get("/parceiros/{pid:int}")
-def parceiro_ficha(request: Request, pid: int, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def parceiro_ficha(request: Request, pid: int, usuario: Usuario = Depends(exige("parceiros.ver")), db: Session = Depends(obter_db)):
     if pid == 0:
         p = Parceiro(escritorio="", status="EM ATIVAÇÃO", data_entrada=date.today(), comissao_tipo="", comissao_valor=0)
         return tela(request, "parceiro.html", {"p": p, "novo": True, "vendedores": _vendedores(db)})
@@ -71,7 +74,7 @@ def parceiro_ficha(request: Request, pid: int, usuario: Usuario = Depends(equipe
     acesso = db.execute(select(Usuario).where(Usuario.parceiro_id == p.id)).scalars().first()
     return tela(request, "parceiro.html", {
         "p": p, "novo": False, "clientes": clientes, "vendas": vendas, "certificados": certificados,
-        "vendedores": _vendedores(db), "chave_pix": descriptografar(p.chave_pix_cripto) if ve_tudo(usuario) else "",
+        "vendedores": _vendedores(db), "chave_pix": descriptografar(p.chave_pix_cripto) if autorizacao.pode(usuario, "parceiros.comercial") else "",
         "regra": descrever_regra(tipo, valor) if tipo else "Regra padrão de cada produto",
         "totais": {"indicados": len(clientes), "vendidos": len(vendas), "receita": sum(v.valor for v in vendas),
                    "comissao": sum(v.comissao for v in vendas),
@@ -82,9 +85,9 @@ def parceiro_ficha(request: Request, pid: int, usuario: Usuario = Depends(equipe
 
 
 @rotas.post("/parceiros/{pid:int}", dependencies=[Depends(verificar_csrf)])
-async def parceiro_salvar(request: Request, pid: int, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+async def parceiro_salvar(request: Request, pid: int, usuario: Usuario = Depends(exige("parceiros.editar")), db: Session = Depends(obter_db)):
     form = await request.form()
-    p = Parceiro() if pid == 0 else _parceiro(db, pid, usuario)
+    p = Parceiro() if pid == 0 else _parceiro(db, pid, usuario, "parceiros.editar")
     p.escritorio = str(form.get("escritorio", "")).strip()
     if not p.escritorio:
         avisar(request, "Informe o nome do escritório.", "erro")
@@ -101,7 +104,7 @@ async def parceiro_salvar(request: Request, pid: int, usuario: Usuario = Depends
     p.data_entrada = util.para_data(form.get("data_entrada")) or p.data_entrada or date.today()
     if form.get("status") in config.STATUS_PARCEIRO:
         p.status = form.get("status")
-    if ve_tudo(usuario):
+    if autorizacao.pode(usuario, "parceiros.comercial"):
         p.vendedor_id = util.para_int(form.get("vendedor_id"))
         tipo = str(form.get("comissao_tipo", ""))
         p.comissao_tipo = tipo if tipo in ("percentual", "fixo") else ""
@@ -124,11 +127,8 @@ async def parceiro_salvar(request: Request, pid: int, usuario: Usuario = Depends
 
 @rotas.get("/clientes")
 def clientes(request: Request, q: str = "", parceiro: int | None = None, status: str = "",
-             usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
-    consulta = select(Cliente).order_by(Cliente.criado_em.desc())
-    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
-        ids = [p.id for p in _parceiros_visiveis(db, usuario)]
-        consulta = consulta.where(Cliente.parceiro_id.in_(ids))
+             usuario: Usuario = Depends(exige("clientes.ver")), db: Session = Depends(obter_db)):
+    consulta = _clientes_visiveis(db, select(Cliente).order_by(Cliente.criado_em.desc()), usuario)
     if q:
         consulta = consulta.where(or_(Cliente.nome.ilike(f"%{q}%"), Cliente.cnpj.ilike(f"%{q}%")))
     if parceiro:
@@ -141,11 +141,9 @@ def clientes(request: Request, q: str = "", parceiro: int | None = None, status:
 
 
 @rotas.post("/clientes/{cid:int}", dependencies=[Depends(verificar_csrf)])
-async def cliente_salvar(request: Request, cid: int, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+async def cliente_salvar(request: Request, cid: int, usuario: Usuario = Depends(exige("clientes.editar")), db: Session = Depends(obter_db)):
     form = await request.form()
-    c = Cliente(origem="Direto") if cid == 0 else db.get(Cliente, cid)
-    if c is None:
-        raise HTTPException(404)
+    c = Cliente(origem="Direto") if cid == 0 else autorizacao.garantir(usuario, "clientes.editar", db.get(Cliente, cid))
     c.nome = str(form.get("nome", "")).strip()
     if not c.nome:
         avisar(request, "Informe o nome do cliente.", "erro")
@@ -154,7 +152,12 @@ async def cliente_salvar(request: Request, cid: int, usuario: Usuario = Depends(
     c.contato = str(form.get("contato", "")).strip()
     c.telefone = util.formatar_telefone(str(form.get("telefone", "")))
     c.email = str(form.get("email", "")).strip().lower()
-    c.parceiro_id = util.para_int(form.get("parceiro_id"))
+    novo_parceiro = util.para_int(form.get("parceiro_id"))
+    if novo_parceiro and novo_parceiro != c.parceiro_id and not autorizacao.pode(
+            usuario, "clientes.editar", db.get(Parceiro, novo_parceiro) or Parceiro(vendedor_id=-1)):
+        avisar(request, "Escolha um parceiro da sua carteira.", "erro")
+        return voltar("/clientes")
+    c.parceiro_id = novo_parceiro
     if c.parceiro_id and cid == 0:
         c.origem = "Indicação"
     if form.get("status") in config.STATUS_CLIENTE:
@@ -171,32 +174,38 @@ async def cliente_salvar(request: Request, cid: int, usuario: Usuario = Depends(
 
 @rotas.get("/vendas")
 def vendas(request: Request, periodo: str = "90d", parceiro: int | None = None, cliente: int | None = None,
-           renovar: int | None = None, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+           renovar: int | None = None, usuario: Usuario = Depends(exige("vendas.ver")), db: Session = Depends(obter_db)):
     p = metricas.periodo(periodo)
-    consulta = select(Venda).where(Venda.data >= p.inicio).order_by(Venda.data.desc(), Venda.id.desc())
-    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
-        consulta = consulta.where(Venda.vendedor_id == usuario.id)
+    consulta = autorizacao.filtrar(select(Venda).where(Venda.data >= p.inicio).order_by(Venda.data.desc(), Venda.id.desc()),
+                                   usuario, "vendas.ver", Venda.vendedor_id)
     if parceiro:
         consulta = consulta.where(Venda.parceiro_id == parceiro)
     lista = db.execute(consulta.limit(500)).scalars().all()
     cert_renovar = db.get(Certificado, renovar) if renovar else None
+    if cert_renovar is not None and not autorizacao.pode(usuario, "vendas.ver", cert_renovar, sem_dono=True):
+        cert_renovar = None
     return tela(request, "vendas.html", {
         "vendas": lista, "periodo": periodo, "p": p, "parceiro": parceiro,
         "totais": {"qtd": len(lista), "receita": sum(v.valor for v in lista), "comissao": sum(v.comissao for v in lista),
                    "lucro": sum(v.valor - v.custo - v.comissao for v in lista)},
         "produtos": db.execute(select(Produto).where(Produto.ativo.is_(True)).order_by(Produto.nome)).scalars().all(),
-        "parceiros": _parceiros_visiveis(db, usuario) if usuario.perfil in config.PERFIS_SO_PROPRIOS else
-        db.execute(select(Parceiro).where(Parceiro.status != "BLOQUEADO").order_by(Parceiro.escritorio)).scalars().all(),
-        "clientes": db.execute(select(Cliente).order_by(Cliente.nome).limit(1000)).scalars().all(),
+        "parceiros": [x for x in _parceiros_visiveis(db, usuario, "vendas.ver") if x.status != "BLOQUEADO"],
+        "clientes": db.execute(_clientes_visiveis(db, select(Cliente).order_by(Cliente.nome), usuario, "vendas.ver")
+                               .limit(1000)).scalars().all(),
         "cliente_sel": cliente, "renovar": cert_renovar, "vendedores": _vendedores(db),
     })
 
 
 @rotas.post("/vendas/nova", dependencies=[Depends(verificar_csrf)])
-async def venda_nova(request: Request, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+async def venda_nova(request: Request, usuario: Usuario = Depends(exige("vendas.criar")), db: Session = Depends(obter_db)):
     form = await request.form()
     cliente = db.get(Cliente, util.para_int(form.get("cliente_id")) or 0)
     parceiro = db.get(Parceiro, util.para_int(form.get("parceiro_id")) or 0)
+    # Só clientes e parceiros da carteira de quem registra (trocar o número no formulário não abre a de outro)
+    if cliente is not None:
+        autorizacao.garantir(usuario, "vendas.ver", cliente)
+    if parceiro is not None:
+        autorizacao.garantir(usuario, "vendas.ver", parceiro)
     if not cliente:
         nome = str(form.get("cliente_nome", "")).strip()
         if not nome:
@@ -213,8 +222,11 @@ async def venda_nova(request: Request, usuario: Usuario = Depends(equipe), db: S
         avisar(request, "Este parceiro está BLOQUEADO e não pode receber comissão.", "erro")
         return voltar("/vendas")
     produto = db.get(Produto, util.para_int(form.get("produto_id")) or 0)
-    vendedor = db.get(Usuario, util.para_int(form.get("vendedor_id")) or 0) if ve_tudo(usuario) else usuario
+    vendedor = (db.get(Usuario, util.para_int(form.get("vendedor_id")) or 0)
+                if autorizacao.pode(usuario, "vendas.atribuir") else usuario)
     anterior = db.get(Certificado, util.para_int(form.get("certificado_id")) or 0) if form.get("certificado_id") else None
+    if anterior is not None:
+        autorizacao.garantir(usuario, "vendas.ver", anterior, sem_dono=True)
     venda = registrar_venda(
         db, cliente=cliente, produto=produto, parceiro=parceiro, valor=util.para_float(form.get("valor")) or None,
         data=util.para_data(form.get("data")) or date.today(),
@@ -229,7 +241,7 @@ async def venda_nova(request: Request, usuario: Usuario = Depends(equipe), db: S
 
 
 @rotas.post("/vendas/{vid:int}/excluir", dependencies=[Depends(verificar_csrf)])
-def venda_excluir(request: Request, vid: int, usuario: Usuario = Depends(admin), db: Session = Depends(obter_db)):
+def venda_excluir(request: Request, vid: int, usuario: Usuario = Depends(exige("vendas.excluir")), db: Session = Depends(obter_db)):
     v = db.get(Venda, vid)
     if not v:
         raise HTTPException(404)
@@ -246,10 +258,9 @@ def venda_excluir(request: Request, vid: int, usuario: Usuario = Depends(admin),
 
 @rotas.get("/comissoes")
 def comissoes(request: Request, situacao: str = "a_pagar", parceiro: int | None = None,
-              usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
-    consulta = select(Venda).where(Venda.comissao > 0).order_by(Venda.data.desc())
-    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
-        consulta = consulta.where(Venda.vendedor_id == usuario.id)
+              usuario: Usuario = Depends(exige("comissoes.ver")), db: Session = Depends(obter_db)):
+    consulta = autorizacao.filtrar(select(Venda).where(Venda.comissao > 0).order_by(Venda.data.desc()), usuario,
+                                   "comissoes.ver", Venda.vendedor_id)
     if situacao == "a_pagar":
         consulta = consulta.where(Venda.comissao_paga.is_(False))
     elif situacao == "pagas":
@@ -274,7 +285,7 @@ def comissoes(request: Request, situacao: str = "a_pagar", parceiro: int | None 
 
 
 @rotas.post("/comissoes/pagar", dependencies=[Depends(verificar_csrf)])
-async def comissoes_pagar(request: Request, usuario: Usuario = Depends(admin), db: Session = Depends(obter_db)):
+async def comissoes_pagar(request: Request, usuario: Usuario = Depends(exige("comissoes.pagar")), db: Session = Depends(obter_db)):
     form = await request.form()
     ids = [int(i) for i in form.getlist("ids") if str(i).isdigit()]
     vendas = db.execute(select(Venda).where(Venda.id.in_(ids), Venda.comissao_paga.is_(False))).scalars().all()
@@ -288,7 +299,7 @@ async def comissoes_pagar(request: Request, usuario: Usuario = Depends(admin), d
 
 
 @rotas.post("/produtos/{pid:int}", dependencies=[Depends(verificar_csrf)])
-async def produto_salvar(request: Request, pid: int, usuario: Usuario = Depends(admin), db: Session = Depends(obter_db)):
+async def produto_salvar(request: Request, pid: int, usuario: Usuario = Depends(exige("produtos.editar")), db: Session = Depends(obter_db)):
     form = await request.form()
     pr = Produto() if pid == 0 else db.get(Produto, pid)
     if pr is None:
@@ -311,7 +322,7 @@ async def produto_salvar(request: Request, pid: int, usuario: Usuario = Depends(
 # ---------------------------------------------------------------- Vencimentos
 
 @rotas.get("/vencimentos")
-def vencimentos(request: Request, janela: str = "30", parceiro: int | None = None, usuario: Usuario = Depends(equipe),
+def vencimentos(request: Request, janela: str = "30", parceiro: int | None = None, usuario: Usuario = Depends(exige("vencimentos.ver")),
                 db: Session = Depends(obter_db)):
     processar_vencimentos(db)
     db.commit()
@@ -327,8 +338,8 @@ def vencimentos(request: Request, janela: str = "30", parceiro: int | None = Non
                                   Certificado.data_vencimento <= hoje + timedelta(days=dias))
     if parceiro:
         consulta = consulta.where(Certificado.parceiro_id == parceiro)
-    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
-        ids = [p.id for p in _parceiros_visiveis(db, usuario)]
+    if not ve_tudo(usuario, "vencimentos.ver"):
+        ids = [p.id for p in _parceiros_visiveis(db, usuario, "vencimentos.ver")]
         consulta = consulta.where(or_(Certificado.parceiro_id.in_(ids), Certificado.parceiro_id.is_(None)))
     certs = db.execute(consulta.limit(1000)).scalars().all()
     faixas = {}
@@ -338,17 +349,17 @@ def vencimentos(request: Request, janela: str = "30", parceiro: int | None = Non
             Certificado.data_vencimento <= hoje + timedelta(days=dias))).all())
     return tela(request, "vencimentos.html", {
         "certs": certs, "janela": janela, "parceiro": parceiro, "faixas": faixas,
-        "parceiros": _parceiros_visiveis(db, usuario), "hoje": hoje,
+        "parceiros": _parceiros_visiveis(db, usuario, "vencimentos.ver"), "hoje": hoje,
         "tarefas": {t.certificado_id: t for t in db.execute(select(Tarefa).where(
             Tarefa.certificado_id.is_not(None), Tarefa.status == "pendente")).scalars()},
     })
 
 
 @rotas.post("/vencimentos/{cid:int}/status", dependencies=[Depends(verificar_csrf)])
-def vencimento_status(request: Request, cid: int, status: str = Form(...), usuario: Usuario = Depends(equipe),
+def vencimento_status(request: Request, cid: int, status: str = Form(...), usuario: Usuario = Depends(exige("vencimentos.editar")),
                       db: Session = Depends(obter_db)):
-    c = db.get(Certificado, cid)
-    if not c or status not in config.STATUS_CERTIFICADO:
+    c = autorizacao.garantir(usuario, "vencimentos.editar", db.get(Certificado, cid), sem_dono=True)
+    if status not in config.STATUS_CERTIFICADO:
         raise HTTPException(404)
     c.status = status
     if status in ("Não renovará", "Renovado"):
@@ -360,7 +371,7 @@ def vencimento_status(request: Request, cid: int, status: str = Form(...), usuar
 
 
 @rotas.post("/vencimentos/importar", dependencies=[Depends(verificar_csrf)])
-async def vencimentos_importar(request: Request, arquivo: UploadFile = File(...), usuario: Usuario = Depends(gestao),
+async def vencimentos_importar(request: Request, arquivo: UploadFile = File(...), usuario: Usuario = Depends(exige("vencimentos.importar")),
                                db: Session = Depends(obter_db)):
     conteudo = await arquivo.read()
     try:

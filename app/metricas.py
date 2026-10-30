@@ -10,7 +10,7 @@ from datetime import date, datetime, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from . import config, util
+from . import autorizacao, config, util
 from .banco import ler_config_int
 from .modelos import Certificado, Cliente, Lead, Parceiro, Tarefa, Usuario, Venda
 from .util import taxa
@@ -44,20 +44,22 @@ def _no_periodo(valor, p: Periodo) -> bool:
     return p.inicio <= d <= p.fim
 
 
+# Alcance dos números (Dashboard, relatórios, IA Comercial): o mesmo da permissão "Ver o Dashboard".
+NUMEROS = "painel.ver"
+
+
+def _no_alcance(consulta, usuario: Usuario | None, coluna):
+    return autorizacao.filtrar(consulta, usuario, NUMEROS, coluna) if usuario is not None else consulta
+
+
 def _escopo_leads(consulta, usuario: Usuario, vendedor_id: int | None):
-    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
-        return consulta.where(Lead.vendedor_id == usuario.id)
-    if vendedor_id:
-        return consulta.where(Lead.vendedor_id == vendedor_id)
-    return consulta
+    consulta = _no_alcance(consulta, usuario, Lead.vendedor_id)
+    return consulta.where(Lead.vendedor_id == vendedor_id) if vendedor_id else consulta
 
 
 def _escopo_vendas(consulta, usuario: Usuario, vendedor_id: int | None):
-    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
-        return consulta.where(Venda.vendedor_id == usuario.id)
-    if vendedor_id:
-        return consulta.where(Venda.vendedor_id == vendedor_id)
-    return consulta
+    consulta = _no_alcance(consulta, usuario, Venda.vendedor_id)
+    return consulta.where(Venda.vendedor_id == vendedor_id) if vendedor_id else consulta
 
 
 def _leads(db: Session, usuario: Usuario, vendedor_id=None):
@@ -76,9 +78,8 @@ def _vendas(db: Session, usuario: Usuario, vendedor_id=None):
 
 def _parceiros(db: Session, usuario: Usuario, vendedor_id=None):
     consulta = select(Parceiro)
-    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
-        consulta = consulta.where(Parceiro.vendedor_id == usuario.id)
-    elif vendedor_id:
+    consulta = _no_alcance(consulta, usuario, Parceiro.vendedor_id)
+    if vendedor_id:
         consulta = consulta.where(Parceiro.vendedor_id == vendedor_id)
     return list(db.execute(consulta).scalars())
 
@@ -145,9 +146,7 @@ def indicadores(db: Session, usuario: Usuario, p: Periodo, vendedor_id: int | No
 
 
 def _escopo_tarefas(consulta, usuario: Usuario):
-    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
-        return consulta.where(Tarefa.usuario_id == usuario.id)
-    return consulta
+    return _no_alcance(consulta, usuario, Tarefa.usuario_id)
 
 
 def taxa_renovacao(db: Session, p: Periodo) -> float:
@@ -293,8 +292,7 @@ def leads_parados(db: Session, usuario: Usuario, dias: int | None = None) -> lis
 
 def contar_followups_hoje(db: Session, usuario: Usuario) -> int:
     consulta = select(func.count(Tarefa.id)).where(Tarefa.status == "pendente", Tarefa.data <= date.today())
-    if usuario.perfil in config.PERFIS_SO_PROPRIOS:
-        consulta = consulta.where(Tarefa.usuario_id == usuario.id)
+    consulta = _escopo_tarefas(consulta, usuario)
     return db.execute(consulta).scalar() or 0
 
 

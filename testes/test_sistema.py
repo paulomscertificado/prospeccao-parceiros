@@ -368,30 +368,34 @@ def test_apagar_demonstracao(cliente, csrf):
 
 
 def test_vendas_vencimentos_comissoes_ocultos_por_padrao(cliente):
-    from app.banco import gravar_config, sessao
+    from app import config
+    from conftest import ligar_modulos
 
-    pagina = cliente.get("/").text
-    assert 'href="/vendas"' not in pagina and 'href="/comissoes"' not in pagina and 'href="/vencimentos"' not in pagina
-    assert "Comissão gerada" not in pagina and "Ranking dos parceiros" not in pagina
-    assert 'href="/leads"' in pagina and "Conversão do funil" in pagina
-    with sessao() as db:
-        gravar_config(db, "mostrar_vendas", "1")
+    assert config.CONFIG_PADRAO["mostrar_vendas"] == "0"  # na MS o módulo vem desligado
+    ligar_modulos("vendas", ligado=False)
     try:
         pagina = cliente.get("/").text
-        assert 'href="/vendas"' in pagina and "Comissão gerada" in pagina and "Ranking dos parceiros" in pagina
+        assert 'href="/vendas"' not in pagina and 'href="/comissoes"' not in pagina and 'href="/vencimentos"' not in pagina
+        assert "Comissão gerada" not in pagina and "Ranking dos parceiros" not in pagina
+        assert 'href="/leads"' in pagina and "Conversão do funil" in pagina
+        # desligado também no servidor: o endereço digitado não abre
+        assert cliente.get("/vendas").status_code == 403
+        assert cliente.get("/exportar/vencimentos.csv").status_code == 403
     finally:
-        with sessao() as db:
-            gravar_config(db, "mostrar_vendas", "0")
+        ligar_modulos("vendas")
+    pagina = cliente.get("/").text
+    assert 'href="/vendas"' in pagina and "Comissão gerada" in pagina and "Ranking dos parceiros" in pagina
 
 
 def test_agenda_oculta_por_padrao(cliente):
-    from app.banco import gravar_config, sessao
+    from app import config
+    from conftest import ligar_modulos
 
-    assert 'href="/agenda"' not in cliente.get("/").text
-    with sessao() as db:
-        gravar_config(db, "mostrar_agenda", "1")
+    assert config.CONFIG_PADRAO["mostrar_agenda"] == "0"
+    ligar_modulos("agenda", ligado=False)
     try:
-        assert 'href="/agenda"' in cliente.get("/").text
+        assert 'href="/agenda"' not in cliente.get("/").text
+        assert cliente.get("/agenda").status_code == 403
     finally:
-        with sessao() as db:
-            gravar_config(db, "mostrar_agenda", "0")
+        ligar_modulos("agenda")
+    assert 'href="/agenda"' in cliente.get("/").text

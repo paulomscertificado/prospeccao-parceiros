@@ -31,7 +31,13 @@ _LETRAS_RECUPERACAO = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # sem 0/O e 1/I, que s
 
 def precisa(usuario) -> bool:
     """Pede o código no login: obrigatório para admin/gestor, e para quem já ativou."""
-    return config.EXIGIR_2FA and (usuario.perfil in PERFIS_OBRIGADOS or bool(usuario.totp_ativo))
+    if not config.EXIGIR_2FA:
+        return False
+    if usuario.perfil in PERFIS_OBRIGADOS or usuario.totp_ativo:
+        return True
+    from . import autorizacao  # quem recebeu poder de administrar (papel ou exceção) também precisa
+
+    return any(autorizacao.pode(usuario, p) for p in autorizacao.SENSIVEIS)
 
 
 def novo_segredo() -> str:

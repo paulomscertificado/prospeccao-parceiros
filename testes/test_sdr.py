@@ -101,7 +101,8 @@ def test_mensagens_por_angulo_sem_spam(cliente):
     assert "com quem posso falar sobre possíveis parcerias" in generica
     assert set(msgs) == set(config.ANGULOS)
     assert len({m["whatsapp"] for m in msgs.values()}) == 4  # cada toque é diferente
-    assert msgs["apresentacao"]["whatsapp"].startswith("Olá, Maria! Tudo bem?")
+    # a variação do modelo é escolhida pelo número do lead; todas cumprimentam pelo primeiro nome
+    assert msgs["apresentacao"]["whatsapp"].split("!")[0] in ("Olá, Maria", "Oi, Maria")
     assert "condomínio" in msgs["apresentacao"]["whatsapp"] and msgs["apresentacao"]["fonte"] == "modelos do segmento"
     assert "{" not in " ".join(m["whatsapp"] + m["email"] + m["assunto"] for m in msgs.values())  # variáveis preenchidas
     assert "viu minha mensagem" not in " ".join(m["whatsapp"] for m in msgs.values()).lower()

@@ -8,12 +8,12 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from .. import cadencias, config, ia, leads_servico, mensagens, planilhas, prospeccao, score, sdr, util
+from .. import autorizacao, cadencias, config, ia, leads_servico, mensagens, planilhas, prospeccao, score, sdr, util
 from ..banco import agora, obter_db
 from ..integracoes import email_smtp, whatsapp_cloud
 from ..leads_servico import filtrar_por_usuario, historico, pode_ver
 from ..modelos import Busca, Cadencia, Campanha, Categoria, Historico, Lead, Mensagem, Tarefa, Template, Usuario
-from ..seguranca import equipe, gestao, registrar_log, ve_tudo, verificar_csrf
+from ..seguranca import exige, registrar_log, ve_tudo, verificar_csrf
 from ..web import avisar, tela, voltar
 
 rotas = APIRouter()
@@ -21,10 +21,7 @@ POR_PAGINA = 50
 
 
 def _lead(db: Session, lead_id: int, usuario: Usuario) -> Lead:
-    lead = db.get(Lead, lead_id)
-    if not lead or not pode_ver(usuario, lead):
-        raise HTTPException(404)
-    return lead
+    return autorizacao.garantir(usuario, "leads.ver", db.get(Lead, lead_id))
 
 
 def _vendedores(db: Session):
@@ -51,7 +48,7 @@ def _dados_do_form(form) -> dict:
 @rotas.get("/leads")
 def lista(request: Request, q: str = "", status: str = "", potencial: str = "", uf: str = "", cidade: str = "",
           vendedor: str = "", origem: str = "", ordem: str = "score", pagina: int = 1,
-          usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+          usuario: Usuario = Depends(exige("leads.ver")), db: Session = Depends(obter_db)):
     consulta = filtrar_por_usuario(select(Lead).where(Lead.anonimizado.is_(False)), usuario)
     if q:
         termo = f"%{q.strip()}%"
@@ -72,9 +69,9 @@ def lista(request: Request, q: str = "", status: str = "", potencial: str = "", 
         consulta = consulta.where(Lead.estado == uf)
     if cidade:
         consulta = consulta.where(Lead.cidade.ilike(f"%{cidade}%"))
-    if vendedor == "sem" and ve_tudo(usuario):
+    if vendedor == "sem" and ve_tudo(usuario, "leads.ver"):
         consulta = consulta.where(Lead.vendedor_id.is_(None))
-    elif vendedor and ve_tudo(usuario):
+    elif vendedor and ve_tudo(usuario, "leads.ver"):
         consulta = consulta.where(Lead.vendedor_id == util.para_int(vendedor))
     if origem:
         consulta = consulta.where(Lead.origem == origem)
@@ -94,7 +91,7 @@ def lista(request: Request, q: str = "", status: str = "", potencial: str = "", 
 
 
 @rotas.post("/leads/acoes", dependencies=[Depends(verificar_csrf)])
-async def acoes_em_lote(request: Request, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+async def acoes_em_lote(request: Request, usuario: Usuario = Depends(exige("leads.editar")), db: Session = Depends(obter_db)):
     form = await request.form()
     ids = [int(i) for i in form.getlist("ids") if str(i).isdigit()]
     acao = form.get("acao", "")
@@ -126,8 +123,8 @@ async def acoes_em_lote(request: Request, usuario: Usuario = Depends(equipe), db
 
             personalizar_campanha_em_segundo_plano(campanha.id, usuario.id)
             avisar(request, "A IA está personalizando a primeira mensagem de cada lead. Atualize a agenda em alguns minutos.")
-        return voltar("/agenda")
-    if acao == "vendedor" and ve_tudo(usuario):
+        return voltar("/agenda" if autorizacao.pode(usuario, "agenda.ver") else "/fila")
+    if acao == "vendedor" and autorizacao.pode(usuario, "leads.atribuir"):
         vid = util.para_int(form.get("vendedor_id"))
         for l in leads:
             l.vendedor_id = vid
@@ -150,9 +147,9 @@ async def acoes_em_lote(request: Request, usuario: Usuario = Depends(equipe), db
 # ---------------------------------------------------------------- Pipeline (Kanban)
 
 @rotas.get("/leads/pipeline")
-def pipeline(request: Request, vendedor: str = "", usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def pipeline(request: Request, vendedor: str = "", usuario: Usuario = Depends(exige("leads.ver")), db: Session = Depends(obter_db)):
     consulta = filtrar_por_usuario(select(Lead).where(Lead.anonimizado.is_(False)), usuario)
-    if ve_tudo(usuario) and vendedor != "todos":
+    if ve_tudo(usuario, "leads.ver") and vendedor != "todos":
         vendedor = vendedor or str(usuario.id)  # padrão: os leads de quem está usando a conta
         consulta = consulta.where(Lead.vendedor_id == util.para_int(vendedor))
     colunas = []
@@ -165,7 +162,7 @@ def pipeline(request: Request, vendedor: str = "", usuario: Usuario = Depends(eq
 
 
 @rotas.post("/api/leads/{lead_id}/status", dependencies=[Depends(verificar_csrf)])
-async def api_mudar_status(lead_id: int, request: Request, usuario: Usuario = Depends(equipe),
+async def api_mudar_status(lead_id: int, request: Request, usuario: Usuario = Depends(exige("leads.editar")),
                            db: Session = Depends(obter_db)):
     corpo = await request.json()
     lead = _lead(db, lead_id, usuario)
@@ -180,13 +177,13 @@ async def api_mudar_status(lead_id: int, request: Request, usuario: Usuario = De
 # ---------------------------------------------------------------- Cadastro e ficha do lead
 
 @rotas.get("/leads/novo")
-def novo_tela(request: Request, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def novo_tela(request: Request, usuario: Usuario = Depends(exige("leads.criar")), db: Session = Depends(obter_db)):
     return tela(request, "lead_form.html", {"lead": Lead(status="Novo", estado="", origem="Cadastro manual"),
                                             "vendedores": _vendedores(db), "novo": True})
 
 
 @rotas.post("/leads/novo", dependencies=[Depends(verificar_csrf)])
-async def novo(request: Request, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+async def novo(request: Request, usuario: Usuario = Depends(exige("leads.criar")), db: Session = Depends(obter_db)):
     form = await request.form()
     dados = _dados_do_form(form)
     problemas = planilhas.validar_lead(dados)
@@ -233,13 +230,13 @@ def _contexto_lead(db: Session, lead: Lead, usuario: Usuario) -> dict:
 
 
 @rotas.get("/leads/{lead_id:int}")
-def ficha(request: Request, lead_id: int, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def ficha(request: Request, lead_id: int, usuario: Usuario = Depends(exige("leads.ver")), db: Session = Depends(obter_db)):
     lead = _lead(db, lead_id, usuario)
     return tela(request, "lead.html", _contexto_lead(db, lead, usuario))
 
 
 @rotas.post("/leads/{lead_id:int}", dependencies=[Depends(verificar_csrf)])
-async def salvar(request: Request, lead_id: int, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+async def salvar(request: Request, lead_id: int, usuario: Usuario = Depends(exige("leads.editar")), db: Session = Depends(obter_db)):
     lead = _lead(db, lead_id, usuario)
     form = await request.form()
     if "empresa" not in form:  # só mudança de status (ex.: botão "Mudar status para...")
@@ -249,7 +246,7 @@ async def salvar(request: Request, lead_id: int, usuario: Usuario = Depends(equi
             avisar(request, f"Status alterado para {lead.status}.")
         return voltar(f"/leads/{lead_id}")
     dados = _dados_do_form(form)
-    if not ve_tudo(usuario):
+    if not autorizacao.pode(usuario, "leads.atribuir"):
         dados.pop("vendedor_id", None)
     problemas = planilhas.validar_lead(dados)
     if problemas:
@@ -277,7 +274,7 @@ async def salvar(request: Request, lead_id: int, usuario: Usuario = Depends(equi
 
 
 @rotas.post("/leads/{lead_id:int}/qualificar", dependencies=[Depends(verificar_csrf)])
-def qualificar(request: Request, lead_id: int, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def qualificar(request: Request, lead_id: int, usuario: Usuario = Depends(exige("leads.editar")), db: Session = Depends(obter_db)):
     lead = _lead(db, lead_id, usuario)
     score.atualizar(db, lead)
     try:
@@ -294,7 +291,7 @@ def qualificar(request: Request, lead_id: int, usuario: Usuario = Depends(equipe
 
 
 @rotas.post("/leads/{lead_id:int}/proximo-passo", dependencies=[Depends(verificar_csrf)])
-def proximo_passo(request: Request, lead_id: int, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def proximo_passo(request: Request, lead_id: int, usuario: Usuario = Depends(exige("leads.editar")), db: Session = Depends(obter_db)):
     lead = _lead(db, lead_id, usuario)
     itens = list(reversed(db.execute(select(Historico).where(Historico.lead_id == lead.id)
                                      .order_by(Historico.criado_em.desc()).limit(40)).scalars().all()))
@@ -316,7 +313,7 @@ def proximo_passo(request: Request, lead_id: int, usuario: Usuario = Depends(equ
 
 
 @rotas.post("/leads/{lead_id:int}/enriquecer", dependencies=[Depends(verificar_csrf)])
-def enriquecer(request: Request, lead_id: int, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def enriquecer(request: Request, lead_id: int, usuario: Usuario = Depends(exige("leads.editar")), db: Session = Depends(obter_db)):
     lead = _lead(db, lead_id, usuario)
     if not lead.site and not lead.cnpj:
         avisar(request, "Informe o site ou o CNPJ do escritório para buscar dados públicos.", "alerta")
@@ -331,7 +328,7 @@ def enriquecer(request: Request, lead_id: int, usuario: Usuario = Depends(equipe
 
 @rotas.post("/leads/{lead_id:int}/contato", dependencies=[Depends(verificar_csrf)])
 def contato(request: Request, lead_id: int, canal: str = Form(...), descricao: str = Form(""),
-            usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+            usuario: Usuario = Depends(exige("leads.editar")), db: Session = Depends(obter_db)):
     lead = _lead(db, lead_id, usuario)
     leads_servico.registrar_contato(db, lead, canal, descricao or f"Contato por {config.CANAIS.get(canal, canal)}.", usuario)
     db.commit()
@@ -341,7 +338,7 @@ def contato(request: Request, lead_id: int, canal: str = Form(...), descricao: s
 
 @rotas.post("/leads/{lead_id:int}/resposta", dependencies=[Depends(verificar_csrf)])
 def resposta(request: Request, lead_id: int, canal: str = Form("whatsapp"), texto: str = Form(""),
-             usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+             usuario: Usuario = Depends(exige("leads.editar")), db: Session = Depends(obter_db)):
     lead = _lead(db, lead_id, usuario)
     if not texto.strip():
         leads_servico.registrar_resposta(db, lead, canal, "", usuario)
@@ -361,7 +358,7 @@ def resposta(request: Request, lead_id: int, canal: str = Form("whatsapp"), text
 
 
 @rotas.post("/leads/{lead_id:int}/nota", dependencies=[Depends(verificar_csrf)])
-def nota(request: Request, lead_id: int, texto: str = Form(...), usuario: Usuario = Depends(equipe),
+def nota(request: Request, lead_id: int, texto: str = Form(...), usuario: Usuario = Depends(exige("leads.editar")),
          db: Session = Depends(obter_db)):
     lead = _lead(db, lead_id, usuario)
     if texto.strip():
@@ -373,7 +370,7 @@ def nota(request: Request, lead_id: int, texto: str = Form(...), usuario: Usuari
 @rotas.post("/leads/{lead_id:int}/tarefa", dependencies=[Depends(verificar_csrf)])
 def nova_tarefa(request: Request, lead_id: int, tipo: str = Form("followup"), canal: str = Form("whatsapp"),
                 data: str = Form(...), hora: str = Form("09:00"), acao: str = Form(""), mensagem: str = Form(""),
-                usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+                usuario: Usuario = Depends(exige("leads.editar")), db: Session = Depends(obter_db)):
     lead = _lead(db, lead_id, usuario)
     dia = util.para_data(data) or date.today()
     tipo = "reuniao" if tipo == "reuniao" else "followup"
@@ -392,7 +389,7 @@ def nova_tarefa(request: Request, lead_id: int, tipo: str = Form("followup"), ca
 
 
 @rotas.post("/leads/{lead_id:int}/converter", dependencies=[Depends(verificar_csrf)])
-def converter(request: Request, lead_id: int, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def converter(request: Request, lead_id: int, usuario: Usuario = Depends(exige("leads.editar")), db: Session = Depends(obter_db)):
     lead = _lead(db, lead_id, usuario)
     if lead.etapa < 7:
         leads_servico.mudar_status(db, lead, "Parceiro", usuario, "convertido pelo vendedor")
@@ -404,10 +401,10 @@ def converter(request: Request, lead_id: int, usuario: Usuario = Depends(equipe)
 
 
 @rotas.post("/leads/{lead_id:int}/opt-out", dependencies=[Depends(verificar_csrf)])
-def opt_out(request: Request, lead_id: int, desfazer: str = Form(""), usuario: Usuario = Depends(equipe),
+def opt_out(request: Request, lead_id: int, desfazer: str = Form(""), usuario: Usuario = Depends(exige("leads.editar")),
             db: Session = Depends(obter_db)):
     lead = _lead(db, lead_id, usuario)
-    if desfazer and ve_tudo(usuario):
+    if desfazer and autorizacao.pode(usuario, "leads.liberar_contato"):
         lead.opt_out, lead.opt_out_em = False, None
         historico(db, lead.id, "lgpd", "Opt-out desfeito (o contato autorizou novamente).", usuario)
         avisar(request, "Opt-out desfeito.")
@@ -420,7 +417,7 @@ def opt_out(request: Request, lead_id: int, desfazer: str = Form(""), usuario: U
 
 
 @rotas.post("/leads/{lead_id:int}/excluir", dependencies=[Depends(verificar_csrf)])
-def excluir(request: Request, lead_id: int, usuario: Usuario = Depends(gestao), db: Session = Depends(obter_db)):
+def excluir(request: Request, lead_id: int, usuario: Usuario = Depends(exige("leads.excluir")), db: Session = Depends(obter_db)):
     """Atende pedido de exclusão (LGPD): anonimiza e guarda só o necessário para não contatar de novo."""
     lead = _lead(db, lead_id, usuario)
     leads_servico.registrar_opt_out(db, lead, usuario, "pedido de exclusão de dados")
@@ -435,7 +432,7 @@ def excluir(request: Request, lead_id: int, usuario: Usuario = Depends(gestao), 
 # ---------------------------------------------------------------- Mensagens (copiar / enviar)
 
 @rotas.post("/api/mensagens/registrar", dependencies=[Depends(verificar_csrf)])
-async def registrar_mensagem(request: Request, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+async def registrar_mensagem(request: Request, usuario: Usuario = Depends(exige("leads.editar")), db: Session = Depends(obter_db)):
     """Chamado ao clicar em "Copiar mensagem" ou "Abrir no WhatsApp": aplica as regras e guarda no histórico."""
     corpo = await request.json()
     lead = _lead(db, int(corpo.get("lead_id") or 0), usuario) if corpo.get("lead_id") else None
@@ -455,7 +452,7 @@ async def registrar_mensagem(request: Request, usuario: Usuario = Depends(equipe
 
 @rotas.post("/leads/{lead_id:int}/enviar", dependencies=[Depends(verificar_csrf)])
 def enviar_api(request: Request, lead_id: int, canal: str = Form(...), template_id: int = Form(...),
-               usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+               usuario: Usuario = Depends(exige("leads.editar")), db: Session = Depends(obter_db)):
     """Envio de UMA mensagem pela integração oficial (WhatsApp Cloud API ou SMTP)."""
     lead = _lead(db, lead_id, usuario)
     template = db.get(Template, template_id)
@@ -496,14 +493,14 @@ def enviar_api(request: Request, lead_id: int, canal: str = Form(...), template_
 # ---------------------------------------------------------------- Importação
 
 @rotas.get("/leads/importar")
-def importar_tela(request: Request, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def importar_tela(request: Request, usuario: Usuario = Depends(exige("leads.importar")), db: Session = Depends(obter_db)):
     return tela(request, "importar.html", {"vendedores": _vendedores(db), "resultado": None})
 
 
 @rotas.post("/leads/importar", dependencies=[Depends(verificar_csrf)])
 async def importar(request: Request, arquivo: UploadFile = File(...), vendedor_id: str = Form(""),
                    origem: str = Form(""), base_legal: str = Form("Legítimo interesse (contato B2B)"),
-                   usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+                   usuario: Usuario = Depends(exige("leads.importar")), db: Session = Depends(obter_db)):
     conteudo = await arquivo.read()
     if len(conteudo) > 10 * 1024 * 1024:
         avisar(request, "Arquivo grande demais (máximo 10 MB). Divida em partes.", "erro")
@@ -514,7 +511,7 @@ async def importar(request: Request, arquivo: UploadFile = File(...), vendedor_i
         avisar(request, str(erro), "erro")
         return voltar("/leads/importar")
     origem = origem.strip() or f"Importação: {arquivo.filename}"
-    vendedor = util.para_int(vendedor_id) if ve_tudo(usuario) else usuario.id
+    vendedor = util.para_int(vendedor_id) if autorizacao.pode(usuario, "leads.atribuir") else usuario.id
     resultado = {"importados": 0, "duplicados": [], "invalidos": [], "total": len(linhas), "colunas_ignoradas": []}
     if linhas:
         resultado["colunas_ignoradas"] = [c for c in linhas[0].keys()
@@ -542,7 +539,7 @@ async def importar(request: Request, arquivo: UploadFile = File(...), vendedor_i
 # ---------------------------------------------------------------- Prospecção ("Encontrar novos parceiros")
 
 @rotas.get("/prospeccao")
-def prospeccao_tela(request: Request, pedido: str = "", usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+def prospeccao_tela(request: Request, pedido: str = "", usuario: Usuario = Depends(exige("prospeccao.buscar")), db: Session = Depends(obter_db)):
     preenchido = prospeccao.interpretar_pedido(pedido) if pedido else {}
     buscas = db.execute(select(Busca).order_by(Busca.criado_em.desc()).limit(15)).scalars().all()
     from .. import base_receita
@@ -566,7 +563,7 @@ def _cnaes_do_formulario(form) -> list[str]:
 
 
 @rotas.post("/prospeccao/buscar", dependencies=[Depends(verificar_csrf)])
-async def prospeccao_buscar(request: Request, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+async def prospeccao_buscar(request: Request, usuario: Usuario = Depends(exige("prospeccao.buscar")), db: Session = Depends(obter_db)):
     form = await request.form()
     cidade, uf = str(form.get("cidade", "")).strip(), str(form.get("estado", "")).strip().upper()
     fontes = [f for f in form.getlist("fontes") if f in ("receita", "osm", "google")]
@@ -598,11 +595,9 @@ async def prospeccao_buscar(request: Request, usuario: Usuario = Depends(equipe)
 
 
 @rotas.get("/prospeccao/busca/{busca_id}")
-def prospeccao_resultado(request: Request, busca_id: int, potencial: str = "", usuario: Usuario = Depends(equipe),
+def prospeccao_resultado(request: Request, busca_id: int, potencial: str = "", usuario: Usuario = Depends(exige("prospeccao.buscar")),
                          db: Session = Depends(obter_db)):
-    busca = db.get(Busca, busca_id)
-    if not busca:
-        raise HTTPException(404)
+    busca = autorizacao.garantir(usuario, "prospeccao.buscar", db.get(Busca, busca_id), sem_dono=True)
     leads = [l for l in prospeccao.leads_da_busca(db, busca_id) if pode_ver(usuario, l)]
     if potencial:
         leads = [l for l in leads if l.potencial == potencial]

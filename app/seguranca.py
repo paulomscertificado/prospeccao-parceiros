@@ -181,28 +181,18 @@ def usuario_logado(request: Request, db: Session = Depends(obter_db)) -> Usuario
     return usuario
 
 
-def exigir(*perfis: str):
-    """Dependência: só deixa passar os perfis informados."""
+def exige(*permissoes: str):
+    """Dependência das rotas: só deixa passar quem tem as permissões (ver app/autorizacao.py)."""
+    from .autorizacao import exige as _exige
 
-    def _checar(usuario: Usuario = Depends(usuario_logado)) -> Usuario:
-        if usuario.perfil not in perfis:
-            raise SemPermissao("Seu perfil não tem acesso a esta parte do sistema.")
-        return usuario
-
-    return _checar
+    return _exige(*permissoes)
 
 
-EQUIPE = ("admin", "gestor", "funcionario", "vendedor")
-GESTAO = ("admin", "gestor")
-equipe = exigir(*EQUIPE)
-gestao = exigir(*GESTAO)
-admin = exigir("admin")
-ferramentas = exigir(*config.PERFIS_FERRAMENTAS)  # Funcionário MS também usa (o vendedor não)
-parceiro = exigir("parceiro")
+def ve_tudo(usuario: Usuario, permissao: str = "leads.ver") -> bool:
+    """A pessoa alcança os registros de todos nesta permissão (não só os próprios ou os da equipe)?"""
+    from .autorizacao import ve_tudo as _ve_tudo
 
-
-def ve_tudo(usuario: Usuario) -> bool:
-    return usuario.perfil in GESTAO
+    return _ve_tudo(usuario, permissao)
 
 
 # ---------------------------------------------------------------- Auditoria

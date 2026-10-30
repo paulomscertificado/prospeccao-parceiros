@@ -16,10 +16,10 @@
 </div>
 <div class="grade-lead">
 <div class="cartao" style="padding:0"><div class="tabela-rolagem"><table>
-  <tr><th>Data</th><th>Cliente</th><th>Produto</th><th>Parceiro</th><th class="num">Valor</th><th class="num">Comissão</th><th class="num">Lucro</th>{% if usuario.perfil == 'admin' %}<th></th>{% endif %}</tr>
+  <tr><th>Data</th><th>Cliente</th><th>Produto</th><th>Parceiro</th><th class="num">Valor</th><th class="num">Comissão</th><th class="num">Lucro</th>{% if pode('vendas.excluir') %}<th></th>{% endif %}</tr>
   {% for v in vendas %}<tr><td class="nowrap">{{ v.data|data }}</td><td>{{ v.cliente.nome }}</td><td>{{ v.produto.nome if v.produto else '' }}{% if v.tipo == 'renovacao' %} <span class="selo selo-ok">renovação</span>{% endif %}</td>
     <td>{{ v.parceiro.escritorio if v.parceiro else 'Direta' }}</td><td class="num">{{ v.valor|moeda }}</td><td class="num">{{ v.comissao|moeda }}</td><td class="num">{{ (v.valor - v.custo - v.comissao)|moeda }}</td>
-    {% if usuario.perfil == 'admin' %}<td><form method="post" action="/vendas/{{ v.id }}/excluir" data-confirmar="Excluir esta venda?"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-pequeno btn-perigo">Excluir</button></form></td>{% endif %}</tr>
+    {% if pode('vendas.excluir') %}<td><form method="post" action="/vendas/{{ v.id }}/excluir" data-confirmar="Excluir esta venda?"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-pequeno btn-perigo">Excluir</button></form></td>{% endif %}</tr>
   {% else %}<tr><td colspan="8" class="vazio">Nenhuma venda no período.</td></tr>{% endfor %}
 </table></div></div>
 
@@ -37,7 +37,7 @@
     <div><label>Valor cobrado (R$)</label><input type="text" name="valor" id="valor" placeholder="preço da tabela"></div>
     <div><label>Data</label><input type="date" name="data" value="{{ hoje.isoformat() }}"></div>
     {% if not renovar %}<div><label>Tipo</label><select name="tipo"><option value="nova">Nova emissão</option><option value="renovacao">Renovação</option></select></div>{% endif %}
-    {% if usuario.perfil in ['admin','gestor'] %}<div><label>Vendedor</label><select name="vendedor_id">{% for v in vendedores %}<option value="{{ v.id }}" {{ 'selected' if v.id == usuario.id }}>{{ v.nome }}</option>{% endfor %}</select></div>{% endif %}
+    {% if pode('vendas.atribuir') %}<div><label>Vendedor</label><select name="vendedor_id">{% for v in vendedores %}<option value="{{ v.id }}" {{ 'selected' if v.id == usuario.id }}>{{ v.nome }}</option>{% endfor %}</select></div>{% endif %}
   </div>
   <div class="campo" style="margin-top:10px"><label>Observações</label><input type="text" name="observacoes"></div>
   <button class="btn btn-primario">Salvar venda</button>

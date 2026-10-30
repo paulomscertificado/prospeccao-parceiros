@@ -40,19 +40,19 @@
 <form class="cartao" style="padding:0" method="post" action="/comissoes/pagar" data-confirmar="Marcar as comissões selecionadas como pagas?">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <div class="tabela-rolagem"><table>
-    <tr>{% if usuario.perfil == 'admin' %}<th><input type="checkbox" data-marcar-todos=".marca-com" aria-label="Marcar todas"></th>{% endif %}<th>Data</th><th>Parceiro</th><th>Cliente</th><th>Produto</th><th class="num">Venda</th><th class="num">Comissão</th><th>Situação</th></tr>
-    {% for v in vendas %}<tr>{% if usuario.perfil == 'admin' %}<td>{% if not v.comissao_paga %}<input type="checkbox" class="marca-com" name="ids" value="{{ v.id }}">{% endif %}</td>{% endif %}
+    <tr>{% if pode('comissoes.pagar') %}<th><input type="checkbox" data-marcar-todos=".marca-com" aria-label="Marcar todas"></th>{% endif %}<th>Data</th><th>Parceiro</th><th>Cliente</th><th>Produto</th><th class="num">Venda</th><th class="num">Comissão</th><th>Situação</th></tr>
+    {% for v in vendas %}<tr>{% if pode('comissoes.pagar') %}<td>{% if not v.comissao_paga %}<input type="checkbox" class="marca-com" name="ids" value="{{ v.id }}">{% endif %}</td>{% endif %}
       <td>{{ v.data|data }}</td><td>{{ v.parceiro.escritorio if v.parceiro else '' }}</td><td>{{ v.cliente.nome }}</td><td>{{ v.produto.nome if v.produto else '' }}</td><td class="num">{{ v.valor|moeda }}</td><td class="num">{{ v.comissao|moeda }}</td>
       <td>{% if v.comissao_paga %}<span class="selo selo-ok">paga {{ v.comissao_paga_em|data }}</span>{% else %}<span class="selo selo-alerta">a pagar</span>{% endif %}</td></tr>
     {% else %}<tr><td colspan="8" class="vazio">Nenhuma comissão.</td></tr>{% endfor %}
   </table></div>
-  {% if usuario.perfil == 'admin' and vendas %}<div style="padding:12px 14px"><button class="btn btn-primario">Marcar selecionadas como pagas</button></div>{% endif %}
+  {% if pode('comissoes.pagar') and vendas %}<div style="padding:12px 14px"><button class="btn btn-primario">Marcar selecionadas como pagas</button></div>{% endif %}
 </form>
 
 <div class="cartao" id="produtos">
   <h2>Produtos, preços e regra de comissão padrão</h2>
   <div class="tabela-rolagem"><table>
-    <tr><th>Produto</th><th>Preço</th><th>Custo</th><th>Comissão</th><th>Valor</th><th>Validade (meses)</th><th>Ativo</th><th class="num">Comissão R$</th><th class="num">Lucro</th><th class="num">Margem</th>{% if usuario.perfil == 'admin' %}<th></th>{% endif %}</tr>
+    <tr><th>Produto</th><th>Preço</th><th>Custo</th><th>Comissão</th><th>Valor</th><th>Validade (meses)</th><th>Ativo</th><th class="num">Comissão R$</th><th class="num">Lucro</th><th class="num">Margem</th>{% if pode('produtos.editar') %}<th></th>{% endif %}</tr>
     {% for pr in produtos %}{% set c = calculos[pr.id] %}
     <tr>
       <td><input form="prod-{{ pr.id }}" type="text" name="nome" value="{{ pr.nome }}" style="min-width:180px" aria-label="Nome"></td>
@@ -63,9 +63,9 @@
       <td><input form="prod-{{ pr.id }}" type="number" name="validade_meses" value="{{ pr.validade_meses }}" style="width:70px" aria-label="Validade"></td>
       <td><input form="prod-{{ pr.id }}" type="checkbox" name="ativo" {{ 'checked' if pr.ativo }} aria-label="Ativo"></td>
       <td class="num">{{ c.comissao|moeda }}</td><td class="num">{{ c.lucro_bruto|moeda }}</td><td class="num">{{ c.margem|pct }}</td>
-      {% if usuario.perfil == 'admin' %}<td><button form="prod-{{ pr.id }}" class="btn btn-pequeno">Salvar</button></td>{% endif %}
+      {% if pode('produtos.editar') %}<td><button form="prod-{{ pr.id }}" class="btn btn-pequeno">Salvar</button></td>{% endif %}
     </tr>{% endfor %}
-    {% if usuario.perfil == 'admin' %}
+    {% if pode('produtos.editar') %}
     <tr>
       <td><input form="prod-novo" type="text" name="nome" placeholder="Novo produto" required aria-label="Nome"></td><td><input form="prod-novo" type="text" name="preco" style="width:90px" aria-label="Preço"></td><td><input form="prod-novo" type="text" name="custo" style="width:90px" aria-label="Custo"></td>
       <td><select form="prod-novo" name="comissao_tipo" aria-label="Tipo"><option value="percentual">%</option><option value="fixo">R$</option></select></td><td><input form="prod-novo" type="text" name="comissao_valor" style="width:80px" aria-label="Comissão"></td>

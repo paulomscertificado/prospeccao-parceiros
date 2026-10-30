@@ -45,7 +45,10 @@ Definido em `app/modelos.py` e `app/base_receita.py`.
 | Tabela | Para quê | Campos principais |
 |---|---|---|
 | `contas_email` | E-mail de envio de cada pessoa e o principal da MS (`app/contas_email.py`) | dono_id, endereco, senha_cripto, ler_respostas, ativa, compartilhada_todos/com |
-| `usuarios` | Login e perfis | email (único), senha_hash, perfil (admin/gestor/vendedor/parceiro), parceiro_id, versao_sessao, totp_* e versao_2fa (2 etapas) |
+| `usuarios` | Login e perfis | email (único), senha_hash, perfil (tipo base: admin/gestor/funcionario/vendedor/parceiro), papel_id (papel criado na tela; vazio = papel do sistema do perfil), equipe_id, parceiro_id, versao_sessao, totp_* e versao_2fa (2 etapas) |
+| `papeis` / `permissoes_papel` | Papéis e o que cada um pode (`docs/permissoes.md`) | codigo, nome, base, sistema, permissoes_conhecidas · papel_id, permissao (`recurso.acao`), escopo (tudo/equipe/proprios) |
+| `excecoes_permissao` | PERMITIR/NEGAR por usuário | usuario_id, permissao, efeito, escopo, ate, motivo, criado_por_id |
+| `equipes` | Equipes (unidades) para o alcance "só a equipe" | nome |
 | `leads` | Banco de leads | dados do escritório, critérios do score, status, score, potencial, origem, fonte_url, base_legal, opt_out, datas do funil (contatado_em, respondeu_em, interessado_em, reuniao_em, proposta_em, convertido_em), chaves de dedup (chave_cnpj, chave_dominio, chave_telefone, chave_whatsapp, chave_email) |
 | `historico` | Linha do tempo do lead (registro de tratamento LGPD) | tipo (status, contato, resposta, nota, ia, sistema, reuniao, lgpd), canal, descrição, usuário |
 | `buscas` | Execuções de "Encontrar novos parceiros" | critérios, fontes, status, contadores |
@@ -94,5 +97,6 @@ Detalhes em [ia-sdr.md](ia-sdr.md).
 - SQL injection: só consultas parametrizadas do SQLAlchemy (nenhum SQL montado com texto).
 - Criptografia: chave Pix com Fernet (`CHAVE_CRIPTOGRAFIA`).
 - Cabeçalhos: `X-Frame-Options`, `nosniff`, `Referrer-Policy`, HSTS em produção. Documentação automática da API desligada.
-- Permissões por perfil em toda rota (`app/seguranca.py`) e filtro de dados por vendedor/parceiro.
+- Permissões em camadas em toda rota (`app/autorizacao.py`, ver `docs/permissoes.md`): papel + exceções por usuário +
+  módulos; o registro é conferido pelo dono (trocar o ID no endereço dá 404) e as listas/exportações são filtradas.
 - Logs de auditoria de login, exportações, importações, alterações e LGPD.

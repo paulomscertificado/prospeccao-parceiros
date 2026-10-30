@@ -2,7 +2,9 @@
 
 Todas as rotas exigem login (exceto `/login`, `/primeiro-acesso`, `/api/saude` e os webhooks).
 Todo `POST` exige o token CSRF (campo `csrf` no formulário ou cabeçalho `X-CSRF-Token`).
-Perfis: A = administrador, G = gestor, V = vendedor, P = parceiro.
+Perfis: A = administrador, G = gestor, V = vendedor, P = parceiro (acesso **padrão**). Desde as permissões em camadas
+cada rota confere uma permissão `recurso.acao` (ex.: `leads.editar`), que o administrador pode mudar por papel ou por
+pessoa: veja a lista e as regras em [permissoes.md](permissoes.md). Sem a permissão: 403; registro de outra pessoa: 404.
 
 ## Telas
 

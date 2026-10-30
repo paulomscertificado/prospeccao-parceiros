@@ -9,8 +9,7 @@ from sqlalchemy.orm import Session
 from .. import util
 from ..banco import obter_db
 from ..modelos import Certificado, Cliente, Parceiro, Tarefa, Usuario, Venda
-from ..seguranca import parceiro as so_parceiro
-from ..seguranca import registrar_log, verificar_csrf
+from ..seguranca import exige, registrar_log, verificar_csrf
 from ..vendas_servico import descrever_regra, responsavel_padrao
 from ..web import avisar, tela, voltar
 
@@ -27,7 +26,7 @@ def _meu(db: Session, usuario: Usuario) -> Parceiro:
 
 
 @rotas.get("")
-def painel(request: Request, usuario: Usuario = Depends(so_parceiro), db: Session = Depends(obter_db)):
+def painel(request: Request, usuario: Usuario = Depends(exige("portal.usar")), db: Session = Depends(obter_db)):
     p = _meu(db, usuario)
     vendas = db.execute(select(Venda).where(Venda.parceiro_id == p.id).order_by(Venda.data.desc())).scalars().all()
     clientes = db.execute(select(Cliente).where(Cliente.parceiro_id == p.id)).scalars().all()
@@ -48,7 +47,7 @@ def painel(request: Request, usuario: Usuario = Depends(so_parceiro), db: Sessio
 
 
 @rotas.get("/indicar")
-def indicar_tela(request: Request, usuario: Usuario = Depends(so_parceiro), db: Session = Depends(obter_db)):
+def indicar_tela(request: Request, usuario: Usuario = Depends(exige("portal.usar")), db: Session = Depends(obter_db)):
     _meu(db, usuario)
     return tela(request, "portal_indicar.html")
 
@@ -56,7 +55,7 @@ def indicar_tela(request: Request, usuario: Usuario = Depends(so_parceiro), db: 
 @rotas.post("/indicar", dependencies=[Depends(verificar_csrf)])
 def indicar(request: Request, nome: str = Form(...), cnpj: str = Form(""), contato: str = Form(""),
             telefone: str = Form(""), email: str = Form(""), produto: str = Form(""), observacoes: str = Form(""),
-            autorizou: str = Form(""), usuario: Usuario = Depends(so_parceiro), db: Session = Depends(obter_db)):
+            autorizou: str = Form(""), usuario: Usuario = Depends(exige("portal.usar")), db: Session = Depends(obter_db)):
     p = _meu(db, usuario)
     if not nome.strip() or not (util.normalizar_telefone(telefone) or util.email_valido(email)):
         avisar(request, "Informe o nome do cliente e um telefone ou e-mail válido.", "erro")
@@ -83,7 +82,7 @@ def indicar(request: Request, nome: str = Form(...), cnpj: str = Form(""), conta
 
 
 @rotas.get("/clientes")
-def carteira(request: Request, usuario: Usuario = Depends(so_parceiro), db: Session = Depends(obter_db)):
+def carteira(request: Request, usuario: Usuario = Depends(exige("portal.usar")), db: Session = Depends(obter_db)):
     p = _meu(db, usuario)
     clientes = db.execute(select(Cliente).where(Cliente.parceiro_id == p.id).order_by(Cliente.criado_em.desc())).scalars().all()
     vendas = db.execute(select(Venda).where(Venda.parceiro_id == p.id).order_by(Venda.data.desc())).scalars().all()
@@ -91,7 +90,7 @@ def carteira(request: Request, usuario: Usuario = Depends(so_parceiro), db: Sess
 
 
 @rotas.get("/vencimentos")
-def vencimentos(request: Request, usuario: Usuario = Depends(so_parceiro), db: Session = Depends(obter_db)):
+def vencimentos(request: Request, usuario: Usuario = Depends(exige("portal.usar")), db: Session = Depends(obter_db)):
     p = _meu(db, usuario)
     certs = db.execute(select(Certificado).where(Certificado.parceiro_id == p.id)
                        .order_by(Certificado.data_vencimento)).scalars().all()

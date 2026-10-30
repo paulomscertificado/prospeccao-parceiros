@@ -26,7 +26,7 @@
   {% else %}<tr><td colspan="7" class="vazio">Nenhum certificado nesta lista.</td></tr>{% endfor %}
 </table></div></div>
 
-{% if usuario.perfil in ['admin','gestor'] %}
+{% if pode('vencimentos.importar') %}
 <form class="cartao" method="post" action="/vencimentos/importar" enctype="multipart/form-data" style="max-width:720px">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <h2>Importar certificados (CSV ou Excel)</h2>

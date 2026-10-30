@@ -8,10 +8,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from .. import campanhas, config, mensagens, sdr, util
+from .. import autorizacao, campanhas, config, mensagens, sdr, util
 from ..banco import agora, ler_config, obter_db
 from ..modelos import Campanha, Lead, LogAuditoria, Mensagem, Tarefa, Usuario
-from ..seguranca import equipe, registrar_log, ve_tudo, verificar_csrf
+from ..seguranca import exige, registrar_log, ve_tudo, verificar_csrf
 from ..web import avisar, tela, voltar
 from .envios import STATUS_ENVIO
 
@@ -53,11 +53,11 @@ def _motivo_pendente(db, t: Tarefa, hoje: date, no_horario: bool, liberados: dic
 
 
 @rotas.get("/fila")
-def minha_fila(request: Request, de: str = "", canal: str = "", usuario: Usuario = Depends(equipe),
+def minha_fila(request: Request, de: str = "", canal: str = "", usuario: Usuario = Depends(exige("fila.ver")),
                db: Session = Depends(obter_db)):
     hoje = date.today()
     alvo_id = usuario.id
-    if ve_tudo(usuario) and de:
+    if ve_tudo(usuario, "fila.ver") and de:
         alvo_id = None if de == "todos" else (util.para_int(de) or usuario.id)
 
     def do_alvo_tarefa(q):
@@ -122,7 +122,7 @@ def minha_fila(request: Request, de: str = "", canal: str = "", usuario: Usuario
     leads_por_id = {l.id: l for l in db.execute(select(Lead).where(Lead.id.in_(ids))).scalars()} if ids else {}
     nomes_camp = {c.id: c.nome for c in db.execute(select(Campanha)).scalars()}
     pessoas = db.execute(select(Usuario).where(Usuario.ativo.is_(True)).order_by(Usuario.nome)).scalars().all() \
-        if ve_tudo(usuario) else []
+        if ve_tudo(usuario, "fila.ver") else []
     return tela(request, "fila.html", {
         "pendentes": pendentes, "na_fila": na_fila, "historico": historico, "logs": logs, "resumo": resumo,
         "leads_por_id": leads_por_id, "nomes_camp": nomes_camp, "STATUS_ENVIO": STATUS_ENVIO, "hoje": hoje,
@@ -134,7 +134,7 @@ def minha_fila(request: Request, de: str = "", canal: str = "", usuario: Usuario
 
 
 @rotas.post("/fila/enviar/{tid:int}", dependencies=[Depends(verificar_csrf)])
-async def enviar_agora(request: Request, tid: int, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+async def enviar_agora(request: Request, tid: int, usuario: Usuario = Depends(exige("fila.enviar")), db: Session = Depends(obter_db)):
     """Botão "Enviar agora" (pendente) ou "Enviar de novo" (não saiu) da Minha fila."""
     form = await request.form()
     t = db.get(Tarefa, tid)
@@ -142,7 +142,7 @@ async def enviar_agora(request: Request, tid: int, usuario: Usuario = Depends(eq
     if t is None or camp is None:
         raise HTTPException(404)
     lead = t.lead
-    if usuario.perfil in config.PERFIS_SO_PROPRIOS and usuario.id not in (camp.usuario_id, lead.vendedor_id if lead else None):
+    if not autorizacao.pode(usuario, "fila.enviar", dono={camp.usuario_id, lead.vendedor_id if lead else None}):
         raise HTTPException(404)
     if t.status not in ("pendente", "feita") or camp.status != "ativa":
         avisar(request, "Este toque não pode mais ser enviado (campanha parada ou toque cancelado).", "erro")
@@ -164,7 +164,7 @@ async def enviar_agora(request: Request, tid: int, usuario: Usuario = Depends(eq
 
 
 @rotas.post("/fila/mensagem/{tid:int}", dependencies=[Depends(verificar_csrf)])
-async def editar_mensagem(request: Request, tid: int, usuario: Usuario = Depends(equipe), db: Session = Depends(obter_db)):
+async def editar_mensagem(request: Request, tid: int, usuario: Usuario = Depends(exige("fila.enviar")), db: Session = Depends(obter_db)):
     """Popup da Minha fila: altera o texto da versão de e-mail ou de WhatsApp de um toque que ainda não saiu."""
     form = await request.form()
     t = db.get(Tarefa, tid)
@@ -172,7 +172,7 @@ async def editar_mensagem(request: Request, tid: int, usuario: Usuario = Depends
     if t is None or camp is None:
         raise HTTPException(404)
     lead = t.lead
-    if usuario.perfil in config.PERFIS_SO_PROPRIOS and usuario.id not in (camp.usuario_id, lead.vendedor_id if lead else None):
+    if not autorizacao.pode(usuario, "fila.enviar", dono={camp.usuario_id, lead.vendedor_id if lead else None}):
         raise HTTPException(404)
     canal = str(form.get("canal") or "")
     texto = str(form.get("texto") or "")

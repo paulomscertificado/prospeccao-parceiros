@@ -38,7 +38,17 @@ def cliente():
         pagina = c.get("/primeiro-acesso")
         c.post("/primeiro-acesso", data={"csrf": csrf_de(pagina.text), "nome": "Maria Admin",
                                          "email": "admin@teste.com.br", "senha": SENHA, "senha2": SENHA})
+        ligar_modulos("vendas", "agenda")  # na MS vêm desligados; os testes passam por todas as telas
         yield c
+
+
+def ligar_modulos(*modulos: str, ligado: bool = True):
+    from app import autorizacao
+    from app.banco import gravar_config, sessao
+
+    with sessao() as db:
+        for m in modulos:
+            gravar_config(db, autorizacao.MODULOS[m][1], "1" if ligado else "0")
 
 
 @pytest.fixture()

@@ -43,7 +43,7 @@
   </details>
   <label style="margin-top:10px">Fontes de dados</label>
   {% for codigo, nome, ok in fontes %}<label class="marcar"><input type="checkbox" name="fontes" value="{{ codigo }}" {{ 'checked' if ok else 'disabled' }}> {{ nome }}</label>{% endfor %}
-  {% if not fontes[0][2] %}<div class="aviso aviso-alerta" style="margin:6px 0">Para achar escritórios em qualquer cidade, importe a base da Receita Federal (gratuita) em <a href="/configuracoes?aba=integracoes#receita">Configurações &gt; Integrações</a>{% if usuario.perfil != 'admin' %} (peça ao administrador){% endif %}. O OpenStreetMap tem poucos escritórios cadastrados no Brasil.</div>{% endif %}
+  {% if not fontes[0][2] %}<div class="aviso aviso-alerta" style="margin:6px 0">Para achar escritórios em qualquer cidade, importe a base da Receita Federal (gratuita) em <a href="/configuracoes?aba=integracoes#receita">Configurações &gt; Integrações</a>{% if not pode('configuracoes.alterar') %} (peça ao administrador){% endif %}. O OpenStreetMap tem poucos escritórios cadastrados no Brasil.</div>{% endif %}
   <label class="marcar"><input type="checkbox" name="enriquecer" checked> Completar com dados públicos do site e do CNPJ (mais lento, recomendado)</label>
   <div style="margin-top:12px"><button class="btn btn-primario">Buscar escritórios</button></div>
 </form>

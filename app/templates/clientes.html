@@ -17,7 +17,7 @@
   {% for c in clientes %}<tr><td><b>{{ c.nome }}</b><div class="pequeno suave">{{ c.cnpj }}</div></td><td class="pequeno">{{ c.contato }} {{ c.telefone }}<br>{{ c.email }}</td>
     <td>{% if c.parceiro %}<a href="/parceiros/{{ c.parceiro.id }}">{{ c.parceiro.escritorio }}</a>{% else %}Direto{% endif %}</td>
     <td><span class="selo">{{ c.status }}</span></td><td>{{ c.criado_em|data }}</td>
-    <td><a class="btn btn-pequeno" href="/vendas?cliente={{ c.id }}">Registrar venda</a></td></tr>
+    <td>{% if pode('vendas.criar') %}<a class="btn btn-pequeno" href="/vendas?cliente={{ c.id }}">Registrar venda</a>{% endif %}</td></tr>
   {% else %}<tr><td colspan="6" class="vazio">Nenhum cliente.</td></tr>{% endfor %}
 </table></div></div>
 <form class="cartao" method="post" action="/clientes/0">
