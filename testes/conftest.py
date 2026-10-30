@@ -13,6 +13,7 @@ os.environ["ANTHROPIC_API_KEY"] = ""          # testes nunca chamam a IA de verd
 os.environ["GOOGLE_PLACES_API_KEY"] = ""
 os.environ["WHATSAPP_TOKEN"] = ""
 os.environ["SMTP_HOST"] = ""
+os.environ["EXIGIR_2FA"] = "0"                                 # os testes do 2FA ligam só neles
 os.environ["WHATSAPP_LEADS_TOKEN"] = ""                       # nunca fala com o WhatsApp Leads de verdade
 os.environ["WHATSAPP_LEADS_PASTA"] = str(Path(PASTA_TESTE, "sem-whatsapp-leads"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))

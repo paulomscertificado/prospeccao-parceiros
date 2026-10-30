@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block titulo %}Códigos de recuperação{% endblock %}
+{% block publico %}
+<div class="login"><div class="conteiner largo">
+  <div class="capa">
+    <div class="marca"><img class="logo-img" src="/static/logo-ms.png" alt="MS Certificação Digital"></div>
+    <h1>Pronto!</h1>
+    <p>A verificação em 2 etapas está ligada.</p>
+  </div>
+  <div class="cartao">
+    <p><b>Guarde estes códigos de recuperação.</b> Se você perder o celular, cada código serve para entrar uma vez no
+      lugar do código do app. Eles <b>não aparecem de novo</b>.</p>
+    <div class="codigos-rec">{% for c in codigos %}<span>{{ c }}</span>{% endfor %}</div>
+    <p class="pequeno suave">Anote num papel guardado em lugar seguro ou tire um print e guarde fora do celular. Não
+      mande por WhatsApp nem e-mail.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+      <button type="button" class="btn" onclick="window.print()">Imprimir</button>
+      <a class="btn btn-primario" href="{{ destino }}">Já guardei, continuar</a>
+    </div>
+  </div>
+</div></div>
+{% endblock %}

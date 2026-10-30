@@ -206,6 +206,25 @@ def testar_leitura(request: Request, usuario: Usuario = Depends(admin), db: Sess
 
 # ---------------------------------------------------------------- Usuários
 
+@rotas.post("/configuracoes/usuarios/{uid:int}/zerar-2fa", dependencies=[Depends(verificar_csrf)])
+def zerar_2fa(request: Request, uid: int, usuario: Usuario = Depends(admin), db: Session = Depends(obter_db)):
+    """Celular perdido: desliga a verificação em 2 etapas da pessoa; no próximo login ela configura de novo."""
+    from .. import dois_fatores
+
+    u = db.get(Usuario, uid)
+    if u is None:
+        raise HTTPException(404)
+    dois_fatores.zerar(u)
+    registrar_log(db, usuario, "zerou_2fa", "usuario", u.id, u.email, request)
+    db.commit()
+    if u.id == usuario.id:
+        request.session.clear()
+        avisar(request, "Sua verificação em 2 etapas foi zerada. Entre de novo e configure o app no celular.", "alerta")
+        return voltar("/login")
+    avisar(request, f"Verificação em 2 etapas de {u.nome} zerada. No próximo login, a pessoa lê um QR code novo.")
+    return voltar("/configuracoes?aba=usuarios")
+
+
 @rotas.post("/configuracoes/usuarios/{uid:int}", dependencies=[Depends(verificar_csrf)])
 def salvar_usuario(request: Request, uid: int, nome: str = Form(...), email: str = Form(...), perfil: str = Form(...),
                    senha: str = Form(""), parceiro_id: str = Form(""), ativo: str = Form(""),

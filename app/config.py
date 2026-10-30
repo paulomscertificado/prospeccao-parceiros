@@ -81,6 +81,8 @@ SEGUNDOS_POR_RODADA = int(os.environ.get("SEGUNDOS_POR_RODADA", "240"))
 
 # Sessão: expira depois deste tempo sem uso.
 MINUTOS_SESSAO_OCIOSA = int(os.environ.get("MINUTOS_SESSAO_OCIOSA", "120"))
+# Verificação em 2 etapas (código do celular) para administrador e gestor. "0" desliga (só para testes).
+EXIGIR_2FA = os.environ.get("EXIGIR_2FA", "1") != "0"
 
 # ---------------------------------------------------------------- Integrações (todas opcionais)
 

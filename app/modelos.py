@@ -119,6 +119,13 @@ class Usuario(Base):
     duracao_reuniao: Mapped[int] = mapped_column(Integer, default=30)
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
     ultimo_login: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Verificação em 2 etapas (app/dois_fatores.py): segredo criptografado, último código usado e os resumos dos
+    # códigos de recuperação. versao_2fa muda ao ativar/zerar e invalida os "computadores confiáveis".
+    totp_segredo: Mapped[str] = mapped_column(String(300), default="")
+    totp_ativo: Mapped[bool] = mapped_column(Boolean, default=False)
+    totp_ultimo_passo: Mapped[int] = mapped_column(Integer, default=0)
+    totp_recuperacao: Mapped[str] = mapped_column(Text, default="")
+    versao_2fa: Mapped[int] = mapped_column(Integer, default=1)
 
     @property
     def perfil_nome(self) -> str:

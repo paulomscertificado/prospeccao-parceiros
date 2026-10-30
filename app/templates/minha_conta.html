@@ -12,5 +12,15 @@
     <div class="campo"><label>Repita a senha nova</label><input type="password" name="nova2" required minlength="8"></div>
     <button class="btn btn-primario">Trocar senha</button>
   </form>
+  <h2 style="margin-top:24px">Verificação em 2 etapas</h2>
+  {% if usuario.totp_ativo %}
+  <p>🔐 <b>Ligada.</b> Ao entrar, o sistema pede o código de 6 números do app no seu celular.</p>
+  <p class="pequeno suave">Códigos de recuperação que ainda valem: {{ restam_codigos }}. Perdeu ou trocou de celular? Peça ao
+    administrador para zerar a verificação em Configurações &gt; Usuários e leia o QR code novo no próximo login.</p>
+  {% elif exige_2fa %}
+  <p>🔐 Você vai configurar o código do celular no próximo login.</p>
+  {% else %}
+  <p class="pequeno suave">Não é exigida para o seu perfil.</p>
+  {% endif %}
 </div>
 {% endblock %}

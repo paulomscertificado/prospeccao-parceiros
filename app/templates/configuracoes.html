@@ -36,6 +36,7 @@
 {% elif aba == 'usuarios' %}
 <div class="cartao"><h2>Usuários</h2>
   <p class="suave">Administrador: acesso total · Gestor: equipe e indicadores · Vendedor: só os próprios leads · Parceiro: só a própria carteira (portal).</p>
+  <p class="pequeno suave">🔐 Administrador e gestor entram com a senha e o código de 6 números de um app no celular (verificação em 2 etapas). Se a pessoa perder o celular, clique em "zerar" na linha dela.</p>
   <div class="tabela-rolagem"><table>
     <tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Parceiro</th><th>Expediente (reuniões)</th><th>Ativo</th><th>Nova senha</th><th></th></tr>
     {% for u in usuarios %}
@@ -48,7 +49,9 @@
         <input form="u-{{ u.id }}" type="number" name="duracao_reuniao" value="{{ u.duracao_reuniao }}" aria-label="Duração da reunião (min)" style="width:70px" title="minutos por reunião"></td>
       <td><input form="u-{{ u.id }}" type="checkbox" name="ativo" {{ 'checked' if u.ativo }} aria-label="Ativo"></td>
       <td><input form="u-{{ u.id }}" type="password" name="senha" placeholder="(manter)" autocomplete="new-password" aria-label="Nova senha"></td>
-      <td><button form="u-{{ u.id }}" class="btn btn-pequeno">Salvar</button><div class="pequeno suave">{{ 'último acesso ' ~ (u.ultimo_login|datahora) if u.ultimo_login else 'nunca entrou' }}</div></td>
+      <td><button form="u-{{ u.id }}" class="btn btn-pequeno">Salvar</button><div class="pequeno suave">{{ 'último acesso ' ~ (u.ultimo_login|datahora) if u.ultimo_login else 'nunca entrou' }}</div>
+        {% if u.totp_ativo %}<div class="pequeno">🔐 código do celular ativo · <button form="z-{{ u.id }}" class="link-botao" data-confirmar="Zerar a verificação em 2 etapas de {{ u.nome }}? Use quando a pessoa perdeu ou trocou de celular: no próximo login ela lê um QR code novo.">zerar</button></div>
+        {% elif u.perfil in ('admin', 'gestor') %}<div class="pequeno suave">🔐 configura o código no próximo login</div>{% endif %}</td>
     </tr>{% endfor %}
     <tr>
       <td><input form="u-0" type="text" name="nome" placeholder="Nome" required aria-label="Nome"></td>
@@ -61,7 +64,8 @@
       <td><button form="u-0" class="btn btn-pequeno btn-primario">Criar</button></td>
     </tr>
   </table></div>
-  {% for u in usuarios %}<form id="u-{{ u.id }}" method="post" action="/configuracoes/usuarios/{{ u.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"></form>{% endfor %}
+  {% for u in usuarios %}<form id="u-{{ u.id }}" method="post" action="/configuracoes/usuarios/{{ u.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"></form>
+  <form id="z-{{ u.id }}" method="post" action="/configuracoes/usuarios/{{ u.id }}/zerar-2fa"><input type="hidden" name="csrf" value="{{ csrf }}"></form>{% endfor %}
   <form id="u-0" method="post" action="/configuracoes/usuarios/0"><input type="hidden" name="csrf" value="{{ csrf }}"></form>
 </div>
 

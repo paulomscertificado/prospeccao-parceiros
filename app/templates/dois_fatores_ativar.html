@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block titulo %}Ligar a verificação em 2 etapas{% endblock %}
+{% block publico %}
+<div class="login"><div class="conteiner largo">
+  <div class="capa">
+    <div class="marca"><img class="logo-img" src="/static/logo-ms.png" alt="MS Certificação Digital"></div>
+    <h1>Mais segurança.</h1>
+    <p>Quem é administrador ou gestor entra com a senha e um código de 6 números do celular. Isso protege os dados
+      dos leads e dos parceiros mesmo se alguém descobrir a sua senha.</p>
+  </div>
+  <form class="cartao" method="post" action="/login/ativar-codigo">
+    {% for tipo, texto in avisos %}<div class="aviso aviso-{{ tipo }}">{{ texto }}</div>{% endfor %}
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <p><b>{{ pessoa.nome }}</b>, faça isto uma vez só:</p>
+    <ol class="passos-2fa">
+      <li>No celular, instale o app <b>Google Authenticator</b> ou <b>Microsoft Authenticator</b> (grátis, na loja de aplicativos).</li>
+      <li>Abra o app, toque em <b>+</b> e escolha <b>Ler código QR</b>.</li>
+      <li>Aponte a câmera para o quadrado abaixo.</li>
+    </ol>
+    <div class="qr-2fa" aria-label="QR code para o app autenticador">{{ qr|safe }}</div>
+    <details class="pequeno" style="margin-bottom:12px"><summary>A câmera não leu? Digite esta chave no app</summary>
+      <p class="suave" style="margin:6px 0">No app, escolha "Inserir chave de configuração", dê o nome "MS Prospecção" e digite:</p>
+      <div class="chave-2fa">{{ chave }}</div></details>
+    <div class="campo"><label>4. Digite o código de 6 números que apareceu no app</label>
+      <input class="campo-codigo" type="text" name="codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="7"
+             pattern="[0-9 ]{6,7}" required autofocus placeholder="000000"></div>
+    <button class="btn btn-primario" style="width:100%;justify-content:center">Ligar e entrar</button>
+    <p class="ajuda" style="margin-top:12px">O código muda a cada 30 segundos. Se der "código errado", espere o próximo e digite de novo.</p>
+  </form>
+</div></div>
+{% endblock %}

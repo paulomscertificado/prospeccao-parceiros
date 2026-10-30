@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block titulo %}Código do celular{% endblock %}
+{% block publico %}
+<div class="login"><div class="conteiner">
+  <div class="capa">
+    <div class="marca"><img class="logo-img" src="/static/logo-ms.png" alt="MS Certificação Digital"></div>
+    <h1>Código.</h1>
+    <p>Abra o app autenticador no celular e digite os 6 números de "MS Prospecção".</p>
+  </div>
+  <form class="cartao" method="post" action="/login/codigo">
+    {% for tipo, texto in avisos %}<div class="aviso aviso-{{ tipo }}">{{ texto }}</div>{% endfor %}
+    {% if erro %}<div class="aviso aviso-erro">{{ erro }}</div>{% endif %}
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="campo"><label>Código de 6 números</label>
+      <input class="campo-codigo" type="text" name="codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="9"
+             required autofocus placeholder="000000"></div>
+    <label class="pequeno" style="display:flex;gap:8px;align-items:center;margin-bottom:14px">
+      <input type="checkbox" name="lembrar"> Não pedir o código neste computador por 30 dias</label>
+    <button class="btn btn-primario" style="width:100%;justify-content:center">Entrar</button>
+    <details class="pequeno" style="margin-top:14px"><summary>Perdi ou troquei de celular</summary>
+      <p class="suave" style="margin-top:6px">Digite no campo acima um dos <b>códigos de recuperação</b> (como ABCD-EFGH) que
+        você guardou quando ligou a verificação. Cada um vale uma vez. Sem eles, peça ao administrador para zerar a
+        verificação em Configurações &gt; Usuários.</p></details>
+    <p class="ajuda" style="margin-top:12px"><a href="/sair">Voltar e entrar com outra conta</a></p>
+  </form>
+</div></div>
+{% endblock %}

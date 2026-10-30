@@ -141,6 +141,20 @@ Configure as categorias em Configurações > **Categorias de parceiros** e o que
 
 Crie usuários em **Configurações > Usuários** (o perfil padrão é Funcionário MS).
 
+**Verificação em 2 etapas (administrador e gestor):** além da senha, o sistema pede um código de 6 números do
+celular.
+1. Instale no celular o app **Google Authenticator** ou **Microsoft Authenticator** (grátis).
+2. No primeiro login depois da senha, o sistema mostra um QR code: no app, toque em **+** > **Ler código QR** e
+   aponte para a tela. Digite o código de 6 números que aparecer.
+3. Guarde os **8 códigos de recuperação** que aparecem em seguida (papel ou print fora do celular). Cada um serve
+   para entrar uma vez se você perder o celular.
+4. Nos próximos logins: senha + o código que o app mostra na hora. Marque "Não pedir o código neste computador por
+   30 dias" no computador do trabalho.
+
+**Perdeu ou trocou de celular?** Use um código de recuperação, ou peça ao administrador para clicar em **zerar** na
+sua linha em Configurações > Usuários: no próximo login você lê um QR code novo. Se o próprio administrador ficar sem
+acesso: `redefinir_senha.bat` (escolha "sistema na internet") cria uma senha nova e desliga o código do celular.
+
 **Cada pessoa com o seu WhatsApp:** no menu **WhatsApp > Meu WhatsApp**, cada um conecta o próprio número pelo
 QR code. A IA SDR manda os WhatsApps dos leads de cada pessoa pelo número dela; sem número conectado, as
 mensagens esperam e a pessoa recebe um aviso para conectar. Em **Conversas**, cada um vê só as conversas do
@@ -155,6 +169,8 @@ pessoas. Só o dono do número e o administrador compartilham, pausam ou desliga
 | "O Python não foi encontrado" | Instale o Python marcando "Add Python to PATH" e rode `instalar.bat` de novo |
 | "O sistema ainda não foi instalado" | Rode `instalar.bat` |
 | Esqueci a senha | Outro administrador cria uma senha nova em Configurações > Usuários, ou rode `redefinir_senha.bat` |
+| "Código errado" no login | O código muda a cada 30 segundos: digite o que o app mostra agora. Se sempre der errado, acerte a hora automática do celular |
+| Perdi o celular do código | Use um código de recuperação ou peça ao administrador para clicar em "zerar" em Configurações > Usuários |
 | "Muitas tentativas erradas" | Espere 15 minutos e tente de novo |
 | "O formulário expirou" | Recarregue a página (F5) e repita |
 | Lead da base sem responsável | A Receita não tem sócio-administrador pessoa física para essa empresa: preencha à mão |

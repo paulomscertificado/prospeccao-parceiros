@@ -147,12 +147,14 @@ async def verificar_csrf(request: Request):
 
 
 def entrar(request: Request, usuario: Usuario):
+    """Abre a sessão. Só chamar depois da senha e, para quem precisa, do código do celular (rotas/auth.py)."""
     request.session.clear()
     request.session.update({
         "usuario_id": usuario.id,
         "versao": usuario.versao_sessao,
         "ultimo_uso": int(time.time()),
         "csrf": secrets.token_urlsafe(32),
+        "2fa": True,
     })
 
 
@@ -168,6 +170,12 @@ def usuario_logado(request: Request, db: Session = Depends(obter_db)) -> Usuario
     if not usuario or not usuario.ativo or usuario.versao_sessao != request.session.get("versao"):
         request.session.clear()
         raise PrecisaLogin()
+    from .dois_fatores import precisa
+
+    if precisa(usuario) and not request.session.get("2fa"):  # sessão aberta antes do 2FA ser exigido
+        request.session.clear()
+        raise PrecisaLogin("Por segurança, entre de novo: o acesso de administrador e gestor agora pede também o "
+                           "código do celular.")
     request.session["ultimo_uso"] = int(time.time())
     request.state.usuario = usuario
     return usuario
