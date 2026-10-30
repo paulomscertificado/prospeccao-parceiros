@@ -147,7 +147,32 @@ Prospecção por CNAE: `Busca.cnaes` + `base_receita.buscar(cnaes=...)` filtra p
 viram a classe `config.CLASSE_AUTOMATICA`: `processar_resposta` só registra (`_resposta_de_robo`), sem resposta da SDR,
 sem oportunidade e sem cancelar a sequência. A IA também pode devolver essa classe. `rotinas.responder_automaticamente`
 responde no máximo 1 vez a cada 24 h por lead. `criar_oportunidade` junta novas respostas na oportunidade "nova" do lead.
-Agente de IA do lead: assinatura "*Nome:*" no começo (`ASSINATURA_DE_AGENTE`) ou 4+ mensagens em 10 min também contam como robô. A resposta automática da SDR respeita o limite diário de WhatsApp.
+Agente de IA do lead: assinatura "*Nome:*" no começo (`ASSINATURA_DE_AGENTE`) ou 4+ mensagens em 10 min também contam como robô. A resposta automática da SDR respeita o limite diário do número por onde sai.
+
+## Quando a IA não classifica (correções de risco, out/2026)
+
+Valem para mensagens que chegam sozinhas (WhatsApp e e-mail). Uma resposta registrada à mão por alguém da equipe
+continua sendo classificada.
+- **Parceiro ou lead com alguém da equipe** (`sdr.com_humano`: assumido, Reunião, Negociação, Parceiro; ou com
+  registro em `parceiros`): `_mensagem_para_o_humano` só registra e avisa quem cuida (1 aviso a cada 2 h por lead;
+  pedido para parar avisa sempre). Não classifica, não responde, não volta a etapa e não marca opt-out sozinha
+  ("cancelar a indicação do João" não vira opt-out). `rotinas.responder_automaticamente` também recusa esses leads.
+- **Só mídia** (`[áudio]`, `[imagem]`, `[documento]`... sem legenda, `SO_MIDIA`): `_so_midia` para a sequência, não
+  responde e cria uma oportunidade morna "Ouvir o áudio no WhatsApp e responder".
+- Uma resposta quente nunca volta a etapa do lead (só vai para Interessado se ele estiver antes disso).
+
+## Limite de WhatsApp por número
+
+O limite diário (`limite_diario_whatsapp`, 40) e o por hora valem para **cada número**, porque é o número que pode ser
+bloqueado; o WhatsApp Leads conta do mesmo jeito. `mensagens.limite_do_numero(db, conexao)` é conferido em
+`sdr.enviar_whatsapp_conectado` depois de escolher o número, e na resposta automática. A fila automática pula para o
+próximo lead quando um número chega ao limite. Minha fila mostra o contador do número da pessoa; Envios, o do número
+que mais enviou.
+
+## CNPJ inativo
+
+Se a BrasilAPI disser que o CNPJ não está ativo (baixada, inapta, suspensa), `leads_servico.cnpj_inativo` registra no
+histórico e, se o lead ainda não conversou, marca Perdido (motivo "CNPJ inativo") e ele sai da campanha.
 
 **Restaurantes e lanchonetes** (CNAE 5611-2/01 e 5611-2/03): segmento novo; na base da Receita só entram os da Região
 Metropolitana do Recife (importação própria, para não estourar o espaço do banco gratuito).

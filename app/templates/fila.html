@@ -49,7 +49,7 @@
   <div class="kpi"><div class="rotulo">Na fila do WhatsApp</div><div class="valor">{{ resumo.na_fila }}</div><div class="detalhe">saindo um por vez</div></div>
   <div class="kpi"><div class="rotulo">Enviadas hoje</div><div class="valor">{{ resumo.enviadas_hoje }}</div><div class="detalhe">nesta fila</div></div>
   <div class="kpi"><div class="rotulo">Não saíram</div><div class="valor" style="{{ 'color:var(--erro)' if resumo.falharam }}">{{ resumo.falharam }}</div><div class="detalhe">últimos 7 dias</div></div>
-  <div class="kpi"><div class="rotulo">Limite do dia (MS)</div><div class="valor" style="font-size:1rem">✉️ {{ resumo.email_hoje }}/{{ resumo.email_limite }} · 💬 {{ resumo.whats_hoje }}/{{ resumo.whats_limite }}</div><div class="detalhe">e-mail · WhatsApp</div></div>
+  <div class="kpi"><div class="rotulo">Limite do dia (MS)</div><div class="valor" style="font-size:1rem">✉️ {{ resumo.email_hoje }}/{{ resumo.email_limite }} · 💬 {{ resumo.whats_hoje }}/{{ resumo.whats_limite }}</div><div class="detalhe">e-mail (MS) · WhatsApp (seu número)</div></div>
 </div>
 
 <div class="cartao">

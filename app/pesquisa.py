@@ -19,7 +19,7 @@ import httpx
 
 from . import config, ia, score, util
 from .banco import agora
-from .leads_servico import historico, limpar_campos, preencher
+from .leads_servico import cnpj_inativo, historico, limpar_campos, preencher
 from .prospeccao import dados_do_cnpj, dados_do_site, descobrir_site
 
 log = logging.getLogger(__name__)
@@ -186,10 +186,12 @@ def pesquisar_lead(db, lead, usuario=None, usar_ia: bool = True) -> dict:
     if lead.cnpj and not lead.socios:
         receita = dados_do_cnpj(lead.cnpj)
         if receita:
-            for chave in ("situacao", "fonte_url", "empresa", "especialidade"):
+            situacao = receita.pop("situacao", "")
+            for chave in ("fonte_url", "empresa", "especialidade"):
                 receita.pop(chave, None)
             preencher(lead, receita, so_vazios=True)
             fontes.append("dados abertos da Receita (BrasilAPI)")
+            cnpj_inativo(db, lead, situacao, usuario)
     if not lead.responsavel and lead.socios:
         # Quadro societário público da Receita: o sócio-administrador é o contato mais provável.
         socios = [s for s in lead.socios.splitlines() if s.strip()]

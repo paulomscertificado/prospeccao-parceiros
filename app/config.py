@@ -142,7 +142,7 @@ STATUS_LEAD = [
 ]
 STATUS_PERDIDO = ["Perdido"]
 MOTIVOS_PERDA = ["Sem interesse", "Sem resposta", "Já possui parceiro", "Contato inválido", "Sem fit",
-                 "Opt-out", "Outro"]
+                 "CNPJ inativo", "Opt-out", "Outro"]
 
 # Status antigos (versão 1) → novos. Aplicado sozinho ao abrir o sistema.
 MIGRACAO_STATUS = {

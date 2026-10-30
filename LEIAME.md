@@ -72,6 +72,10 @@ Geral > "Mostrar Vendas, Vencimentos e Comissões" = 1 > Salvar.
 ### Regras importantes (anti-spam e LGPD)
 - O sistema **nunca dispara mensagens sozinho**. Cada mensagem é enviada por uma pessoa.
 - Há **limite diário** de mensagens e um **intervalo mínimo** entre mensagens para o mesmo lead (Configurações).
+  No WhatsApp, o limite (40 por dia) vale para **cada número** conectado.
+- Áudio, foto ou documento sem texto não recebem resposta automática: viram uma oportunidade para alguém ouvir/ver.
+- Depois que alguém da equipe assume o lead, e nas mensagens de parceiros, a IA não responde nem muda a etapa:
+  só avisa quem cuida.
 - Se a pessoa pedir para sair, clique em **Pediu para sair / Registrar opt-out**: ela nunca mais entra em campanha.
 - Cada lead guarda **de onde veio** (fonte) e a **base legal**. Pedido de exclusão: ficha do lead → **Excluir dados (LGPD)**.
 - O sistema **não inventa dados**: se a fonte não traz telefone ou e-mail, o lead fica sem.
@@ -180,6 +184,11 @@ pessoas. Só o dono do número e o administrador compartilham, pausam ou desliga
 | A IA não escreve as mensagens | Sem a chave da IA, o sistema usa os templates. Veja `docs/configuracao.md` |
 
 **Seus dados ficam na pasta `dados/`. Não apague essa pasta.** Faça cópia dela de vez em quando (backup).
+
+**Cópia de segurança do sistema na internet:** todo dia, a partir do meio-dia, este computador guarda sozinho uma
+cópia do banco da nuvem em `dadosackups` (ficam os últimos 14 dias). Para fazer uma na hora: dois cliques em
+`fazer_backup.bat`. Só em emergência (dados apagados por engano): `restaurar_backup.bat` volta uma cópia. Ele
+apaga o que está hoje no sistema e pede para digitar SIM.
 
 Testes automáticos: dois cliques em `testar.bat` (não mexe nos seus dados).
 

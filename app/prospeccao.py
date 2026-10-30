@@ -20,7 +20,7 @@ from sqlalchemy import select
 
 from . import base_receita, config, score, trabalhos, util
 from .banco import agora, sessao
-from .leads_servico import criar_lead, historico, limpar_campos, preencher
+from .leads_servico import cnpj_inativo, criar_lead, historico, limpar_campos, preencher
 from .modelos import Busca, Lead, Usuario
 
 log = logging.getLogger(__name__)
@@ -307,8 +307,7 @@ def enriquecer_lead(db, lead: Lead, usuario: Usuario | None = None) -> list[str]
             if mudou:
                 alterados += mudou
                 fontes.append("dados abertos da Receita Federal (BrasilAPI)")
-            if situacao and situacao.upper() != "ATIVA":
-                historico(db, lead.id, "sistema", f"Atenção: situação cadastral do CNPJ na Receita: {situacao}.", usuario)
+            cnpj_inativo(db, lead, situacao, usuario)
     lead.enriquecido_em = agora()
     if alterados:
         limpar_campos(lead)

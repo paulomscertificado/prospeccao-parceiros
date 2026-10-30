@@ -15,7 +15,7 @@ from datetime import date, datetime, timedelta
 from sqlalchemy import func, select
 
 from . import base_receita, cadencias, config, ia, mensagens, prospeccao, sdr, trabalhos, util
-from .banco import agora, ler_config, ler_config_int, sessao
+from .banco import agora, gravar_config, ler_config, ler_config_int, sessao
 from .leads_servico import criar_lead, historico, mudar_status, registrar_contato
 from .modelos import Cadencia, Campanha, Categoria, Lead, Tarefa, Usuario
 from .modelos import NOME_CADENCIA_SDR
@@ -241,7 +241,7 @@ def etapa_gerar(campanha_id: int, _usuario_id, estado: dict, prazo: float) -> bo
             return False
         with sessao() as db:
             leads = [db.get(Lead, i) for i in candidatos]
-            elegiveis = [l for l in leads if l and l.fit != "Sem fit" and not l.opt_out]
+            elegiveis = [l for l in leads if l and l.fit != "Sem fit" and not l.opt_out and not l.perdido]
             canais = [c for c in db.get(Campanha, campanha_id).canais.split(",") if c]
             for l in elegiveis:
                 if "whatsapp" in canais and not l.whatsapp:
@@ -567,6 +567,8 @@ def processar_fila(db, maximo: int = 25) -> dict:
         return feito
     if not mensagens.dentro_do_horario(db):
         return feito
+    if ler_config(db, "fila_email_pausada_ate") > agora().isoformat(timespec="seconds"):
+        return feito  # a caixa de envio deu erro há pouco: espera antes de tentar de novo
     hora = agora().strftime("%H:%M")
     consulta = (select(Tarefa).join(Campanha, Tarefa.campanha_id == Campanha.id)
                 .where(Tarefa.status == "pendente", Tarefa.tipo == "prospeccao", Tarefa.canal == "email",
@@ -588,15 +590,27 @@ def processar_fila(db, maximo: int = 25) -> dict:
             if "limite" in bloqueio.lower() and "domínio" not in bloqueio:
                 break  # limite do canal/campanha: o resto espera a próxima rodada
             continue
-        if not _enviar_email_da_tarefa(db, t, None, "Enviado automaticamente pela fila"):
+        erro = _enviar_email_da_tarefa(db, t, None, "Enviado automaticamente pela fila")
+        if erro == DESTINATARIO_RECUSADO:
             feito["erros"] += 1
-            break  # problema no servidor de e-mail: não insiste agora
+            continue  # só o e-mail deste lead não sai: a fila segue com os outros
+        if erro:
+            feito["erros"] += 1
+            gravar_config(db, "fila_email_pausada_ate",
+                          (agora() + timedelta(minutes=PAUSA_FILA_EMAIL)).isoformat(timespec="seconds"))
+            log.warning("Fila de e-mail pausada por %s min: %s", PAUSA_FILA_EMAIL, erro)
+            break  # problema na caixa de envio: não insiste agora
         feito["enviados"] += 1
     return feito
 
 
-def _enviar_email_da_tarefa(db, t: Tarefa, usuario: Usuario | None, resultado: str) -> bool:
-    """Envia o e-mail do toque e registra (enviada ou falhou). False = o servidor de e-mail recusou."""
+DESTINATARIO_RECUSADO = "destinatario"
+PAUSA_FILA_EMAIL = 15  # minutos sem tentar depois de um erro da caixa de envio
+
+
+def _enviar_email_da_tarefa(db, t: Tarefa, usuario: Usuario | None, resultado: str) -> str:
+    """Envia o e-mail do toque e registra (enviada ou falhou). Devolve "" se saiu; DESTINATARIO_RECUSADO se o
+    endereço do lead foi recusado (só este toque é cancelado); senão o erro da caixa de envio."""
     from .integracoes import email_smtp
 
     lead = t.lead
@@ -607,14 +621,18 @@ def _enviar_email_da_tarefa(db, t: Tarefa, usuario: Usuario | None, resultado: s
         mensagens.registrar(db, lead.id, "email", t.mensagem, usuario, modo="api", status="falhou", assunto=t.assunto,
                             tarefa_id=t.id, erro=str(erro), campanha_id=t.campanha_id, angulo=t.angulo,
                             categoria_id=lead.categoria_id)
-        return False
+        if isinstance(erro, email_smtp.ErroDestinatario):
+            t.status, t.concluida_em, t.resultado = "cancelada", agora(), f"E-mail não saiu: {str(erro)[:200]}"
+            historico(db, lead.id, "sistema", f"E-mail recusado: {erro} Confira o endereço do lead.", usuario, "email")
+            return DESTINATARIO_RECUSADO
+        return str(erro) or "erro no servidor de e-mail"
     mensagens.registrar(db, lead.id, "email", t.mensagem, usuario, modo="api", status="enviada", assunto=t.assunto,
                         tarefa_id=t.id, id_externo=id_externo, campanha_id=t.campanha_id, angulo=t.angulo,
                         categoria_id=lead.categoria_id)
     t.status, t.concluida_em, t.resultado = "feita", agora(), resultado
     registrar_contato(db, lead, "email", f"E-mail enviado pela IA SDR ({config.ANGULOS.get(t.angulo, t.acao)}).",
                       usuario)
-    return True
+    return ""
 
 
 def para_disparar(db, camp: Campanha) -> dict[str, list[Tarefa]]:
@@ -710,7 +728,11 @@ def _enviar_toque(db, t: Tarefa, usuario: Usuario) -> str:
         return bloqueio
     t.status = "pendente"
     if t.canal == "email":
-        if not _enviar_email_da_tarefa(db, t, usuario, f"Enviado por {usuario.nome} (Minha fila)"):
+        erro = _enviar_email_da_tarefa(db, t, usuario, f"Enviado por {usuario.nome} (Minha fila)")
+        if erro == DESTINATARIO_RECUSADO:
+            return ("O e-mail deste lead foi recusado (endereço inválido ou inexistente). Corrija o e-mail na ficha "
+                    "do lead; este toque foi cancelado.")
+        if erro:
             return "O servidor de e-mail recusou o envio. Confira Configurações > E-mail."
         return ""
     try:
@@ -742,7 +764,11 @@ def disparar(db, camp: Campanha, usuario: Usuario, canal: str) -> dict:
                 break
             continue
         if canal == "email":
-            if not _enviar_email_da_tarefa(db, t, usuario, f"Disparado por {usuario.nome}"):
+            erro = _enviar_email_da_tarefa(db, t, usuario, f"Disparado por {usuario.nome}")
+            if erro == DESTINATARIO_RECUSADO:
+                feito["erros"].append(f"{lead.empresa}: e-mail recusado (endereço inválido)")
+                continue
+            if erro:
                 feito["erros"].append("O servidor de e-mail recusou o envio. Confira Configurações > E-mail")
                 break
         else:
@@ -807,6 +833,9 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
                 _avisar_para_conectar(db, lead, t)
                 feito["bloqueados"] += 1
                 continue
+            if "limite" in texto and "este número" in texto:
+                feito["bloqueados"] += 1
+                continue  # este número chegou ao limite: os leads de outros números seguem
             if "limite" in texto or "whatsapp leads" in texto or "desligado" in texto:
                 feito["bloqueados"] += 1
                 break  # limite do canal ou WhatsApp fora do ar: o resto espera a próxima rodada

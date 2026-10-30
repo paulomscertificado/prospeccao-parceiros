@@ -258,8 +258,9 @@ def salvar_usuario(request: Request, uid: int, nome: str = Form(...), email: str
 def importar_receita(request: Request, pasta: str = Form(...), usuario: Usuario = Depends(admin),
                      db: Session = Depends(obter_db)):
     if config.NA_NUVEM:
-        avisar(request, "Na nuvem a base é importada pelo seu computador: dois cliques em importar_receita_nuvem.bat "
-                        "(veja docs/deploy-vercel.md).", "alerta")
+        avisar(request, "Na nuvem a base da Receita não é importada por esta tela: o banco grátis tem só 500 MB e uma "
+                        "importação inteira não cabe junto com o que já está lá. Para acrescentar um ramo ou uma "
+                        "região, peça para quem cuida do sistema (veja docs/deploy-vercel.md).", "alerta")
     elif base_receita.resumo(db)["status"].startswith("Lendo"):
         avisar(request, "A importação já está em andamento.", "alerta")
     else:

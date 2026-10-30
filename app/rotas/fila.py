@@ -18,6 +18,14 @@ from .envios import STATUS_ENVIO
 rotas = APIRouter()
 
 
+def _numero_da_pessoa(db, usuario: Usuario) -> str:
+    """O WhatsApp da pessoa (o limite diário é de cada número); sem número próprio, o principal da MS."""
+    from .. import conexoes
+
+    proprio = conexoes.minha(db, usuario)
+    return proprio.id if proprio else conexoes.PRINCIPAL
+
+
 def _motivo_pendente(db, t: Tarefa, hoje: date, no_horario: bool, liberados: dict[int, bool]) -> str:
     """Por que o toque ainda não saiu, em linguagem simples."""
     lead = t.lead
@@ -105,7 +113,8 @@ def minha_fila(request: Request, de: str = "", canal: str = "", usuario: Usuario
         "enviadas_hoje": sum(1 for m in historico if m.criado_em >= inicio_hoje and m.status != "falhou"),
         "falharam": sum(1 for m in historico if m.status == "falhou"),
         "email_hoje": mensagens.enviadas_hoje(db, "email"), "email_limite": mensagens.limite_diario(db, "email"),
-        "whats_hoje": mensagens.enviadas_hoje(db, "whatsapp"), "whats_limite": mensagens.limite_diario(db, "whatsapp"),
+        "whats_hoje": mensagens.enviadas_hoje(db, "whatsapp", _numero_da_pessoa(db, usuario)),
+        "whats_limite": mensagens.limite_diario(db, "whatsapp"),
     }
     ids_t = {m.tarefa_id for m in historico if m.tarefa_id}
     tarefas_por_id = {t.id: t for t in db.execute(select(Tarefa).where(Tarefa.id.in_(ids_t))).scalars()} if ids_t else {}

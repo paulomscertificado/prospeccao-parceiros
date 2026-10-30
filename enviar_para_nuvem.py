@@ -71,10 +71,11 @@ def _ciclos(tabelas) -> set[str]:
     return {nome for nome, destinos in alcanca.items() if nome in destinos}
 
 
-def copiar(origem, destino, avisar=print) -> dict[str, int]:
-    """Copia todas as tabelas de `origem` para `destino` (que precisa estar vazio). Devolve as contagens."""
+def copiar(origem, destino, avisar=print, pular=frozenset()) -> dict[str, int]:
+    """Copia todas as tabelas de `origem` para `destino` (que precisa estar vazio), menos as de `pular`.
+    Devolve as contagens."""
     Base.metadata.create_all(destino)
-    tabelas = [t for t in Base.metadata.sorted_tables if t.name not in TABELAS_QUE_NAO_VAO
+    tabelas = [t for t in Base.metadata.sorted_tables if t.name not in TABELAS_QUE_NAO_VAO and t.name not in pular
                and inspect(origem).has_table(t.name)]
     em_ciclo = _ciclos(tabelas)
     depois: list[tuple] = []  # (tabela, coluna, [(id, valor)])
@@ -113,8 +114,8 @@ def copiar(origem, destino, avisar=print) -> dict[str, int]:
     return contagem
 
 
-def esvaziar(destino) -> None:
-    tabelas = [t for t in reversed(Base.metadata.sorted_tables) if inspect(destino).has_table(t.name)]
+def esvaziar(destino, pular=frozenset()) -> None:
+    tabelas = [t for t in reversed(Base.metadata.sorted_tables) if t.name not in pular and inspect(destino).has_table(t.name)]
     with destino.begin() as d:
         if destino.dialect.name == "postgresql":
             d.execute(text("TRUNCATE " + ", ".join(t.name for t in tabelas) + " RESTART IDENTITY CASCADE"))

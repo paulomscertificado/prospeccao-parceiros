@@ -6,6 +6,7 @@ senha é uma SENHA DE APP do Google (não a senha normal). Configure em Configur
 
 import hashlib
 import hmac
+import re
 import smtplib
 import ssl
 from email.message import EmailMessage
@@ -16,6 +17,13 @@ from .. import config
 
 class ErroEmail(Exception):
     pass
+
+
+class ErroDestinatario(ErroEmail):
+    """O problema é o endereço do lead (inválido ou recusado), não a caixa de envio: só este e-mail não sai."""
+
+
+ENDERECO_VALIDO = re.compile(r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$")
 
 
 def endereco_remetente() -> str:
@@ -65,13 +73,17 @@ RODAPE_OPT_OUT = rodape(None)
 # ---------------------------------------------------------------- Envio
 
 def enviar(para: str, assunto: str, corpo: str, responder_para: str = "", com_rodape: bool = True,
-           lead_id: int | None = None) -> str:
+           lead_id: int | None = None, em_resposta_a: str = "") -> str:
+    """Envia e devolve o Message-ID. em_resposta_a: Message-ID do e-mail do lead (a resposta fica no mesmo fio)."""
     from .. import arquivo_env
 
     arquivo_env.carregar_do_banco(forcar=True)  # na nuvem: a senha salva há pouco já vale aqui
     problema = problema_de_configuracao()
     if problema:
         raise ErroEmail(problema)
+    para = (para or "").strip()
+    if not ENDERECO_VALIDO.match(para):
+        raise ErroDestinatario(f"O e-mail \"{para}\" não é um endereço válido.")
     remetente = endereco_remetente()
     nome = parseaddr(config.SMTP_REMETENTE)[0]
     msg = EmailMessage()
@@ -79,6 +91,9 @@ def enviar(para: str, assunto: str, corpo: str, responder_para: str = "", com_ro
     msg["To"] = para
     msg["Subject"] = assunto
     msg["Message-ID"] = make_msgid(domain=remetente.split("@")[-1])
+    if em_resposta_a:
+        msg["In-Reply-To"] = em_resposta_a
+        msg["References"] = em_resposta_a
     link = link_descadastro(lead_id)
     unsubscribe = f"<mailto:{remetente}?subject=SAIR>"
     if link:
@@ -118,6 +133,10 @@ def enviar(para: str, assunto: str, corpo: str, responder_para: str = "", com_ro
                             "myaccount.google.com/apppasswords com a conta do e-mail de envio — a verificação em duas "
                             "etapas precisa estar ligada nessa conta.") from None
         raise ErroEmail("Usuário ou senha do e-mail recusados. Confira em Configurações > E-mail.") from None
+    except smtplib.SMTPRecipientsRefused as erro:
+        detalhe = "; ".join(f"{c} {m.decode(errors='replace') if isinstance(m, bytes) else m}"
+                            for c, m in erro.recipients.values())
+        raise ErroDestinatario(f"O servidor recusou o endereço {para} ({detalhe[:150]}).") from None
     except smtplib.SMTPSenderRefused:
         raise ErroEmail(f"O servidor não aceitou enviar como {remetente}. O remetente deve ser o próprio e-mail "
                         "da conta (ou um alias dela).") from None

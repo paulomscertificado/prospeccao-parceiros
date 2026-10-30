@@ -20,7 +20,7 @@ from sqlalchemy import func, select
 from . import config, ia, mensagens, util
 from .banco import agora, ler_config
 from .leads_servico import cancelar_tarefas_de_prospeccao, historico, mudar_status, registrar_opt_out
-from .modelos import Campanha, Conhecimento, Lead, Mensagem, Notificacao, Oportunidade, Tarefa, Usuario
+from .modelos import Campanha, Conhecimento, Lead, Mensagem, Notificacao, Oportunidade, Parceiro, Tarefa, Usuario
 
 log = logging.getLogger(__name__)
 
@@ -413,21 +413,55 @@ def ultima_mensagem_enviada(db, lead_id: int) -> Mensagem | None:
                       .order_by(Mensagem.criado_em.desc(), Mensagem.id.desc()).limit(1)).scalars().first()
 
 
-def processar_resposta(db, lead: Lead, texto: str, canal: str, usuario: Usuario | None = None,
-                       registrar_entrada: bool = True) -> dict:
-    """Registra e interpreta a resposta do lead. Interesse → para tudo e entrega ao humano."""
-    analise = classificar_resposta(db, lead, texto)
-    classe = analise["classe"]
-    if classe == config.CLASSE_AUTOMATICA:
-        return _resposta_de_robo(db, lead, texto, canal, usuario, registrar_entrada, analise)
+# Mensagem só de mídia, como o WhatsApp Leads entrega ("[áudio]", "[imagem] legenda" tem texto e é classificada)
+SO_MIDIA = re.compile(r"^\[(áudio|imagem|vídeo|documento|figurinha|contato|localização)\]$")
+NOME_DA_MIDIA = {"áudio": "um áudio", "imagem": "uma imagem", "vídeo": "um vídeo", "documento": "um documento",
+                 "figurinha": "uma figurinha", "contato": "um contato", "localização": "uma localização"}
+
+
+def parceiro_do_lead(db, lead: Lead) -> Parceiro | None:
+    return db.execute(select(Parceiro).where(Parceiro.lead_id == lead.id).limit(1)).scalars().first()
+
+
+def _registrar_entrada(db, lead: Lead, texto: str, canal: str, usuario, id_externo: str = "") -> Mensagem | None:
+    """Guarda a mensagem recebida e marca a última enviada como respondida. Devolve a última enviada."""
     enviada = ultima_mensagem_enviada(db, lead.id)
     if enviada:
         enviada.respondida = True
+    entrada = mensagens.registrar(db, lead.id, canal, texto, usuario, status="recebida", id_externo=id_externo)
+    entrada.direcao = "entrada"
+    entrada.campanha_id = enviada.campanha_id if enviada else None
+    entrada.categoria_id = lead.categoria_id
+    return enviada
+
+
+def com_humano(lead: Lead) -> bool:
+    """Alguém da equipe já cuida do lead (assumiu, reunião, negociação ou já é parceiro)."""
+    return bool(lead.humano_id) or lead.etapa >= config.ETAPA_DO_STATUS["Humano assumiu"]
+
+
+def processar_resposta(db, lead: Lead, texto: str, canal: str, usuario: Usuario | None = None,
+                       registrar_entrada: bool = True, id_externo: str = "") -> dict:
+    """Registra e interpreta a resposta do lead. Interesse → para tudo e entrega ao humano.
+    Mensagens que chegam sozinhas (usuario=None) de parceiros ou de leads com alguém da equipe não passam pela
+    IA: só registram e avisam. Mensagem só de mídia (áudio, imagem...) não é classificada às cegas."""
+    if usuario is None:
+        parceiro = parceiro_do_lead(db, lead)
+        if parceiro or com_humano(lead):
+            return _mensagem_para_o_humano(db, lead, texto, canal, registrar_entrada, id_externo, parceiro)
+        midia = SO_MIDIA.match((texto or "").strip())
+        if midia:
+            return _so_midia(db, lead, texto, canal, registrar_entrada, id_externo, midia.group(1))
+    analise = classificar_resposta(db, lead, texto)
+    classe = analise["classe"]
+    if classe == config.CLASSE_AUTOMATICA:
+        return _resposta_de_robo(db, lead, texto, canal, usuario, registrar_entrada, analise, id_externo)
     if registrar_entrada:
-        entrada = mensagens.registrar(db, lead.id, canal, texto, usuario, status="recebida")
-        entrada.direcao = "entrada"
-        entrada.campanha_id = enviada.campanha_id if enviada else None
-        entrada.categoria_id = lead.categoria_id
+        enviada = _registrar_entrada(db, lead, texto, canal, usuario, id_externo)
+    else:
+        enviada = ultima_mensagem_enviada(db, lead.id)
+        if enviada:
+            enviada.respondida = True
     lead.ultimo_contato = agora()
     lead.classificacao_resposta = classe
     historico(db, lead.id, "resposta", f"Resposta ({classe}): {texto[:1500]}", usuario, canal)
@@ -447,7 +481,8 @@ def processar_resposta(db, lead: Lead, texto: str, canal: str, usuario: Usuario 
         quente = classe in config.CLASSES_QUENTES
         if quente:
             lead.demonstrou_interesse = True
-            mudar_status(db, lead, "Interessado", usuario)
+            if lead.etapa < config.ETAPA_DO_STATUS["Interessado"]:  # nunca volta uma etapa
+                mudar_status(db, lead, "Interessado", usuario)
         lead.automacao_pausada = True
         oportunidade = criar_oportunidade(db, lead, analise, texto, canal, enviada, "quente" if quente else "morna")
         analise["oportunidade_id"] = oportunidade.id
@@ -460,13 +495,62 @@ def processar_resposta(db, lead: Lead, texto: str, canal: str, usuario: Usuario 
     return analise
 
 
-def _resposta_de_robo(db, lead: Lead, texto: str, canal: str, usuario, registrar_entrada: bool, analise: dict) -> dict:
+def _mensagem_para_o_humano(db, lead: Lead, texto: str, canal: str, registrar_entrada: bool, id_externo: str,
+                            parceiro: Parceiro | None) -> dict:
+    """Parceiro ou lead com alguém da equipe: a IA não classifica, não responde e não mexe na etapa (ex.: "cancelar
+    a indicação do João" não pode virar opt-out). Só registra e avisa quem cuida (1 aviso a cada 2 horas por lead,
+    fora pedidos para parar, que avisam sempre)."""
+    from datetime import timedelta
+
+    if registrar_entrada:
+        _registrar_entrada(db, lead, texto, canal, None, id_externo)
+    lead.ultimo_contato = agora()
+    quem = f"Parceiro {parceiro.escritorio}" if parceiro else lead.empresa
+    historico(db, lead.id, "resposta", f"Mensagem recebida (a IA não respondeu: {'é parceiro' if parceiro else 'lead com a equipe'}): "
+                                       f"{texto[:1500]}", None, canal)
+    link = f"/leads/{lead.id}"
+    pede_para_parar = mensagens.pede_opt_out(texto)
+    recente = db.execute(select(Notificacao.id).where(Notificacao.link == link,
+                                                      Notificacao.criado_em >= agora() - timedelta(hours=2))
+                         .limit(1)).first()
+    if pede_para_parar or not recente:
+        aviso = f"💬 {quem} mandou mensagem ({'e-mail' if canal == 'email' else canal})"
+        if pede_para_parar:
+            aviso += ": parece pedir para parar de receber mensagens. Confira e, se for o caso, marque o opt-out"
+        notificar(db, lead, aviso, link)
+    return {"classe": "", "interesse": "", "resposta_sugerida": "", "oportunidade_id": None, "com_humano": True}
+
+
+def _so_midia(db, lead: Lead, texto: str, canal: str, registrar_entrada: bool, id_externo: str, tipo: str) -> dict:
+    """Só áudio/imagem/documento: ninguém sabe o que diz. A sequência para, sem resposta automática, e nasce uma
+    oportunidade para alguém ouvir/ver no WhatsApp e responder."""
+    enviada = (_registrar_entrada(db, lead, texto, canal, None, id_externo) if registrar_entrada
+               else ultima_mensagem_enviada(db, lead.id))
+    lead.ultimo_contato = agora()
+    nome = NOME_DA_MIDIA.get(tipo, "um arquivo")
+    historico(db, lead.id, "resposta", f"O lead mandou {nome}: a IA não classifica nem responde. Confira no WhatsApp.",
+              None, canal)
+    if lead.etapa < 2:
+        mudar_status(db, lead, "Respondeu", None)
+    cancelar_tarefas_de_prospeccao(db, lead.id, f"o lead mandou {nome}")
+    lead.automacao_pausada = True
+    verbo = "Ouvir o áudio" if tipo == "áudio" else f"Ver {nome}"
+    analise = {"classe": "RESPOSTA INDEFINIDA", "interesse": "", "objecoes": [], "resposta_sugerida": "",
+               "resumo": f"O lead respondeu com {nome}. A IA não abre arquivos: {verbo.lower()} no WhatsApp antes "
+                         "de responder (pode ser interesse, dúvida ou pedido para parar).",
+               "proximo_passo": f"{verbo} no WhatsApp e responder"}
+    analise["oportunidade_id"] = criar_oportunidade(db, lead, analise, texto, canal, enviada, "morna").id
+    return analise
+
+
+def _resposta_de_robo(db, lead: Lead, texto: str, canal: str, usuario, registrar_entrada: bool, analise: dict,
+                      id_externo: str = "") -> dict:
     """Robô/chatbot/ausência respondeu: só registra. Sem resposta da SDR, sem oportunidade e a sequência continua
     (a próxima mensagem pode chegar numa pessoa)."""
     if registrar_entrada:
-        entrada = mensagens.registrar(db, lead.id, canal, texto, usuario, status="recebida")
-        entrada.direcao = "entrada"
         enviada = ultima_mensagem_enviada(db, lead.id)
+        entrada = mensagens.registrar(db, lead.id, canal, texto, usuario, status="recebida", id_externo=id_externo)
+        entrada.direcao = "entrada"
         entrada.campanha_id = enviada.campanha_id if enviada else None
         entrada.categoria_id = lead.categoria_id
     historico(db, lead.id, "resposta", f"Resposta automática (robô/ausência), ignorada pela SDR: {texto[:500]}",
@@ -505,8 +589,8 @@ def criar_oportunidade(db, lead: Lead, analise: dict, texto: str, canal: str, en
 
 
 def destinatarios(db, lead: Lead) -> list[Usuario]:
-    if lead.vendedor_id:
-        dono = db.get(Usuario, lead.vendedor_id)
+    for uid in (lead.humano_id, lead.vendedor_id):  # quem assumiu o lead; senão o vendedor dele
+        dono = db.get(Usuario, uid) if uid else None
         if dono and dono.ativo:
             return [dono]
     return list(db.execute(select(Usuario).where(Usuario.perfil.in_(["admin", "gestor"]), Usuario.ativo.is_(True))).scalars())
@@ -600,6 +684,9 @@ def enviar_whatsapp_conectado(db, texto: str, usuario: Usuario | None, lead: Lea
                        or conexoes.para_enviar(db, conexoes.responsavel(db, lead, usuario, tarefa)))
         except conexoes.SemNumero as erro:
             raise EnvioRecusado(str(erro)) from None
+    bloqueio = mensagens.limite_do_numero(db, conexao)
+    if bloqueio:
+        raise EnvioRecusado(bloqueio)
     try:
         id_externo = whatsapp_leads.enviar(telefone, nome, texto, db=db, conexao=conexao)
     except whatsapp_leads.ErroWhatsAppLeads as erro:

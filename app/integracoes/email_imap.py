@@ -1,14 +1,19 @@
 """Leitura das RESPOSTAS por e-mail (IMAP): a IA SDR identifica quem respondeu e classifica.
 
 Configure IMAP_HOST, IMAP_USUARIO e IMAP_SENHA no .env (a mesma caixa que envia os e-mails).
-Só lê e-mails NÃO LIDOS de remetentes que são leads cadastrados; os demais ficam como estão.
+Lê os e-mails dos últimos dias (lidos ou não, sem marcar nada como lido) que vieram de um lead cadastrado ou que
+respondem a um e-mail enviado pelo sistema (In-Reply-To/References). Cada e-mail é processado uma vez só: o
+Message-ID fica guardado na mensagem recebida.
 """
 
 import email
+import hashlib
 import imaplib
 import logging
 import re
+from datetime import datetime, timedelta, timezone
 from email.header import decode_header, make_header
+from email.utils import parsedate_to_datetime
 
 from .. import config
 
@@ -47,28 +52,78 @@ def sem_citacao(texto: str) -> str:
     return re.sub(r"\n+\s*(Atenciosamente|Att|Abraços|Obrigad[oa])[,.!]?\s*$", "", resposta, flags=re.I).strip()
 
 
-def ler_respostas(emails_de_leads: set[str], maximo: int = 30) -> list[dict]:
-    """Devolve [{"de", "assunto", "texto"}] dos e-mails não lidos vindos de leads (e marca como lidos)."""
+DIAS_DE_LEITURA = 3
+_MESES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+FUSO_BRASILIA = timezone(timedelta(hours=-3))
+
+
+def _data_imap(d: datetime) -> str:
+    return f"{d.day:02d}-{_MESES[d.month - 1]}-{d.year}"  # o IMAP só aceita o mês em inglês
+
+
+def _ids(valor: str) -> list[str]:
+    return re.findall(r"<[^<>\s]+>", valor or "")
+
+
+def id_da_mensagem(cab) -> str:
+    """Message-ID (até 120 letras, o tamanho do campo). Sem ele: uma marca feita do remetente, data e assunto."""
+    ids = _ids(cab.get("Message-ID", ""))
+    if ids:
+        return ids[0][:120]
+    base = f"{cab.get('From', '')}|{cab.get('Date', '')}|{cab.get('Subject', '')}"
+    return "sem-id:" + hashlib.sha1(base.encode("utf-8", "replace")).hexdigest()[:24]
+
+
+def _quando(cab) -> datetime | None:
+    try:
+        d = parsedate_to_datetime(cab.get("Date", ""))
+    except (TypeError, ValueError, IndexError):
+        return None
+    if d.tzinfo is None:
+        return d
+    return d.astimezone(FUSO_BRASILIA).replace(tzinfo=None)
+
+
+def ler_respostas(emails_de_leads: set[str], enviados: set[str] | None = None, ja_processados: set[str] | None = None,
+                  desde: datetime | None = None, maximo: int = 30) -> list[dict]:
+    """[{"de", "assunto", "texto", "message_id", "responde_a"}] dos e-mails recentes de leads (ou que respondem a um
+    e-mail enviado pelo sistema) ainda não processados. Não marca nada como lido: a caixa fica como a equipe deixou.
+    enviados: Message-IDs dos e-mails que o sistema mandou; ja_processados: Message-IDs já tratados;
+    desde: ignora e-mails mais antigos (a 1ª leitura não reprocessa respostas já tratadas)."""
     from .. import arquivo_env
 
     arquivo_env.carregar_do_banco(forcar=True)  # na nuvem: a senha salva há pouco já vale aqui
     if not configurado():
         return []
+    enviados, ja_processados = enviados or set(), ja_processados or set()
+    inicio = datetime.now(FUSO_BRASILIA).replace(tzinfo=None) - timedelta(days=DIAS_DE_LEITURA)
+    if desde and desde > inicio:
+        inicio = desde
     achados = []
     try:
         with imaplib.IMAP4_SSL(config.IMAP_HOST, config.IMAP_PORTA, timeout=30) as caixa:
             caixa.login(config.IMAP_USUARIO, config.IMAP_SENHA)
-            caixa.select("INBOX")
-            _, dados = caixa.search(None, "UNSEEN")
-            for num in dados[0].split()[-200:]:
-                _, cab = caixa.fetch(num, "(BODY.PEEK[HEADER.FIELDS (FROM)])")
-                remetente = email.utils.parseaddr(email.message_from_bytes(cab[0][1]).get("From", ""))[1].lower()
-                if remetente not in emails_de_leads:
-                    continue  # não é lead: continua "não lido" para a equipe
-                _, conteudo = caixa.fetch(num, "(RFC822)")
+            caixa.select("INBOX", readonly=True)  # só leitura: nada fica marcado como lido
+            _, dados = caixa.search(None, "SINCE", _data_imap(inicio))
+            for num in dados[0].split()[-300:]:
+                _, cab_bruto = caixa.fetch(
+                    num, "(BODY.PEEK[HEADER.FIELDS (FROM DATE SUBJECT MESSAGE-ID IN-REPLY-TO REFERENCES)])")
+                cab = email.message_from_bytes(cab_bruto[0][1])
+                message_id = id_da_mensagem(cab)
+                if message_id in ja_processados:
+                    continue
+                quando = _quando(cab)
+                if quando and quando < inicio:
+                    continue
+                remetente = email.utils.parseaddr(cab.get("From", ""))[1].lower()
+                responde_a = [i[:120] for i in _ids(cab.get("In-Reply-To", "")) + _ids(cab.get("References", ""))]
+                if remetente not in emails_de_leads and not any(i in enviados for i in responde_a):
+                    continue  # não é de lead nem responde a um e-mail nosso
+                _, conteudo = caixa.fetch(num, "(BODY.PEEK[])")
                 msg = email.message_from_bytes(conteudo[0][1])
                 achados.append({"de": remetente, "assunto": str(make_header(decode_header(msg.get("Subject", "")))),
-                                "texto": sem_citacao(_texto(msg))[:4000]})
+                                "texto": sem_citacao(_texto(msg))[:4000], "message_id": message_id,
+                                "responde_a": responde_a})
                 if len(achados) >= maximo:
                     break
     except (imaplib.IMAP4.error, OSError) as erro:

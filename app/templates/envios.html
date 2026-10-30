@@ -39,7 +39,7 @@
   {% set pw = (100 * resumo.whats_hoje / resumo.whats_limite)|round|int if resumo.whats_limite else 0 %}
   <div class="kpi destaque"><div class="rotulo">E-mails hoje</div><div class="valor">{{ resumo.email_hoje }} <span style="font-size:.9rem;opacity:.7">/ {{ resumo.email_limite }}</span></div>
     <div class="barra-limite" style="background:rgba(255,255,255,.2)"><span style="width:{{ [pe, 100]|min }}%"></span></div></div>
-  <div class="kpi"><div class="rotulo">WhatsApp hoje</div><div class="valor">{{ resumo.whats_hoje }} <span class="suave" style="font-size:.9rem">/ {{ resumo.whats_limite }}</span></div>
+  <div class="kpi"><div class="rotulo">WhatsApp hoje (número que mais enviou)</div><div class="valor">{{ resumo.whats_hoje }} <span class="suave" style="font-size:.9rem">/ {{ resumo.whats_limite }}</span></div>
     <div class="barra-limite"><span style="width:{{ [pw, 100]|min }}%"></span></div></div>
   <div class="kpi"><div class="rotulo">Na fila</div><div class="valor">{{ resumo.na_fila }}</div><div class="detalhe">esperando sair</div></div>
   <div class="kpi"><div class="rotulo">Não saíram</div><div class="valor" style="{{ 'color:var(--erro)' if resumo.falharam }}">{{ resumo.falharam }}</div><div class="detalhe">no período</div></div>

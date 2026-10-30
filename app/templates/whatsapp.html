@@ -66,9 +66,9 @@
   <p class="pequeno suave">Valem para todos os números (cada número tem o próprio limite por dia). Só o administrador muda.</p>
   {% if not regras %}<div class="aviso aviso-alerta">As regras atuais aparecem quando o computador com o WhatsApp Leads se conectar.</div>{% endif %}
   <div class="campos">
-    <div><label>Pausa mínima entre mensagens (segundos)</label><input type="number" min="1" name="intervalo_min_seg" value="{{ regras.intervalo_min_seg or 8 }}"></div>
-    <div><label>Pausa máxima (segundos)</label><input type="number" min="1" name="intervalo_max_seg" value="{{ regras.intervalo_max_seg or 20 }}"></div>
-    <div><label>Limite de mensagens por dia (por número)</label><input type="number" min="1" name="limite_diario" value="{{ regras.limite_diario or 200 }}"></div>
+    <div><label>Pausa mínima entre mensagens (segundos)</label><input type="number" min="1" name="intervalo_min_seg" value="{{ regras.intervalo_min_seg or 30 }}"></div>
+    <div><label>Pausa máxima (segundos)</label><input type="number" min="1" name="intervalo_max_seg" value="{{ regras.intervalo_max_seg or 90 }}"></div>
+    <div><label>Limite de mensagens por dia (por número)</label><input type="number" min="1" name="limite_diario" value="{{ regras.limite_diario or 40 }}"></div>
     <div><label>Enviar a partir de</label><input type="time" name="horario_inicio" value="{{ regras.horario_inicio or '08:00' }}"></div>
     <div><label>Enviar até</label><input type="time" name="horario_fim" value="{{ regras.horario_fim or '20:00' }}"></div>
     <div class="largo"><label>Palavras para o lead sair da lista</label><input type="text" name="palavras_sair" value="{{ regras.palavras_sair or 'SAIR, PARAR, CANCELAR, DESCADASTRAR' }}">

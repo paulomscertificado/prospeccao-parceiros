@@ -125,6 +125,18 @@ def preencher(lead: Lead, dados: dict, so_vazios: bool = False) -> list[str]:
     return alterados
 
 
+def cnpj_inativo(db: Session, lead: Lead, situacao: str, usuario: Usuario | None = None) -> bool:
+    """A Receita diz que o CNPJ não está ativo (baixada, inapta, suspensa...). Lead que ainda não conversou vira
+    Perdido e sai das campanhas; com conversa em andamento, só fica o aviso. True = virou Perdido."""
+    situacao = (situacao or "").strip()
+    if not situacao or situacao.upper() == "ATIVA":
+        return False
+    historico(db, lead.id, "sistema", f"Atenção: situação cadastral do CNPJ na Receita: {situacao}.", usuario)
+    if lead.etapa < 2 and not lead.perdido:
+        return mudar_status(db, lead, "Perdido", usuario, "CNPJ inativo")
+    return False
+
+
 def mudar_status(db: Session, lead: Lead, novo: str, usuario: Usuario | None, motivo: str = "") -> bool:
     """Muda o status, grava as datas do funil, registra histórico e mantém o parceiro em dia."""
     if novo not in config.STATUS_LEAD or novo == lead.status:

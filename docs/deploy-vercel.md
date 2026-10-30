@@ -36,7 +36,17 @@ O modo nuvem liga sozinho quando a variável `VERCEL` existe (a Vercel cria) ou 
 - **Supabase Free: 500 MB.** A base da Receita (814 mil empresas, com índices) deu uns 300 MB num teste com
   dados de tamanho parecido; com o resto do sistema deve ficar entre 350 e 400 MB. Confira o tamanho real depois
   da cópia (`select pg_size_pretty(pg_database_size('postgres'))`). Projeto parado 7 dias é pausado (com o
-  agendador isso não acontece) e o plano grátis **não tem backup automático**.
+  agendador isso não acontece) e o plano grátis **não tem backup automático**: por isso existe o backup diário
+  abaixo.
+- **Backup diário.** `fazer_backup.py` copia o banco da nuvem (tudo menos `base_receita`, que se reimporta dos .zip)
+  para `dados/backups/nuvem_AAAA-MM-DD.db` (SQLite, ~55 MB, ~1,5 min) e guarda 14 dias. Roda sozinho 1 vez por dia, a
+  partir das 12:00, pelo `dados/chamar_cron.ps1` (escondido; se falhar, tenta de novo depois de 2 h; saída em
+  `dados/backups/saida.txt` e `erros.txt`). À mão: `fazer_backup.bat`. Para voltar uma cópia (emergência, APAGA o que
+  está na nuvem menos a base da Receita): `restaurar_backup.bat`, que pede para digitar SIM. Cada backup gasta ~55 MB
+  da transferência mensal do Supabase (5 GB no grátis).
+- **Base da Receita na nuvem.** A tela Configurações > Integrações não importa a base na nuvem: uma importação
+  inteira não cabe no limite de 500 MB junto com o resto. Ramo ou região novos entram por importação própria e
+  filtrada (como os restaurantes da Região Metropolitana do Recife), feita pelo suporte.
 - **Conexão com o Supabase.** Use o *Transaction pooler* (porta 6543) na `DATABASE_URL` da Vercel: a conexão
   direta só funciona por IPv6. Esse pooler não aceita *prepared statements*, por isso o `banco.py` e o
   `enviar_para_nuvem.py` abrem as conexões com `prepare_threshold=None`.

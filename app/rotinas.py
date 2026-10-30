@@ -18,7 +18,8 @@ from .modelos import Lead
 log = logging.getLogger(__name__)
 
 
-def responder_automaticamente(db, lead: Lead, canal: str, analise: dict, conexao: str | None = None) -> bool:
+def responder_automaticamente(db, lead: Lead, canal: str, analise: dict, conexao: str | None = None,
+                              em_resposta_a: str = "", assunto: str = "") -> bool:
     """Envia a resposta da SDR (ex.: "vou passar para o time comercial") quando o canal permite.
     WhatsApp: só dentro da janela de 24 h aberta pela mensagem do lead (regra da Meta)."""
     from . import mensagens
@@ -26,6 +27,8 @@ def responder_automaticamente(db, lead: Lead, canal: str, analise: dict, conexao
     texto = analise.get("resposta_sugerida", "")
     if ler_config(db, "sdr_resposta_automatica") != "1" or not texto or not sdr.texto_seguro(texto):
         return False
+    if sdr.com_humano(lead) or sdr.parceiro_do_lead(db, lead):
+        return False  # alguém da equipe conduz a conversa: a IA não fala no meio
     from datetime import timedelta
 
     from sqlalchemy import select
@@ -36,11 +39,13 @@ def responder_automaticamente(db, lead: Lead, canal: str, analise: dict, conexao
     if db.execute(select(Mensagem.id).where(Mensagem.lead_id == lead.id, Mensagem.angulo == "resposta",
                                             Mensagem.criado_em >= agora() - timedelta(hours=24)).limit(1)).first():
         return False  # a SDR responde 1 vez por dia, no máximo: nunca entra em conversa sem fim (ex.: com robô)
-    if canal == "whatsapp" and mensagens.enviadas_hoje(db, "whatsapp") >= mensagens.limite_diario(db, "whatsapp"):
-        return False  # resposta automática também respeita o limite diário de WhatsApp
     try:
         if canal == "email" and lead.email and email_smtp.configurado():
-            id_externo = email_smtp.enviar(lead.email, "Re: parceria MS Certificação Digital", texto, com_rodape=False)
+            assunto = assunto.strip()
+            assunto = assunto if assunto.lower().startswith("re:") else (f"Re: {assunto}" if assunto
+                                                                          else "Re: parceria MS Certificação Digital")
+            id_externo = email_smtp.enviar(lead.email, assunto[:200], texto, com_rodape=False,
+                                           em_resposta_a="" if em_resposta_a.startswith("sem-id:") else em_resposta_a)
         elif canal == "whatsapp" and lead.whatsapp and whatsapp_cloud.configurado():
             id_externo = whatsapp_cloud.enviar_texto(lead.whatsapp, texto)
         elif canal == "whatsapp" and (lead.whatsapp or lead.telefone) and whatsapp_leads.configurado():
@@ -53,10 +58,13 @@ def responder_automaticamente(db, lead: Lead, canal: str, analise: dict, conexao
                     conexao = conexoes.para_enviar(db, conexoes.responsavel(db, lead))
                 except conexoes.SemNumero:
                     return False
+            if mensagens.limite_do_numero(db, conexao):
+                return False  # resposta automática também respeita o limite diário do número
             id_externo = str(whatsapp_leads.enviar(lead.whatsapp or lead.telefone, lead.responsavel or lead.empresa,
                                                    texto, resposta=True, db=db, conexao=conexao))
-            mensagens.registrar(db, lead.id, canal, texto, None, modo="whatsapp-leads", status="na_fila",
-                                id_externo=id_externo, categoria_id=lead.categoria_id, angulo="resposta")
+            msg = mensagens.registrar(db, lead.id, canal, texto, None, modo="whatsapp-leads", status="na_fila",
+                                      id_externo=id_externo, categoria_id=lead.categoria_id, angulo="resposta")
+            msg.conexao = conexao
             return True
         else:
             return False
@@ -69,18 +77,50 @@ def responder_automaticamente(db, lead: Lead, canal: str, analise: dict, conexao
 
 
 def ler_respostas_por_email() -> int:
+    """Respostas por e-mail → IA SDR. Acha o lead pelo remetente ou pelo e-mail nosso que ele respondeu
+    (In-Reply-To/References: vale quando um colega do lead responde de outro endereço)."""
+    from datetime import datetime, timedelta
+
+    from .banco import agora, gravar_config
+    from .modelos import Mensagem
+
     if not email_imap.configurado():
         return 0
     with sessao() as db:
+        try:
+            desde = datetime.fromisoformat(ler_config(db, "imap_ler_desde"))
+        except ValueError:  # 1ª leitura neste formato: começa agora (as respostas antigas já foram tratadas)
+            desde = agora().replace(microsecond=0)
+            gravar_config(db, "imap_ler_desde", desde.isoformat())
         emails = {e for (e,) in db.execute(select(Lead.chave_email).where(Lead.chave_email != "")) if e}
+        enviados = dict(db.execute(select(Mensagem.id_externo, Mensagem.lead_id).where(
+            Mensagem.canal == "email", Mensagem.direcao == "saida", Mensagem.id_externo != "",
+            Mensagem.lead_id.is_not(None), Mensagem.criado_em >= agora() - timedelta(days=120))).all())
+        ja_processados = {i for (i,) in db.execute(select(Mensagem.id_externo).where(
+            Mensagem.canal == "email", Mensagem.direcao == "entrada", Mensagem.id_externo != "",
+            Mensagem.criado_em >= agora() - timedelta(days=email_imap.DIAS_DE_LEITURA + 7)))}
     total = 0
-    for item in email_imap.ler_respostas(emails):
+    for item in email_imap.ler_respostas(emails, set(enviados), ja_processados, desde):
         with sessao() as db:
             lead = db.execute(select(Lead).where(Lead.chave_email == item["de"])).scalars().first()
-            if not lead or not item["texto"]:
+            if lead is None:
+                lead_id = next((enviados[i] for i in item["responde_a"] if i in enviados), None)
+                lead = db.get(Lead, lead_id) if lead_id else None
+            if not lead:
                 continue
-            analise = sdr.processar_resposta(db, lead, item["texto"], "email")
-            responder_automaticamente(db, lead, "email", analise)
+            if not item["texto"]:
+                # e-mail sem texto (só anexo): fica registrado (não volta na próxima leitura) e avisa quem cuida
+                from . import mensagens
+
+                entrada = mensagens.registrar(db, lead.id, "email", "[e-mail sem texto, só anexo]", None,
+                                              status="recebida", id_externo=item["message_id"])
+                entrada.direcao = "entrada"
+                sdr.notificar(db, lead, f"{lead.empresa} mandou um e-mail sem texto (só anexo): confira na caixa "
+                                        "de e-mail", f"/leads/{lead.id}")
+                continue
+            analise = sdr.processar_resposta(db, lead, item["texto"], "email", id_externo=item["message_id"])
+            responder_automaticamente(db, lead, "email", analise, em_resposta_a=item["message_id"],
+                                      assunto=item["assunto"])
             total += 1
     return total
 

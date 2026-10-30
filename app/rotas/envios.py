@@ -77,7 +77,8 @@ def tela_envios(request: Request, canal: str = "", status: str = "", campanha: s
     base = select(func.count(Mensagem.id)).where(Mensagem.criado_em >= desde)
     resumo = {
         "email_hoje": mensagens.enviadas_hoje(db, "email"), "email_limite": mensagens.limite_diario(db, "email"),
-        "whats_hoje": mensagens.enviadas_hoje(db, "whatsapp"), "whats_limite": mensagens.limite_diario(db, "whatsapp"),
+        "whats_hoje": max(mensagens.whatsapp_hoje_por_numero(db).values(), default=0),
+        "whats_limite": mensagens.limite_diario(db, "whatsapp"),
         "falharam": contar(base.where(Mensagem.status == "falhou")),
         "respostas": contar(base.where(Mensagem.status == "recebida")),
         "na_fila": contar(base.where(Mensagem.status == "na_fila")),

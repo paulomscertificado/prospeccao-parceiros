@@ -66,8 +66,18 @@ Respeite a [política comercial do WhatsApp](https://business.whatsapp.com/polic
 quem faz sentido falar, ofereça saída e pare quando pedirem.
 
 ### Respostas por e-mail (IMAP) – IA SDR
-Configurado na mesma tela (Configurações > E-mail, "A IA SDR lê as respostas desta caixa"). Só são lidos
-e-mails **não lidos** de remetentes que são leads; os outros continuam "não lidos" na caixa.
+Configurado na mesma tela (Configurações > E-mail, "A IA SDR lê as respostas desta caixa"). A cada 5 minutos o
+sistema lê os e-mails dos **últimos 3 dias, lidos ou não**, em modo só leitura (nada fica marcado como lido). Entram
+os que vêm de um lead cadastrado ou que respondem a um e-mail mandado pelo sistema (cabeçalhos In-Reply-To e
+References: vale quando um colega do lead responde de outro endereço). Cada e-mail é tratado uma vez só (o
+Message-ID fica guardado na mensagem recebida). A resposta automática sai no mesmo fio ("Re:" + In-Reply-To).
+Na 1ª leitura depois desta mudança, o sistema começa do zero (`imap_ler_desde`) para não repetir respostas antigas.
+
+### Fila de e-mail: endereço recusado x caixa com problema
+- Endereço do lead inválido ou recusado pelo servidor (`email_smtp.ErroDestinatario`): só aquele toque é cancelado
+  (o motivo fica na tarefa e no histórico) e a fila segue com os outros.
+- Erro da caixa de envio (senha, servidor fora do ar): a fila pausa 15 minutos (`fila_email_pausada_ate`) e tenta de
+  novo depois.
 
 ### Regras do WhatsApp para a IA SDR
 - Primeiro contato com quem **não autorizou** receber mensagens: a SDR prepara a mensagem e a pessoa envia com

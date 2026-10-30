@@ -75,12 +75,36 @@ def _contar_saida(db: Session, desde: datetime, *condicoes) -> int:
     )).scalar() or 0
 
 
-def enviadas_hoje(db: Session, canal: str) -> int:
-    return _contar_saida(db, datetime.combine(agora().date(), datetime.min.time()), Mensagem.canal == canal)
+def enviadas_hoje(db: Session, canal: str, conexao: str | None = None) -> int:
+    """conexao: só as que saíram por este número de WhatsApp."""
+    extra = [Mensagem.conexao == conexao] if conexao else []
+    return _contar_saida(db, datetime.combine(agora().date(), datetime.min.time()), Mensagem.canal == canal, *extra)
 
 
-def enviadas_na_hora(db: Session, canal: str) -> int:
-    return _contar_saida(db, agora() - timedelta(hours=1), Mensagem.canal == canal)
+def enviadas_na_hora(db: Session, canal: str, conexao: str | None = None) -> int:
+    extra = [Mensagem.conexao == conexao] if conexao else []
+    return _contar_saida(db, agora() - timedelta(hours=1), Mensagem.canal == canal, *extra)
+
+
+def whatsapp_hoje_por_numero(db: Session) -> dict[str, int]:
+    """{número: mensagens de WhatsApp de hoje} (o limite diário vale para cada número)."""
+    inicio = datetime.combine(agora().date(), datetime.min.time())
+    return dict(db.execute(select(Mensagem.conexao, func.count(Mensagem.id)).where(
+        Mensagem.direcao == "saida", Mensagem.criado_em >= inicio, Mensagem.status.in_(ENVIADAS),
+        Mensagem.canal == "whatsapp", Mensagem.conexao != "").group_by(Mensagem.conexao)).all())
+
+
+def limite_do_numero(db: Session, conexao: str) -> str:
+    """WhatsApp: o limite por dia e por hora vale para CADA número, porque é o número que o WhatsApp pode
+    bloquear (o WhatsApp Leads conta do mesmo jeito). Vazio = pode."""
+    limite = limite_diario(db, "whatsapp")
+    if limite and enviadas_hoje(db, "whatsapp", conexao) >= limite:
+        return (f"Este número de WhatsApp já mandou {limite} mensagens hoje (limite diário por número). "
+                "O resto sai amanhã ou por outro número.")
+    por_hora = ler_config_int(db, "limite_hora_whatsapp", 0)
+    if por_hora and enviadas_na_hora(db, "whatsapp", conexao) >= por_hora:
+        return f"Este número de WhatsApp já mandou {por_hora} mensagens nesta hora. A fila continua na próxima hora."
+    return ""
 
 
 def enviadas_hoje_campanha(db: Session, campanha_id: int) -> int:
@@ -127,9 +151,12 @@ def horas_entre_contatos(db: Session, canal: str) -> int:
     return util.para_int(valor) if valor else ler_config_int(db, "horas_entre_contatos", 20)
 
 
-def bloqueio_de_envio(db: Session, lead: Lead | None, canal: str, campanha_id: int | None = None) -> str:
+def bloqueio_de_envio(db: Session, lead: Lead | None, canal: str, campanha_id: int | None = None,
+                      conexao: str | None = None) -> str:
     """Motivo para NÃO contatar agora (vazio = pode). Vale para envio manual, pela API e pela fila.
-    Limites: por contato (intervalo), por dia e por hora (canal), por campanha e por domínio (e-mail)."""
+    Limites: por contato (intervalo), por dia e por hora (canal), por campanha e por domínio (e-mail).
+    WhatsApp: o limite por dia/hora é de cada número (conexao); sem o número, ele é conferido na hora do envio
+    (sdr.enviar_whatsapp_conectado), depois de escolher por qual número sai."""
     if lead is not None:
         if lead.opt_out:
             return "Este contato pediu para não receber mensagens (opt-out)."
@@ -143,12 +170,18 @@ def bloqueio_de_envio(db: Session, lead: Lead | None, canal: str, campanha_id: i
         if horas and ultimo and agora() - ultimo < timedelta(hours=horas):
             return (f"Já houve um {nome} para este lead há menos de {horas} horas (controle de frequência do {nome}). "
                     "Tente mais tarde ou use o outro canal.")
-    limite = limite_diario(db, canal)
-    if limite and enviadas_hoje(db, canal) >= limite:
-        return f"O limite diário de {limite} mensagens de {canal} foi atingido. Ajuste em Configurações."
-    por_hora = ler_config_int(db, {"email": "limite_hora_email", "whatsapp": "limite_hora_whatsapp"}.get(canal, ""), 0)
-    if por_hora and enviadas_na_hora(db, canal) >= por_hora:
-        return f"O limite de {por_hora} mensagens de {canal} por hora foi atingido. A fila continua na próxima hora."
+    if canal == "whatsapp":
+        if conexao:
+            motivo = limite_do_numero(db, conexao)
+            if motivo:
+                return motivo
+    else:
+        limite = limite_diario(db, canal)
+        if limite and enviadas_hoje(db, canal) >= limite:
+            return f"O limite diário de {limite} mensagens de {canal} foi atingido. Ajuste em Configurações."
+        por_hora = ler_config_int(db, {"email": "limite_hora_email"}.get(canal, ""), 0)
+        if por_hora and enviadas_na_hora(db, canal) >= por_hora:
+            return f"O limite de {por_hora} mensagens de {canal} por hora foi atingido. A fila continua na próxima hora."
     if campanha_id:
         por_campanha = ler_config_int(db, "limite_diario_campanha", 0)
         if por_campanha and enviadas_hoje_campanha(db, campanha_id) >= por_campanha:
