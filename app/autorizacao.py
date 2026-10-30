@@ -118,6 +118,8 @@ CATALOGO = [
     Permissao("email.ver", "Comunicação", "Conectar e usar o próprio e-mail", padrao="E"),
     Permissao("email.gerenciar_todas", "Comunicação", "Gerenciar o e-mail de todos (e o principal)", padrao="A"),
     Permissao("email.compartilhar_todas", "Comunicação", "Compartilhar o e-mail de qualquer pessoa", padrao="G"),
+    Permissao("email.outro_dominio", "Comunicação", "Enviar pelo próprio domínio e servidor de e-mail (fora do @da MS)",
+              padrao="G"),
 
     Permissao("ia.usar", "IA", "Usar a IA Comercial", modulo="ia_comercial", padrao="E"),
 

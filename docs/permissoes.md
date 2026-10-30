@@ -66,7 +66,8 @@ nuvem prepara o banco de novo quando uma permissão nova aparece.
 Os números do Dashboard, relatórios e IA Comercial usam o alcance de `painel.ver` (`metricas.NUMEROS`). E-mail e
 WhatsApp continuam com as regras de dono/compartilhamento de `contas_email.py` e `conexoes.py`; o "gerenciar de
 todos" e o "compartilhar de todos" viraram `email.gerenciar_todas`/`email.compartilhar_todas` e
-`whatsapp.gerenciar_todos`/`whatsapp.compartilhar_todos`.
+`whatsapp.gerenciar_todos`/`whatsapp.compartilhar_todos`. `email.outro_dominio` (admin e gestor) libera cadastrar o
+próprio e-mail em outro domínio/servidor (ver `docs/configuracao.md`); é conferida a cada envio.
 
 ## Furos fechados com esta mudança
 

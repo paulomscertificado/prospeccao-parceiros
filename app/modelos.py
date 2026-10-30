@@ -102,6 +102,7 @@ class ContaEmail(Base):
     imap_porta: Mapped[int] = mapped_column(Integer, default=993)
     ler_respostas: Mapped[bool] = mapped_column(Boolean, default=True)
     ativa: Mapped[bool] = mapped_column(Boolean, default=True)
+    dominio_livre: Mapped[bool] = mapped_column(Boolean, default=False)  # outro domínio/servidor (email.outro_dominio)
     compartilhada_todos: Mapped[bool] = mapped_column(Boolean, default=False)
     compartilhada_com: Mapped[str] = mapped_column(Text, default="[]")  # JSON com ids de usuários
     ultimo_erro: Mapped[str] = mapped_column(Text, default="")

@@ -88,8 +88,9 @@ def enviar(para: str, assunto: str, corpo: str, responder_para: str = "", com_ro
     if not principal:
         if not c.host or not c.endereco or not c.senha:
             raise ErroEmail(f"A conta {c.rotulo} está incompleta: falta a senha de app (tela E-mail).")
-        if not dominio_permitido(c.endereco):
-            raise ErroEmail(f"O remetente precisa ser um e-mail @{config.EMAIL_DOMINIO} (está {c.endereco}).")
+        if not dominio_permitido(c.endereco) and not contas_email.dominio_liberado(conta):
+            raise ErroEmail(f"O remetente precisa ser um e-mail @{config.EMAIL_DOMINIO} (está {c.endereco}). "
+                            "Outro domínio só para quem tem a permissão \"Enviar pelo próprio domínio\".")
     para = (para or "").strip()
     if not ENDERECO_VALIDO.match(para):
         raise ErroDestinatario(f"O e-mail \"{para}\" não é um endereço válido.")

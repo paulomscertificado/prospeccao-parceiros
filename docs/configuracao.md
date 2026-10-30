@@ -85,6 +85,20 @@ endereço, login e senha de app criptografada (Google Workspace: smtp.gmail.com:
 - `Mensagem.conexao` guarda por onde saiu (`email:principal` ou `email:<id>`). Os limites de e-mail continuam da MS
   inteira (mesmo domínio, mesma reputação).
 
+### Domínio e servidor próprios (permissão `email.outro_dominio`, padrão: admin e gestor)
+- Tela E-mail > **Onde fica este e-mail?**: Google Workspace (smtp.gmail.com/imap.gmail.com, senha de app de 16
+  letras) ou **Outro provedor** (SMTP + porta 465/587/25/2525 e IMAP SSL, senha livre). Porta 465 = SSL direto; as
+  outras = STARTTLS. Leitura só por IMAP com SSL (993).
+- Endereço fora de `EMAIL_DOMINIO` ou outro servidor exigem a permissão (o servidor confere, não só a tela). Domínio
+  gratuito (`util.PROVEDORES_GRATUITOS`) é recusado; servidor tem de ser um nome público (nada de localhost, IP
+  interno, `.local`).
+- `ContaEmail.dominio_livre` marca a conta; `contas_email.dominio_liberado` confere **a cada envio** se o dono
+  ainda tem a permissão (NEGAR na tela Permissões bloqueia na hora).
+- A tela confere o DNS do domínio da conta (`dns_email.verificar`): reconhece Google e Microsoft 365 pelo MX (SPF com
+  o include certo; DKIM `google` ou `selector1/2`) e, nos outros, procura o DKIM nos seletores mais comuns
+  (`dns_email.SELETORES_DKIM`).
+- Os limites por hora/dia continuam somados com os da MS (conservador para não queimar nenhum domínio).
+
 ### Fila de e-mail: endereço recusado x caixa com problema
 - Endereço do lead inválido ou recusado pelo servidor (`email_smtp.ErroDestinatario`): só aquele toque é cancelado
   (o motivo fica na tarefa e no histórico) e a fila segue com os outros.

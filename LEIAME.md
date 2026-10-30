@@ -192,6 +192,21 @@ começa liberado para toda a equipe. O dono da conta, o administrador e o gestor
 conta (inclusive o principal) em **Compartilhar esta conta**. Os limites de envio por hora e por dia continuam
 valendo para a MS inteira.
 
+**Gestor com o domínio da própria empresa:** o gestor (e o administrador) pode cadastrar um e-mail de outro domínio,
+por exemplo joao@contabiljoao.com.br. No menu **E-mail**:
+1. Em **Onde fica este e-mail?**, escolha **Google Workspace** ou **Outro provedor** (Microsoft 365, Hostinger,
+   Locaweb, servidor próprio...).
+2. Outro provedor: copie do painel do provedor o **servidor de envio (SMTP)** e a porta (quase sempre 587 ou 465) e
+   o **servidor de leitura (IMAP)** (porta 993). Digite a senha do e-mail. A tela traz os dados do Microsoft 365 e
+   da Hostinger como exemplo.
+3. Clique em **Salvar** e depois em **Enviar e-mail de teste**.
+4. Logo abaixo aparece **"O domínio ... está pronto para não cair no spam?"**, com SPF, DKIM e DMARC. O que estiver
+   "Falta configurar" traz o passo a passo; quem cuida do domínio faz isso em poucos minutos.
+
+Gmail, Hotmail e Yahoo pessoais não são aceitos (caem no spam e a conta pode ser bloqueada). Outras pessoas só podem
+usar outro domínio se o administrador der a permissão **"Enviar pelo próprio domínio"** na tela Permissões; tirando a
+permissão, a conta para de enviar na hora.
+
 ## 6. Problemas comuns
 
 | Mensagem / situação | O que fazer |

@@ -1,7 +1,8 @@
 """Contas de e-mail das campanhas: a principal da MS (Configurações > E-mail) e a de cada pessoa da equipe.
 
 Funciona como os números de WhatsApp (app/conexoes.py):
-- cada pessoa cadastra o PRÓPRIO e-mail @mscertificados.com.br (tela E-mail);
+- cada pessoa cadastra o PRÓPRIO e-mail @mscertificados.com.br (tela E-mail); quem tem email.outro_dominio
+  (gestor e admin) pode usar o próprio domínio e servidor (Google, Microsoft 365 ou outro SMTP/IMAP);
 - o dono, o administrador e o gestor compartilham uma conta com toda a equipe ou com pessoas escolhidas;
 - o e-mail de um lead sai pela conta do responsável; sem conta própria, por uma compartilhada com ele; por último
   pela principal, se ela estiver liberada para ele (começa liberada para toda a equipe).
@@ -56,6 +57,17 @@ def credenciais(conta: ContaEmail | None) -> Credenciais:
                        formataddr((conta.nome_remetente, conta.endereco)) if conta.nome_remetente else conta.endereco,
                        conta.endereco, "", conta.imap_host if conta.ler_respostas else "", conta.imap_porta,
                        conta.endereco)
+
+
+def dominio_liberado(conta: ContaEmail | None) -> bool:
+    """A conta pode enviar fora do domínio da MS: foi salva assim e o dono AINDA tem email.outro_dominio."""
+    if conta is None or conta.principal or not conta.dominio_livre or not conta.dono_id:
+        return False
+    from sqlalchemy.orm import object_session
+
+    db = object_session(conta)
+    dono = db.get(Usuario, conta.dono_id) if db is not None else None
+    return bool(dono and dono.ativo and autorizacao.pode(dono, "email.outro_dominio"))
 
 
 def chave(conta: ContaEmail | None) -> str:

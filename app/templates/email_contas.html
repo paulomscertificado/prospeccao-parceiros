@@ -12,25 +12,46 @@
   .compartilhar { border-top: 1px dashed var(--borda); padding-top: 10px; }
   .compartilhar summary { cursor: pointer; font-weight: 600; color: var(--azul); font-size: .85rem; }
   .lista-pessoas { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 2px 10px; margin: 8px 0; }
+  .servidor-proprio { display: none; border: 1px dashed var(--borda); border-radius: 10px; padding: 10px; }
+  .conta.outro .servidor-proprio { display: block; }
+  .conta.outro .so-google { display: none; }
+  .duas { display: grid; grid-template-columns: 1fr 90px; gap: 8px; }
   @media (max-width: 420px) { .contas { grid-template-columns: 1fr; } }
 </style>
 {% set icone %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM22 6l-10 7L2 6"/></svg>{% endset %}
-<div class="cabecalho"><div><h1>E-mail</h1><div class="suave">Cada pessoa pode cadastrar o próprio e-mail @{{ dominio }} para as campanhas. As respostas dos leads chegam na caixa de quem enviou.</div></div></div>
+<div class="cabecalho"><div><h1>E-mail</h1><div class="suave">Cada pessoa pode cadastrar o próprio e-mail @{{ dominio }} para as campanhas{% if pode('email.outro_dominio') %} (você também pode usar o e-mail do domínio da sua empresa, com o servidor de e-mail dela){% endif %}. As respostas dos leads chegam na caixa de quem enviou.</div></div></div>
 
 {% if por_onde %}<div class="aviso aviso-info">Os e-mails das campanhas dos seus leads saem por <b>{{ por_onde }}</b>.</div>{% endif %}
 
 <h2 style="margin:4px 0 10px"><span class="etiqueta">Meu e-mail</span></h2>
 <div class="contas" style="margin-bottom:22px">
-  <form class="cartao conta" method="post" action="/email/minha">
+  <form class="cartao conta{{ ' outro' if outro_provedor }}" id="form-meu-email" method="post" action="/email/minha">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <div class="topo-conta"><div class="icone-conta">{{ icone }}</div>
       <div class="titulo"><b>{{ minha.endereco if minha else 'Cadastrar o meu e-mail' }}</b>
         <span class="pequeno suave">{{ ('Ligado' if minha.ativa else 'Pausado') if minha else 'Conta Google Workspace da MS' }}</span></div></div>
-    <div class="campo"><label>Seu e-mail</label><input type="email" name="endereco" required value="{{ minha.endereco if minha else '' }}" placeholder="nome@{{ dominio }}"></div>
+    {% if pode('email.outro_dominio') %}
+    <div class="campo"><label>Onde fica este e-mail?</label>
+      <select name="provedor" id="provedor-email">
+        <option value="google" {{ 'selected' if not outro_provedor }}>Google Workspace (Gmail da empresa)</option>
+        <option value="outro" {{ 'selected' if outro_provedor }}>Outro provedor (Microsoft 365, Hostinger, Locaweb, servidor próprio...)</option>
+      </select></div>
+    {% endif %}
+    <div class="campo"><label>Seu e-mail</label><input type="email" name="endereco" required value="{{ minha.endereco if minha else '' }}" placeholder="nome@{{ 'suaempresa.com.br' if pode('email.outro_dominio') else dominio }}"></div>
     <div class="campo"><label>Nome que aparece para o lead</label><input type="text" name="nome_remetente" maxlength="120" value="{{ minha.nome_remetente if minha else usuario.nome ~ ' | MS Certificação Digital' }}"></div>
-    <div class="campo"><label>Senha de app do Google (16 letras){% if minha %} — deixe vazio para manter{% endif %}</label>
-      <input type="password" name="senha" autocomplete="new-password" placeholder="abcd efgh ijkl mnop" {{ '' if minha else 'required' }}></div>
-    <details class="pequeno"><summary>Como criar a senha de app</summary>
+    {% if pode('email.outro_dominio') %}
+    <div class="servidor-proprio">
+      <p class="pequeno suave" style="margin:0 0 8px">Copie estes dados do painel do seu provedor de e-mail (procure por "configurar no Outlook" ou "SMTP/IMAP").</p>
+      <div class="duas"><div class="campo"><label>Servidor de envio (SMTP)</label><input type="text" name="smtp_host" value="{{ minha.smtp_host if outro_provedor else '' }}" placeholder="smtp.suaempresa.com.br"></div>
+        <div class="campo"><label>Porta</label><input type="text" name="smtp_porta" inputmode="numeric" value="{{ minha.smtp_porta if outro_provedor else 587 }}"></div></div>
+      <div class="duas"><div class="campo"><label>Servidor de leitura (IMAP)</label><input type="text" name="imap_host" value="{{ minha.imap_host if outro_provedor else '' }}" placeholder="imap.suaempresa.com.br"></div>
+        <div class="campo"><label>Porta</label><input type="text" name="imap_porta" inputmode="numeric" value="{{ minha.imap_porta if outro_provedor else 993 }}"></div></div>
+      <p class="pequeno suave" style="margin:0">Microsoft 365: envio <b>smtp.office365.com</b> porta 587, leitura <b>outlook.office365.com</b> porta 993. Hostinger: <b>smtp.hostinger.com</b> 465 e <b>imap.hostinger.com</b> 993.</p>
+    </div>
+    {% endif %}
+    <div class="campo"><label><span class="so-google">Senha de app do Google (16 letras)</span><span class="servidor-proprio" style="border:0;padding:0">Senha do e-mail</span>{% if minha %} — deixe vazio para manter{% endif %}</label>
+      <input type="password" name="senha" autocomplete="new-password" placeholder="{{ '••••••••' if outro_provedor else 'abcd efgh ijkl mnop' }}" {{ '' if minha else 'required' }}></div>
+    <details class="pequeno so-google"><summary>Como criar a senha de app</summary>
       <ol style="padding-left:18px;margin:6px 0">
         <li>Entre no seu e-mail @{{ dominio }} no navegador.</li>
         <li>Abra <b>myaccount.google.com/apppasswords</b> (a verificação em 2 etapas do Google precisa estar ligada).</li>
@@ -43,6 +64,15 @@
     {% if c and c.ultimo_erro %}<div class="aviso aviso-erro" style="margin:0">{{ c.ultimo_erro }}</div>{% endif %}
     <div class="grupo-btn"><button class="btn btn-primario btn-pequeno">Salvar</button></div>
   </form>
+  {% if pode('email.outro_dominio') %}
+  <script>
+    (function () {
+      var escolha = document.getElementById("provedor-email"), cartao = document.getElementById("form-meu-email");
+      if (!escolha) return;
+      escolha.addEventListener("change", function () { cartao.classList.toggle("outro", escolha.value === "outro"); });
+    })();
+  </script>
+  {% endif %}
   {% if minha %}
   <div class="cartao conta">
     <b>Ações</b>
@@ -61,6 +91,16 @@
   {% endif %}
 </div>
 
+{% if dns %}
+<div class="cartao" style="margin-bottom:22px"><h2>O domínio {{ dominio_minha }} está pronto para não cair no spam?</h2>
+  <p class="suave">Provedor de e-mail: <b>{{ dns.provedor }}</b></p>
+  <table>{% for nome, ok, detalhe, como in dns.itens %}
+    <tr><td style="width:90px"><b>{{ nome }}</b></td><td style="width:120px"><span class="selo {{ 'selo-ok' if ok else 'selo-erro' }}">{{ 'OK' if ok else 'Falta configurar' }}</span></td>
+      <td class="pequeno" style="overflow-wrap:anywhere">{{ detalhe }}{% if not ok %}<div style="margin-top:4px"><b>Como resolver:</b> {{ como }}</div>{% endif %}</td></tr>{% endfor %}</table>
+  <p class="ajuda">Sem SPF, DKIM e DMARC, o Gmail e o Outlook mandam os e-mails de prospecção para o spam. Quem cuida do domínio da sua empresa (registro.br, Cloudflare, o provedor de e-mail...) faz isso em poucos minutos. Comece com poucos e-mails por dia: os limites de envio da MS valem para todas as contas juntas.</p>
+</div>
+{% endif %}
+
 {% set outras = contas|rejectattr('minha')|list %}
 {% if outras %}
 <h2 style="margin:4px 0 10px"><span class="etiqueta">{{ 'Todas as contas' if (pode('email.compartilhar_todas') or pode('email.gerenciar_todas')) else 'Compartilhadas comigo' }}</span></h2>
@@ -69,7 +109,7 @@
   <div class="cartao conta">
     <div class="topo-conta"><div class="icone-conta" style="{{ 'background:var(--verde)' if conta.principal }}">{{ icone }}</div>
       <div class="titulo"><b>{{ conta.nome }}</b>
-        <span class="pequeno suave">{{ conta.endereco or 'ainda não configurado' }} · {{ 'principal da MS' if conta.principal else 'de ' ~ (conta.dono or '—') }}</span></div>
+        <span class="pequeno suave">{{ conta.endereco or 'ainda não configurado' }} · {{ 'principal da MS' if conta.principal else 'de ' ~ (conta.dono or '—') }}{% if conta.dominio_livre %} · domínio próprio{% endif %}</span></div>
       <span class="selo {{ 'selo-ok' if conta.ativa else 'selo-alerta' }}">{{ 'Ligada' if conta.ativa else ('Pausada' if not conta.principal else 'Não configurado') }}</span></div>
     <div class="pequeno suave">{% if conta.compartilhada_todos %}Liberada para toda a equipe{% elif conta.compartilhada_com %}Liberada para {{ conta.compartilhada_com|length }} pessoa(s){% else %}Não compartilhada{% endif %}
       {% if conta.le_respostas %} · a IA lê as respostas desta caixa{% endif %}{% if conta.usar %} · você pode usar{% endif %}</div>
