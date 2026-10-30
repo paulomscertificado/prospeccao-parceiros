@@ -23,7 +23,7 @@ from . import config
 PASSO_SEG = 30
 DIGITOS = 6
 PERFIS_OBRIGADOS = ("admin", "gestor")
-EMISSOR = "MS Prospecção"
+EMISSOR = "MS Prospeccao"  # sem acento: alguns apps autenticadores erram com acentos no QR
 COOKIE_APARELHO = "ms_aparelho"
 DIAS_APARELHO = 30
 _LETRAS_RECUPERACAO = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # sem 0/O e 1/I, que se confundem
@@ -71,7 +71,9 @@ def link_do_app(segredo: str, email: str) -> str:
 def qr_svg(texto: str) -> str:
     import segno
 
-    return segno.make(texto, error="m").svg_inline(scale=5, border=2, dark="#0b2545", light="#ffffff")
+    # omitsize: o SVG leva viewBox e encolhe/estica inteiro na tela (com width/height fixos, o CSS cortava o código);
+    # borda de 4 módulos e preto puro: o mínimo que os apps de autenticação leem com folga
+    return segno.make(texto, error="m").svg_inline(scale=5, border=4, dark="#000000", light="#ffffff", omitsize=True)
 
 
 def segredo_em_grupos(segredo: str) -> str:

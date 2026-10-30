@@ -310,7 +310,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid rgba(60, 199, 122
 .link-botao { background: none; border: 0; padding: 0; font: inherit; color: var(--azul); text-decoration: underline; cursor: pointer; }
 .login .conteiner.largo, .login .conteiner.largo .cartao { max-width: 460px; }
 .qr-2fa { display: flex; justify-content: center; margin: 10px 0 6px; }
-.qr-2fa svg { width: 200px; height: 200px; }
+.qr-2fa svg { width: 240px; max-width: 100%; height: auto; background: #fff; }
 .chave-2fa { font-family: ui-monospace, Consolas, monospace; font-size: .95rem; letter-spacing: .04em; background: var(--azul-claro);
   border-radius: 6px; padding: 8px 10px; text-align: center; word-break: break-all; }
 .passos-2fa { padding-left: 20px; margin: 8px 0 14px; }
