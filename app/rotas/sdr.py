@@ -333,6 +333,7 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(exige("c
     return tela(request, "campanha.html", {
         "testaveis": [{"id": t.id, "nome": t.nome, **contagem[t.id]} for t in testaveis],
         "so_fixo": so_fixo,
+        "emails_invalidos": campanhas.emails_invalidos(db, camp),
         "andamento": campanhas.andamento(db, camp) if camp.status not in ("gerando", "erro") else [],
         "whatsapp_hoje": whatsapp_hoje, "numero_whatsapp": numero, "sem_numero": sem_numero,
         "disparar": {k: len(v) for k, v in campanhas.para_disparar(db, camp).items()},
@@ -441,6 +442,27 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
             avisar(request, f"WhatsApp de {lead.empresa} salvo. As mensagens da campanha vão para este número.")
         db.commit()
         return voltar(f"/campanhas/{cid}#ligacoes")
+    elif acao == "corrigir-email":
+        lead = db.get(Lead, util.para_int(form.get("lead_id")) or 0)
+        if not lead or not db.execute(select(Tarefa.id).where(Tarefa.campanha_id == cid, Tarefa.lead_id == lead.id)).first():
+            avisar(request, "Empresa não encontrada nesta campanha.", "erro")
+        else:
+            try:
+                r = campanhas.corrigir_email(db, camp, lead, str(form.get("email", "")), usuario)
+            except ValueError as erro:
+                texto = str(erro)
+                avisar(request, f"{lead.empresa}: {texto[:1].upper()}{texto[1:]}.", "erro")
+            else:
+                partes = []
+                if r["reenvio"]:
+                    partes.append("o e-mail que tinha voltado será reenviado hoje")
+                if r["reativados"]:
+                    partes.append(f"{r['reativados']} envio(s) parado(s) voltaram para o cronograma")
+                resumo = "; ".join(partes)
+                avisar(request, f"E-mail de {lead.empresa} corrigido." + (f" {resumo[:1].upper()}{resumo[1:]}."
+                                                                          if resumo else ""))
+        db.commit()
+        return voltar(f"/campanhas/{cid}#emails-invalidos")
     elif acao == "testar":
         alvo = _campanha(db, util.para_int(form.get("campanha_teste")) or cid, usuario)
         canal = "whatsapp" if form.get("canal_teste") == "whatsapp" else "email"

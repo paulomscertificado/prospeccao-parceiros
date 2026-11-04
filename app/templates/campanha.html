@@ -185,6 +185,30 @@
 </details>
 {% endif %}
 
+{% if emails_invalidos %}
+<details class="cartao" id="emails-invalidos" open>
+  <summary><h2 style="display:inline">✉️ E-mails que não existem: {{ emails_invalidos|length }} empresa{{ 's' if emails_invalidos|length > 1 }}</h2></summary>
+  <p class="pequeno suave">O e-mail destas empresas voltou ("Endereço não encontrado") ou o domínio não existe, então os
+    e-mails da campanha para elas foram parados. Pesquise o e-mail certo (site, Google, Instagram) e salve aqui: a empresa
+    volta para o cronograma e, se o e-mail tinha voltado, ele é reenviado hoje para o endereço novo.</p>
+  <div class="tabela-rolagem"><table>
+    <tr><th>Empresa</th><th>E-mail que não existe</th><th>Pesquisar</th><th>E-mail certo</th></tr>
+    {% for item in emails_invalidos %}{% set l = item.lead %}<tr>
+      <td><a href="/leads/{{ l.id }}">{{ l.empresa }}</a><div class="pequeno suave">{{ l.cidade }}{% if l.telefone %} · {{ l.telefone|telefone }}{% endif %}</div></td>
+      <td><s>{{ l.email }}</s><div class="pequeno suave">{{ l.email_motivo }}{% if item.toques_parados %} · {{ item.toques_parados }} envio(s) parado(s){% endif %}</div></td>
+      <td>{% if l.site %}<a class="btn btn-pequeno" target="_blank" rel="noopener" href="{{ l.site if l.site.startswith('http') else 'https://' ~ l.site }}">Site</a>{% endif %}
+        <a class="btn btn-pequeno" target="_blank" rel="noopener" href="https://www.google.com/search?q={{ (l.empresa ~ ' ' ~ (l.cidade or '') ~ ' email contato')|urlencode }}">Google</a>
+        <a class="btn btn-pequeno" target="_blank" rel="noopener" href="https://www.google.com/search?q={{ (l.empresa ~ ' ' ~ (l.cidade or '') ~ ' instagram')|urlencode }}">Instagram</a></td>
+      <td>{% if pode_gerenciar %}<form class="inline" method="post" action="/campanhas/{{ c.id }}/corrigir-email"><input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="lead_id" value="{{ l.id }}">
+          <input type="email" name="email" required placeholder="contato@escritorio.com.br" style="width:210px">
+          <button class="btn btn-pequeno btn-verde">{{ 'Salvar e reenviar' if item.foi_devolvido else 'Salvar' }}</button></form>
+        {% else %}<span class="pequeno suave">Peça a quem cuida da campanha</span>{% endif %}</td>
+    </tr>{% endfor %}
+  </table></div>
+</details>
+{% endif %}
+
 {% if andamento %}
 <div class="cartao" id="andamento">
   <h2>Andamento por empresa <a class="btn btn-pequeno" href="/envios?campanha={{ c.id }}&periodo=90d">Ver todos os envios</a></h2>

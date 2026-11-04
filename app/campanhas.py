@@ -996,3 +996,89 @@ def conferir_emails(db, camp: Campanha, maximo: int = 400) -> dict:
                     t.status, t.concluida_em, t.resultado = "cancelada", agora(),                         f"E-mail não existe: {lead.email_motivo}"[:500]
             feito["toques_cancelados"] += antes
     return feito
+
+
+
+# ---------------------------------------------------------------- E-mails que não existem: corrigir e reenviar
+
+_CANCELADO_POR_EMAIL = ("E-mail não existe", "E-mail não saiu")
+
+
+def emails_invalidos(db, camp: Campanha) -> list[dict]:
+    """Empresas desta campanha com e-mail marcado como inexistente, para o time pesquisar o endereço certo.
+    [{"lead", "toques_parados", "foi_devolvido"}]"""
+    ids = {i for (i,) in db.execute(select(Tarefa.lead_id).where(Tarefa.campanha_id == camp.id,
+                                                                  Tarefa.lead_id.is_not(None)))}
+    if not ids:
+        return []
+    itens = []
+    leads = db.execute(select(Lead).where(Lead.id.in_(ids), Lead.email_invalido.is_(True), Lead.opt_out.is_(False))
+                       .order_by(Lead.empresa)).scalars()
+    for lead in leads:
+        if (lead.email_conferido or "") != lead.email:
+            continue  # já corrigido: a marca antiga não vale
+        parados = db.execute(select(func.count()).select_from(Tarefa).where(
+            Tarefa.campanha_id == camp.id, Tarefa.lead_id == lead.id, Tarefa.canal == "email",
+            Tarefa.status == "cancelada", Tarefa.resultado.like("E-mail n%"))).scalar()
+        itens.append({"lead": lead, "toques_parados": parados, "foi_devolvido": _foi_devolvido(lead)})
+    return itens
+
+
+def _foi_devolvido(lead: Lead) -> bool:
+    """O e-mail chegou a sair e voltou (devolução ou recusa do servidor), em vez de ser barrado antes."""
+    return bool(re.search(r"devolvido|recusou", lead.email_motivo or ""))
+
+
+def corrigir_email(db, camp: Campanha, lead: Lead, novo: str, usuario: Usuario) -> dict:
+    """Troca o e-mail do lead, tira a marca de inexistente e põe a empresa de volta no cronograma da campanha:
+    os toques de e-mail parados voltam (datas empurradas para hoje em diante, mantendo o intervalo entre eles) e,
+    se o e-mail tinha voltado, o último toque é reenviado hoje. Lança ValueError com o motivo se o endereço novo
+    não serve. Devolve {"reativados", "reenvio"}."""
+    from .leads_servico import limpar_campos
+
+    novo = (novo or "").strip().lower()
+    if not email_validacao.formato_valido(novo):
+        raise ValueError("o e-mail está escrito errado. Confira e tente de novo (ex.: contato@escritorio.com.br)")
+    if novo == (lead.email or "").lower():
+        raise ValueError("é o mesmo e-mail que não existe. Pesquise o endereço certo da empresa")
+    ok, motivo = email_validacao.conferir(novo)
+    if ok is False:
+        raise ValueError(motivo)
+    antigo, devolvido = lead.email, _foi_devolvido(lead)
+    lead.email = novo
+    limpar_campos(lead)
+    lead.email_invalido, lead.email_motivo, lead.email_conferido = False, "", lead.email
+    lead.email_verificado_em = agora() if ok else None
+    historico(db, lead.id, "contato", f"E-mail corrigido pelo time: {antigo} → {lead.email}. "
+                                      "A empresa voltou para o cronograma da campanha.", usuario, "email")
+
+    feito = {"reativados": 0, "reenvio": False}
+    if camp.status not in ("aguardando_aprovacao", "ativa", "pausada"):
+        return feito  # campanha encerrada/cancelada: só corrige o cadastro
+    novo_status = "rascunho" if camp.status == "aguardando_aprovacao" else "pendente"
+    parados = db.execute(select(Tarefa).where(
+        Tarefa.campanha_id == camp.id, Tarefa.lead_id == lead.id, Tarefa.canal == "email",
+        Tarefa.status == "cancelada").order_by(Tarefa.data, Tarefa.id)).scalars().all()
+    parados = [t for t in parados if (t.resultado or "").startswith(_CANCELADO_POR_EMAIL)]
+    hoje = date.today()
+    if parados and novo_status == "pendente" and parados[0].data < hoje:
+        atraso = hoje - parados[0].data  # empurra todos juntos: o intervalo entre os toques continua igual
+        for t in parados:
+            t.data = t.data + atraso
+    for t in parados:
+        t.status, t.concluida_em, t.resultado = novo_status, None, ""
+        feito["reativados"] += 1
+
+    if devolvido and novo_status == "pendente":
+        ultimo = db.execute(select(Tarefa).where(
+            Tarefa.campanha_id == camp.id, Tarefa.lead_id == lead.id, Tarefa.canal == "email",
+            Tarefa.status == "feita").order_by(Tarefa.concluida_em.desc(), Tarefa.id.desc())).scalars().first()
+        if ultimo:
+            db.add(Tarefa(tipo=ultimo.tipo, lead_id=lead.id, campanha_id=camp.id, passo_id=ultimo.passo_id,
+                          usuario_id=ultimo.usuario_id, canal="email", data=hoje, hora=ultimo.hora or "09:00",
+                          acao=f"Reenvio para o e-mail corrigido ({ultimo.acao})"[:250], assunto=ultimo.assunto,
+                          mensagem=ultimo.mensagem, mensagem_whatsapp=ultimo.mensagem_whatsapp,
+                          mensagem_email=ultimo.mensagem_email, assunto_email=ultimo.assunto_email,
+                          angulo=ultimo.angulo, status="pendente"))
+            feito["reenvio"] = True
+    return feito
