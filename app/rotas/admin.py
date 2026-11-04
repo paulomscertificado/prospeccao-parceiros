@@ -57,6 +57,7 @@ def _papeis(db: Session) -> list[Papel]:
 
 @rotas.get("/configuracoes")
 def configuracoes(request: Request, aba: str = "geral", usuario: Usuario = Depends(exige("configuracoes.ver")), db: Session = Depends(obter_db)):
+    wl = whatsapp_leads.status(False)  # uma consulta só (antes eram duas a cada abertura da tela)
     return tela(request, "configuracoes.html", {
         "aba": aba, "campos": [(c, n, t, ler_config(db, c)) for c, n, t in CAMPOS_GERAIS],
         "criterios": score.CRITERIOS, "pesos": score.pesos(db), "faixas": score.faixas(db),
@@ -66,9 +67,9 @@ def configuracoes(request: Request, aba: str = "geral", usuario: Usuario = Depen
         "logs": db.execute(select(LogAuditoria).order_by(LogAuditoria.id.desc()).limit(300)).scalars().all() if aba == "logs" else [],
         "integracoes": [
             ("IA (Claude)", ia.disponivel(), f"Modelo: {config.IA_MODELO}" if ia.disponivel() else "ANTHROPIC_API_KEY no .env"),
-            ("WhatsApp conectado (WhatsApp Leads)", whatsapp_leads.status(False).get("conectado", False),
-             (lambda s: f"{s.get('estado', '')} · {s.get('enviadas_hoje', 0)} de {s.get('limite_diario', 0)} hoje"
-              if s.get("disponivel") else s.get("erro", ""))(whatsapp_leads.status(False))),
+            ("WhatsApp conectado (WhatsApp Leads)", wl.get("conectado", False),
+             f"{wl.get('estado', '')} · {wl.get('enviadas_hoje', 0)} de {wl.get('limite_diario', 0)} hoje"
+             if wl.get("disponivel") else wl.get("erro", "")),
             ("WhatsApp Cloud API (oficial)", whatsapp_cloud.configurado(), "WHATSAPP_TOKEN e WHATSAPP_PHONE_NUMBER_ID no .env"),
             ("E-mail (SMTP)", email_smtp.configurado(), "SMTP_HOST, SMTP_USUARIO, SMTP_SENHA e SMTP_REMETENTE no .env"),
             ("Respostas por e-mail (IMAP)", email_imap.configurado(), "IMAP_HOST, IMAP_USUARIO e IMAP_SENHA no .env"),

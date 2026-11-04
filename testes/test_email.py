@@ -112,6 +112,7 @@ def test_descadastro_em_um_clique(cliente, monkeypatch):
 
 
 def test_verificacao_do_dns(monkeypatch):
+    monkeypatch.setattr(dns_email, "_cache_verificacao", {})  # resultado guardado por outro teste não vale aqui
     respostas = {
         ("mscertificados.com.br", "MX"): [{"type": 15, "data": "1 aspmx.l.google.com."}],
         ("mscertificados.com.br", "TXT"): [{"type": 16, "data": "v=spf1 include:_spf.google.com ~all"}],

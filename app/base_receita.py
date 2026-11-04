@@ -369,16 +369,28 @@ def ajustar_base_antiga(db) -> None:
 # ---------------------------------------------------------------- Consultas
 
 def resumo(db) -> dict:
-    try:
-        total = db.execute(select(func.count()).select_from(EmpresaReceita)).scalar() or 0
-    except Exception:  # noqa: BLE001 - tabela ainda não criada
-        total = 0
+    """Total de empresas da base. Usa o número gravado na importação: contar a tabela inteira (COUNT) no banco da
+    nuvem leva segundos e deixava a tela Configurações lenta a cada abertura."""
+    gravado = ler_config(db, "receita_total")
+    if gravado.isdigit() and int(gravado) > 0:
+        total = int(gravado) if disponivel(db) else 0
+    else:
+        try:
+            total = db.execute(select(func.count()).select_from(EmpresaReceita)).scalar() or 0
+            if total:
+                gravar_config(db, "receita_total", str(total))  # conta uma vez só; as próximas aberturas usam este
+        except Exception:  # noqa: BLE001 - tabela ainda não criada
+            total = 0
     return {"total": total, "atualizada_em": ler_config(db, "receita_atualizada_em"),
             "status": ler_config(db, "receita_status")}
 
 
 def disponivel(db) -> bool:
-    return resumo(db)["total"] > 0
+    """Tem alguma empresa na base? (olha só a primeira linha: instantâneo, mesmo com milhões de linhas)"""
+    try:
+        return db.execute(select(EmpresaReceita.cnpj_basico).limit(1)).first() is not None
+    except Exception:  # noqa: BLE001 - tabela ainda não criada
+        return False
 
 
 def contar(db, uf: str = "", cidade: str = "") -> dict[str, int]:

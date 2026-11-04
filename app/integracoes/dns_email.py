@@ -35,7 +35,24 @@ def _provedor(mx: list[str]) -> str:
     return ""
 
 
+_cache_verificacao: dict[str, tuple[float, dict]] = {}
+MINUTOS_CACHE = 10
+
+
 def verificar(dominio: str) -> dict:
+    """Igual a _verificar, guardando o resultado por 10 minutos: a aba E-mail faz várias consultas de DNS pela
+    internet e abria devagar toda vez."""
+    import time
+
+    guardado = _cache_verificacao.get(dominio)
+    if guardado and time.monotonic() - guardado[0] < MINUTOS_CACHE * 60:
+        return guardado[1]
+    resultado = _verificar(dominio)
+    _cache_verificacao[dominio] = (time.monotonic(), resultado)
+    return resultado
+
+
+def _verificar(dominio: str) -> dict:
     """{"provedor", "google", "itens": [(nome, ok, detalhe, como_resolver)]}. Funciona para o domínio da MS e para
     o domínio próprio de um gestor (Google Workspace, Microsoft 365 ou outro provedor)."""
     mx = _mx(dominio)
