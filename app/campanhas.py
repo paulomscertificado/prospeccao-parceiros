@@ -14,7 +14,7 @@ from datetime import date, datetime, timedelta
 
 from sqlalchemy import func, select
 
-from . import base_receita, cadencias, config, contas_email, ia, mensagens, prospeccao, sdr, trabalhos, util
+from . import base_receita, cadencias, config, contas_email, email_validacao, ia, mensagens, prospeccao, sdr, trabalhos, util
 from .banco import agora, gravar_config, ler_config, ler_config_int, sessao
 from .leads_servico import criar_lead, historico, mudar_status, registrar_contato
 from .modelos import Cadencia, Campanha, Categoria, Lead, Tarefa, Usuario
@@ -161,7 +161,8 @@ def celular_do_lead(lead: Lead) -> str:
 
 
 def tem_canal(lead: Lead, canais: list[str]) -> bool:
-    return any({"whatsapp": lead.whatsapp, "email": lead.email, "linkedin": lead.linkedin}.get(c) for c in canais or ["whatsapp", "email"])
+    email = lead.email and not lead.email_invalido  # e-mail que não existe não conta como canal
+    return any({"whatsapp": lead.whatsapp, "email": email, "linkedin": lead.linkedin}.get(c) for c in canais or ["whatsapp", "email"])
 
 
 def _buscar_candidatos(campanha_id: int) -> list[int]:
@@ -204,6 +205,8 @@ def _buscar_candidatos(campanha_id: int) -> list[int]:
                         lead.categoria = cats[cod]
                     if "whatsapp" in canais and not lead.whatsapp:
                         lead.whatsapp = celular_do_lead(lead)
+                    if "email" in canais and lead.email:
+                        email_validacao.utilizavel(db, lead)  # domínio sem e-mail: já entra sem esse canal
                     if not tem_canal(lead, canais):
                         if not lead.telefone:
                             continue  # sem nenhum contato: não dá nem para pesquisar
@@ -685,6 +688,10 @@ def _enviar_email_da_tarefa(db, t: Tarefa, usuario: Usuario | None, resultado: s
     from .integracoes import email_smtp
 
     lead = t.lead
+    if not email_validacao.utilizavel(db, lead):
+        t.status, t.concluida_em = "cancelada", agora()
+        t.resultado = f"E-mail não existe: {lead.email_motivo or 'endereço inválido'}"[:500]
+        return DESTINATARIO_RECUSADO
     if conta is None:
         try:
             conta = conta_do_toque(db, t, usuario)
@@ -702,6 +709,7 @@ def _enviar_email_da_tarefa(db, t: Tarefa, usuario: Usuario | None, resultado: s
                                     angulo=t.angulo, categoria_id=lead.categoria_id)
         falha.conexao = contas_email.chave(conta)
         if do_lead:
+            email_validacao.marcar_invalido(db, lead, f"o servidor recusou o endereço ({str(erro)[:120]})", usuario)
             t.status, t.concluida_em, t.resultado = "cancelada", agora(), f"E-mail não saiu: {str(erro)[:200]}"
             historico(db, lead.id, "sistema", f"E-mail recusado: {erro} Confira o endereço do lead.", usuario, "email")
             return DESTINATARIO_RECUSADO
@@ -966,3 +974,25 @@ def finalizar_cadencias(db) -> int:
         if not pendentes and camp.aprovado_em:
             camp.status = "concluida"
     return total
+
+
+def conferir_emails(db, camp: Campanha, maximo: int = 400) -> dict:
+    """Confere os e-mails dos leads da campanha que ainda têm toque de e-mail pendente (domínio que não recebe
+    e-mail ou endereço mal escrito) e tira os inválidos. Devolve {"conferidos", "invalidos", "toques_cancelados"}."""
+    ids = list(dict.fromkeys(i for (i,) in db.execute(select(Tarefa.lead_id).where(
+        Tarefa.campanha_id == camp.id, Tarefa.canal == "email", Tarefa.status.in_(["pendente", "rascunho"]),
+        Tarefa.lead_id.is_not(None)))))[:maximo]
+    feito = {"conferidos": 0, "invalidos": 0, "toques_cancelados": 0}
+    for lead in db.execute(select(Lead).where(Lead.id.in_(ids))).scalars():
+        feito["conferidos"] += 1
+        antes = db.execute(select(func.count()).select_from(Tarefa).where(
+            Tarefa.lead_id == lead.id, Tarefa.canal == "email", Tarefa.status.in_(["pendente", "rascunho"]))).scalar()
+        lead.email_verificado_em = None  # confere de novo agora, mesmo que já tenha sido conferido
+        if not email_validacao.utilizavel(db, lead):
+            feito["invalidos"] += 1
+            if lead.email_invalido:
+                for t in db.execute(select(Tarefa).where(Tarefa.lead_id == lead.id, Tarefa.canal == "email",
+                                                         Tarefa.status.in_(["pendente", "rascunho"]))).scalars():
+                    t.status, t.concluida_em, t.resultado = "cancelada", agora(),                         f"E-mail não existe: {lead.email_motivo}"[:500]
+            feito["toques_cancelados"] += antes
+    return feito

@@ -199,7 +199,8 @@
     <h2>Contatos</h2>
     <p>{% if lead.whatsapp %}WhatsApp: <a href="{{ lead.whatsapp|whats }}" target="_blank" rel="noopener">{{ lead.whatsapp }}</a><br>{% endif %}
        {% if lead.telefone %}Telefone: <a href="tel:{{ lead.telefone }}">{{ lead.telefone }}</a><br>{% endif %}
-       {% if lead.email %}E-mail: {{ lead.email }}<br>{% endif %}
+       {% if lead.email %}E-mail: {{ lead.email }}{% if lead.email_invalido and lead.email_conferido == lead.email %} <span class="selo selo-erro" title="{{ lead.email_motivo }}">não existe</span>{% endif %}<br>
+       {% if lead.email_invalido and lead.email_conferido == lead.email %}<small class="suave">{{ lead.email_motivo }}. Corrija o endereço em Editar para voltar a enviar.</small><br>{% endif %}{% endif %}
        {% if lead.site %}Site: <a href="{{ lead.site }}" target="_blank" rel="noopener">{{ lead.site }}</a><br>{% endif %}
        {% if lead.instagram %}Instagram: <a href="{{ lead.instagram|insta }}" target="_blank" rel="noopener">{{ lead.instagram }}</a><br>{% endif %}
        {% if lead.linkedin %}LinkedIn: <a href="{{ lead.linkedin }}" target="_blank" rel="noopener">abrir perfil</a><br>{% endif %}</p>

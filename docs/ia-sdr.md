@@ -169,6 +169,23 @@ bloqueado; o WhatsApp Leads conta do mesmo jeito. `mensagens.limite_do_numero(db
 próximo lead quando um número chega ao limite. Minha fila mostra o contador do número da pessoa; Envios, o do número
 que mais enviou.
 
+## E-mails que não existem (nov/2026)
+
+`app/email_validacao.py`. Campos novos em `leads`: `email_invalido`, `email_motivo`, `email_verificado_em`,
+`email_conferido` (endereço a que a marca se refere; editar o e-mail limpa a marca).
+
+- **Antes do envio** (`utilizavel`, chamado em `campanhas._buscar_candidatos` e `_enviar_email_da_tarefa`):
+  formato + MX via dns.google (NXDOMAIN, MX nulo "0 ." ou sem MX/A = inválido; erro de rede = não barra);
+  reconfere a cada 30 dias; cache por domínio no processo. `tem_canal` ignora e-mail inválido.
+- **Recusa do SMTP** (`ErroDestinatario`) também marca o lead.
+- **Devoluções** (`email_imap.ler_devolucoes` + `rotinas._ler_devolucoes`, a cada 5 min junto com as respostas):
+  identifica DSN (multipart/report, mailer-daemon/postmaster + assunto), extrai `Final-Recipient`/`X-Failed-Recipients`
+  ou o e-mail citado no texto e o Message-ID original; só devolução permanente (5.x.x ou texto "não encontrado",
+  "user unknown"...) marca. 1ª leitura por caixa: 60 dias (`devolucoes_lidas:<conta>` em config).
+- `marcar_invalido` cancela os toques de e-mail pendentes/rascunho e grava no histórico.
+- Botão **Conferir e-mails** na campanha (`POST /campanhas/{id}/conferir-emails`, `campanhas.conferir_emails`).
+- Testes: `testes/test_emails_inexistentes.py`; a variável `CONFERIR_DOMINIO_EMAIL=0` desliga o DNS nos testes.
+
 ## CNPJ inativo
 
 Se a BrasilAPI disser que o CNPJ não está ativo (baixada, inapta, suspensa), `leads_servico.cnpj_inativo` registra no

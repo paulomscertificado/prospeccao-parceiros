@@ -142,6 +142,38 @@ def ler_respostas(emails_de_leads: set[str], enviados: set[str] | None = None, j
     return achados
 
 
+def ler_devolucoes(desde: datetime, maximo: int = 200, conta=None) -> list[dict]:
+    """Mensagens de devolução ("Endereço não encontrado", "Undeliverable"...) desde a data. Não marca nada como lido.
+    [{"message_id", "destinatarios", "permanente", "motivo", "ids_originais"}] — ver app/email_validacao.py."""
+    from .. import arquivo_env, email_validacao
+
+    arquivo_env.carregar_do_banco(forcar=True)
+    servidor, porta, login, senha = _acesso(conta)
+    if not (servidor and login and senha):
+        return []
+    achados = []
+    try:
+        with imaplib.IMAP4_SSL(servidor, porta, timeout=30) as caixa:
+            caixa.login(login, senha)
+            caixa.select("INBOX", readonly=True)
+            _, dados = caixa.search(None, "SINCE", _data_imap(desde))
+            for num in dados[0].split()[-1500:]:
+                _, cab_bruto = caixa.fetch(num, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT MESSAGE-ID CONTENT-TYPE DATE)])")
+                cab = email.message_from_bytes(cab_bruto[0][1])
+                assunto = str(make_header(decode_header(cab.get("Subject", ""))))
+                if not email_validacao.parece_devolucao(cab.get("From", ""), assunto, cab.get("Content-Type", "")):
+                    continue
+                _, conteudo = caixa.fetch(num, "(BODY.PEEK[])")
+                analise = email_validacao.analisar_devolucao(email.message_from_bytes(conteudo[0][1]))
+                analise["message_id"] = id_da_mensagem(cab)
+                achados.append(analise)
+                if len(achados) >= maximo:
+                    break
+    except (imaplib.IMAP4.error, OSError) as erro:
+        log.warning("Leitura das devoluções falhou (%s): %s", login, erro)
+    return achados
+
+
 def testar(conta=None) -> str:
     """Entra na caixa e conta os e-mails não lidos. Devolve um texto para a tela (ou lança ErroImap).
     conta: ContaEmail (None = a principal)."""

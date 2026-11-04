@@ -129,6 +129,23 @@ respostas dos parceiros chegam sozinhas na IA SDR. O rodapé do menu mostra se o
 Configure as categorias em Configurações > **Categorias de parceiros** e o que a IA pode responder em
 **Base de conhecimento**. Detalhes técnicos: [`docs/ia-sdr.md`](docs/ia-sdr.md).
 
+### E-mails que não existem
+
+Muitos e-mails da base da Receita estão desatualizados. O sistema tira esses endereços das campanhas sozinho:
+
+- **Antes de enviar**, confere se o domínio do e-mail existe e recebe e-mails (ex.: `jaci@jacicontabilpe.com.br`,
+  cujo domínio não existe). Esse e-mail nem sai.
+- **Depois de enviar**, a cada 5 minutos lê as mensagens de devolução que chegam na caixa ("Endereço não
+  encontrado", "Undeliverable", "Mail delivery failed"). O e-mail daquele lead é marcado como **não existe**.
+  Na primeira vez, ele também lê as devoluções dos últimos 60 dias que já estão na caixa.
+- Lead marcado: os próximos e-mails da campanha para ele são cancelados, e a ficha mostra o selo vermelho
+  **"não existe"** ao lado do e-mail. Se você corrigir o endereço em **Editar**, ele volta a receber.
+- "Caixa cheia" e outras recusas temporárias **não** tiram o e-mail.
+- Na página da campanha, o botão **Conferir e-mails** faz a conferência de todos de uma vez.
+
+Obs.: a conferência do domínio não descobre se uma caixa específica existe (ex.: `fulano@hotmail.com`). Isso
+só se sabe quando a devolução chega, e aí o sistema tira o e-mail sozinho.
+
 ## 5. Perfis de acesso
 
 | Perfil | Vê |

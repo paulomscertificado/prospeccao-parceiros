@@ -113,7 +113,53 @@ def ler_respostas_por_email() -> int:
             continue
         inicio = desde if conta.principal else max(desde, criada_em)  # conta nova: só o que chegou depois dela
         total += _ler_caixa(conta, emails, enviados, ja_processados, inicio)
+        try:
+            _ler_devolucoes(conta, enviados)
+        except Exception:  # noqa: BLE001 — devolução com problema não pode parar a leitura das respostas
+            log.exception("Erro ao ler as devoluções de e-mail")
     return total
+
+
+DIAS_DEVOLUCOES_1A_VEZ = 60  # na primeira leitura, pega também as devoluções antigas que já estão na caixa
+
+
+def _ler_devolucoes(conta, enviados: dict) -> int:
+    """"Endereço não encontrado" e afins → o e-mail do lead fica marcado como inexistente e sai da campanha."""
+    from datetime import datetime, timedelta
+
+    from sqlalchemy import func
+
+    from . import contas_email, email_validacao
+    from .banco import agora, gravar_config
+
+    marca = "devolucoes_lidas:" + contas_email.chave(conta)
+    with sessao() as db:
+        ja_leu = ler_config(db, marca)
+    desde = agora() - timedelta(days=email_imap.DIAS_DE_LEITURA if ja_leu else DIAS_DEVOLUCOES_1A_VEZ)
+    marcados = 0
+    for d in email_imap.ler_devolucoes(desde, conta=conta):
+        if not d["permanente"]:
+            continue  # caixa cheia, servidor ocupado: o próximo envio pode dar certo
+        with sessao() as db:
+            leads = []
+            if d["destinatarios"]:
+                leads = list(db.execute(select(Lead).where(
+                    func.lower(Lead.email).in_(d["destinatarios"]))).scalars())
+            if not leads:
+                ids = {enviados[i] for i in d["ids_originais"] if i in enviados}
+                leads = [lead for lead in (db.get(Lead, i) for i in ids) if lead]
+                if d["destinatarios"]:  # achou pelo e-mail enviado, mas o endereço citado é outro: não arrisca
+                    leads = [lead for lead in leads if lead.email.lower() in d["destinatarios"]]
+            for lead in leads:
+                if lead.email_invalido and (lead.email_conferido or "") == lead.email:
+                    continue
+                email_validacao.marcar_invalido(db, lead, d["motivo"])
+                marcados += 1
+    with sessao() as db:
+        gravar_config(db, marca, datetime.now().replace(microsecond=0).isoformat())
+    if marcados:
+        log.info("Devoluções: %s e-mails de leads marcados como inexistentes", marcados)
+    return marcados
 
 
 def _ler_caixa(conta, emails: set[str], enviados: dict, ja_processados: set[str], desde) -> int:

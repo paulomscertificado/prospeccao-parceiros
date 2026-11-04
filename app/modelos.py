@@ -270,6 +270,11 @@ class Lead(Base):
     telefone: Mapped[str] = mapped_column(String(30), default="")
     whatsapp: Mapped[str] = mapped_column(String(30), default="")
     email: Mapped[str] = mapped_column(String(160), default="")
+    # E-mail que não existe (domínio sem e-mail ou devolução "Endereço não encontrado"): ver app/email_validacao.py
+    email_invalido: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    email_motivo: Mapped[str] = mapped_column(String(200), default="")
+    email_verificado_em: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    email_conferido: Mapped[str] = mapped_column(String(160), default="")  # endereço a que a marca se refere
     site: Mapped[str] = mapped_column(String(200), default="")
     instagram: Mapped[str] = mapped_column(String(120), default="")
     linkedin: Mapped[str] = mapped_column(String(200), default="")

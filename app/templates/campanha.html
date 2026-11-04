@@ -155,6 +155,9 @@
     {% elif c.status == 'pausada' and pode_aprovar %}
     <form method="post" action="/campanhas/{{ c.id }}/retomar"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-primario">Retomar</button></form>
     {% endif %}
+    {% if c.status in ('aguardando_aprovacao', 'ativa', 'pausada') and 'email' in c.canais %}
+    <form method="post" action="/campanhas/{{ c.id }}/conferir-emails" title="Tira da campanha os e-mails de domínio que não existe ou mal escritos"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">Conferir e-mails</button></form>
+    {% endif %}
   </div>
 </div>
 

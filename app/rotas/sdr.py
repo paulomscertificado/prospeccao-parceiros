@@ -369,6 +369,19 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
         db.commit()
         avisar(request, "Campanha arquivada (veja em Arquivadas)." if camp.arquivada else "Campanha de volta à lista.")
         return voltar("/campanhas" if camp.arquivada else f"/campanhas/{cid}")
+    if acao == "conferir-emails":
+        r = campanhas.conferir_emails(db, camp)
+        registrar_log(db, usuario, "conferiu_emails_campanha", "campanha", cid,
+                      f"{r['invalidos']} de {r['conferidos']} inválidos", request)
+        db.commit()
+        if r["invalidos"]:
+            avisar(request, f"Conferi {r['conferidos']} e-mails: {r['invalidos']} não existem (domínio sem e-mail ou "
+                            f"endereço mal escrito) e saíram da campanha ({r['toques_cancelados']} envios cancelados). "
+                            "As devoluções \"Endereço não encontrado\" também tiram o e-mail sozinhas.")
+        else:
+            avisar(request, f"Conferi {r['conferidos']} e-mails: nenhum com domínio inexistente. Endereços que só "
+                            "falham na entrega (caixa que não existe) saem sozinhos quando a devolução chega.")
+        return voltar(f"/campanhas/{cid}")
     if acao == "aprovar" and camp.status == "aguardando_aprovacao":
         n = campanhas.aprovar(db, camp, usuario)
         registrar_log(db, usuario, "aprovou_campanha", "campanha", cid, f"{n} tarefas", request)
