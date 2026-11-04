@@ -150,6 +150,9 @@ def mudar_status(db: Session, lead: Lead, novo: str, usuario: Usuario | None, mo
                 setattr(lead, campo, agora())
     if novo in config.STATUS_PERDIDO:
         lead.motivo_perda = motivo or novo
+    from . import reservas
+
+    reservas.renovar_por_status(lead)  # mexeu no lead: os 60 dias da reserva recomeçam
     texto = f"Status: {anterior} → {novo}" + (f" ({motivo})" if motivo else "")
     historico(db, lead.id, "status", texto, usuario)
     # Respondeu, avançou ou foi encerrado: as tentativas automáticas da cadência param.

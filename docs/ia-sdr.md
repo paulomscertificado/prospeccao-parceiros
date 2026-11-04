@@ -169,6 +169,23 @@ bloqueado; o WhatsApp Leads conta do mesmo jeito. `mensagens.limite_do_numero(db
 próximo lead quando um número chega ao limite. Minha fila mostra o contador do número da pessoa; Envios, o do número
 que mais enviou.
 
+## Reserva do lead por usuário (nov/2026)
+
+`app/reservas.py`. Campos em `leads`: `reservado_por_id`, `reservado_em`, `reservado_ate`.
+
+- `campanhas._montar` reserva cada empresa para o dono da campanha (`reservar`, 60 dias).
+- `campanhas._buscar_candidatos` pula empresa com reserva ativa de outro usuário (`de_outro`).
+  `_leads_em_outras_campanhas` agora só barra empresa com toque pendente/rascunho em campanha em andamento
+  (antes barrava para sempre qualquer empresa que já esteve em campanha).
+- `leads_servico.mudar_status` chama `renovar_por_status` (os 60 dias recomeçam).
+- Rotina de hora em hora (`rotinas.rodada`): `preencher_reservas_antigas` (uma vez, flag `reservas_preenchidas`)
+  e `liberar_vencidas` (adia 1 dia se ainda há campanha em andamento com toque pendente).
+- `liberar`: cancela toques de prospecção pendentes/rascunho, tira o vendedor se era o dono da reserva e volta o
+  status para Novo se a empresa nunca respondeu (Novo/Pesquisando/Abordagem criada/Contatado/Aguardando resposta
+  ou Perdido por "Sem resposta"), sem mexer em opt-out.
+- Ficha do lead: selo + `POST /leads/{id}/liberar` (dono da reserva ou quem vê todos os leads).
+- Testes: `testes/test_reservas.py`.
+
 ## Quem assina e envia a campanha (nov/2026)
 
 - `campanhas._mensagens` gera os textos com o **dono da campanha** (`camp.usuario_id`), não com o vendedor da ficha.

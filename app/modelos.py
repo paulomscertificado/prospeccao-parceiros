@@ -300,6 +300,10 @@ class Lead(Base):
     classificacao_resposta: Mapped[str] = mapped_column(String(40), default="")
     automacao_pausada: Mapped[bool] = mapped_column(Boolean, default=False)
     humano_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"), nullable=True)
+    # Reserva: empresa travada com quem fez a campanha por 60 dias (ver app/reservas.py)
+    reservado_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"), nullable=True, index=True)
+    reservado_em: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    reservado_ate: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
     assumido_em: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # Critérios marcados pelo vendedor (entram no score)
     equipe_comercial: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -346,6 +350,7 @@ class Lead(Base):
 
     vendedor: Mapped["Usuario | None"] = relationship(foreign_keys=[vendedor_id])
     humano: Mapped["Usuario | None"] = relationship(foreign_keys=[humano_id])
+    reservado_por: Mapped["Usuario | None"] = relationship(foreign_keys=[reservado_por_id])
     categoria: Mapped["Categoria | None"] = relationship()
 
     @property

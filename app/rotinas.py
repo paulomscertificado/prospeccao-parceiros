@@ -247,5 +247,12 @@ def rodada(numero: int | None) -> None:
             with sessao() as db:
                 processar_vencimentos(db)
                 campanhas.finalizar_cadencias(db)
+            from . import reservas
+
+            with sessao() as db:
+                reservas.preencher_reservas_antigas(db)  # só na primeira vez
+                liberadas = reservas.liberar_vencidas(db)
+                if liberadas:
+                    log.info("Reservas: %s empresas voltaram para a base (60 dias sem mudança)", liberadas)
         except Exception:  # noqa: BLE001
             log.exception("Erro na rotina de hora em hora")

@@ -10,6 +10,8 @@
       {% if lead.fit %}<span class="selo {{ lead.fit|selo }}">{{ lead.fit }}</span>{% endif %}
       {% if lead.categoria %} · {{ lead.categoria.nome }}{% endif %}
       {% if lead.opt_out %}<span class="selo selo-erro">Opt-out em {{ lead.opt_out_em|data }}</span>{% endif %}
+      {% if lead.reservado_por_id and lead.reservado_ate and lead.reservado_ate > agora_ %}<span class="selo selo-alerta" title="Outros usuários não podem incluir esta empresa em campanha. Volta para a base sozinha se ficar 60 dias sem mudança de status.">🔒 Reservada para {{ lead.reservado_por.nome if lead.reservado_por else '?' }} até {{ lead.reservado_ate|data }}</span>
+        {% if lead.reservado_por_id == usuario.id or ve_tudo_ %}<form class="inline" method="post" action="/leads/{{ lead.id }}/liberar" data-confirmar="Liberar esta empresa para a base? Os envios de campanha pendentes para ela serão cancelados e outra pessoa poderá incluí-la numa campanha."><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-pequeno">Liberar para a base</button></form>{% endif %}{% endif %}
       {% if lead.automacao_pausada %}<span class="selo selo-alerta">Automação parada{{ ' · com ' ~ lead.humano.nome if lead.humano }}</span>{% endif %}</div>
   </div>
   <div class="acoes">

@@ -14,7 +14,7 @@ from datetime import date, datetime, timedelta
 
 from sqlalchemy import func, select
 
-from . import base_receita, cadencias, config, contas_email, email_validacao, ia, mensagens, prospeccao, sdr, trabalhos, util
+from . import base_receita, cadencias, config, contas_email, email_validacao, reservas, ia, mensagens, prospeccao, sdr, trabalhos, util
 from .banco import agora, gravar_config, ler_config, ler_config_int, sessao
 from .leads_servico import criar_lead, historico, mudar_status, registrar_contato
 from .modelos import Cadencia, Campanha, Categoria, Lead, Tarefa, Usuario
@@ -141,11 +141,13 @@ def _mensagens(lead_id: int, usuario_id: int, cta: str, tom: str) -> tuple[int, 
 
 
 def _leads_em_outras_campanhas(db, campanha_id: int) -> set[int]:
-    """Leads que já estão em outra campanha que não foi cancelada nem deu erro: não entram de novo."""
+    """Leads com envio ainda por fazer em outra campanha em andamento: não entram em duas campanhas ao mesmo tempo.
+    (Depois que a outra campanha acaba, quem decide é a reserva: ver app/reservas.py.)"""
     return set(db.execute(
         select(Tarefa.lead_id).join(Campanha, Tarefa.campanha_id == Campanha.id)
         .where(Tarefa.campanha_id != campanha_id, Tarefa.lead_id.is_not(None),
-               Campanha.status.not_in(["cancelada", "erro"]))
+               Tarefa.status.in_(["pendente", "rascunho"]),
+               Campanha.status.in_(["gerando", "aguardando_aprovacao", "ativa", "pausada"]))
         .distinct()).scalars())
 
 
@@ -200,6 +202,8 @@ def _buscar_candidatos(campanha_id: int) -> list[int]:
                         continue
                     if lead.id in ja_usados:
                         continue  # já está em outra campanha: esta campanha pega outras empresas
+                    if reservas.de_outro(lead, camp.usuario_id):
+                        continue  # travada com outro usuário (60 dias ou até ele liberar)
                     if motivo and (lead.opt_out or lead.perdido or lead.etapa >= 1 or lead.automacao_pausada):
                         continue  # já cadastrado e já trabalhado: não entra de novo
                     if lead.categoria_id is None and cod in cats:
@@ -291,6 +295,8 @@ def _montar(campanha_id: int, escolhidos: list[int], textos: dict[int, dict], so
                                                       f"para {usuario.nome} (entrou na campanha \"{camp.nome}\").",
                               usuario)
                 lead.vendedor_id = usuario.id
+            if not reservas.de_outro(lead, usuario.id):
+                reservas.reservar(db, lead, usuario, f"campanha \"{camp.nome}\"")
         r = cadencias.aplicar(db, cad, leads, usuario, camp.inicio or date.today(), camp.id, textos,
                               [c for c in camp.canais.split(",") if c], "rascunho", camp.cta, camp.tom)
         camp.etapa = (f"Pronta: {r['leads']} empresas, {r['tarefas']} mensagens"

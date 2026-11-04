@@ -226,6 +226,7 @@ def _contexto_lead(db: Session, lead: Lead, usuario: Usuario) -> dict:
         "categorias": db.execute(select(Categoria).order_by(Categoria.prioridade)).scalars().all(),
         "sdr_msgs": (json.loads(lead.qualificacao).get("sdr") if lead.qualificacao else None),
         "handoff": sdr.resumo_handoff(db, lead) if (lead.automacao_pausada or lead.humano_id) else None,
+        "agora_": agora(), "ve_tudo_": autorizacao.ve_tudo(usuario, "leads.ver"),
     }
 
 
@@ -413,6 +414,23 @@ def opt_out(request: Request, lead_id: int, desfazer: str = Form(""), usuario: U
         avisar(request, "Opt-out registrado: este lead não receberá mais contatos.")
     registrar_log(db, usuario, "opt_out" if not desfazer else "opt_out_desfeito", "lead", lead.id, request=request)
     db.commit()
+    return voltar(f"/leads/{lead_id}")
+
+
+@rotas.post("/leads/{lead_id:int}/liberar", dependencies=[Depends(verificar_csrf)])
+def liberar_reserva(request: Request, lead_id: int, usuario: Usuario = Depends(exige("leads.editar")),
+                    db: Session = Depends(obter_db)):
+    from .. import reservas
+
+    lead = _lead(db, lead_id, usuario)
+    if not reservas.pode_liberar(usuario, lead):
+        avisar(request, "Só quem está com a empresa (ou o administrador/gestor) pode liberar.", "erro")
+        return voltar(f"/leads/{lead_id}")
+    cancelados = reservas.liberar(db, lead, usuario, f"liberada por {usuario.nome}")
+    registrar_log(db, usuario, "liberou_lead", "lead", lead.id, request=request)
+    db.commit()
+    avisar(request, "Empresa liberada para a base: outra pessoa já pode incluí-la numa campanha."
+                    + (f" {cancelados} envio(s) pendente(s) foram cancelados." if cancelados else ""))
     return voltar(f"/leads/{lead_id}")
 
 

@@ -129,6 +129,22 @@ respostas dos parceiros chegam sozinhas na IA SDR. O rodapé do menu mostra se o
 Configure as categorias em Configurações > **Categorias de parceiros** e o que a IA pode responder em
 **Base de conhecimento**. Detalhes técnicos: [`docs/ia-sdr.md`](docs/ia-sdr.md).
 
+### Empresa reservada (travada) com quem fez a campanha
+
+- Quando uma empresa entra na campanha de alguém, ela fica **reservada** para essa pessoa: a campanha de **outro
+  usuário não pega essa empresa**. A ficha do lead mostra o selo **"🔒 Reservada para Fulano até dd/mm/aaaa"**.
+- A reserva vale **60 dias** e **recomeça a contar a cada mudança de status** do lead (Contatado, Respondeu,
+  Interessado, Reunião...).
+- **Passados 60 dias sem nenhuma mudança de status**, a empresa volta **sozinha** para a base (a conferência roda
+  de hora em hora). Se ainda houver campanha mandando mensagens para ela, espera a campanha acabar.
+- **Liberar antes:** na ficha do lead, botão **"Liberar para a base"** (quem está com a empresa, ou o
+  administrador/gestor). Os envios de campanha pendentes para ela são cancelados.
+- Ao voltar para a base, a empresa sai do nome da pessoa. Se ela **nunca respondeu** (Contatado, Aguardando
+  resposta ou Perdido por "Sem resposta"), o status volta para **Novo** e outra pessoa pode fazer campanha. Quem
+  respondeu, pediu para sair (opt-out) ou disse que não tem interesse **não** volta a ser procurado.
+- As empresas que já estavam em campanhas antes desta regra ficaram reservadas para quem criou a campanha mais
+  recente delas, contando os 60 dias a partir da criação da campanha.
+
 ### Quem assina e envia a campanha
 
 Quem **cria a campanha** assina as mensagens ("Sou Paulo, da MS..." e a assinatura do e-mail) e é por **o WhatsApp
