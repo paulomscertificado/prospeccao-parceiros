@@ -131,7 +131,10 @@ def migrar_colunas() -> list[str]:
                 if coluna.name in existentes:
                     continue
                 tipo = coluna.type.compile(dialect=motor.dialect)
-                con.execute(text(f'ALTER TABLE {tabela.name} ADD COLUMN "{coluna.name}" {tipo}{_valor_padrao_sql(coluna)}'))
+                # Postgres: IF NOT EXISTS evita erro quando duas cópias na nuvem migram ao mesmo tempo
+                se_nao_existe = "IF NOT EXISTS " if motor.dialect.name == "postgresql" else ""
+                con.execute(text(f'ALTER TABLE {tabela.name} ADD COLUMN {se_nao_existe}"{coluna.name}" {tipo}'
+                                 f'{_valor_padrao_sql(coluna)}'))
                 adicionadas.append(f"{tabela.name}.{coluna.name}")
     return adicionadas
 
