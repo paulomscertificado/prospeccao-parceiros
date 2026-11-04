@@ -129,6 +129,17 @@ respostas dos parceiros chegam sozinhas na IA SDR. O rodapé do menu mostra se o
 Configure as categorias em Configurações > **Categorias de parceiros** e o que a IA pode responder em
 **Base de conhecimento**. Detalhes técnicos: [`docs/ia-sdr.md`](docs/ia-sdr.md).
 
+### Quem assina e envia a campanha
+
+Quem **cria a campanha** assina as mensagens ("Sou Paulo, da MS..." e a assinatura do e-mail) e é por **o WhatsApp
+e o e-mail dessa pessoa** que elas saem. Uma empresa que já estava com outro vendedor na ficha, mas com quem
+ninguém conversou ainda, passa para quem criou a campanha (fica anotado no histórico do lead). Se o outro vendedor
+já conversou com ela, ela continua com ele.
+
+Campanhas montadas antes desta regra podem mostrar o aviso **"⚠️ X empresas desta campanha estão com outro
+responsável"**. Clique em **"Passar para ... e corrigir as assinaturas"**: as empresas passam para quem criou a
+campanha e o nome na assinatura das mensagens que ainda vão sair é trocado.
+
 ### E-mails que não existem
 
 Muitos e-mails da base da Receita estão desatualizados. O sistema tira esses endereços das campanhas sozinho:

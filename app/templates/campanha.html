@@ -185,6 +185,23 @@
 </details>
 {% endif %}
 
+{% if responsaveis_diferentes %}
+{% set nomes = responsaveis_diferentes|map(attribute='responsavel')|map(attribute='nome')|unique|join(', ') %}
+<div class="cartao aviso aviso-alerta" id="responsaveis">
+  <b>⚠️ {{ responsaveis_diferentes|length }} empresa{{ 's' if responsaveis_diferentes|length > 1 }} desta campanha
+    {{ 'estão' if responsaveis_diferentes|length > 1 else 'está' }} com outro responsável ({{ nomes }}).</b>
+  As mensagens delas estão assinadas por essa pessoa e sairiam pelo WhatsApp/e-mail dela, e não de
+  {{ dono.nome if dono else 'quem criou a campanha' }}.
+  <details style="margin:8px 0"><summary class="pequeno">Ver empresas</summary><ul class="pequeno">
+    {% for i in responsaveis_diferentes %}<li><a href="/leads/{{ i.lead.id }}">{{ i.lead.empresa }}</a> — {{ i.responsavel.nome if i.responsavel else '?' }}{% if not i.pode_passar %} (já conversou com a empresa: continua com ele){% endif %}</li>{% endfor %}
+  </ul></details>
+  {% if pode_gerenciar %}<form method="post" action="/campanhas/{{ c.id }}/assumir-empresas"
+      data-confirmar="Passar estas empresas para {{ dono.nome if dono else 'quem criou a campanha' }} e trocar a assinatura das mensagens?">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="btn btn-primario">Passar para {{ (dono.nome.split(' ')[0]) if dono else 'quem criou' }} e corrigir as assinaturas</button></form>{% endif %}
+</div>
+{% endif %}
+
 {% if emails_invalidos %}
 <details class="cartao" id="emails-invalidos" open>
   <summary><h2 style="display:inline">✉️ E-mails que não existem: {{ emails_invalidos|length }} empresa{{ 's' if emails_invalidos|length > 1 }}</h2></summary>

@@ -131,7 +131,8 @@ def _mensagens(lead_id: int, usuario_id: int, cta: str, tom: str) -> tuple[int, 
     """Mensagens de UMA empresa. Se a IA falhar, usa os modelos por regras (a campanha não para)."""
     with sessao() as db:
         lead = db.get(Lead, lead_id)
-        usuario = db.get(Usuario, lead.vendedor_id or usuario_id)
+        # quem criou a campanha assina e envia (mesmo que a ficha já tivesse outro vendedor: ver _montar)
+        usuario = db.get(Usuario, usuario_id)
         try:
             return lead_id, sdr.gerar_mensagens(db, lead, usuario, cta, tom)
         except Exception as erro:  # noqa: BLE001
@@ -282,8 +283,14 @@ def _montar(campanha_id: int, escolhidos: list[int], textos: dict[int, dict], so
         cad = db.get(Cadencia, camp.cadencia_id) if camp.cadencia_id else cadencia_sdr(db)
         leads = [l for l in (db.get(Lead, i) for i in escolhidos) if l]
         for lead in leads:
-            if lead.vendedor_id is None:
-                lead.vendedor_id = usuario.id  # o lead passa a ser de quem criou a campanha (e o WhatsApp sai pelo número dela)
+            if lead.vendedor_id != usuario.id and _livre_para_campanha(lead):
+                # o lead passa a ser de quem criou a campanha: assina as mensagens e envia pelo WhatsApp/e-mail dela
+                if lead.vendedor_id:
+                    anterior = db.get(Usuario, lead.vendedor_id)
+                    historico(db, lead.id, "sistema", f"Responsável passou de {anterior.nome if anterior else '?'} "
+                                                      f"para {usuario.nome} (entrou na campanha \"{camp.nome}\").",
+                              usuario)
+                lead.vendedor_id = usuario.id
         r = cadencias.aplicar(db, cad, leads, usuario, camp.inicio or date.today(), camp.id, textos,
                               [c for c in camp.canais.split(",") if c], "rascunho", camp.cta, camp.tom)
         camp.etapa = (f"Pronta: {r['leads']} empresas, {r['tarefas']} mensagens"
@@ -1081,4 +1088,67 @@ def corrigir_email(db, camp: Campanha, lead: Lead, novo: str, usuario: Usuario) 
                           mensagem_email=ultimo.mensagem_email, assunto_email=ultimo.assunto_email,
                           angulo=ultimo.angulo, status="pendente"))
             feito["reenvio"] = True
+    return feito
+
+
+
+# ---------------------------------------------------------------- Responsável diferente de quem criou a campanha
+
+def _livre_para_campanha(lead: Lead) -> bool:
+    """Ninguém conversou com a empresa ainda: pode passar para quem criou a campanha."""
+    return lead.humano_id is None and lead.contatado_em is None and lead.respondeu_em is None
+
+
+def responsaveis_diferentes(db, camp: Campanha) -> list[dict]:
+    """Empresas da campanha (com envio ainda por fazer) cujo responsável não é quem criou a campanha: as mensagens
+    estão assinadas por outra pessoa e sairiam pelo WhatsApp/e-mail dela. [{"lead", "responsavel", "pode_passar"}]"""
+    if not camp.usuario_id or camp.status not in ("aguardando_aprovacao", "ativa", "pausada"):
+        return []
+    ids = {i for (i,) in db.execute(select(Tarefa.lead_id).where(
+        Tarefa.campanha_id == camp.id, Tarefa.status.in_(["rascunho", "pendente"]), Tarefa.lead_id.is_not(None)))}
+    if not ids:
+        return []
+    itens = []
+    for lead in db.execute(select(Lead).where(Lead.id.in_(ids), Lead.vendedor_id.is_not(None),
+                                              Lead.vendedor_id != camp.usuario_id).order_by(Lead.empresa)).scalars():
+        itens.append({"lead": lead, "responsavel": db.get(Usuario, lead.vendedor_id),
+                      "pode_passar": _livre_para_campanha(lead)})
+    return itens
+
+
+def _trocar_assinatura(texto: str, velho: str, novo: str) -> str:
+    if not texto or not velho or velho == novo:
+        return texto
+    texto = texto.replace(f"\n\n{velho}\nMS Certificação Digital", f"\n\n{novo}\nMS Certificação Digital")
+    return re.sub(rf"\bSou {re.escape(velho)}(,| da| e)", lambda m: f"Sou {novo}{m.group(1)}", texto)
+
+
+def assumir_empresas(db, camp: Campanha, usuario: Usuario | None) -> dict:
+    """Passa para quem criou a campanha as empresas com outro responsável (as que ninguém trabalhou ainda) e troca a
+    assinatura das mensagens que ainda vão sair. Devolve {"empresas", "mensagens", "mantidas"}."""
+    dono = db.get(Usuario, camp.usuario_id) if camp.usuario_id else None
+    feito = {"empresas": 0, "mensagens": 0, "mantidas": 0}
+    if dono is None:
+        return feito
+    novo = util.primeiro_nome(dono.nome) if dono.perfil != "parceiro" else "a equipe"
+    for item in responsaveis_diferentes(db, camp):
+        lead, antigo = item["lead"], item["responsavel"]
+        if not item["pode_passar"]:
+            feito["mantidas"] += 1
+            continue
+        velho = util.primeiro_nome(antigo.nome) if antigo and antigo.perfil != "parceiro" else "a equipe"
+        for t in db.execute(select(Tarefa).where(Tarefa.campanha_id == camp.id, Tarefa.lead_id == lead.id,
+                                                 Tarefa.status.in_(["rascunho", "pendente"]))).scalars():
+            antes = (t.mensagem, t.mensagem_email, t.mensagem_whatsapp)
+            t.mensagem = _trocar_assinatura(t.mensagem, velho, novo)
+            t.mensagem_email = _trocar_assinatura(t.mensagem_email, velho, novo)
+            t.mensagem_whatsapp = _trocar_assinatura(t.mensagem_whatsapp, velho, novo)
+            if t.usuario_id == lead.vendedor_id:
+                t.usuario_id = dono.id
+            if (t.mensagem, t.mensagem_email, t.mensagem_whatsapp) != antes:
+                feito["mensagens"] += 1
+        historico(db, lead.id, "sistema", f"Responsável passou de {antigo.nome if antigo else '?'} para {dono.nome} "
+                                          f"(campanha \"{camp.nome}\"); assinatura das mensagens trocada.", usuario)
+        lead.vendedor_id = dono.id
+        feito["empresas"] += 1
     return feito

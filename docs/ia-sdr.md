@@ -169,6 +169,17 @@ bloqueado; o WhatsApp Leads conta do mesmo jeito. `mensagens.limite_do_numero(db
 próximo lead quando um número chega ao limite. Minha fila mostra o contador do número da pessoa; Envios, o do número
 que mais enviou.
 
+## Quem assina e envia a campanha (nov/2026)
+
+- `campanhas._mensagens` gera os textos com o **dono da campanha** (`camp.usuario_id`), não com o vendedor da ficha.
+- `campanhas._montar`: empresa que entra na campanha passa para o dono se `_livre_para_campanha` (sem
+  `humano_id`, `contatado_em` e `respondeu_em`); a troca vai para o histórico. Assim `conexoes.responsavel` (que
+  olha `lead.vendedor_id`) envia pelo WhatsApp/e-mail do dono.
+- Campanhas antigas: `responsaveis_diferentes` mostra o aviso na campanha e `assumir_empresas`
+  (`POST /campanhas/{id}/assumir-empresas`) passa as empresas livres para o dono e troca a assinatura nos toques
+  rascunho/pendentes (`_trocar_assinatura`: só "\n\n<Nome>\nMS Certificação Digital" e "Sou <Nome>, da/e").
+- Testes: `testes/test_responsavel_campanha.py`.
+
 ## E-mails que não existem (nov/2026)
 
 `app/email_validacao.py`. Campos novos em `leads`: `email_invalido`, `email_motivo`, `email_verificado_em`,

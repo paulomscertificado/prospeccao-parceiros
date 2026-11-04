@@ -334,6 +334,7 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(exige("c
         "testaveis": [{"id": t.id, "nome": t.nome, **contagem[t.id]} for t in testaveis],
         "so_fixo": so_fixo,
         "emails_invalidos": campanhas.emails_invalidos(db, camp),
+        "responsaveis_diferentes": campanhas.responsaveis_diferentes(db, camp),
         "andamento": campanhas.andamento(db, camp) if camp.status not in ("gerando", "erro") else [],
         "whatsapp_hoje": whatsapp_hoje, "numero_whatsapp": numero, "sem_numero": sem_numero,
         "disparar": {k: len(v) for k, v in campanhas.para_disparar(db, camp).items()},
@@ -370,6 +371,18 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
         db.commit()
         avisar(request, "Campanha arquivada (veja em Arquivadas)." if camp.arquivada else "Campanha de volta à lista.")
         return voltar("/campanhas" if camp.arquivada else f"/campanhas/{cid}")
+    if acao == "assumir-empresas":
+        r = campanhas.assumir_empresas(db, camp, usuario)
+        registrar_log(db, usuario, "assumiu_empresas_campanha", "campanha", cid, f"{r['empresas']} empresas", request)
+        db.commit()
+        dono = db.get(Usuario, camp.usuario_id) if camp.usuario_id else None
+        texto = (f"{r['empresas']} empresa(s) passaram para {dono.nome if dono else 'quem criou a campanha'} e "
+                 f"{r['mensagens']} mensagem(ns) tiveram a assinatura trocada.")
+        if r["mantidas"]:
+            texto += (f" {r['mantidas']} empresa(s) continuam com o responsável atual porque ele já conversou com elas "
+                      "(tire da campanha se não for para enviar).")
+        avisar(request, texto)
+        return voltar(f"/campanhas/{cid}")
     if acao == "conferir-emails":
         r = campanhas.conferir_emails(db, camp)
         registrar_log(db, usuario, "conferiu_emails_campanha", "campanha", cid,
