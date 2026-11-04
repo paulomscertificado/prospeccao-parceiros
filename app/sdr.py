@@ -643,6 +643,35 @@ def resumo_handoff(db, lead: Lead) -> dict:
         "resposta": op.resposta if op else "", "resumo": op.resumo if op else "",
         "objecoes": op.objecoes if op else "", "interesse": op.interesse if op else "",
         "proximo_passo": op.proximo_passo if op else "", "classificacao": op.classificacao if op else "",
+        **origem_do_contato(db, lead, enviada, op),
+    }
+
+
+def origem_do_contato(db, lead: Lead, enviada: Mensagem | None, op: Oportunidade | None) -> dict:
+    """De onde veio a resposta: campanha, dono da campanha, canal, por qual número/e-mail saiu e quando."""
+    from .modelos import ConexaoWhatsApp
+
+    campanha = db.get(Campanha, enviada.campanha_id) if enviada and enviada.campanha_id else None
+    dono = db.get(Usuario, campanha.usuario_id) if campanha and campanha.usuario_id else None
+    quem_enviou = db.get(Usuario, enviada.usuario_id) if enviada and enviada.usuario_id else None
+    canal = (op.canal if op and op.canal else "") or (enviada.canal if enviada else "")
+    saiu_por = ""
+    if enviada and enviada.conexao:
+        if canal == "whatsapp":
+            conexao = db.get(ConexaoWhatsApp, enviada.conexao)
+            saiu_por = conexao.nome if conexao and conexao.nome else enviada.conexao
+        else:
+            saiu_por = enviada.conexao.split(":", 1)[-1]  # conta de e-mail ("u3:fulano@..." → "fulano@...")
+    return {
+        "campanha_id": campanha.id if campanha else None,
+        "campanha_nome": campanha.nome if campanha else "",
+        "campanha_dono": dono.nome if dono else "",
+        "enviado_por": (quem_enviou.nome if quem_enviou else "") or (dono.nome if dono else "IA SDR (automático)"),
+        "canal": canal,
+        "canal_nome": {"whatsapp": "WhatsApp", "email": "E-mail", "linkedin": "LinkedIn"}.get(canal, canal or "-"),
+        "saiu_por": saiu_por,
+        "enviada_em": enviada.criado_em if enviada else None,
+        "vendedor": lead.vendedor.nome if lead.vendedor else "",
     }
 
 

@@ -29,25 +29,39 @@
 
 {% for o in oportunidades %}{% set l = o.lead %}{% set r = resumos[o.id] %}
 <div class="cartao op-card {{ o.temperatura }}" id="op-{{ o.id }}">
-  <h2>{{ '🔥 NOVO LEAD QUENTE' if o.temperatura == 'quente' else 'Resposta para analisar' }} · {{ l.empresa }}
-    <span class="pequeno suave">{{ o.criado_em|datahora }}{{ ' · assumido por ' ~ o.responsavel.nome if o.responsavel }}</span></h2>
+  <h2>{{ '🔥 NOVO LEAD QUENTE' if o.temperatura == 'quente' else 'Resposta para analisar' }} · <a href="/leads/{{ l.id }}">{{ l.empresa }}</a>
+    <span class="pequeno suave">respondeu em {{ o.criado_em|datahora }}{{ ' · assumido por ' ~ o.responsavel.nome if o.responsavel }}</span></h2>
+
+  <div class="op-origem">
+    <div><span class="rotulo">Campanha</span>{% if r.campanha_id %}<a href="/campanhas/{{ r.campanha_id }}">{{ r.campanha_nome }}</a>{% else %}<span class="suave">sem campanha (contato avulso)</span>{% endif %}</div>
+    <div><span class="rotulo">Dono da campanha</span>{{ r.campanha_dono or '—' }}</div>
+    <div><span class="rotulo">Canal</span>{{ '💬' if r.canal == 'whatsapp' else ('✉️' if r.canal == 'email' else '•') }} <b>{{ r.canal_nome }}</b>{% if r.saiu_por %}<span class="pequeno suave"> · por {{ r.saiu_por }}</span>{% endif %}</div>
+    <div><span class="rotulo">Responsável pelo lead</span>{{ r.vendedor or 'ninguém ainda' }}</div>
+  </div>
+
   <div class="grade-2">
-    <dl class="ficha">
-      <dt>Empresa</dt><dd><a href="/leads/{{ l.id }}">{{ l.empresa }}</a></dd>
-      <dt>Responsável</dt><dd>{{ r.responsavel }}</dd>
-      <dt>Score</dt><dd><b>{{ l.score }}</b> · {{ l.fit }}</dd>
-      <dt>Categoria</dt><dd>{{ r.categoria }}</dd>
-      <dt>Cidade</dt><dd>{{ r.cidade }}</dd>
-      <dt>Site</dt><dd>{{ r.site }}</dd>
-      <dt>Classificação</dt><dd><span class="selo {{ 'selo-erro' if o.temperatura == 'quente' else 'selo-alerta' }}">{{ o.classificacao }}</span> · interesse {{ o.interesse }}</dd>
-      {% if o.objecoes %}<dt>Objeções</dt><dd>{{ o.objecoes }}</dd>{% endif %}
-    </dl>
+    <div class="op-conversa">
+      <div class="rotulo">1. O que enviamos{% if r.enviada_em %} · {{ r.enviada_em|datahora }}{% endif %}{% if r.enviado_por %} · por {{ r.enviado_por }}{% endif %}</div>
+      <div class="mensagem">{{ o.mensagem_enviada or r.mensagem_enviada or '—' }}</div>
+      <div class="rotulo" style="margin-top:10px">2. O que o lead respondeu · {{ o.criado_em|datahora }}</div>
+      <div class="mensagem op-resposta">{{ o.resposta or '—' }}</div>
+    </div>
     <div>
-      <p><b>Resumo:</b> {{ o.resumo or '—' }}</p>
-      <p><b>Resposta do lead:</b></p><div class="mensagem">{{ o.resposta }}</div>
-      {% if o.mensagem_enviada %}<details style="margin-top:6px"><summary class="pequeno">Mensagem que a SDR enviou</summary><div class="mensagem">{{ o.mensagem_enviada }}</div></details>{% endif %}
-      <p style="margin-top:8px"><b>Próxima ação:</b> <span class="selo selo-azul">{{ o.proximo_passo|upper }}</span></p>
-      <p class="pequeno suave">Motivo do contato: {{ r.motivo }}</p>
+      <div class="rotulo">3. O que a IA entendeu</div>
+      <p style="margin:4px 0"><span class="selo {{ 'selo-erro' if o.temperatura == 'quente' else 'selo-alerta' }}">{{ o.classificacao }}</span>
+        <span class="pequeno">interesse {{ o.interesse or '—' }}</span></p>
+      <p style="margin:4px 0">{{ o.resumo or '—' }}</p>
+      {% if o.objecoes %}<p class="pequeno" style="margin:4px 0"><b>Objeções:</b> {{ o.objecoes }}</p>{% endif %}
+      <p style="margin:8px 0 4px"><b>Próxima ação:</b> <span class="selo selo-azul">{{ o.proximo_passo|upper }}</span></p>
+      <details class="pequeno" style="margin-top:10px"><summary>Sobre a empresa</summary>
+        <dl class="ficha" style="margin-top:6px">
+          <dt>Contato na empresa</dt><dd>{{ r.responsavel }}</dd>
+          <dt>Cidade</dt><dd>{{ r.cidade }}</dd>
+          <dt>Categoria</dt><dd>{{ r.categoria }}</dd>
+          <dt>Site</dt><dd>{{ r.site }}</dd>
+          <dt>Score</dt><dd><b>{{ l.score }}</b> · {{ l.fit }}</dd>
+          <dt>Por que foi escolhida</dt><dd>{{ r.motivo or '—' }}</dd>
+        </dl></details>
     </div>
   </div>
   {% if o.status == 'nova' %}
