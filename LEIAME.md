@@ -142,6 +142,11 @@ Muitos e-mails da base da Receita estão desatualizados. O sistema tira esses en
   **"não existe"** ao lado do e-mail. Se você corrigir o endereço em **Editar**, ele volta a receber.
 - "Caixa cheia" e outras recusas temporárias **não** tiram o e-mail.
 - Na página da campanha, o botão **Conferir e-mails** faz a conferência de todos de uma vez.
+- **Corrigir e reenviar:** na página da campanha aparece o quadro **"E-mails que não existem"**, com as empresas
+  marcadas, o motivo e botões para pesquisar no site, no Google e no Instagram. Digite o e-mail certo e clique em
+  **Salvar e reenviar** (ou **Salvar**). A empresa volta para o cronograma: os envios parados voltam, com as datas
+  empurradas para hoje em diante (o intervalo entre eles continua igual), e o e-mail que tinha voltado é reenviado
+  hoje para o endereço novo. Se o endereço novo também não existir, o sistema avisa e não salva.
 
 Obs.: a conferência do domínio não descobre se uma caixa específica existe (ex.: `fulano@hotmail.com`). Isso
 só se sabe quando a devolução chega, e aí o sistema tira o e-mail sozinho.

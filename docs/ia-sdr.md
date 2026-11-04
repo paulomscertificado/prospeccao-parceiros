@@ -183,6 +183,11 @@ que mais enviou.
   ou o e-mail citado no texto e o Message-ID original; só devolução permanente (5.x.x ou texto "não encontrado",
   "user unknown"...) marca. 1ª leitura por caixa: 60 dias (`devolucoes_lidas:<conta>` em config).
 - `marcar_invalido` cancela os toques de e-mail pendentes/rascunho e grava no histórico.
+- Quadro **E-mails que não existem** na campanha (`campanhas.emails_invalidos`) com correção em linha
+  (`POST /campanhas/{id}/corrigir-email`, `campanhas.corrigir_email`): valida o endereço novo (formato + DNS),
+  limpa a marca, reativa os toques de e-mail cancelados por e-mail inválido (empurra as datas atrasadas para hoje,
+  mantendo o intervalo; em campanha aguardando aprovação voltam como rascunho) e, se o e-mail tinha sido
+  devolvido, cria um toque de reenvio hoje com a última mensagem enviada.
 - Botão **Conferir e-mails** na campanha (`POST /campanhas/{id}/conferir-emails`, `campanhas.conferir_emails`).
 - Testes: `testes/test_emails_inexistentes.py`; a variável `CONFERIR_DOMINIO_EMAIL=0` desliga o DNS nos testes.
 
