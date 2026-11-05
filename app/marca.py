@@ -40,27 +40,39 @@ def assinatura(usuario: Usuario | None, vendedor: str) -> str:
 def aplicar(texto: str, usuario: Usuario | None) -> str:
     """Troca a MS pela empresa do usuário nos textos montados com os modelos do sistema."""
     m = da_pessoa(usuario)
+    texto = re.sub(r"^1\. A .+? indica o cliente;$", "1. Vocês indicam o cliente;", texto or "", flags=re.M)
+    texto = re.sub(r"^3\. A .+? é remunerada por certificado emitido;$",
+                   "3. Vocês são remunerados por cada certificado emitido;", texto, flags=re.M)
     if not texto or not m["propria"]:
         return texto
     t = texto
-    # "da MS" → "do Grupo Certy" quando o nome é masculino (Grupo, Escritório, Instituto, Cartório...)
-    masculino = (m["nome"].split() or [""])[0].lower() in {"grupo", "escritório", "escritorio", "instituto",
-                                                            "cartório", "cartorio", "centro", "portal", "ponto"}
-    if masculino:
-        for de_ms in ("da MS Certificação Digital", "da MS Certificados"):
-            t = t.replace(de_ms, f"do {m['nome']}")
-        t = re.sub(r"\b(com a|pela|na) MS Certificação Digital\b",
-                   lambda x: {"com a": "com o", "pela": "pelo", "na": "no"}[x.group(1)] + " " + m["nome"], t)
-    t = t.replace("MS Certificação Digital", m["nome"]).replace("MS Certificados", m["nome"])
+    nome = m["nome"]
+    # "a MS" vira "o Grupo Certy" quando o nome é masculino (Grupo, Escritório, Instituto, Cartório...)
+    masculino = (nome.split() or [""])[0].lower() in {"grupo", "escritório", "escritorio", "instituto",
+                                                       "cartório", "cartorio", "centro", "portal", "ponto"}
+    artigos = {"a": "o", "da": "do", "na": "no", "pela": "pelo", "com a": "com o", "à": "ao", "para a": "para o"}
+
+    def com_artigo(x):
+        artigo = x.group(1)
+        novo = artigos.get(artigo.lower(), artigo.lower()) if masculino else artigo.lower()
+        if artigo[0].isupper():
+            novo = novo[0].upper() + novo[1:]
+        return f"{novo} {nome}"
+
+    # "A MS faz", "a MS Certificação Digital tem", "da MS", "com a MS"... (maiúscula ou minúscula)
+    t = re.sub(r"\b(para a|com a|pela|da|na|à|a)\s+MS(?:\s+Certificação Digital|\s+Certificados)?\b", com_artigo, t,
+               flags=re.I)
+    t = t.replace("MS Certificação Digital", nome).replace("MS Certificados", nome)
     t = t.replace("https://mscertificados.com.br", f"https://{m['site']}" if m["site"] else "")
     t = t.replace("mscertificados.com.br", m["site"])
-    t = t.replace("Autoridade de Registro ICP-Brasil", m["descricao"]) if m["descricao"] else re.sub(
+    descricao = m["descricao"].strip().rstrip(".;,: ")  # o modelo já põe o ponto depois
+    t = t.replace("Autoridade de Registro ICP-Brasil", descricao) if descricao else re.sub(
         r"\s*\(?,?\s*Autoridade de Registro ICP-Brasil[^).\n]*\)?", "", t)
     # onde é a validação é coisa da MS: some da mensagem de outra empresa
     t = re.sub(r"\s*\(presencial em Recife ou por videoconferência\)", "", t)
     t = re.sub(r"\s*presencial em Recife ou por videoconferência", "", t)
     t = re.sub(r"\s+em Recife\b", "", t)
-    # "a MS cuida", "com a MS", "da MS" → nome da empresa
-    t = re.sub(r"\b(a|da|na|pela|com a) MS\b(?! Certifica)", lambda x: f"{x.group(1)} {m['nome']}", t)
+    # "MS" solto dos modelos (ex.: "Parceria MS + Fulano"); não mexe em "MS" do nome do lead
+    t = re.sub(r"\b(Parceria|parceria|equipe|time|Equipe|Time) MS\b", lambda x: f"{x.group(1)} {nome}", t)
     t = re.sub(r" · $", "", t, flags=re.M)
     return t

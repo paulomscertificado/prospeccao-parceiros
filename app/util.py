@@ -237,6 +237,13 @@ def so_data_br(valor) -> str:
     return valor.strftime("%d/%m/%Y")
 
 
+def nome_para_mensagem(empresa: str) -> str:
+    """Razão social sem os números que a Receita põe no nome do MEI ("12.345.678 FULANO DE TAL 12345678901")."""
+    nome = re.sub(r"^\s*\d{2}\.?\d{3}\.?\d{3}\s+", "", empresa or "")
+    nome = re.sub(r"\s+\d{11}\s*$", "", nome)
+    return nome.strip() or (empresa or "").strip()
+
+
 def primeiro_nome(nome: str) -> str:
     partes = (nome or "").strip().split()
     return partes[0].capitalize() if partes else ""

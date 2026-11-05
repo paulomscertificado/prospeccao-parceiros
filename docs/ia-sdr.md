@@ -183,6 +183,13 @@ mas não são usados: a Maria pediu para tirar.)
 - A IA SDR escreve como SDR da empresa do usuário. Empresas novas: placeholder `{minha_empresa}` e assinatura
   `marca.assinatura`; as mensagens de venda não têm preço nem local de validação.
 - `campanhas._trocar_assinatura` não depende mais do nome da MS.
+- Correção (caso "Grupo Certy - Teste 02"): a troca de artigo ignora maiúscula ("A MS faz" → "O Grupo Certy faz",
+  com concordância a/o, da/do, na/no, pela/pelo, com a/com o, à/ao, para a/para o); "Parceria/equipe/time MS" também
+  troca, mas "MS" dentro do nome do lead não. A apresentação curta perde o ponto final (o modelo já põe) e tem até
+  80 letras. O nome do lead nas mensagens passa por `util.nome_para_mensagem` (tira o CNPJ/CPF que a Receita põe no
+  nome do MEI). O modelo de e-mail diz "1. Vocês indicam o cliente;" / "3. Vocês são remunerados por cada
+  certificado emitido;" (`modelos_segmento.TROCAS_ANTIGAS` corrige os modelos salvos e `marca.aplicar` as tarefas
+  já montadas, na hora do envio).
 - Testes: `testes/test_marca.py`.
 
 ## Empresas novas – venda para empresas recém-abertas (nov/2026)

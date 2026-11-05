@@ -65,3 +65,26 @@ def test_minha_conta_salva_empresa(cliente):
         assert admin.empresa_nome == "Grupo Certy Certificados" and admin.empresa_site == "grupocerty.com.br"
         admin.empresa_nome = admin.empresa_site = ""  # os outros testes esperam a empresa padrão
         db.commit()
+
+
+def test_email_da_campanha_grupo_certy_teste_02():
+    """Caso real: 'A MS faz todo o atendimento' (com maiúscula) escapava, e o nome do MEI vinha com o CPF."""
+    u = _usuario(nome="Grupo Certy", site="grupocerty.com.br",
+                 descricao="credenciado à ICP-Brasil para emitir certificados digitais.")
+    t = marca.aplicar("Sou Thamires, da MS Certificação Digital, Autoridade de Registro ICP-Brasil.\n\n"
+                      "1. A Alberto Vitor de Carvalho 52309851604 indica o cliente;\n"
+                      "2. A MS faz todo o atendimento, emissão e validação;\n"
+                      "3. A Alberto Vitor de Carvalho 52309851604 é remunerada por certificado emitido;\n"
+                      "Vocês indicam e a MS cuida de tudo. Parceria MS Certificação Digital + MS Engenharia", u)
+    assert "Sou Thamires, do Grupo Certy, credenciado à ICP-Brasil para emitir certificados digitais." in t
+    assert "2. O Grupo Certy faz todo o atendimento" in t and "1. Vocês indicam o cliente;" in t
+    assert "o Grupo Certy cuida de tudo" in t and "Parceria Grupo Certy + MS Engenharia" in t
+    assert "A MS" not in t and "a MS " not in t and "52309851604" not in t
+
+
+def test_nome_do_mei_sem_numeros():
+    from app import util
+
+    assert util.nome_para_mensagem("69.562.640 RAQUEL TAVARES DA SILVA") == "RAQUEL TAVARES DA SILVA"
+    assert util.nome_para_mensagem("Alberto Vitor de Carvalho 52309851604") == "Alberto Vitor de Carvalho"
+    assert util.nome_para_mensagem("Contabilidade 2000 Ltda") == "Contabilidade 2000 Ltda"

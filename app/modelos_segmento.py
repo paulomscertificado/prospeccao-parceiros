@@ -146,8 +146,8 @@ MODELOS = [
     ("email", "apresentacao", "Parceria MS Certificação Digital + {{empresa}}",
      "Olá, {{nome}}, tudo bem?\n\nSou {{vendedor}}, da MS Certificação Digital, Autoridade de Registro ICP-Brasil.\n\n"
      "Trabalhamos com {quem} e sabemos que {clientes} precisam de certificado digital {momento}. Por isso criamos "
-     "um programa de parceria simples:\n\n1. A {{empresa}} indica o cliente;\n2. A MS faz todo o atendimento, emissão "
-     "e validação;\n3. A {{empresa}} é remunerada por certificado emitido;\n4. Cuidamos do vencimento e da renovação, "
+     "um programa de parceria simples:\n\n1. Vocês indicam o cliente;\n2. A MS faz todo o atendimento, emissão "
+     "e validação;\n3. Vocês são remunerados por cada certificado emitido;\n4. Cuidamos do vencimento e da renovação, "
      "mantendo vocês como parceiros.\n\nPodemos marcar 15 minutos para eu apresentar?\n\n" + RODAPE),
     ("email", "apresentacao", "Uma pergunta sobre os certificados dos clientes da {{empresa}}",
      "Olá, {{nome}}!\n\nQuando {clientes} precisam emitir ou renovar o certificado digital, quem resolve isso hoje?\n\n"
@@ -199,10 +199,19 @@ def modelos_do_segmento(codigo: str) -> list[dict]:
     return lista
 
 
+TROCAS_ANTIGAS = [("1. A {{empresa}} indica o cliente;", "1. Vocês indicam o cliente;"),
+                  ("3. A {{empresa}} é remunerada por certificado emitido;", "3. Vocês são remunerados por cada certificado emitido;")]
+
+
 def garantir(db) -> int:
-    """Cria os modelos que ainda não existem (pelo nome). Os que a equipe editou ficam como estão."""
+    """Cria os modelos que ainda não existem (pelo nome). Os que a equipe editou ficam como estão, só com as
+    frases antigas corrigidas ("A {{empresa}} indica" ficava estranho quando o nome era de pessoa)."""
     from .modelos import Template
 
+    for t in db.execute(select(Template).where(Template.categoria != "")).scalars():
+        for velho, novo in TROCAS_ANTIGAS:
+            if velho in (t.corpo or ""):
+                t.corpo = t.corpo.replace(velho, novo)
     existentes = {n for (n,) in db.execute(select(Template.nome).where(Template.categoria != ""))}
     novos = 0
     for codigo in SEGMENTOS:

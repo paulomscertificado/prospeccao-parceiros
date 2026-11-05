@@ -233,7 +233,7 @@ def textos_do_lead(db, lead: Lead, usuario: Usuario | None) -> dict:
     vendedor = util.primeiro_nome(usuario.nome) if usuario and usuario.perfil != "parceiro" else "a equipe"
     m = marca.da_pessoa(usuario)
     assinatura = marca.assinatura(usuario, vendedor)
-    valores = {"empresa": lead.empresa, "vendedor": vendedor, "cidade": lead.cidade or "", "minha_empresa": m["nome"]}
+    valores = {"empresa": util.nome_para_mensagem(lead.empresa), "vendedor": vendedor, "cidade": lead.cidade or "", "minha_empresa": m["nome"]}
 
     def trocar(texto: str) -> str:
         texto = re.sub(r"\{(empresa|vendedor|cidade|minha_empresa)\}",

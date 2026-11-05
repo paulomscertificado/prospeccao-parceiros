@@ -10,7 +10,8 @@
   <div class="grade-2">
     <div class="campo"><label>Nome da empresa</label><input type="text" name="nome" maxlength="160" value="{{ usuario.empresa_nome }}" placeholder="{{ marca_padrao.nome }}"></div>
     <div class="campo"><label>Site</label><input type="text" name="site" maxlength="160" value="{{ usuario.empresa_site }}" placeholder="{{ marca_padrao.site }}"></div>
-    <div class="campo"><label>Apresentação curta</label><input type="text" name="descricao" maxlength="200" value="{{ usuario.empresa_descricao }}" placeholder="{{ marca_padrao.descricao }}"></div>
+    <div class="campo"><label>Apresentação curta</label><input type="text" name="descricao" maxlength="80" value="{{ usuario.empresa_descricao }}" placeholder="{{ marca_padrao.descricao }}">
+      <div class="ajuda pequeno suave">Poucas palavras, sem ponto no fim. Entra logo depois do nome: "Sou Ana, da {{ usuario.empresa_nome or marca_padrao.nome }}, <b>{{ usuario.empresa_descricao or marca_padrao.descricao }}</b>."</div></div>
   </div>
   <button class="btn btn-primario">Salvar empresa</button>
 </form>

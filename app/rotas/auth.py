@@ -244,11 +244,13 @@ async def salvar_empresa(request: Request, usuario: Usuario = Depends(usuario_lo
     """Empresa que o usuário representa nas mensagens (app/marca.py)."""
     form = await request.form()
     usuario = db.get(Usuario, usuario.id)
-    limites = {"nome": 160, "site": 160, "descricao": 200}
+    limites = {"nome": 160, "site": 160, "descricao": 80}
     for campo, tamanho in limites.items():
         valor = str(form.get(campo, "")).strip()
         if campo == "site":
             valor = valor.removeprefix("https://").removeprefix("http://").removeprefix("www.").rstrip("/")
+        if campo == "descricao":
+            valor = valor.rstrip(".;,: ")
         setattr(usuario, f"empresa_{campo}", valor[:tamanho])
     registrar_log(db, usuario, "configurou_empresa_representada", "usuario", usuario.id, request=request)
     db.commit()

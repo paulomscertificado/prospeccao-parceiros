@@ -33,7 +33,7 @@ def valores_variaveis(db: Session, lead: Lead | None, usuario: Usuario | None) -
         vendedor = vendedor or (dono.nome if dono else "")
     return {
         "nome": util.primeiro_nome(lead.responsavel) if lead else "",
-        "empresa": (lead.empresa if lead else "") or "seu escritório",
+        "empresa": util.nome_para_mensagem(lead.empresa if lead else "") or "seu escritório",
         "cidade": (lead.cidade if lead else "") or "sua região",
         "estado": lead.estado if lead else "",
         "especialidade": (lead.especialidade if lead else "").lower(),
