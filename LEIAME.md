@@ -129,6 +129,31 @@ respostas dos parceiros chegam sozinhas na IA SDR. O rodapé do menu mostra se o
 Configure as categorias em Configurações > **Categorias de parceiros** e o que a IA pode responder em
 **Base de conhecimento**. Detalhes técnicos: [`docs/ia-sdr.md`](docs/ia-sdr.md).
 
+### Empresas novas (venda de certificado para empresas recém-abertas)
+
+Menu **Empresas novas**. Todo dia o sistema busca as empresas que acabaram de abrir e monta uma campanha de
+**venda** do certificado digital para elas.
+
+**Configurar (uma vez):**
+1. Crie uma conta em **cnpja.com**, assine um plano (ex.: R$ 39,99/mês, 2.500 créditos) e copie a **Chave de API**.
+2. Em **Empresas novas > Configurar**: cole a chave, escolha os **estados** (ex.: PE), o **dono** das campanhas
+   diárias (ele assina e envia pelo WhatsApp/e-mail dele), os **canais**, o **máximo de empresas por dia** e o horário.
+3. Marque **"Buscar todo dia sozinho"** e salve. Clique em **Ver saldo da CNPJá** para conferir a chave.
+
+**Todo dia:** no horário escolhido, o sistema busca as empresas **ativas** abertas desde a última busca, cadastra
+como leads (origem "Empresas novas (CNPJá)") e monta a campanha **"Empresas novas dd/mm – PE"**, que fica
+**aguardando aprovação**. Depois de aprovada: o e-mail sai sozinho pela fila (horário e limites) e o WhatsApp
+aparece para o time enviar com 1 clique. São 3 toques: dia 1 (boas-vindas + oferta com preço), dia 3 (lembrete)
+e dia 7 (último contato). As mensagens podem ser editadas na própria tela. A IA não responde sozinha esses
+leads: as respostas vão para **Oportunidades** e o time conversa.
+
+- **Buscar agora:** escolha as datas de abertura (até 7 dias) e clique em **Buscar agora e montar campanha**.
+- **Custo:** cada 10 empresas encontradas gastam 1 crédito. Em PE abrem cerca de 380 empresas por dia
+  (≈ 1.100 créditos por mês).
+- Os celulares que a Receita guarda sem o 9 ganham o 9 na frente (é um palpite: confira antes de enviar).
+- Empresas com o mesmo telefone/e-mail (do contador) **não** são juntadas: só o CNPJ conta como repetido.
+- Opção para deixar de fora **empresário individual** (inclui os MEIs, que muitas vezes não precisam de e-CNPJ).
+
 ### Empresa reservada (travada) com quem fez a campanha
 
 - Quando uma empresa entra na campanha de alguém, ela fica **reservada** para essa pessoa: a campanha de **outro

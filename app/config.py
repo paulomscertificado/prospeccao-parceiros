@@ -90,6 +90,7 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 IA_MODELO = os.environ.get("IA_MODELO", "claude-opus-5-5")
 
 GOOGLE_PLACES_API_KEY = os.environ.get("GOOGLE_PLACES_API_KEY", "")
+CNPJA_API_KEY = os.environ.get("CNPJA_API_KEY", "")  # API paga da CNPJá (área Empresas novas)
 # Contato exigido pela política de uso do OpenStreetMap (Nominatim/Overpass).
 OSM_CONTATO = os.environ.get("OSM_CONTATO", "contato@mscertificados.com.br")
 

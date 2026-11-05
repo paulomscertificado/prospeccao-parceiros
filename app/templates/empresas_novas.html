@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block titulo %}Empresas novas{% endblock %}
+{% block conteudo %}
+{% set SELOS = {'aguardando_aprovacao': ('selo-alerta', 'Aguardando aprovação'), 'ativa': ('selo-ok', 'Em andamento'),
+                'pausada': ('', 'Pausada'), 'erro': ('selo-erro', 'Com erro'), 'gerando': ('selo-azul', 'Montando...'),
+                'concluida': ('selo-azul', 'Concluída'), 'cancelada': ('', 'Cancelada')} %}
+<div class="cabecalho">
+  <div><h1>Empresas novas</h1>
+    <div class="suave">Todo dia o sistema busca as empresas que acabaram de abrir e monta uma campanha de venda do certificado digital para elas.</div></div>
+</div>
+<div class="passos-ia"><span>1. Busca as empresas abertas (API CNPJá)</span><span>2. Cadastra como leads</span>
+  <span>3. Monta a campanha do dia</span><span>4. Você aprova</span><span>5. E-mail sai sozinho · WhatsApp com 1 clique</span></div>
+
+<div class="cartao">
+  <h2>Situação</h2>
+  <ul class="pequeno" style="margin:0 0 10px;padding-left:18px">
+    <li>Busca automática: {% if cfg.novas_ativo == '1' %}<span class="selo selo-ok">ligada</span> todo dia a partir das {{ cfg.novas_hora }}{% else %}<span class="selo">desligada</span>{% endif %}</li>
+    <li>Chave da API da CNPJá: {% if tem_chave %}<span class="selo selo-ok">configurada</span>{% else %}<span class="selo selo-erro">falta colocar</span>{% endif %}</li>
+    <li>Dono das campanhas diárias: {{ dono.nome if dono else 'ninguém escolhido ainda' }}</li>
+    <li>Estados: {{ cfg.novas_ufs }} · até {{ cfg.novas_maximo_dia }} empresas por dia{% if cfg.novas_sem_individual == '1' %} · sem empresário individual/MEI{% endif %}</li>
+    {% if cfg.novas_ultimo_resultado %}<li>Última busca automática: {{ cfg.novas_ultimo_resultado }}</li>{% endif %}
+  </ul>
+  {% if pode('campanhas.gerenciar') %}
+  <div class="grupo-btn">
+    <form class="inline" method="post" action="/empresas-novas/buscar" style="display:flex;gap:6px;align-items:end;flex-wrap:wrap">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label class="pequeno">Abertas de<br><input type="date" name="desde" value="{{ ontem.isoformat() }}"></label>
+      <label class="pequeno">até<br><input type="date" name="ate" value="{{ hoje.isoformat() }}"></label>
+      <button class="btn btn-primario" {{ 'disabled' if not tem_chave }}>Buscar agora e montar campanha</button></form>
+    {% if tem_chave %}<form class="inline" method="post" action="/empresas-novas/saldo"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">Ver saldo da CNPJá</button></form>{% endif %}
+  </div>
+  <p class="pequeno suave">Cada 10 empresas encontradas gastam 1 crédito da CNPJá. Em Pernambuco abrem cerca de 380 empresas por dia (≈ 1.100 créditos por mês; o plano de R$ 39,99 tem 2.500).</p>
+  {% endif %}
+</div>
+
+{% if pode('campanhas.gerenciar') %}
+<form class="cartao" method="post" action="/empresas-novas/configurar">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>Configurar</h2>
+  <div class="grade-2">
+    <div>
+      <label class="marcar"><input type="checkbox" name="ativo" {{ 'checked' if cfg.novas_ativo == '1' }}> Buscar todo dia sozinho e montar a campanha do dia</label>
+      <label>Horário da busca<br><input type="time" name="hora" value="{{ cfg.novas_hora }}"></label>
+      <label>Estados (siglas separadas por vírgula)<br><input type="text" name="ufs" value="{{ cfg.novas_ufs }}" placeholder="PE"></label>
+      <label>Máximo de empresas por campanha diária<br><input type="number" name="maximo_dia" min="1" max="500" value="{{ cfg.novas_maximo_dia }}">
+        <span class="pequeno suave">Os limites de envio continuam valendo (padrão: 80 e-mails por dia, 60 por campanha). Empresas com celular e e-mail entram primeiro.</span></label>
+    </div>
+    <div>
+      <label>Dono das campanhas diárias (assina e envia pelo WhatsApp/e-mail dele)<br>
+        <select name="dono_id"><option value="">Escolha...</option>
+          {% for u in usuarios %}<option value="{{ u.id }}" {{ 'selected' if dono and dono.id == u.id }}>{{ u.nome }}</option>{% endfor %}</select></label>
+      <div><b class="pequeno">Canais</b><br>
+        <label class="marcar"><input type="checkbox" name="canal_email" {{ 'checked' if 'email' in cfg.novas_canais }}> E-mail (sai sozinho pela fila)</label>
+        <label class="marcar"><input type="checkbox" name="canal_whatsapp" {{ 'checked' if 'whatsapp' in cfg.novas_canais }}> WhatsApp (o time envia com 1 clique)</label></div>
+      <label class="marcar"><input type="checkbox" name="sem_individual" {{ 'checked' if cfg.novas_sem_individual == '1' }}> Deixar de fora empresário individual (inclui os MEIs, que muitas vezes não precisam de e-CNPJ)</label>
+      <label>Chave da API da CNPJá{% if tem_chave %} <span class="selo selo-ok">salva</span>{% endif %}<br>
+        <input type="password" name="chave" autocomplete="off" placeholder="{{ 'Deixe vazio para manter a chave salva' if tem_chave else 'Cole aqui a chave (cnpja.com > Chave de API)' }}"></label>
+    </div>
+  </div>
+  <button class="btn btn-primario">Salvar configuração</button>
+</form>
+
+<form class="cartao" id="mensagens" method="post" action="/empresas-novas/mensagens">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>Mensagens de venda (3 toques: dia 1, dia 3 e dia 7)</h2>
+  <p class="pequeno suave">Use {empresa}, {vendedor} e {cidade}: o sistema troca pelos dados de cada empresa. A assinatura do e-mail ({vendedor} · MS Certificação Digital) entra sozinha. Aqui pode ter preço; evite frases de spam como "promoção" e "não perca".</p>
+  {% for angulo, nome in angulos.items() %}{% set m = mensagens[angulo] %}
+  <details {{ 'open' if loop.first }} style="border-top:1px solid var(--borda);padding:8px 0">
+    <summary><b>{{ loop.index }}. {{ nome }}</b></summary>
+    <div class="grade-2" style="margin-top:8px">
+      <label>💬 WhatsApp<br><textarea name="{{ angulo }}_whatsapp" rows="9">{{ m.whatsapp }}</textarea></label>
+      <div><label>✉️ Assunto do e-mail<br><input type="text" name="{{ angulo }}_assunto" value="{{ m.assunto }}"></label>
+        <label>✉️ E-mail<br><textarea name="{{ angulo }}_email" rows="7">{{ m.email }}</textarea></label></div>
+    </div>
+  </details>
+  {% endfor %}
+  <div class="grupo-btn"><button class="btn btn-primario">Salvar mensagens</button></div>
+</form>
+<form method="post" action="/empresas-novas/restaurar-mensagens" data-confirmar="Voltar as mensagens para o texto inicial?" style="margin:-8px 0 16px"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-pequeno">Voltar as mensagens ao texto inicial</button></form>
+{% endif %}
+
+<div class="cartao">
+  <h2>Campanhas diárias</h2>
+  {% if campanhas %}
+  <div class="tabela-rolagem"><table>
+    <tr><th>Campanha</th><th>Situação</th><th>Empresas</th><th>Dono</th><th>Criada em</th></tr>
+    {% for c in campanhas %}{% set selo = SELOS.get(c.status, ('', c.status)) %}
+    <tr><td><a href="/campanhas/{{ c.id }}">{{ c.nome }}</a>{% if c.status == 'erro' and c.erro %}<div class="pequeno suave">{{ c.erro[:160] }}</div>{% elif c.etapa %}<div class="pequeno suave">{{ c.etapa }}</div>{% endif %}</td>
+      <td><span class="selo {{ selo[0] }}">{{ selo[1] }}</span></td>
+      <td>{{ empresas_por_campanha.get(c.id, 0) }}</td>
+      <td>{{ (usuarios|selectattr('id', 'equalto', c.usuario_id)|map(attribute='nome')|first) or '—' }}</td>
+      <td>{{ c.criado_em|datahora }}</td></tr>
+    {% endfor %}
+  </table></div>
+  {% else %}<p class="suave">Nenhuma campanha diária ainda. Configure a chave da CNPJá e o dono, e clique em "Buscar agora" para a primeira.</p>{% endif %}
+</div>
+{% endblock %}

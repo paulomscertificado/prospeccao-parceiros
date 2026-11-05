@@ -23,6 +23,7 @@ CAMPOS = {
     "SMTP_TLS": ("SMTP_TLS", lambda v: v == "1"), "SMTP_RESPONDER_PARA": ("SMTP_RESPONDER_PARA", str),
     "IMAP_HOST": ("IMAP_HOST", str), "IMAP_PORTA": ("IMAP_PORTA", int), "IMAP_USUARIO": ("IMAP_USUARIO", str),
     "IMAP_SENHA": ("IMAP_SENHA", str),
+    "CNPJA_API_KEY": ("CNPJA_API_KEY", str),
 }
 
 

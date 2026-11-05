@@ -416,13 +416,14 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
         t = db.get(Tarefa, util.para_int(form.get("tarefa_id")) or 0)
         if t and t.campanha_id == cid and t.status in ("rascunho", "pendente"):
             novo = str(form.get("mensagem", "")).strip()
-            if not sdr.texto_seguro(novo):
+            regra = sdr.texto_sem_spam if camp.tipo == "empresas_novas" else sdr.texto_seguro
+            if not regra(novo):
                 avisar(request, "A mensagem tem termos que a SDR não pode usar (valores, %, desconto, exclusividade, "
                                 "contrato ou frases de spam). Ajuste o texto.", "erro")
             else:
                 t.mensagem, t.assunto = novo, str(form.get("assunto", t.assunto))[:200]
                 outro = str(form.get("outro_modelo", "")).strip()
-                if outro and sdr.texto_seguro(outro):
+                if outro and regra(outro):
                     if t.canal == "email":
                         t.mensagem_whatsapp = outro
                     else:

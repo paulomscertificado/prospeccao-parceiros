@@ -444,6 +444,7 @@ class Campanha(Base):
     arquivada: Mapped[bool] = mapped_column(Boolean, default=False)  # some da lista (Ver arquivadas)
     conexao_id: Mapped[str] = mapped_column(String(40), default="")  # número escolhido pelo admin (vazio = automático)
     so_fixo: Mapped[str] = mapped_column(Text, default="")  # ids dos leads só com telefone fixo (o usuário liga)
+    tipo: Mapped[str] = mapped_column(String(30), default="parceiros", index=True)  # parceiros | empresas_novas
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
 
     cadencia: Mapped["Cadencia | None"] = relationship()

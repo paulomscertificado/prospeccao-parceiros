@@ -31,7 +31,7 @@ modelos_html.env.globals.update(config=config, CANAIS=config.CANAIS, PERFIS=conf
 # Cada item aparece só para quem tem a permissão (e com o módulo ligado). A proteção de verdade é a da rota.
 PERMISSAO_DO_MENU = {
     "/": "painel.ver", "/campanhas": "campanhas.ver", "/envios": "envios.ver", "/fila": "fila.ver",
-    "/oportunidades": "oportunidades.ver", "/prospeccao": "prospeccao.buscar", "/leads": "leads.ver",
+    "/oportunidades": "oportunidades.ver", "/empresas-novas": "campanhas.ver", "/prospeccao": "prospeccao.buscar", "/leads": "leads.ver",
     "/agenda": "agenda.ver", "/cadencias": "cadencias.ver", "/parceiros": "parceiros.ver", "/clientes": "clientes.ver",
     "/vencimentos": "vencimentos.ver", "/vendas": "vendas.ver", "/comissoes": "comissoes.ver",
     "/relatorios": "relatorios.ver", "/inteligencia": "inteligencia.ver", "/ia": "ia.usar", "/conversas": "conversas.ver",
@@ -43,6 +43,7 @@ PERMISSAO_DO_MENU = {
 MENU_EQUIPE = [
     ("/", "Dashboard", "grafico"),
     ("/campanhas", "IA SDR (campanhas)", "megafone"),
+    ("/empresas-novas", "Empresas novas", "predio"),
     ("/envios", "Envios", "enviar"),
     ("/fila", "Minha fila", "relogio"),
     ("/oportunidades", "Oportunidades", "fogo"),

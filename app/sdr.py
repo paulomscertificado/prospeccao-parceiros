@@ -163,6 +163,12 @@ ESQUEMA_MENSAGENS = {
 }
 
 
+def texto_sem_spam(texto: str) -> bool:
+    """Campanha de VENDA (Empresas novas): pode ter preço; só não pode frase de spam."""
+    t = (texto or "").lower()
+    return bool(texto) and not any(f in t for f in FRASES_PROIBIDAS)
+
+
 def texto_seguro(texto: str) -> bool:
     t = (texto or "").lower()
     return bool(texto) and not any(f in t for f in FRASES_PROIBIDAS) and not RE_NEGOCIACAO.search(texto or "")

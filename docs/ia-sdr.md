@@ -169,6 +169,24 @@ bloqueado; o WhatsApp Leads conta do mesmo jeito. `mensagens.limite_do_numero(db
 próximo lead quando um número chega ao limite. Minha fila mostra o contador do número da pessoa; Envios, o do número
 que mais enviou.
 
+## Empresas novas – venda para empresas recém-abertas (nov/2026)
+
+`app/empresas_novas.py`, tela `app/rotas/empresas_novas.py` + `empresas_novas.html` (menu "Empresas novas",
+permissão `campanhas.ver`; configurar/buscar com `campanhas.gerenciar`).
+
+- API paga da CNPJá (`CNPJA_API_KEY`, salva pela tela via `arquivo_env`): `GET https://api.cnpja.com/office` com
+  `founded.gte`, `founded.lte`, `address.state.in`, `status.id.in=2`, `limit=1000`, paginação por `token`
+  (até 5 páginas); `GET /credit` para o saldo. 1 crédito a cada 10 registros.
+- `Campanha.tipo` (`parceiros` | `empresas_novas`). A campanha diária é criada com `status="gerando"` e o trabalho
+  "campanha" começa na fase `novas` (`etapa_importar`): cadastra os leads em lotes (duplicado só pelo CNPJ),
+  escreve as mensagens (`textos_do_lead`, modelos editáveis em config `novas_mensagens`) e segue para `_montar`
+  com a cadência "Venda – Empresas novas (D1, D3, D7)" (ângulos `venda_*`).
+- `rotinas.rodada`: a cada 15 min chama `rodada_diaria` (uma vez por dia depois de `novas_hora`; busca de
+  `novas_ultima_data`+1 até hoje, no máximo 7 dias; erro da API tenta de novo na próxima volta).
+- Edição de mensagens na campanha de venda usa `sdr.texto_sem_spam` (preço permitido) em vez de `texto_seguro`.
+  `rotinas.responder_automaticamente` não responde leads de venda (`empresas_novas.e_lead_de_venda`).
+- Testes: `testes/test_empresas_novas.py` (API simulada).
+
 ## Reserva do lead por usuário (nov/2026)
 
 `app/reservas.py`. Campos em `leads`: `reservado_por_id`, `reservado_em`, `reservado_ate`.

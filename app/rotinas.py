@@ -29,6 +29,10 @@ def responder_automaticamente(db, lead: Lead, canal: str, analise: dict, conexao
         return False
     if sdr.com_humano(lead) or sdr.parceiro_do_lead(db, lead):
         return False  # alguém da equipe conduz a conversa: a IA não fala no meio
+    from . import empresas_novas
+
+    if empresas_novas.e_lead_de_venda(lead):
+        return False  # venda para empresa nova: quem responde é o time, não a SDR de parcerias
     from datetime import timedelta
 
     from sqlalchemy import select
@@ -240,6 +244,15 @@ def rodada(numero: int | None) -> None:
                 log.info("Respostas por e-mail processadas: %s", lidas)
         except Exception:  # noqa: BLE001
             log.exception("Erro ao ler respostas por e-mail")
+    if _na_vez(numero, "ultima_busca_empresas_novas", 15):
+        from . import empresas_novas
+
+        try:
+            r = empresas_novas.rodada_diaria()
+            if r:
+                log.info("Empresas novas: %s", r)
+        except Exception:  # noqa: BLE001
+            log.exception("Erro na busca de empresas novas")
     if _na_vez(numero, "ultima_rotina_hora", 60):
         from .vendas_servico import processar_vencimentos
 

@@ -233,6 +233,15 @@ def etapa_gerar(campanha_id: int, _usuario_id, estado: dict, prazo: float) -> bo
     """Monta a campanha em etapas (ver app/trabalhos.py) e deixa esperando aprovação.
     estado["fase"]: buscar → pesquisar → mensagens → montar."""
     fase = estado.setdefault("fase", "buscar")
+    if fase == "novas":  # Empresas novas: as empresas vêm da API da CNPJá (app/empresas_novas.py)
+        from . import empresas_novas
+
+        _anotar(campanha_id, f"Cadastrando as empresas abertas ({estado.get('feitos', 0)} lidas)...", "gerando")
+        if not empresas_novas.etapa_importar(campanha_id, estado, prazo):
+            return False
+        if not estado["escolhidos"]:
+            raise RuntimeError("Nenhuma empresa nova para contatar (todas já estavam cadastradas e em atendimento).")
+        estado["fase"] = fase = "montar"
     if fase == "buscar":
         _anotar(campanha_id, "Procurando empresas na base da Receita...", "gerando")
         estado.update(candidatos=_buscar_candidatos(campanha_id), feitos=0, fase="pesquisar")
