@@ -185,8 +185,11 @@ def gerar_mensagens(db, lead: Lead, usuario, cta: str = "", tom: str = "consulti
                                         "motivo_para_indicar_certificado") if perfil.get(k)}
     cat = lead.categoria
     vendedor = util.primeiro_nome(usuario.nome) if usuario and usuario.perfil != "parceiro" else "a equipe"
+    from . import marca
+
+    empresa_usuario = marca.da_pessoa(usuario)["nome"]
     pedido = (
-        "Você é a SDR virtual da MS Certificação Digital. Objetivo do contato: CONSEGUIR UMA RESPOSTA, não vender.\n"
+        f"Você é a SDR virtual da {empresa_usuario}. Objetivo do contato: CONSEGUIR UMA RESPOSTA, não vender.\n"
         "Escreva 4 mensagens (uma por toque da cadência) para ESTA empresa, cada uma com ângulo diferente:\n"
         + "\n".join(f"- {a}: {d}" for a, d in config.ANGULOS.items()) +
         "\nCada mensagem: contexto real da empresa + motivo do contato + benefício potencial + UMA pergunta simples "
@@ -210,6 +213,7 @@ def gerar_mensagens(db, lead: Lead, usuario, cta: str = "", tom: str = "consulti
     resultado = {}
     for angulo in config.ANGULOS:
         m = dados.get(angulo) or {}
+        m = {k: (marca.aplicar(v, usuario) if isinstance(v, str) else v) for k, v in m.items()}
         if texto_seguro(m.get("whatsapp")) and texto_seguro(m.get("email")):
             resultado[angulo] = {"whatsapp": m["whatsapp"].strip(), "assunto": m.get("assunto", "").strip()
                                  or base[angulo]["assunto"], "email": m["email"].strip(), "fonte": "ia"}
@@ -701,9 +705,12 @@ def enviar_whatsapp_conectado(db, texto: str, usuario: Usuario | None, lead: Lea
     from .integracoes import whatsapp_leads
     from .leads_servico import registrar_contato
 
+    from . import marca
+
     texto = (texto or "").strip()
     if not texto:
         raise EnvioRecusado("A mensagem está vazia.")
+    texto = marca.aplicar(texto, usuario or (lead.vendedor if lead is not None else None))
     if lead is not None:
         telefone = lead.whatsapp or lead.telefone
         nome = lead.responsavel or lead.empresa

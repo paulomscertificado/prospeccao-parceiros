@@ -129,6 +129,15 @@ respostas dos parceiros chegam sozinhas na IA SDR. O rodapé do menu mostra se o
 Configure as categorias em Configurações > **Categorias de parceiros** e o que a IA pode responder em
 **Base de conhecimento**. Detalhes técnicos: [`docs/ia-sdr.md`](docs/ia-sdr.md).
 
+### Empresa que cada usuário representa
+
+Cada usuário pode trabalhar por uma empresa diferente (ex.: MS Certificação Digital, Grupo Certy Certificados).
+Em **Minha conta > Empresa que eu represento**, cada pessoa preenche: nome da empresa, site, apresentação curta,
+como é a validação e os preços do e-CNPJ A1 e A3. A partir daí, as campanhas, mensagens de WhatsApp, e-mails e a
+assinatura dessa pessoa falam em nome da empresa dela (nas campanhas de parceria e na área Empresas novas).
+Quem deixa em branco fala pela MS Certificação Digital. Mensagens já enviadas não mudam; as que ainda vão sair
+são corrigidas na hora do envio.
+
 ### Empresas novas (venda de certificado para empresas recém-abertas)
 
 Menu **Empresas novas**. Todo dia o sistema busca as empresas que acabaram de abrir e monta uma campanha de

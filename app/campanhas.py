@@ -568,7 +568,10 @@ def enviar_teste(db, camp: Campanha, usuario: Usuario, canal: str, destino: str,
         assunto, texto = _texto_do_canal(t, canal)
         try:
             if canal == "email":
-                email_smtp.enviar(destino, f"[TESTE] {assunto or 'MS Certificação Digital'}",
+                from . import marca
+
+                assunto, texto = marca.aplicar(assunto, usuario), marca.aplicar(texto, usuario)
+                email_smtp.enviar(destino, f"[TESTE] {assunto or marca.da_pessoa(usuario)['nome']}",
                                   f"{rotulo}\n\n{texto}", lead_id=None, conta=conta)
             else:
                 whatsapp_leads.enviar(destino, "Teste", f"{rotulo}\n\n{texto}", db=db, manual=True,
@@ -719,8 +722,12 @@ def _enviar_email_da_tarefa(db, t: Tarefa, usuario: Usuario | None, resultado: s
             conta = conta_do_toque(db, t, usuario)
         except contas_email.SemConta as erro:
             return str(erro)
+    from . import conexoes, marca
+
+    quem = conexoes.responsavel(db, lead, usuario, t)
+    t.assunto, t.mensagem = marca.aplicar(t.assunto, quem), marca.aplicar(t.mensagem, quem)
     try:
-        id_externo = email_smtp.enviar(lead.email, t.assunto or "MS Certificação Digital", t.mensagem,
+        id_externo = email_smtp.enviar(lead.email, t.assunto or marca.da_pessoa(quem)["nome"], t.mensagem,
                                        lead_id=lead.id, conta=conta)
     except email_smtp.ErroEmail as erro:
         do_lead = isinstance(erro, email_smtp.ErroDestinatario)
@@ -1134,7 +1141,7 @@ def responsaveis_diferentes(db, camp: Campanha) -> list[dict]:
 def _trocar_assinatura(texto: str, velho: str, novo: str) -> str:
     if not texto or not velho or velho == novo:
         return texto
-    texto = texto.replace(f"\n\n{velho}\nMS Certificação Digital", f"\n\n{novo}\nMS Certificação Digital")
+    texto = re.sub(rf"\n\n{re.escape(velho)}\n(?=[^\n]+$)", f"\n\n{novo}\n", texto)
     return re.sub(rf"\bSou {re.escape(velho)}(,| da| e)", lambda m: f"Sou {novo}{m.group(1)}", texto)
 
 

@@ -142,6 +142,13 @@ class Usuario(Base):
     # Agenda para reuniões marcadas pela IA SDR (ex.: "seg-sex 09:00-12:00,14:00-18:00")
     expediente: Mapped[str] = mapped_column(String(120), default="seg-sex 09:00-12:00,14:00-18:00")
     duracao_reuniao: Mapped[int] = mapped_column(Integer, default=30)
+    # Empresa que o usuário representa nas mensagens (vazio = a padrão do sistema; ver app/marca.py)
+    empresa_nome: Mapped[str] = mapped_column(String(160), default="")
+    empresa_site: Mapped[str] = mapped_column(String(160), default="")
+    empresa_descricao: Mapped[str] = mapped_column(String(200), default="")
+    empresa_validacao: Mapped[str] = mapped_column(String(200), default="")
+    empresa_preco_a1: Mapped[str] = mapped_column(String(40), default="")
+    empresa_preco_a3: Mapped[str] = mapped_column(String(40), default="")
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
     ultimo_login: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # Verificação em 2 etapas (app/dois_fatores.py): segredo criptografado, último código usado e os resumos dos

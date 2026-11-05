@@ -98,6 +98,10 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
             else:
                 template = passo.template or mensagens.template_padrao(db, passo.canal)
                 assunto, corpo = mensagens.montar(db, template, lead, responsavel)
+            from . import marca
+
+            assunto, corpo = marca.aplicar(assunto, responsavel), marca.aplicar(corpo, responsavel)
+            modelos = {k: marca.aplicar(v, responsavel) for k, v in modelos.items()}
             db.add(Tarefa(
                 tipo="prospeccao", lead_id=lead.id, passo_id=passo.id, campanha_id=campanha_id,
                 usuario_id=responsavel.id if responsavel else None, canal=canal, data=data,

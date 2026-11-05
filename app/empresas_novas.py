@@ -63,18 +63,18 @@ MENSAGENS_PADRAO = {
     "venda_boas_vindas": {
         "assunto": "Certificado digital para a {empresa}",
         "whatsapp": ("Olá! Tudo bem? Vi que a {empresa} acabou de abrir. Parabéns pela nova empresa!\n\n"
-                     "Sou {vendedor}, da MS Certificação Digital (Autoridade de Registro ICP-Brasil, em Recife). "
+                     "Sou {vendedor}, da {minha_empresa}. "
                      "Para emitir nota fiscal eletrônica, acessar o e-CAC e cumprir as obrigações da empresa, "
                      "normalmente é preciso o certificado digital e-CNPJ.\n\n"
-                     "e-CNPJ A1 (arquivo, 1 ano): R$ 200\ne-CNPJ A3 no token (1 ano): R$ 435\n"
-                     "Validação por videoconferência ou presencial em Recife.\n\n"
+                     "e-CNPJ A1 (arquivo, 1 ano): {preco_a1}\ne-CNPJ A3 no token (1 ano): {preco_a3}\n"
+                     "Validação {validacao}.\n\n"
                      "Posso te ajudar a emitir o seu?\n\n(Se não quiser receber mensagens, é só responder SAIR.)"),
         "email": ("Olá! Tudo bem?\n\nVi que a {empresa} acabou de abrir. Parabéns pela nova empresa!\n\n"
-                  "Sou {vendedor}, da MS Certificação Digital, Autoridade de Registro ICP-Brasil em Recife. Para "
+                  "Sou {vendedor}, da {minha_empresa}. Para "
                   "emitir nota fiscal eletrônica, acessar o e-CAC e cumprir as obrigações da empresa, normalmente é "
                   "preciso o certificado digital e-CNPJ.\n\n"
-                  "- e-CNPJ A1 (arquivo, 1 ano): R$ 200\n- e-CNPJ A3 no token (1 ano): R$ 435\n\n"
-                  "A validação pode ser por videoconferência ou presencial em Recife. Pagamento por Pix, cartão "
+                  "- e-CNPJ A1 (arquivo, 1 ano): {preco_a1}\n- e-CNPJ A3 no token (1 ano): {preco_a3}\n\n"
+                  "A validação pode ser {validacao}. Pagamento por Pix, cartão "
                   "ou boleto.\n\nPosso te ajudar a emitir o seu? É só responder este e-mail."),
     },
     "venda_lembrete": {
@@ -87,7 +87,7 @@ MENSAGENS_PADRAO = {
                   "mesmo dia.\n\nQuer que eu te mande o passo a passo? É só responder."),
     },
     "venda_ultimo": {
-        "assunto": "Encerrando meu contato — MS Certificação Digital",
+        "assunto": "Encerrando meu contato — {minha_empresa}",
         "whatsapp": ("Olá! Este é meu último contato sobre o certificado digital da {empresa}. Se precisar, é só "
                      "responder aqui que eu te atendo. Sucesso com a nova empresa!"),
         "email": ("Olá!\n\nEste é meu último contato sobre o certificado digital da {empresa}. Se em algum momento "
@@ -233,12 +233,18 @@ def garantir_cadencia(db):
 
 def textos_do_lead(db, lead: Lead, usuario: Usuario | None) -> dict:
     """Mensagens dos 3 toques para a empresa ({empresa}, {vendedor}, {cidade} trocados)."""
+    from . import marca
+
     vendedor = util.primeiro_nome(usuario.nome) if usuario and usuario.perfil != "parceiro" else "a equipe"
-    assinatura = f"\n\n{vendedor}\nMS Certificação Digital · mscertificados.com.br"
-    valores = {"empresa": lead.empresa, "vendedor": vendedor, "cidade": lead.cidade or ""}
+    m = marca.da_pessoa(usuario)
+    assinatura = marca.assinatura(usuario, vendedor)
+    valores = {"empresa": lead.empresa, "vendedor": vendedor, "cidade": lead.cidade or "", "minha_empresa": m["nome"],
+               "preco_a1": m["preco_a1"], "preco_a3": m["preco_a3"], "validacao": m["validacao"]}
 
     def trocar(texto: str) -> str:
-        return re.sub(r"\{(empresa|vendedor|cidade)\}", lambda m: valores[m.group(1)], texto or "")
+        texto = re.sub(r"\{(empresa|vendedor|cidade|minha_empresa|preco_a1|preco_a3|validacao)\}",
+                       lambda x: valores[x.group(1)], texto or "")
+        return marca.aplicar(texto, usuario)
 
     return {a: {"whatsapp": trocar(m["whatsapp"]), "email": trocar(m["email"]) + assinatura,
                 "assunto": trocar(m["assunto"])[:200], "fonte": "empresas_novas"}

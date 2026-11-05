@@ -232,8 +232,30 @@ def sair(request: Request):
 
 @rotas.get("/minha-conta")
 def minha_conta(request: Request, usuario: Usuario = Depends(usuario_logado)):
+    from .. import marca
+
     return tela(request, "minha_conta.html", {"restam_codigos": dois_fatores.codigos_restantes(usuario),
-                                              "exige_2fa": dois_fatores.precisa(usuario)})
+                                              "exige_2fa": dois_fatores.precisa(usuario),
+                                              "marca_padrao": marca.PADRAO})
+
+
+@rotas.post("/minha-conta/empresa", dependencies=[Depends(verificar_csrf)])
+async def salvar_empresa(request: Request, usuario: Usuario = Depends(usuario_logado), db: Session = Depends(obter_db)):
+    """Empresa que o usuário representa nas mensagens (app/marca.py)."""
+    form = await request.form()
+    usuario = db.get(Usuario, usuario.id)
+    limites = {"nome": 160, "site": 160, "descricao": 200, "validacao": 200, "preco_a1": 40, "preco_a3": 40}
+    for campo, tamanho in limites.items():
+        valor = str(form.get(campo, "")).strip()
+        if campo == "site":
+            valor = valor.removeprefix("https://").removeprefix("http://").removeprefix("www.").rstrip("/")
+        setattr(usuario, f"empresa_{campo}", valor[:tamanho])
+    registrar_log(db, usuario, "configurou_empresa_representada", "usuario", usuario.id, request=request)
+    db.commit()
+    from .. import marca
+
+    avisar(request, f"Pronto: suas próximas campanhas e mensagens falam em nome de {marca.da_pessoa(usuario)['nome']}.")
+    return voltar("/minha-conta#empresa")
 
 
 @rotas.post("/minha-conta/senha", dependencies=[Depends(verificar_csrf)])

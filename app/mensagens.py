@@ -55,8 +55,11 @@ def montar(db: Session, template: Template | None, lead: Lead | None, usuario: U
     """(assunto, corpo) do template com as variáveis do lead."""
     if not template:
         return "", ""
+    from . import marca
+
     valores = valores_variaveis(db, lead, usuario)
-    return aplicar_variaveis(template.assunto, valores), aplicar_variaveis(template.corpo, valores)
+    return (marca.aplicar(aplicar_variaveis(template.assunto, valores), usuario),
+            marca.aplicar(aplicar_variaveis(template.corpo, valores), usuario))
 
 
 def template_padrao(db: Session, canal: str) -> Template | None:
