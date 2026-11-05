@@ -123,6 +123,10 @@ def migrar_colunas() -> list[str]:
     inspetor = inspect(motor)
     adicionadas = []
     with motor.begin() as con:
+        if motor.dialect.name == "postgresql":
+            # várias cópias da nuvem sobem juntas depois de uma publicação: uma migra por vez, as outras esperam
+            con.execute(text("SELECT pg_advisory_xact_lock(724501)"))
+            inspetor = inspect(con)
         for tabela in Base.metadata.tables.values():
             if not inspetor.has_table(tabela.name):
                 continue
