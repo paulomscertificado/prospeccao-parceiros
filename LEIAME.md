@@ -132,9 +132,10 @@ Configure as categorias em Configurações > **Categorias de parceiros** e o que
 ### Empresa que cada usuário representa
 
 Cada usuário pode trabalhar por uma empresa diferente (ex.: MS Certificação Digital, Grupo Certy Certificados).
-Em **Minha conta > Empresa que eu represento**, cada pessoa preenche: nome da empresa, site, apresentação curta,
-como é a validação e os preços do e-CNPJ A1 e A3. A partir daí, as campanhas, mensagens de WhatsApp, e-mails e a
-assinatura dessa pessoa falam em nome da empresa dela (nas campanhas de parceria e na área Empresas novas).
+Em **Minha conta > Empresa que eu represento**, cada pessoa preenche: nome da empresa, site e apresentação curta.
+A partir daí, as campanhas, mensagens de WhatsApp, e-mails e a assinatura dessa pessoa falam em nome da empresa
+dela (nas campanhas de parceria e na área Empresas novas). Para outra empresa, as mensagens não falam de onde é a
+validação (o "presencial em Recife" é da MS).
 Quem deixa em branco fala pela MS Certificação Digital. Mensagens já enviadas não mudam; as que ainda vão sair
 são corrigidas na hora do envio.
 
@@ -152,7 +153,7 @@ Menu **Empresas novas**. Todo dia o sistema busca as empresas que acabaram de ab
 **Todo dia:** no horário escolhido, o sistema busca as empresas **ativas** abertas desde a última busca, cadastra
 como leads (origem "Empresas novas (CNPJá)") e monta a campanha **"Empresas novas dd/mm – PE"**, que fica
 **aguardando aprovação**. Depois de aprovada: o e-mail sai sozinho pela fila (horário e limites) e o WhatsApp
-aparece para o time enviar com 1 clique. São 3 toques: dia 1 (boas-vindas + oferta com preço), dia 3 (lembrete)
+aparece para o time enviar com 1 clique. São 3 toques: dia 1 (boas-vindas + oferta do e-CNPJ), dia 3 (lembrete)
 e dia 7 (último contato). As mensagens podem ser editadas na própria tela. A IA não responde sozinha esses
 leads: as respostas vão para **Oportunidades** e o time conversa.
 

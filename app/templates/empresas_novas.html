@@ -63,7 +63,7 @@
 <form class="cartao" id="mensagens" method="post" action="/empresas-novas/mensagens">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <h2>Mensagens de venda (3 toques: dia 1, dia 3 e dia 7)</h2>
-  <p class="pequeno suave">Use {empresa}, {vendedor} e {cidade}: o sistema troca pelos dados de cada empresa. A assinatura do e-mail ({vendedor} · MS Certificação Digital) entra sozinha. Aqui pode ter preço; evite frases de spam como "promoção" e "não perca".</p>
+  <p class="pequeno suave">Use {empresa}, {vendedor}, {cidade} e {minha_empresa}: o sistema troca pelos dados de cada empresa. A assinatura do e-mail ({vendedor} · MS Certificação Digital) entra sozinha. Evite frases de spam como "promoção" e "não perca".</p>
   {% for angulo, nome in angulos.items() %}{% set m = mensagens[angulo] %}
   <details {{ 'open' if loop.first }} style="border-top:1px solid var(--borda);padding:8px 0">
     <summary><b>{{ loop.index }}. {{ nome }}</b></summary>

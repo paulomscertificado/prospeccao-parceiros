@@ -5,7 +5,8 @@ from types import SimpleNamespace
 from app import marca
 
 TEXTO_MS = ("Olá, Daniele, tudo bem?\n\nSou Thamires, da MS Certificação Digital, Autoridade de Registro ICP-Brasil.\n\n"
-            "Isso fica com a MS: atendimento, validação presencial em Recife ou por videoconferência.\n\n"
+            "Isso fica com a MS: atendimento, validação presencial em Recife ou por videoconferência e aviso.\n\n"
+            "Nossa equipe faz a validação (presencial em Recife ou por videoconferência) e avisa.\n\n"
             "Thamires\nMS Certificação Digital · mscertificados.com.br")
 
 
@@ -20,33 +21,30 @@ def test_sem_configuracao_fica_como_esta():
     assert marca.aplicar(TEXTO_MS, None) == TEXTO_MS
 
 
-def test_troca_pela_empresa_do_usuario():
-    u = _usuario(nome="Grupo Certy Certificados", site="grupocerty.com.br", descricao="Autoridade de Registro credenciada",
-                 validacao="por videoconferência ou presencial em Fortaleza")
+def test_troca_pela_empresa_do_usuario_e_tira_a_validacao():
+    u = _usuario(nome="Grupo Certy Certificados", site="grupocerty.com.br", descricao="Autoridade de Registro credenciada")
     t = marca.aplicar(TEXTO_MS, u)
-    assert "MS" not in t and "mscertificados" not in t and "Recife" not in t
+    assert "MS" not in t and "mscertificados" not in t and "Recife" not in t and "videoconferência" not in t
     assert "Sou Thamires, do Grupo Certy Certificados, Autoridade de Registro credenciada." in t
+    assert "atendimento, validação e aviso" in t and "faz a validação e avisa" in t
     assert "Grupo Certy Certificados · grupocerty.com.br" in t
-    assert "validação por videoconferência ou presencial em Fortaleza" in t
 
 
-def test_empresas_novas_usa_preco_e_nome_do_dono():
+def test_empresas_novas_sem_preco_e_com_nome_do_dono():
     from app import empresas_novas
 
-    u = _usuario(nome="Certifica Já", preco_a1="R$ 180", preco_a3="R$ 400", site="certificaja.com.br")
+    u = _usuario(nome="Certifica Já", site="certificaja.com.br")
     lead = SimpleNamespace(empresa="Nova Loja Ltda", cidade="Recife")
-
-    class Db:  # mensagens() lê só a configuração (sem textos salvos: usa os modelos)
-        pass
-
     original = empresas_novas.mensagens
     empresas_novas.mensagens = lambda db: empresas_novas.MENSAGENS_PADRAO
     try:
-        textos = empresas_novas.textos_do_lead(Db(), lead, u)
+        textos = empresas_novas.textos_do_lead(None, lead, u)
     finally:
         empresas_novas.mensagens = original
-    zap = textos["venda_boas_vindas"]["whatsapp"]
-    assert "da Certifica Já" in zap and "R$ 180" in zap and "R$ 400" in zap and "MS" not in zap
+    for angulo in textos.values():
+        for campo in ("whatsapp", "email", "assunto"):
+            assert "R$" not in angulo[campo] and "validação" not in angulo[campo].lower() and "MS" not in angulo[campo]
+    assert "da Certifica Já" in textos["venda_boas_vindas"]["whatsapp"]
     assert textos["venda_boas_vindas"]["email"].endswith("Thamires\nCertifica Já · certificaja.com.br")
 
 
@@ -58,10 +56,10 @@ def test_minha_conta_salva_empresa(cliente):
     from app.modelos import Usuario
 
     pagina = cliente.get("/minha-conta")
-    assert "Empresa que eu represento" in pagina.text
+    trecho = pagina.text.split("Empresa que eu represento")[1].split("</form>")[0]
+    assert "Preço" not in trecho and "validação" not in trecho
     cliente.post("/minha-conta/empresa", data={"csrf": csrf_de(pagina.text), "nome": "Grupo Certy Certificados",
-                                               "site": "https://www.grupocerty.com.br/", "descricao": "", "validacao": "",
-                                               "preco_a1": "", "preco_a3": ""})
+                                               "site": "https://www.grupocerty.com.br/", "descricao": ""})
     with sessao() as db:
         admin = db.execute(select(Usuario).where(Usuario.perfil == "admin")).scalars().first()
         assert admin.empresa_nome == "Grupo Certy Certificados" and admin.empresa_site == "grupocerty.com.br"

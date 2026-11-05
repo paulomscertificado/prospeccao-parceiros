@@ -79,7 +79,7 @@ def test_busca_monta_campanha_de_venda(cliente, monkeypatch):
         lead = db.execute(select(Lead).where(Lead.cnpj.like("11.111.111%"))).scalars().first()
         assert lead.origem == empresas_novas.ORIGEM and lead.whatsapp == "(81) 99136-3335"
         primeira = [t for t in tarefas if t.lead_id == lead.id and t.angulo == "venda_boas_vindas"][0]
-        assert "R$ 200" in primeira.mensagem_whatsapp and "acabou de abrir" in primeira.mensagem_whatsapp
+        assert "R$" not in primeira.mensagem_whatsapp and "acabou de abrir" in primeira.mensagem_whatsapp
         assert len([t for t in tarefas if t.lead_id == lead.id]) == 3  # dia 1, 3 e 7
         assert lead.reservado_por_id == admin_id(db)
 

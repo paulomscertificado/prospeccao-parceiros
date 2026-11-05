@@ -11,12 +11,7 @@
     <div class="campo"><label>Nome da empresa</label><input type="text" name="nome" maxlength="160" value="{{ usuario.empresa_nome }}" placeholder="{{ marca_padrao.nome }}"></div>
     <div class="campo"><label>Site</label><input type="text" name="site" maxlength="160" value="{{ usuario.empresa_site }}" placeholder="{{ marca_padrao.site }}"></div>
     <div class="campo"><label>Apresentação curta</label><input type="text" name="descricao" maxlength="200" value="{{ usuario.empresa_descricao }}" placeholder="{{ marca_padrao.descricao }}"></div>
-    <div class="campo"><label>Como é a validação</label><input type="text" name="validacao" maxlength="200" value="{{ usuario.empresa_validacao }}" placeholder="{{ marca_padrao.validacao }}"></div>
-    <div class="campo"><label>Preço do e-CNPJ A1 (1 ano)</label><input type="text" name="preco_a1" maxlength="40" value="{{ usuario.empresa_preco_a1 }}" placeholder="{{ marca_padrao.preco_a1 }}"></div>
-    <div class="campo"><label>Preço do e-CNPJ A3 no token (1 ano)</label><input type="text" name="preco_a3" maxlength="40" value="{{ usuario.empresa_preco_a3 }}" placeholder="{{ marca_padrao.preco_a3 }}"></div>
   </div>
-  <p class="pequeno suave">Os preços entram nas mensagens de venda da área Empresas novas. Mensagens já enviadas não mudam;
-    as que ainda vão sair passam a usar estes dados.</p>
   <button class="btn btn-primario">Salvar empresa</button>
 </form>
 <div class="cartao" style="max-width:520px">

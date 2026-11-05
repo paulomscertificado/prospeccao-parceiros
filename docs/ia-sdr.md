@@ -171,16 +171,17 @@ que mais enviou.
 
 ## Empresa representada por usuário (nov/2026)
 
-`app/marca.py`. Campos em `usuarios`: `empresa_nome`, `empresa_site`, `empresa_descricao`, `empresa_validacao`,
-`empresa_preco_a1`, `empresa_preco_a3` (vazio = `marca.PADRAO`, a MS). Tela: Minha conta (`POST /minha-conta/empresa`).
+`app/marca.py`. Campos em `usuarios`: `empresa_nome`, `empresa_site`, `empresa_descricao` (vazio = `marca.PADRAO`,
+a MS). Tela: Minha conta (`POST /minha-conta/empresa`). (`empresa_validacao`, `empresa_preco_a1/a3` existem no banco
+mas não são usados: a Maria pediu para tirar.)
 
 - `marca.aplicar(texto, usuario)` troca nos textos dos modelos "MS Certificação Digital"/"MS Certificados", o site,
-  "Autoridade de Registro ICP-Brasil", "presencial em Recife ou por videoconferência" e "a/da/com a MS" (com "do/no/
+  "Autoridade de Registro ICP-Brasil", tira "presencial em Recife ou por videoconferência"/"em Recife" e troca "a/da/com a MS" (com "do/no/
   pelo" para nomes masculinos como "Grupo ..."). Chamado em `cadencias.aplicar` (tarefas das campanhas),
   `mensagens.montar`, `sdr.gerar_mensagens`, `sdr.enviar_whatsapp_conectado`, `campanhas._enviar_email_da_tarefa`
   (na hora do envio, com o responsável pelo lead) e no e-mail de teste.
-- A IA SDR escreve como SDR da empresa do usuário. Empresas novas: placeholders `{minha_empresa}`, `{preco_a1}`,
-  `{preco_a3}`, `{validacao}` e assinatura `marca.assinatura`.
+- A IA SDR escreve como SDR da empresa do usuário. Empresas novas: placeholder `{minha_empresa}` e assinatura
+  `marca.assinatura`; as mensagens de venda não têm preço nem local de validação.
 - `campanhas._trocar_assinatura` não depende mais do nome da MS.
 - Testes: `testes/test_marca.py`.
 

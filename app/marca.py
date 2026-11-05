@@ -1,8 +1,8 @@
 """Empresa que cada usuário representa nas mensagens (ex.: MS Certificação Digital, Grupo Certy Certificados).
 
-Cada usuário configura em Minha conta > "Empresa que eu represento": nome, site, apresentação curta, onde faz a
-validação e os preços do e-CNPJ (usados na área Empresas novas). Quem não preencher fala pela empresa padrão do
-sistema (MS Certificação Digital).
+Cada usuário configura em Minha conta > "Empresa que eu represento": nome, site e apresentação curta. Quem não
+preencher fala pela empresa padrão do sistema (MS Certificação Digital). Para outra empresa, as mensagens não falam
+de onde é a validação (o "presencial em Recife" é da MS) nem de preço.
 
 Os modelos de mensagem do sistema foram escritos com o nome da MS. `aplicar` troca esses trechos pela empresa do
 usuário. É chamado ao montar as mensagens das campanhas (o time já vê o texto certo na aprovação) e de novo na hora
@@ -17,9 +17,6 @@ PADRAO = {
     "nome": "MS Certificação Digital",
     "site": "mscertificados.com.br",
     "descricao": "Autoridade de Registro ICP-Brasil",
-    "validacao": "presencial em Recife ou por videoconferência",
-    "preco_a1": "R$ 200",
-    "preco_a3": "R$ 435",
 }
 
 
@@ -59,8 +56,10 @@ def aplicar(texto: str, usuario: Usuario | None) -> str:
     t = t.replace("mscertificados.com.br", m["site"])
     t = t.replace("Autoridade de Registro ICP-Brasil", m["descricao"]) if m["descricao"] else re.sub(
         r"\s*\(?,?\s*Autoridade de Registro ICP-Brasil[^).\n]*\)?", "", t)
-    t = t.replace("presencial em Recife ou por videoconferência", m["validacao"])
-    t = t.replace("em Recife", "").replace("  ", " ") if "Recife" in t and "Recife" not in m["validacao"] else t
+    # onde é a validação é coisa da MS: some da mensagem de outra empresa
+    t = re.sub(r"\s*\(presencial em Recife ou por videoconferência\)", "", t)
+    t = re.sub(r"\s*presencial em Recife ou por videoconferência", "", t)
+    t = re.sub(r"\s+em Recife\b", "", t)
     # "a MS cuida", "com a MS", "da MS" → nome da empresa
     t = re.sub(r"\b(a|da|na|pela|com a) MS\b(?! Certifica)", lambda x: f"{x.group(1)} {m['nome']}", t)
     t = re.sub(r" · $", "", t, flags=re.M)

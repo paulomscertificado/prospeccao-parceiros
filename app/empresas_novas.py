@@ -38,12 +38,12 @@ MAXIMO_PAGINAS = 5  # 5 mil empresas por busca, no máximo (proteção dos créd
 
 ANGULOS = {
     "venda_boas_vindas": "Boas-vindas à empresa nova + oferta do e-CNPJ",
-    "venda_lembrete": "Lembrete com facilidade (validação por vídeo)",
+    "venda_lembrete": "Lembrete",
     "venda_ultimo": "Último contato (encerramento educado)",
 }
 CADENCIA_NOME = "Venda – Empresas novas (D1, D3, D7)"
 CADENCIA_PASSOS = [(1, "venda_boas_vindas", "Boas-vindas e oferta do certificado"),
-                   (3, "venda_lembrete", "Lembrete (validação por vídeo)"),
+                   (3, "venda_lembrete", "Lembrete"),
                    (7, "venda_ultimo", "Último contato")]
 
 PADRAO = {
@@ -66,25 +66,20 @@ MENSAGENS_PADRAO = {
                      "Sou {vendedor}, da {minha_empresa}. "
                      "Para emitir nota fiscal eletrônica, acessar o e-CAC e cumprir as obrigações da empresa, "
                      "normalmente é preciso o certificado digital e-CNPJ.\n\n"
-                     "e-CNPJ A1 (arquivo, 1 ano): {preco_a1}\ne-CNPJ A3 no token (1 ano): {preco_a3}\n"
-                     "Validação {validacao}.\n\n"
                      "Posso te ajudar a emitir o seu?\n\n(Se não quiser receber mensagens, é só responder SAIR.)"),
         "email": ("Olá! Tudo bem?\n\nVi que a {empresa} acabou de abrir. Parabéns pela nova empresa!\n\n"
                   "Sou {vendedor}, da {minha_empresa}. Para "
                   "emitir nota fiscal eletrônica, acessar o e-CAC e cumprir as obrigações da empresa, normalmente é "
                   "preciso o certificado digital e-CNPJ.\n\n"
-                  "- e-CNPJ A1 (arquivo, 1 ano): {preco_a1}\n- e-CNPJ A3 no token (1 ano): {preco_a3}\n\n"
-                  "A validação pode ser {validacao}. Pagamento por Pix, cartão "
-                  "ou boleto.\n\nPosso te ajudar a emitir o seu? É só responder este e-mail."),
+                  "Posso te ajudar a emitir o seu? É só responder este e-mail."),
     },
     "venda_lembrete": {
-        "assunto": "Seu e-CNPJ pode ficar pronto hoje",
-        "whatsapp": ("Olá! Passando para lembrar: se a {empresa} precisar do certificado digital e-CNPJ, dá para "
-                     "fazer a validação por videoconferência, sem sair do escritório. Quer que eu te mande o passo a "
-                     "passo?"),
-        "email": ("Olá!\n\nPassando para lembrar: se a {empresa} precisar do certificado digital e-CNPJ, dá para "
-                  "fazer a validação por videoconferência, sem sair do escritório, e o certificado fica pronto no "
-                  "mesmo dia.\n\nQuer que eu te mande o passo a passo? É só responder."),
+        "assunto": "Certificado digital da {empresa}",
+        "whatsapp": ("Olá! Passando para lembrar: se a {empresa} precisar do certificado digital e-CNPJ para emitir "
+                     "nota fiscal ou acessar o e-CAC, posso te ajudar. Quer que eu te explique como funciona?"),
+        "email": ("Olá!\n\nPassando para lembrar: se a {empresa} precisar do certificado digital e-CNPJ para "
+                  "emitir nota fiscal ou acessar o e-CAC, posso te ajudar.\n\nQuer que eu te explique como "
+                  "funciona? É só responder."),
     },
     "venda_ultimo": {
         "assunto": "Encerrando meu contato — {minha_empresa}",
@@ -238,11 +233,10 @@ def textos_do_lead(db, lead: Lead, usuario: Usuario | None) -> dict:
     vendedor = util.primeiro_nome(usuario.nome) if usuario and usuario.perfil != "parceiro" else "a equipe"
     m = marca.da_pessoa(usuario)
     assinatura = marca.assinatura(usuario, vendedor)
-    valores = {"empresa": lead.empresa, "vendedor": vendedor, "cidade": lead.cidade or "", "minha_empresa": m["nome"],
-               "preco_a1": m["preco_a1"], "preco_a3": m["preco_a3"], "validacao": m["validacao"]}
+    valores = {"empresa": lead.empresa, "vendedor": vendedor, "cidade": lead.cidade or "", "minha_empresa": m["nome"]}
 
     def trocar(texto: str) -> str:
-        texto = re.sub(r"\{(empresa|vendedor|cidade|minha_empresa|preco_a1|preco_a3|validacao)\}",
+        texto = re.sub(r"\{(empresa|vendedor|cidade|minha_empresa)\}",
                        lambda x: valores[x.group(1)], texto or "")
         return marca.aplicar(texto, usuario)
 
