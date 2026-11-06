@@ -160,7 +160,15 @@ def migrar_status(db: Session) -> int:
 def criar_tabelas() -> None:
     from . import base_receita, bases_importadas, modelos  # noqa: F401  (registra as tabelas)
 
-    Base.metadata.create_all(motor)
+    if motor.dialect.name == "postgresql":
+        from sqlalchemy import text
+
+        # várias cópias da nuvem sobem juntas: uma cria as tabelas novas por vez (senão "already exists")
+        with motor.begin() as con:
+            con.execute(text("SELECT pg_advisory_xact_lock(724501)"))
+            Base.metadata.create_all(con)
+    else:
+        Base.metadata.create_all(motor)
     migrar_colunas()
     with sessao() as db:
         modelos.dados_iniciais(db)
