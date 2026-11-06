@@ -73,6 +73,7 @@ def configuracoes(request: Request, aba: str = "geral", usuario: Usuario = Depen
             ("WhatsApp Cloud API (oficial)", whatsapp_cloud.configurado(), "WHATSAPP_TOKEN e WHATSAPP_PHONE_NUMBER_ID no .env"),
             ("E-mail (SMTP)", email_smtp.configurado(), "SMTP_HOST, SMTP_USUARIO, SMTP_SENHA e SMTP_REMETENTE no .env"),
             ("Respostas por e-mail (IMAP)", email_imap.configurado(), "IMAP_HOST, IMAP_USUARIO e IMAP_SENHA no .env"),
+            ("CNPJá (Empresas novas)", bool(_chave_cnpja()), "Chave da API: no quadro CNPJá abaixo"),
             ("Google Places", bool(config.GOOGLE_PLACES_API_KEY), "GOOGLE_PLACES_API_KEY no .env"),
             ("OpenStreetMap", True, "Gratuito, já funciona"),
             ("BrasilAPI (CNPJ)", True, "Gratuito, já funciona"),
@@ -81,6 +82,7 @@ def configuracoes(request: Request, aba: str = "geral", usuario: Usuario = Depen
         "fontes": prospeccao.fontes_disponiveis(db), "receita": base_receita.resumo(db),
         "listas": bases_importadas.listas(db) if aba == "integracoes" else [],
         "receita_oculta": bases_importadas.receita_oculta(db),
+        "tem_chave_cnpja": bool(_chave_cnpja()) if aba == "integracoes" else False,
         "demo": db.execute(select(Lead.id).where(Lead.origem == "Demonstração").limit(1)).first() is not None,
         "email": _email_atual() if aba == "email" else None,
         "dns": dns_email.verificar(config.EMAIL_DOMINIO)
@@ -303,6 +305,45 @@ def importar_receita(request: Request, pasta: str = Form(...), usuario: Usuario 
         db.commit()
         avisar(request, "Importação iniciada. Leva uns 3 a 5 minutos; acompanhe nesta tela.")
     return voltar("/configuracoes?aba=integracoes")
+
+
+def _chave_cnpja() -> str:
+    from .. import empresas_novas
+
+    return empresas_novas.chave_api()
+
+
+@rotas.post("/configuracoes/cnpja", dependencies=[Depends(verificar_csrf)])
+def salvar_chave_cnpja(request: Request, chave: str = Form(""), usuario: Usuario = Depends(exige("configuracoes.alterar")),
+                       db: Session = Depends(obter_db)):
+    """Chave da API da CNPJá (usada em Empresas novas). Fica no .env (na nuvem: no banco, criptografada)."""
+    from .. import arquivo_env
+
+    chave = chave.strip()
+    if len(chave) < 20 or " " in chave:
+        avisar(request, "Cole a chave inteira da API da CNPJá (cnpja.com > Chave de API).", "erro")
+        return voltar("/configuracoes?aba=integracoes#cnpja")
+    arquivo_env.gravar({"CNPJA_API_KEY": chave})
+    registrar_log(db, usuario, "salvou_chave_cnpja", "configuracao", None, request=request)  # a chave não vai no log
+    db.commit()
+    avisar(request, "Chave da CNPJá salva. Clique em \"Testar a chave\" para conferir o saldo.")
+    return voltar("/configuracoes?aba=integracoes#cnpja")
+
+
+@rotas.post("/configuracoes/cnpja/saldo", dependencies=[Depends(verificar_csrf)])
+def saldo_cnpja(request: Request, usuario: Usuario = Depends(exige("configuracoes.ver"))):
+    from .. import empresas_novas
+
+    try:
+        s = empresas_novas.saldo()
+    except empresas_novas.ErroCnpja as erro:
+        texto = str(erro)
+        avisar(request, f"{texto[:1].upper()}{texto[1:]}.", "erro")
+        return voltar("/configuracoes?aba=integracoes#cnpja")
+    total = (s.get("perpetual") or 0) + (s.get("transient") or 0)
+    avisar(request, f"A chave da CNPJá funciona. Saldo: {total} créditos ({s.get('transient', 0)} do mês e "
+                    f"{s.get('perpetual', 0)} acumulados).")
+    return voltar("/configuracoes?aba=integracoes#cnpja")
 
 
 MAXIMO_UPLOAD_NUVEM = 4 * 1024 * 1024  # a Vercel recusa pedidos maiores que 4,5 MB

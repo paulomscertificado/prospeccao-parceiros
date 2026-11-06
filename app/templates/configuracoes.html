@@ -134,6 +134,21 @@
   <p class="ajuda" style="margin-top:12px">As chaves ficam no arquivo <code>.env</code> da pasta do sistema (nunca na tela nem no banco). Passo a passo em <code>docs/configuracao.md</code>. Depois de mudar o .env, feche e abra o sistema de novo.</p>
   <p class="ajuda">Webhook do WhatsApp (para receber respostas e "SAIR" automaticamente): <code>{{ config.URL_PUBLICA }}/api/webhooks/whatsapp</code></p>
 </div>
+<div class="cartao" style="max-width:860px" id="cnpja"><h2>CNPJá (Empresas novas)</h2>
+  <p>A API paga da <b>CNPJá</b> traz, todo dia, as empresas que acabaram de abrir para a campanha de venda do e-CNPJ
+    (menu <a href="/empresas-novas">Empresas novas</a>). Cada 10 empresas encontradas gastam 1 crédito.</p>
+  <p>Chave da API: {% if tem_chave_cnpja %}<span class="selo selo-ok">configurada</span>{% else %}<span class="selo selo-erro">falta colocar</span>{% endif %}</p>
+  {% if pode('configuracoes.alterar') %}
+  <form method="post" action="/configuracoes/cnpja" class="filtros">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="password" name="chave" autocomplete="off" required style="flex:1;min-width:260px" aria-label="Chave da API da CNPJá"
+           placeholder="{{ 'Cole uma chave nova para trocar a atual' if tem_chave_cnpja else 'Cole aqui a chave (cnpja.com > Chave de API)' }}">
+    <button class="btn btn-primario">Salvar chave</button></form>
+  {% endif %}
+  {% if tem_chave_cnpja %}<form method="post" action="/configuracoes/cnpja/saldo" style="margin-top:8px"><input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="btn">Testar a chave (ver saldo, não gasta crédito)</button></form>{% endif %}
+  <p class="ajuda">A chave fica guardada criptografada e nunca aparece na tela. Para trocar, cole a nova e salve.</p>
+</div>
 <div class="cartao" style="max-width:860px" id="receita"><h2>Base de CNPJs da Receita Federal</h2>
   {% if receita.total %}<p><b>{{ receita.total }}</b> escritórios de contabilidade ativos na base local · atualizada em {{ receita.atualizada_em }}.</p>
   {% else %}<p>A base ainda não foi importada. Ela é a melhor fonte para "Encontrar novos parceiros": traz <b>todos</b> os escritórios de contabilidade ativos do Brasil, com CNPJ, endereço, telefone e e-mail informados à Receita.</p>{% endif %}

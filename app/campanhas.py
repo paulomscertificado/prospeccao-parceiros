@@ -597,8 +597,31 @@ def whatsapp_de_hoje(db, camp: Campanha) -> list[Tarefa]:
 
 # ---------------------------------------------------------------- Fila e fim de cadência (rotina)
 
+# Envios automáticos: um de cada vez por canal, com 3 a 4 minutos entre eles, sempre num intervalo diferente.
+# O relógio roda a cada minuto, então o próximo fica liberado entre 2,5 e 3,5 min depois: na prática sai 3 ou 4 min
+# depois do anterior (sorteado), nunca vários no mesmo minuto.
+INTERVALO_AUTOMATICO_SEG = (150, 210)
+
+
+def _vez_do_canal(db, canal: str) -> bool:
+    """Já passou o intervalo desde o último envio automático deste canal?"""
+    if not config.ESPACAR_ENVIOS:
+        return True
+    return ler_config(db, f"proximo_envio_automatico:{canal}") <= agora().isoformat(timespec="seconds")
+
+
+def _anotar_envio(db, canal: str) -> None:
+    """Depois de um envio automático: sorteia quando o próximo deste canal pode sair."""
+    import random
+
+    if config.ESPACAR_ENVIOS:
+        proximo = agora() + timedelta(seconds=random.uniform(*INTERVALO_AUTOMATICO_SEG))
+        gravar_config(db, f"proximo_envio_automatico:{canal}", proximo.isoformat(timespec="seconds"))
+
+
 def processar_fila(db, maximo: int = 25) -> dict:
-    """Envia os e-mails automáticos das campanhas aprovadas, respeitando horário e limites."""
+    """Envia os e-mails automáticos das campanhas aprovadas, respeitando horário, limites e o intervalo de 3 a 4
+    minutos entre um e-mail e outro (_vez_do_canal)."""
     from .integracoes import email_smtp
 
     feito = {"enviados": 0, "bloqueados": 0, "erros": 0}
@@ -606,6 +629,8 @@ def processar_fila(db, maximo: int = 25) -> dict:
         return feito
     if not mensagens.dentro_do_horario(db):
         return feito
+    if not _vez_do_canal(db, "email"):
+        return feito  # o último e-mail automático saiu há menos de 3 minutos
     hora = agora().strftime("%H:%M")
     consulta = (select(Tarefa).join(Campanha, Tarefa.campanha_id == Campanha.id)
                 .where(Tarefa.status == "pendente", Tarefa.tipo == "prospeccao", Tarefa.canal == "email",
@@ -640,6 +665,9 @@ def processar_fila(db, maximo: int = 25) -> dict:
                                        registrar_erro_da_caixa=False)
         if erro == DESTINATARIO_RECUSADO:
             feito["erros"] += 1
+            if config.ESPACAR_ENVIOS:
+                _anotar_envio(db, "email")  # o servidor foi chamado: o próximo também espera o intervalo
+                break
             continue  # só o e-mail deste lead não sai: a fila segue com os outros
         if erro:
             feito["erros"] += 1
@@ -649,6 +677,9 @@ def processar_fila(db, maximo: int = 25) -> dict:
             _avisar_caixa_com_erro(db, t, conta, erro)
             continue  # problema nesta caixa de envio: não insiste nela agora
         feito["enviados"] += 1
+        if config.ESPACAR_ENVIOS:
+            _anotar_envio(db, "email")
+            break  # um por vez: o próximo sai daqui a 3 ou 4 minutos
     return feito
 
 
@@ -932,6 +963,8 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
         return feito
     if not mensagens.dentro_do_horario(db):
         return feito
+    if not _vez_do_canal(db, "whatsapp"):
+        return feito  # a última mensagem automática saiu há menos de 3 minutos
     if not whatsapp_leads.status().get("disponivel"):
         return feito  # computador com o WhatsApp Leads desligado: tudo espera, nada se perde
     hora = agora().strftime("%H:%M")
@@ -966,6 +999,9 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
             continue
         t.resultado = "Enviada sozinha pela IA SDR (contato já conversou com a MS)"
         feito["enviados"] += 1
+        if config.ESPACAR_ENVIOS:
+            _anotar_envio(db, "whatsapp")
+            break  # uma por vez: a próxima sai daqui a 3 ou 4 minutos
     return feito
 
 

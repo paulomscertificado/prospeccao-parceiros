@@ -167,7 +167,7 @@ def test_teste_da_api_com_10_empresas_e_lista_de_exclusao(cliente, monkeypatch):
         gravar_config(db, "novas_excluir_listas", "1")
         db.commit()
     pagina = cliente.get("/empresas-novas")
-    assert "Testar a API" in pagina.text
+    assert "Testar (10 empresas" in pagina.text
     r = cliente.post("/empresas-novas/testar", data={"csrf": csrf_de(pagina.text)})
     assert r.status_code == 200 and "Teste feito: 10 empresas" in r.text
     assert len(pedidos) == 1 and pedidos[0]["limit"] == 10  # uma página só: 1 crédito
@@ -184,18 +184,61 @@ def test_teste_da_api_com_10_empresas_e_lista_de_exclusao(cliente, monkeypatch):
         bid = busca.id
     tela = cliente.get(f"/empresas-novas/busca/{bid}")
     assert "CONTABIL NOVA 0 LTDA" in tela.text and "(81) 3323-1234" in tela.text and "Lista antiga" in tela.text
-    r = cliente.post(f"/empresas-novas/busca/{bid}/campanha", data={"csrf": csrf_de(tela.text)})
-    with sessao() as db:
-        busca = db.get(BuscaCnpja, bid)
-        camp = db.get(Campanha, busca.campanha_id)
-        assert camp.tipo == "empresas_novas"
-        t = db.execute(select(Trabalho).where(Trabalho.ref_id == camp.id, Trabalho.tipo == "campanha")).scalars().first()
-        import json
+    try:
+        with sessao() as db:  # dados que vão para o lead: telefone fixo, celular (WhatsApp) e o 1º e-mail
+            dados = empresas_novas.para_lead(primeira_linha(db, bid))
+            assert dados["telefone"] == "8133231234" and dados["whatsapp"] == "81991112222"
+            assert dados["email"] == "a@contabilnova-teste.com.br" and "b@contabilnova-teste.com.br" in dados["observacoes"]
+        cliente.post(f"/empresas-novas/busca/{bid}/campanha", data={"csrf": csrf_de(tela.text)})
+        with sessao() as db:
+            busca = db.get(BuscaCnpja, bid)
+            camp = db.get(Campanha, busca.campanha_id)
+            assert camp.tipo == "empresas_novas"
+            # a montagem roda em segundo plano: confere pela lista (9 entram; a da lista antiga fica de fora)
+            assert db.execute(select(EmpresaCnpja).where(EmpresaCnpja.busca_id == bid,
+                                                         EmpresaCnpja.motivo_fora == "")).scalars().all().__len__() == 9
+    finally:
+        with sessao() as db:  # os outros testes esperam o sistema sem listas
+            db.execute(bases_importadas.EmpresaBase.__table__.delete())
+            db.execute(bases_importadas.BaseDados.__table__.delete())
+            db.commit()
 
-        estado = json.loads(t.estado)
-        assert len(estado["registros"]) == 9  # a da lista antiga ficou de fora
-        dados = next(d for d in estado["registros"] if d["cnpj"] == "55555555000000")
-        assert dados["telefone"] == "8133231234" and dados["whatsapp"] == "81991112222"
-        db.execute(bases_importadas.EmpresaBase.__table__.delete())
-        db.execute(bases_importadas.BaseDados.__table__.delete())
-        db.commit()
+
+def primeira_linha(db, bid):
+    from app.modelos import EmpresaCnpja
+
+    return db.execute(select(EmpresaCnpja).where(EmpresaCnpja.busca_id == bid,
+                                                 EmpresaCnpja.cnpj == "55555555000000")).scalars().one()
+
+
+def test_chave_da_cnpja_em_configuracoes_e_painel_novo(cliente, monkeypatch):
+    """A chave saiu de Empresas novas e foi para Configurações > Integrações; o painel tem estados por caixinha."""
+    from conftest import csrf_de
+
+    from app import arquivo_env
+
+    gravadas = []
+    monkeypatch.setattr(arquivo_env, "gravar", lambda valores: gravadas.append(valores))  # não mexe no .env real
+    pagina = cliente.get("/configuracoes?aba=integracoes")
+    assert 'id="cnpja"' in pagina.text and "Salvar chave" in pagina.text
+    cliente.post("/configuracoes/cnpja", data={"csrf": csrf_de(pagina.text), "chave": "curta"})
+    assert gravadas == []  # chave incompleta não é salva
+    cliente.post("/configuracoes/cnpja", data={"csrf": csrf_de(pagina.text), "chave": "a" * 40 + "-" + "b" * 30})
+    assert gravadas == [{"CNPJA_API_KEY": "a" * 40 + "-" + "b" * 30}]
+    with sessao() as db:
+        from app.modelos import LogAuditoria
+
+        log = db.execute(select(LogAuditoria).where(LogAuditoria.acao == "salvou_chave_cnpja")).scalars().first()
+        assert log and "aaaa" not in (log.detalhes or "")  # a chave nunca vai para o log
+
+    tela = cliente.get("/empresas-novas")
+    assert 'name="chave"' not in tela.text and 'class="interruptor"' in tela.text and 'name="ufs" value="MG"' in tela.text
+    with sessao() as db:
+        uid = admin_id(db)
+    cliente.post("/empresas-novas/configurar", data={"csrf": csrf_de(tela.text), "ufs": ["PE", "MG", "XX"],
+                                                     "maximo_dia": "30", "hora": "07:00", "dono_id": str(uid),
+                                                     "canal_email": "on"})
+    with sessao() as db:
+        assert empresas_novas.cfg(db, "novas_ufs") == "PE,MG"
+        gravar_config(db, "novas_ufs", "PE")
+        gravar_config(db, "novas_canais", "whatsapp,email")

@@ -216,6 +216,16 @@ permissão `campanhas.ver`; configurar/buscar com `campanhas.gerenciar`).
   `/empresas-novas/busca/{id}`; teste `/empresas-novas/testar` (`limit=10`, 1 página = 1 crédito, sem campanha).
 - Testes: `testes/test_empresas_novas.py` (API simulada).
 
+## Intervalo dos envios automáticos (nov/2026)
+
+`campanhas.processar_fila` (e-mail) e `processar_fila_whatsapp`: um envio automático por rodada e por canal; depois
+de cada envio `_anotar_envio` sorteia o próximo horário liberado (`INTERVALO_AUTOMATICO_SEG` = 150 a 210 s, config
+`proximo_envio_automatico:<canal>`). Com a rodada a cada minuto, cada envio sai 3 ou 4 minutos depois do anterior.
+E-mail recusado pelo destinatário também conta (o servidor foi chamado). Testes desligam com `ESPACAR_ENVIOS=0`
+(conftest); a regra tem teste próprio em `testes/test_intervalo_envios.py`.
+Chave da CNPJá: Configurações > Integrações (`/configuracoes/cnpja`, `/configuracoes/cnpja/saldo`); saiu da tela
+Empresas novas, que virou um painel em 4 passos (estados por caixinha, `name="ufs"` repetido).
+
 ## Reserva do lead por usuário (nov/2026)
 
 `app/reservas.py`. Campos em `leads`: `reservado_por_id`, `reservado_em`, `reservado_ate`.

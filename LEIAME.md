@@ -162,9 +162,11 @@ Menu **Empresas novas**. Todo dia o sistema busca as empresas que acabaram de ab
 
 **Configurar (uma vez):**
 1. Crie uma conta em **cnpja.com**, assine um plano (ex.: R$ 39,99/mês, 2.500 créditos) e copie a **Chave de API**.
-2. Em **Empresas novas > Configurar**: cole a chave, escolha os **estados** (ex.: PE), o **dono** das campanhas
-   diárias (ele assina e envia pelo WhatsApp/e-mail dele), os **canais**, o **máximo de empresas por dia** e o horário.
-3. Marque **"Buscar todo dia sozinho"** e salve. Clique em **Ver saldo da CNPJá** para conferir a chave.
+2. Em **Configurações > Integrações > CNPJá**: cole a chave, clique em **Salvar chave** e depois em **Testar a chave**
+   (mostra o saldo e não gasta crédito).
+3. Em **Empresas novas**, siga os 4 passos do painel: **1.** ligue a busca automática e escolha o horário;
+   **2.** marque os **estados**; **3.** escolha quem fica de fora (listas importadas, MEI); **4.** escolha o **dono**
+   das campanhas diárias (ele assina e envia pelo e-mail/WhatsApp dele) e os **canais**. Clique em **Salvar configuração**.
 
 **Todo dia:** no horário escolhido, o sistema busca as empresas **ativas** abertas desde a última busca, cadastra
 como leads (origem "Empresas novas (CNPJá)") e monta a campanha **"Empresas novas dd/mm – PE"**, que fica
@@ -187,6 +189,12 @@ leads: as respostas vão para **Oportunidades** e o time conversa.
   de fora (e por quê), com o link da campanha.
 - **Testar a API:** o botão **Testar a API (10 empresas · 1 crédito)** busca até 10 empresas abertas nos últimos 7
   dias e só mostra a lista. Se estiver certa, clique em **Montar a campanha com estas empresas** (não gasta crédito).
+
+### Intervalo entre os envios automáticos
+
+Nas campanhas automáticas (depois da aprovação), os **e-mails** e as **mensagens de WhatsApp** que saem sozinhos
+saem **um de cada vez**, com **3 a 4 minutos** entre um e outro, sorteados a cada envio (nunca todos no mesmo
+horário). E-mail e WhatsApp têm cada um o seu intervalo. Os envios feitos por clique de uma pessoa não esperam.
 
 ### Empresa reservada (travada) com quem fez a campanha
 

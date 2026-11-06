@@ -83,6 +83,9 @@ SEGUNDOS_POR_RODADA = int(os.environ.get("SEGUNDOS_POR_RODADA", "240"))
 MINUTOS_SESSAO_OCIOSA = int(os.environ.get("MINUTOS_SESSAO_OCIOSA", "120"))
 # Verificação em 2 etapas (código do celular) para administrador e gestor. "0" desliga (só para testes).
 EXIGIR_2FA = os.environ.get("EXIGIR_2FA", "1") != "0"
+# Envios AUTOMÁTICOS das campanhas (e-mail e WhatsApp): um de cada vez, com 3 a 4 minutos sorteados entre eles
+# (regra da Maria). Os testes desligam com ESPACAR_ENVIOS=0 para mandar vários de uma vez.
+ESPACAR_ENVIOS = os.environ.get("ESPACAR_ENVIOS", "1") != "0"
 
 # ---------------------------------------------------------------- Integrações (todas opcionais)
 

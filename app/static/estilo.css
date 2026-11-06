@@ -325,3 +325,15 @@ input:focus, select:focus, textarea:focus { outline: 2px solid rgba(60, 199, 122
 .op-origem .rotulo, .op-card .rotulo { display: block; font-size: .72rem; text-transform: uppercase; letter-spacing: .04em;
   color: var(--suave); font-weight: 600; margin-bottom: 2px; }
 .op-resposta { border-left: 3px solid var(--verde, #1f9d55); }
+
+/* Empresas novas: interruptor (liga/desliga) e escolha de estados */
+.interruptor { display: inline-flex; align-items: center; gap: 12px; cursor: pointer; margin: 0; }
+.interruptor input { position: absolute; opacity: 0; pointer-events: none; }
+.interruptor .trilho { position: relative; flex: none; width: 52px; height: 30px; border-radius: 999px; background: #cbd5e1; transition: background .15s; }
+.interruptor .trilho::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .25); transition: transform .15s; }
+.interruptor input:checked + .trilho { background: var(--verde); }
+.interruptor input:checked + .trilho::after { transform: translateX(22px); }
+.interruptor input:focus-visible + .trilho { outline: 2px solid #9cc1e6; outline-offset: 2px; }
+.ufs-escolha { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); margin-bottom: 6px; }
+.ufs-escolha .chip { justify-content: center; padding: 6px 10px; font-size: .9rem; }
+.escolha-corpo .pequeno { font-weight: 400; }

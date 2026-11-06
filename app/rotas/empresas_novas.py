@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .. import arquivo_env, empresas_novas, util
+from .. import empresas_novas, util
 from ..banco import gravar_config, obter_db
 from ..modelos import Tarefa, Usuario
 from ..seguranca import exige, registrar_log, verificar_csrf
@@ -95,12 +95,15 @@ def campanha_da_busca(request: Request, busca_id: int, usuario: Usuario = Depend
 @rotas.post("/empresas-novas/configurar", dependencies=[Depends(verificar_csrf)])
 async def configurar(request: Request, usuario: Usuario = Depends(exige("campanhas.gerenciar")),
                      db: Session = Depends(obter_db)):
+    from .. import config
+
     form = await request.form()
-    chave = str(form.get("chave", "")).strip()
-    if chave:
-        arquivo_env.gravar({"CNPJA_API_KEY": chave})
-    ufs = ",".join(u for u in (p.strip().upper() for p in str(form.get("ufs", "PE")).replace(";", ",").split(","))
-                   if len(u) == 2) or "PE"
+    # estados marcados (um por caixinha) ou digitados ("PE, PB")
+    pedidos = ",".join(str(v) for v in form.getlist("ufs")).replace(";", ",").split(",")
+    ufs = ",".join(dict.fromkeys(u for u in (p.strip().upper() for p in pedidos) if u in config.UFS))
+    if not ufs:
+        avisar(request, "Marque pelo menos um estado.", "erro")
+        return voltar("/empresas-novas#configurar")
     canais = ",".join(c for c in ("whatsapp", "email") if form.get(f"canal_{c}"))
     if not canais:
         avisar(request, "Escolha pelo menos um canal (WhatsApp ou e-mail).", "erro")
