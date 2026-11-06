@@ -61,6 +61,7 @@ def test_busca_monta_campanha_de_venda(cliente, monkeypatch):
     assert r["encontradas"] == 5 and cid
     assert pedidos[0][1]["founded.gte"] == (date.today() - timedelta(days=1)).isoformat()
     assert pedidos[0][1]["address.state.in"] == "PE" and pedidos[0][1]["status.id.in"] == "2"
+    assert pedidos[0][1]["mainActivity.id.in"] == "6920601,6822600"  # só contabilidade e adm. de condomínios
 
     with sessao() as db:  # montagem em etapas (aqui roda direto, como o agendador faria)
         t = db.execute(select(Trabalho).where(Trabalho.ref_id == cid, Trabalho.tipo == "campanha")).scalars().first()
@@ -98,7 +99,8 @@ def test_rodada_diaria_respeita_horario_e_roda_uma_vez(cliente, monkeypatch):
     chamadas = []
     monkeypatch.setattr(config, "CNPJA_API_KEY", "chave-de-teste")
     monkeypatch.setattr(empresas_novas, "buscar_e_criar",
-                        lambda db, u, desde, ate: chamadas.append((desde, ate)) or {"encontradas": 0, "campanha_id": None})
+                        lambda db, u, desde, ate, automatica=False: chamadas.append((desde, ate))
+                        or {"encontradas": 0, "campanha_id": None})
     with sessao() as db:
         for c, v in [("novas_ativo", "1"), ("novas_hora", "00:00"), ("novas_dono_id", str(admin_id(db))),
                      ("novas_ultima_busca", ""), ("novas_ultima_data", (date.today() - timedelta(days=2)).isoformat())]:
@@ -136,3 +138,64 @@ def test_tela_abre_e_salva_configuracao(cliente, monkeypatch):
         assert empresas_novas.cfg(db, "novas_ufs") == "PE,PB" and empresas_novas.cfg(db, "novas_canais") == "email"
         gravar_config(db, "novas_ufs", "PE")
         gravar_config(db, "novas_canais", "whatsapp,email")
+
+
+def test_teste_da_api_com_10_empresas_e_lista_de_exclusao(cliente, monkeypatch):
+    """Teste: 10 empresas (1 crédito), lista guardada para conferir; quem está numa lista importada fica de fora."""
+    from conftest import csrf_de
+
+    from app import bases_importadas
+    from app.modelos import BuscaCnpja, EmpresaCnpja
+
+    pedidos = []
+
+    def falso(url, params=None, headers=None, timeout=None):
+        pedidos.append(dict(params or {}))
+        registros = [_registro(f"5555555500{i:02d}{i:02d}", f"CONTABIL NOVA {i} LTDA") for i in range(10)]
+        registros[0]["phones"] = [{"type": "LANDLINE", "area": "81", "number": "33231234"},
+                                  {"type": "MOBILE", "area": "81", "number": "991112222"}]
+        registros[0]["emails"] = [{"address": "a@contabilnova-teste.com.br"}, {"address": "b@contabilnova-teste.com.br"}]
+        return _Resposta({"records": registros, "next": "mais"})
+
+    monkeypatch.setattr(empresas_novas.httpx, "get", falso)
+    monkeypatch.setattr(config, "CNPJA_API_KEY", "chave-de-teste")
+    with sessao() as db:
+        lista = bases_importadas.BaseDados(nome="Lista antiga", total=1)
+        db.add(lista)
+        db.flush()
+        db.add(bases_importadas.EmpresaBase(base_id=lista.id, cnpj="55555555000101", uf="PE"))
+        gravar_config(db, "novas_excluir_listas", "1")
+        db.commit()
+    pagina = cliente.get("/empresas-novas")
+    assert "Testar a API" in pagina.text
+    r = cliente.post("/empresas-novas/testar", data={"csrf": csrf_de(pagina.text)})
+    assert r.status_code == 200 and "Teste feito: 10 empresas" in r.text
+    assert len(pedidos) == 1 and pedidos[0]["limit"] == 10  # uma página só: 1 crédito
+    with sessao() as db:
+        busca = db.execute(select(BuscaCnpja).order_by(BuscaCnpja.id.desc())).scalars().first()
+        assert busca.teste and busca.encontradas == 10 and busca.creditos == 1 and busca.fora == 1
+        assert busca.campanha_id is None  # o teste não cria campanha sozinho
+        primeira = db.execute(select(EmpresaCnpja).where(EmpresaCnpja.busca_id == busca.id,
+                                                         EmpresaCnpja.cnpj == "55555555000000")).scalars().one()
+        assert primeira.telefones_fixos == "8133231234" and primeira.celulares == "81991112222"
+        assert primeira.emails == "a@contabilnova-teste.com.br,b@contabilnova-teste.com.br"
+        excluida = db.execute(select(EmpresaCnpja).where(EmpresaCnpja.cnpj == "55555555000101")).scalars().one()
+        assert "Lista antiga" in excluida.motivo_fora
+        bid = busca.id
+    tela = cliente.get(f"/empresas-novas/busca/{bid}")
+    assert "CONTABIL NOVA 0 LTDA" in tela.text and "(81) 3323-1234" in tela.text and "Lista antiga" in tela.text
+    r = cliente.post(f"/empresas-novas/busca/{bid}/campanha", data={"csrf": csrf_de(tela.text)})
+    with sessao() as db:
+        busca = db.get(BuscaCnpja, bid)
+        camp = db.get(Campanha, busca.campanha_id)
+        assert camp.tipo == "empresas_novas"
+        t = db.execute(select(Trabalho).where(Trabalho.ref_id == camp.id, Trabalho.tipo == "campanha")).scalars().first()
+        import json
+
+        estado = json.loads(t.estado)
+        assert len(estado["registros"]) == 9  # a da lista antiga ficou de fora
+        dados = next(d for d in estado["registros"] if d["cnpj"] == "55555555000000")
+        assert dados["telefone"] == "8133231234" and dados["whatsapp"] == "81991112222"
+        db.execute(bases_importadas.EmpresaBase.__table__.delete())
+        db.execute(bases_importadas.BaseDados.__table__.delete())
+        db.commit()

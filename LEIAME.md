@@ -179,6 +179,15 @@ leads: as respostas vão para **Oportunidades** e o time conversa.
 - Os celulares que a Receita guarda sem o 9 ganham o 9 na frente (é um palpite: confira antes de enviar).
 - Empresas com o mesmo telefone/e-mail (do contador) **não** são juntadas: só o CNPJ conta como repetido.
 - Opção para deixar de fora **empresário individual** (inclui os MEIs, que muitas vezes não precisam de e-CNPJ).
+- **Atividade (CNAE):** a busca pega só as empresas cuja atividade principal está na lista do Configurar. Padrão:
+  **6920-6/01** (contabilidade) e **6822-6/00** (administração de imóveis e condomínios).
+- **Lista de exclusão:** com a opção marcada, quem já está em alguma **lista importada** (Configurações >
+  Integrações > Listas) fica de fora. Também ficam de fora: repetidas, leads já em atendimento e quem pediu para sair.
+- **Ver as empresas encontradas:** no quadro **"Empresas encontradas na CNPJá"**, clique na busca. A lista mostra
+  razão social, CNPJ, cidade, data de abertura, **telefone fixo**, **celular**, **e-mails**, atividade e quem ficou
+  de fora (e por quê), com o link da campanha.
+- **Testar a API:** o botão **Testar a API (10 empresas · 1 crédito)** busca até 10 empresas abertas nos últimos 7
+  dias e só mostra a lista. Se estiver certa, clique em **Montar a campanha com estas empresas** (não gasta crédito).
 
 ### Empresa reservada (travada) com quem fez a campanha
 

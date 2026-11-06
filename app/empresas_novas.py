@@ -57,7 +57,11 @@ PADRAO = {
     "novas_ultima_data": "",           # última data de abertura já buscada (AAAA-MM-DD)
     "novas_ultima_busca": "",          # dia em que a busca automática rodou (AAAA-MM-DD)
     "novas_ultimo_resultado": "",
+    # Atividade principal (CNAE) das empresas buscadas: contabilidade e administração de imóveis/condomínios
+    "novas_cnaes": "6920601,6822600",
+    "novas_excluir_listas": "1",       # 1 = deixa de fora quem já está em alguma lista importada (bases_importadas)
 }
+LIMITE_TESTE = 10  # consulta de teste: 10 empresas = 1 crédito
 
 MENSAGENS_PADRAO = {
     "venda_boas_vindas": {
@@ -151,19 +155,77 @@ def saldo() -> dict:
     return _pedir("/credit")
 
 
-def buscar_abertas(desde: date, ate: date, ufs: list[str]) -> list[dict]:
-    """Estabelecimentos ATIVOS abertos entre as datas nos estados. Custa 1 crédito a cada 10 empresas."""
+def buscar_abertas(desde: date, ate: date, ufs: list[str], cnaes: list[str] | None = None,
+                   limite: int | None = None) -> list[dict]:
+    """Estabelecimentos ATIVOS abertos entre as datas nos estados (e com a atividade principal nos CNAEs).
+    Custa 1 crédito a cada 10 empresas. limite: no máximo essa quantidade (ex.: 10 no teste = 1 crédito)."""
     params = {"founded.gte": desde.isoformat(), "founded.lte": ate.isoformat(),
-              "address.state.in": ",".join(ufs), "status.id.in": "2", "limit": POR_PAGINA}
+              "address.state.in": ",".join(ufs), "status.id.in": "2",
+              "limit": min(POR_PAGINA, limite) if limite else POR_PAGINA}
+    if cnaes:
+        params["mainActivity.id.in"] = ",".join(cnaes)
     registros = []
     for _ in range(MAXIMO_PAGINAS):
         pagina = _pedir("/office", params)
         registros += pagina.get("records") or []
         proximo = pagina.get("next")
-        if not proximo:
+        if not proximo or (limite and len(registros) >= limite):
             break
         params = {"token": proximo}
-    return registros
+    return registros[:limite] if limite else registros
+
+
+def cnaes(db) -> list[str]:
+    """CNAEs configurados (7 dígitos), aceitando "6920-6/01" ou "6920601"."""
+    return [c for c in (util.so_digitos(p) for p in re.split(r"[,; \n]+", cfg(db, "novas_cnaes"))) if len(c) == 7]
+
+
+def telefones(registro: dict) -> tuple[list[str], list[str]]:
+    """(fixos, celulares) com DDD. A CNPJá diz o tipo (LANDLINE / MOBILE); sem tipo, o celular é deduzido."""
+    fixos, celulares = [], []
+    for t in registro.get("phones") or []:
+        area, numero = util.so_digitos(t.get("area", "")), util.so_digitos(t.get("number", ""))
+        if not area or not numero:
+            continue
+        movel = celular(area, numero)
+        if t.get("type") == "MOBILE" or (not t.get("type") and movel):
+            alvo, valor = celulares, movel or area + numero
+        else:
+            alvo, valor = fixos, area + numero
+        if valor not in alvo:
+            alvo.append(valor)
+    return fixos, celulares
+
+
+def dados_da_empresa(registro: dict) -> dict:
+    """Registro da CNPJá → linha da lista de empresas encontradas (EmpresaCnpja)."""
+    empresa = registro.get("company") or {}
+    endereco = registro.get("address") or {}
+    atividade = registro.get("mainActivity") or {}
+    natureza = empresa.get("nature") or {}
+    fixos, celulares = telefones(registro)
+    emails = []
+    for e in registro.get("emails") or []:
+        endereco_email = (e.get("address") or "").strip().lower()
+        if util.email_valido(endereco_email) and endereco_email not in emails:
+            emails.append(endereco_email)
+    rua = " ".join(x for x in (endereco.get("street"), endereco.get("number"), endereco.get("details")) if x)
+    try:
+        aberta = datetime.strptime((registro.get("founded") or "")[:10], "%Y-%m-%d").date()
+    except ValueError:
+        aberta = None
+    return {
+        "cnpj": util.normalizar_cnpj(registro.get("taxId", ""))[:14],
+        "razao_social": (empresa.get("name") or "")[:200], "nome_fantasia": (registro.get("alias") or "")[:200],
+        "cnae": str(atividade.get("id") or "").zfill(7)[:7] if atividade.get("id") else "",
+        "cnae_texto": (atividade.get("text") or "")[:200],
+        "uf": (endereco.get("state") or "")[:2], "cidade": (endereco.get("city") or "")[:120],
+        "endereco": f"{rua} – {endereco.get('district', '')} – CEP {endereco.get('zip', '')}".strip(" –")[:250],
+        "aberta_em": aberta, "situacao": ((registro.get("status") or {}).get("text") or "Ativa")[:40],
+        "porte": ((empresa.get("size") or {}).get("text") or "")[:60], "natureza": (natureza.get("text") or "")[:120],
+        "natureza_id": natureza.get("id"), "telefones_fixos": ",".join(fixos)[:120],
+        "celulares": ",".join(celulares)[:120], "emails": ",".join(emails),
+    }
 
 
 def celular(area: str, numero: str) -> str:
@@ -178,29 +240,21 @@ def celular(area: str, numero: str) -> str:
     return ""
 
 
-def para_lead(registro: dict) -> dict:
-    """Registro da CNPJá → dados do lead."""
-    empresa = registro.get("company") or {}
-    endereco = registro.get("address") or {}
-    telefones = registro.get("phones") or []
-    fixo, zap = "", ""
-    for t in telefones:
-        numero = f"{t.get('area', '')}{t.get('number', '')}"
-        zap = zap or celular(t.get("area", ""), t.get("number", ""))
-        fixo = fixo or numero
-    emails = [e.get("address", "") for e in registro.get("emails") or [] if e.get("address")]
-    atividade = registro.get("mainActivity") or {}
-    natureza = (empresa.get("nature") or {}).get("text", "")
-    nome = empresa.get("name") or registro.get("alias") or ""
-    rua = " ".join(x for x in (endereco.get("street"), endereco.get("number"), endereco.get("details")) if x)
-    obs = [f"Aberta em {_data_br(registro.get('founded'))}." if registro.get("founded") else "",
-           f"Atividade: {atividade.get('text', '')}." if atividade else "", f"Natureza: {natureza}." if natureza else ""]
+def para_lead(e) -> dict:
+    """Empresa encontrada (EmpresaCnpja) → dados do lead. Telefone = fixo (ou o celular); WhatsApp = celular."""
+    fixos = [t for t in (e.telefones_fixos or "").split(",") if t]
+    celulares = [t for t in (e.celulares or "").split(",") if t]
+    emails = [m for m in (e.emails or "").split(",") if m]
+    obs = [f"Aberta em {e.aberta_em:%d/%m/%Y}." if e.aberta_em else "",
+           f"Atividade: {e.cnae_texto}." if e.cnae_texto else "", f"Natureza: {e.natureza}." if e.natureza else "",
+           f"Outros telefones: {', '.join(util.formatar_telefone(t) for t in (fixos + celulares)[1:])}."
+           if len(fixos + celulares) > 1 else "",
+           f"Outros e-mails: {', '.join(emails[1:])}." if len(emails) > 1 else ""]
     return {
-        "empresa": nome[:200], "cnpj": registro.get("taxId", ""), "telefone": fixo, "whatsapp": zap,
-        "email": emails[0] if emails else "", "cidade": endereco.get("city", ""), "estado": endereco.get("state", ""),
-        "endereco": f"{rua} – {endereco.get('district', '')} – CEP {endereco.get('zip', '')}".strip(" –")[:250],
-        "porte": ((empresa.get("size") or {}).get("text") or "")[:60], "tipo_empresa": natureza[:80],
-        "observacoes": " ".join(o for o in obs if o), "_natureza_id": (empresa.get("nature") or {}).get("id"),
+        "empresa": (e.razao_social or e.nome_fantasia)[:200], "cnpj": e.cnpj,
+        "telefone": (fixos or celulares or [""])[0], "whatsapp": celulares[0] if celulares else "",
+        "email": emails[0] if emails else "", "cidade": e.cidade, "estado": e.uf, "endereco": e.endereco,
+        "porte": e.porte, "tipo_empresa": (e.natureza or "")[:80], "observacoes": " ".join(o for o in obs if o),
     }
 
 
@@ -245,22 +299,76 @@ def textos_do_lead(db, lead: Lead, usuario: Usuario | None) -> dict:
             for a, m in mensagens(db).items()}
 
 
-def criar_campanha(db, registros: list[dict], usuario: Usuario, rotulo: str) -> Campanha | None:
-    """Cria a campanha do dia (status "gerando") com os registros da API; o trabalho em etapas cadastra os leads e
-    monta as mensagens. Devolve None se não houver nada novo."""
+def registrar_busca(db, registros: list[dict], desde: date, ate: date, ufs: list[str], lista_cnaes: list[str],
+                    usuario: Usuario | None, teste: bool = False, automatica: bool = False):
+    """Guarda a lista das empresas que a API devolveu (para o usuário conferir) e marca quem fica de fora da campanha:
+    repetida, empresário individual/MEI (se configurado), já está numa lista importada (lista de exclusão) ou já é
+    lead em atendimento/que pediu para sair."""
+    from .bases_importadas import BaseDados, EmpresaBase
+    from .modelos import BuscaCnpja, EmpresaCnpja
+
+    busca = BuscaCnpja(usuario_id=usuario.id if usuario else None, desde=desde, ate=ate, ufs=",".join(ufs)[:120],
+                       cnaes=",".join(lista_cnaes)[:200], teste=teste, automatica=automatica,
+                       encontradas=len(registros), creditos=-(-len(registros) // 10))
+    db.add(busca)
+    db.flush()
+    linhas = [dados_da_empresa(r) for r in registros]
+    cnpjs = [l["cnpj"] for l in linhas if l["cnpj"]]
+    em_listas: dict[str, str] = {}
+    if cnpjs and cfg(db, "novas_excluir_listas") == "1":
+        for i in range(0, len(cnpjs), 500):
+            for cnpj, nome in db.execute(select(EmpresaBase.cnpj, BaseDados.nome)
+                                         .join(BaseDados, BaseDados.id == EmpresaBase.base_id)
+                                         .where(EmpresaBase.cnpj.in_(cnpjs[i:i + 500]))):
+                em_listas.setdefault(cnpj, nome)
+    leads = {}
+    if cnpjs:
+        for i in range(0, len(cnpjs), 500):
+            for lead in db.execute(select(Lead).where(Lead.chave_cnpj.in_(cnpjs[i:i + 500]))).scalars():
+                leads[lead.chave_cnpj] = lead
+    sem_individual = cfg(db, "novas_sem_individual") == "1"
+    vistos = set()
+    for linha in linhas:
+        motivo = ""
+        lead = leads.get(linha["cnpj"])
+        if not linha["cnpj"] or not (linha["razao_social"] or linha["nome_fantasia"]):
+            motivo = "sem CNPJ ou sem nome"
+        elif linha["cnpj"] in vistos:
+            motivo = "repetida na resposta da API"
+        elif sem_individual and linha["natureza_id"] == NATUREZA_EMPRESARIO_INDIVIDUAL:
+            motivo = "empresário individual / MEI (configurado para ficar de fora)"
+        elif linha["cnpj"] in em_listas:
+            motivo = f"já está na lista \"{em_listas[linha['cnpj']]}\""
+        elif lead and (lead.opt_out or lead.perdido or lead.etapa >= 1 or lead.automacao_pausada):
+            motivo = "já é lead em atendimento ou pediu para não receber mensagens"
+        vistos.add(linha["cnpj"])
+        db.add(EmpresaCnpja(busca_id=busca.id, motivo_fora=motivo, lead_id=lead.id if lead else None, **linha))
+    db.flush()
+    busca.fora = sum(1 for _ in db.execute(select(EmpresaCnpja.id).where(EmpresaCnpja.busca_id == busca.id,
+                                                                         EmpresaCnpja.motivo_fora != "")))
+    return busca
+
+
+def criar_campanha_da_busca(db, busca, usuario: Usuario) -> Campanha | None:
+    """Campanha de venda com as empresas da busca que podem entrar (sem gastar crédito: usa a lista guardada)."""
+    from .modelos import EmpresaCnpja
+
+    empresas = db.execute(select(EmpresaCnpja).where(EmpresaCnpja.busca_id == busca.id, EmpresaCnpja.motivo_fora == "")
+                          .order_by(EmpresaCnpja.id)).scalars().all()
+    periodo = f"{busca.desde:%d/%m}" if busca.desde == busca.ate else f"{busca.desde:%d/%m} a {busca.ate:%d/%m}"
+    camp = criar_campanha(db, [para_lead(e) for e in empresas], usuario, f"{periodo} – {busca.ufs.replace(',', ', ')}")
+    if camp:
+        busca.campanha_id = camp.id
+        db.commit()
+    return camp
+
+
+def criar_campanha(db, dados: list[dict], usuario: Usuario, rotulo: str) -> Campanha | None:
+    """Cria a campanha do dia (status "gerando") com as empresas (dados de lead); o trabalho em etapas cadastra os
+    leads e monta as mensagens. Devolve None se não houver nada novo."""
     from . import trabalhos
 
-    sem_individual = cfg(db, "novas_sem_individual") == "1"
-    vistos, dados = set(), []
-    for r in registros:
-        d = para_lead(r)
-        if not d["empresa"] or not d["cnpj"] or d["cnpj"] in vistos:
-            continue
-        if sem_individual and d.get("_natureza_id") == NATUREZA_EMPRESARIO_INDIVIDUAL:
-            continue
-        vistos.add(d["cnpj"])
-        d.pop("_natureza_id", None)
-        dados.append(d)
+    dados = [d for d in dados if d["empresa"] and d["cnpj"]]
     if not dados:
         return None
     # quem tem e-mail e celular primeiro: são os que a campanha consegue alcançar
@@ -333,12 +441,33 @@ def _ufs(db) -> list[str]:
     return [u.strip().upper() for u in re.split(r"[,; ]+", cfg(db, "novas_ufs")) if len(u.strip()) == 2] or ["PE"]
 
 
-def buscar_e_criar(db, usuario: Usuario, desde: date, ate: date) -> dict:
-    """Busca na API e cria a campanha. Devolve {"encontradas", "campanha_id"} (lança ErroCnpja)."""
-    registros = buscar_abertas(desde, ate, _ufs(db))
-    rotulo = (f"{desde:%d/%m}" if desde == ate else f"{desde:%d/%m} a {ate:%d/%m}") + " – " + ", ".join(_ufs(db))
-    camp = criar_campanha(db, registros, usuario, rotulo)
-    return {"encontradas": len(registros), "campanha_id": camp.id if camp else None}
+def buscar_e_criar(db, usuario: Usuario, desde: date, ate: date, automatica: bool = False) -> dict:
+    """Busca na API, guarda a lista e cria a campanha. Devolve {"encontradas", "campanha_id", "busca_id", "fora"}
+    (lança ErroCnpja)."""
+    ufs, lista_cnaes = _ufs(db), cnaes(db)
+    registros = buscar_abertas(desde, ate, ufs, lista_cnaes)
+    busca = registrar_busca(db, registros, desde, ate, ufs, lista_cnaes, usuario, automatica=automatica)
+    db.commit()
+    camp = criar_campanha_da_busca(db, busca, usuario)
+    return {"encontradas": len(registros), "campanha_id": camp.id if camp else None, "busca_id": busca.id,
+            "fora": busca.fora}
+
+
+def testar(db, usuario: Usuario | None, dias: int = 7) -> dict:
+    """Consulta de TESTE: no máximo 10 empresas (1 crédito) abertas nos últimos dias, com os filtros configurados.
+    Só guarda a lista para conferência; a campanha sai depois, por um botão na lista (sem gastar crédito)."""
+    hoje = date.today()
+    ufs, lista_cnaes = _ufs(db), cnaes(db)
+    registros = buscar_abertas(hoje - timedelta(days=dias), hoje, ufs, lista_cnaes, limite=LIMITE_TESTE)
+    busca = registrar_busca(db, registros, hoje - timedelta(days=dias), hoje, ufs, lista_cnaes, usuario, teste=True)
+    db.commit()
+    return {"encontradas": len(registros), "busca_id": busca.id, "fora": busca.fora}
+
+
+def buscas_recentes(db, limite: int = 30):
+    from .modelos import BuscaCnpja
+
+    return db.execute(select(BuscaCnpja).order_by(BuscaCnpja.criado_em.desc()).limit(limite)).scalars().all()
 
 
 def rodada_diaria() -> str:
@@ -358,7 +487,7 @@ def rodada_diaria() -> str:
         desde = max(desde, hoje - timedelta(days=7))  # parado muitos dias: não busca semanas de uma vez
         gravar_config(db, "novas_ultima_busca", hoje.isoformat())
         try:
-            r = buscar_e_criar(db, usuario, desde, hoje)
+            r = buscar_e_criar(db, usuario, desde, hoje, automatica=True)
         except ErroCnpja as erro:
             texto = f"{agora():%d/%m %H:%M} – não deu certo: {erro}."
             gravar_config(db, "novas_ultimo_resultado", texto)
@@ -366,6 +495,7 @@ def rodada_diaria() -> str:
             return texto
         gravar_config(db, "novas_ultima_data", hoje.isoformat())
         texto = (f"{agora():%d/%m %H:%M} – {r['encontradas']} empresas abertas encontradas"
+                 + (f" ({r['fora']} ficaram de fora)" if r.get("fora") else "")
                  + ("; campanha do dia montada (aguarda aprovação)." if r["campanha_id"] else "; nenhuma nova."))
         gravar_config(db, "novas_ultimo_resultado", texto)
         return texto

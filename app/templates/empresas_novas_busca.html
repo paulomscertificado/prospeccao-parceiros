@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block titulo %}Empresas encontradas{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <div><h1>Empresas encontradas na CNPJá{% if busca.teste %} <span class="selo">teste</span>{% endif %}</h1>
+    <div class="suave">Busca de {{ busca.criado_em|datahora }}{% if quem %} por {{ quem.nome }}{% endif %}{% if busca.automatica %} (automática){% endif %}
+      · abertas {% if busca.desde == busca.ate %}em {{ busca.desde.strftime('%d/%m/%Y') }}{% else %}de {{ busca.desde.strftime('%d/%m/%Y') }} a {{ busca.ate.strftime('%d/%m/%Y') }}{% endif %}
+      · {{ busca.ufs }} · CNAE {{ busca.cnaes }} · só ativas</div></div>
+  <a class="btn" href="/empresas-novas">Voltar</a>
+</div>
+
+<div class="cartao">
+  <p><b>{{ busca.encontradas }}</b> empresas encontradas · <b>{{ busca.encontradas - busca.fora }}</b> podem entrar na campanha ·
+    <b>{{ busca.fora }}</b> ficaram de fora · ≈ {{ busca.creditos }} crédito(s) da CNPJá.</p>
+  {% if campanha %}<p>Campanha: <a href="/campanhas/{{ campanha.id }}"><b>{{ campanha.nome }}</b></a> — {{ campanha.etapa or campanha.status }}</p>
+  {% elif busca.encontradas - busca.fora > 0 and pode('campanhas.gerenciar') %}
+  <form method="post" action="/empresas-novas/busca/{{ busca.id }}/campanha" data-confirmar="Montar a campanha de venda do e-CNPJ com as {{ busca.encontradas - busca.fora }} empresas que podem entrar? Ela só começa depois da aprovação. Não gasta crédito.">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-primario">Montar a campanha com estas empresas</button></form>
+  {% endif %}
+</div>
+
+<div class="cartao">
+  <div class="tabela-rolagem"><table>
+    <tr><th>Razão social</th><th>CNPJ</th><th>Cidade</th><th>Aberta em</th><th>Telefone fixo</th><th>Celular</th><th>E-mails</th><th>Atividade</th><th>Situação</th></tr>
+    {% for e in empresas %}
+    <tr {% if e.motivo_fora %}class="suave"{% endif %}>
+      <td><b>{{ e.razao_social or e.nome_fantasia }}</b>{% if e.nome_fantasia and e.razao_social %}<div class="pequeno suave">{{ e.nome_fantasia }}</div>{% endif %}
+        {% if e.motivo_fora %}<div class="pequeno"><span class="selo selo-alerta">fora da campanha</span> {{ e.motivo_fora }}</div>{% endif %}
+        {% if e.lead_id %}<div class="pequeno"><a href="/leads/{{ e.lead_id }}">ver lead</a></div>{% endif %}</td>
+      <td style="white-space:nowrap">{{ e.cnpj|cnpj if e.cnpj|length == 14 else e.cnpj }}</td>
+      <td>{{ e.cidade }}/{{ e.uf }}</td>
+      <td>{{ e.aberta_em.strftime('%d/%m/%Y') if e.aberta_em }}</td>
+      <td style="white-space:nowrap">{% for t in e.telefones_fixos.split(',') if t %}{{ t|telefone }}<br>{% else %}—{% endfor %}</td>
+      <td style="white-space:nowrap">{% for t in e.celulares.split(',') if t %}{{ t|telefone }}<br>{% else %}—{% endfor %}</td>
+      <td class="pequeno">{% for m in e.emails.split(',') if m %}{{ m }}<br>{% else %}—{% endfor %}</td>
+      <td class="pequeno">{{ e.cnae[:4] }}-{{ e.cnae[4:5] }}/{{ e.cnae[5:] }} {{ e.cnae_texto }}</td>
+      <td>{{ e.situacao }}</td></tr>
+    {% else %}<tr><td colspan="9" class="vazio">A CNPJá não devolveu nenhuma empresa com esses filtros.</td></tr>{% endfor %}
+  </table></div>
+</div>
+{% endblock %}

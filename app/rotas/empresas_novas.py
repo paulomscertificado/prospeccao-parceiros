@@ -30,8 +30,66 @@ def tela_empresas_novas(request: Request, usuario: Usuario = Depends(exige("camp
         "mensagens": empresas_novas.mensagens(db), "angulos": empresas_novas.ANGULOS,
         "tem_chave": bool(empresas_novas.chave_api()), "campanhas": campanhas, "empresas_por_campanha": contagem,
         "usuarios": usuarios, "dono": empresas_novas.dono(db), "hoje": date.today(),
-        "ontem": date.today() - timedelta(days=1),
+        "ontem": date.today() - timedelta(days=1), "buscas": empresas_novas.buscas_recentes(db),
+        "cnaes": empresas_novas.cnaes(db), "limite_teste": empresas_novas.LIMITE_TESTE,
     })
+
+
+@rotas.get("/empresas-novas/busca/{busca_id:int}")
+def ver_busca(request: Request, busca_id: int, usuario: Usuario = Depends(exige("campanhas.ver")),
+              db: Session = Depends(obter_db)):
+    """Lista das empresas que a CNPJá devolveu nessa busca (com quem ficou de fora e por quê) e a campanha."""
+    from fastapi import HTTPException
+
+    from ..modelos import BuscaCnpja, Campanha, EmpresaCnpja
+
+    busca = db.get(BuscaCnpja, busca_id)
+    if busca is None:
+        raise HTTPException(404)
+    empresas = db.execute(select(EmpresaCnpja).where(EmpresaCnpja.busca_id == busca_id)
+                          .order_by(EmpresaCnpja.motivo_fora != "", EmpresaCnpja.razao_social)).scalars().all()
+    return tela(request, "empresas_novas_busca.html", {
+        "busca": busca, "empresas": empresas,
+        "campanha": db.get(Campanha, busca.campanha_id) if busca.campanha_id else None,
+        "quem": db.get(Usuario, busca.usuario_id) if busca.usuario_id else None,
+    })
+
+
+@rotas.post("/empresas-novas/testar", dependencies=[Depends(verificar_csrf)])
+def testar_api(request: Request, usuario: Usuario = Depends(exige("campanhas.gerenciar")), db: Session = Depends(obter_db)):
+    try:
+        r = empresas_novas.testar(db, usuario)
+    except empresas_novas.ErroCnpja as erro:
+        texto = str(erro)
+        avisar(request, f"O teste não deu certo: {texto[:1].upper()}{texto[1:]}.", "erro")
+        return voltar("/empresas-novas")
+    registrar_log(db, usuario, "testou_api_cnpja", "busca_cnpja", r["busca_id"], f"{r['encontradas']} empresas", request)
+    db.commit()
+    avisar(request, f"Teste feito: {r['encontradas']} empresas (cerca de 1 crédito). Confira a lista abaixo; se estiver "
+                    "certa, monte a campanha com o botão no fim da página.")
+    return voltar(f"/empresas-novas/busca/{r['busca_id']}")
+
+
+@rotas.post("/empresas-novas/busca/{busca_id:int}/campanha", dependencies=[Depends(verificar_csrf)])
+def campanha_da_busca(request: Request, busca_id: int, usuario: Usuario = Depends(exige("campanhas.gerenciar")),
+                      db: Session = Depends(obter_db)):
+    from fastapi import HTTPException
+
+    from ..modelos import BuscaCnpja
+
+    busca = db.get(BuscaCnpja, busca_id)
+    if busca is None:
+        raise HTTPException(404)
+    if busca.campanha_id:
+        return voltar(f"/campanhas/{busca.campanha_id}")
+    camp = empresas_novas.criar_campanha_da_busca(db, busca, empresas_novas.dono(db) or usuario)
+    if camp is None:
+        avisar(request, "Nenhuma empresa desta lista pode entrar na campanha (todas ficaram de fora).", "erro")
+        return voltar(f"/empresas-novas/busca/{busca_id}")
+    registrar_log(db, usuario, "campanha_da_busca_cnpja", "campanha", camp.id, f"busca {busca_id}", request)
+    db.commit()
+    avisar(request, "A campanha está sendo montada e vai pedir aprovação (leva alguns minutos).")
+    return voltar(f"/campanhas/{camp.id}")
 
 
 @rotas.post("/empresas-novas/configurar", dependencies=[Depends(verificar_csrf)])
@@ -55,8 +113,15 @@ async def configurar(request: Request, usuario: Usuario = Depends(exige("campanh
     for chave_cfg, valor in [("novas_ativo", "1" if form.get("ativo") else "0"), ("novas_ufs", ufs),
                              ("novas_canais", canais), ("novas_maximo_dia", str(maximo)), ("novas_hora", hora),
                              ("novas_sem_individual", "1" if form.get("sem_individual") else "0"),
-                             ("novas_dono_id", str(dono_id or ""))]:
+                             ("novas_dono_id", str(dono_id or "")),
+                             ("novas_excluir_listas", "1" if form.get("excluir_listas") else "0")]:
         gravar_config(db, chave_cfg, valor)
+    if "cnaes" in form:  # atividade principal (CNAE) das empresas buscadas
+        lista = [c for c in (util.so_digitos(p) for p in str(form.get("cnaes")).replace(";", ",").split(",")) if len(c) == 7]
+        if not lista:
+            avisar(request, "Informe pelo menos um CNAE com 7 números (ex.: 6920601).", "erro")
+            return voltar("/empresas-novas")
+        gravar_config(db, "novas_cnaes", ",".join(dict.fromkeys(lista)))
     registrar_log(db, usuario, "configurou_empresas_novas", "configuracao", None, request=request)
     db.commit()
     if form.get("ativo") and not empresas_novas.chave_api():
@@ -123,11 +188,11 @@ async def buscar_agora(request: Request, usuario: Usuario = Depends(exige("campa
                   f"{r['encontradas']} encontradas", request)
     db.commit()
     if r["campanha_id"]:
-        avisar(request, f"{r['encontradas']} empresas abertas encontradas. A campanha está sendo montada e vai pedir "
-                        "aprovação (leva alguns minutos).")
-        return voltar(f"/campanhas/{r['campanha_id']}")
-    avisar(request, f"{r['encontradas']} empresas encontradas, nenhuma nova para contatar nesse período.")
-    return voltar("/empresas-novas")
+        avisar(request, f"{r['encontradas']} empresas abertas encontradas ({r['fora']} ficaram de fora). A campanha "
+                        "está sendo montada e vai pedir aprovação (leva alguns minutos).")
+    else:
+        avisar(request, f"{r['encontradas']} empresas encontradas, nenhuma nova para contatar nesse período.")
+    return voltar(f"/empresas-novas/busca/{r['busca_id']}")
 
 
 @rotas.post("/empresas-novas/saldo", dependencies=[Depends(verificar_csrf)])

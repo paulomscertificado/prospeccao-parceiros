@@ -18,6 +18,8 @@
     <li>Chave da API da CNPJá: {% if tem_chave %}<span class="selo selo-ok">configurada</span>{% else %}<span class="selo selo-erro">falta colocar</span>{% endif %}</li>
     <li>Dono das campanhas diárias: {{ dono.nome if dono else 'ninguém escolhido ainda' }}</li>
     <li>Estados: {{ cfg.novas_ufs }} · até {{ cfg.novas_maximo_dia }} empresas por dia{% if cfg.novas_sem_individual == '1' %} · sem empresário individual/MEI{% endif %}</li>
+    <li>Atividade principal (CNAE): {% for c in cnaes %}<code>{{ c[:4] }}-{{ c[4] }}/{{ c[5:] }}</code>{{ ', ' if not loop.last }}{% endfor %} · só empresas ativas
+      {% if cfg.novas_excluir_listas == '1' %} · sem quem já está nas listas importadas{% endif %}</li>
     {% if cfg.novas_ultimo_resultado %}<li>Última busca automática: {{ cfg.novas_ultimo_resultado }}</li>{% endif %}
   </ul>
   {% if pode('campanhas.gerenciar') %}
@@ -27,7 +29,9 @@
       <label class="pequeno">Abertas de<br><input type="date" name="desde" value="{{ ontem.isoformat() }}"></label>
       <label class="pequeno">até<br><input type="date" name="ate" value="{{ hoje.isoformat() }}"></label>
       <button class="btn btn-primario" {{ 'disabled' if not tem_chave }}>Buscar agora e montar campanha</button></form>
-    {% if tem_chave %}<form class="inline" method="post" action="/empresas-novas/saldo"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">Ver saldo da CNPJá</button></form>{% endif %}
+    {% if tem_chave %}<form class="inline" method="post" action="/empresas-novas/saldo"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">Ver saldo da CNPJá</button></form>
+    <form class="inline" method="post" action="/empresas-novas/testar" data-confirmar="Fazer uma consulta de teste com até {{ limite_teste }} empresas abertas nos últimos 7 dias (gasta cerca de 1 crédito)? Não cria campanha: só mostra a lista.">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">Testar a API ({{ limite_teste }} empresas · 1 crédito)</button></form>{% endif %}
   </div>
   <p class="pequeno suave">Cada 10 empresas encontradas gastam 1 crédito da CNPJá. Em Pernambuco abrem cerca de 380 empresas por dia (≈ 1.100 créditos por mês; o plano de R$ 39,99 tem 2.500).</p>
   {% endif %}
@@ -42,6 +46,9 @@
       <label class="marcar"><input type="checkbox" name="ativo" {{ 'checked' if cfg.novas_ativo == '1' }}> Buscar todo dia sozinho e montar a campanha do dia</label>
       <label>Horário da busca<br><input type="time" name="hora" value="{{ cfg.novas_hora }}"></label>
       <label>Estados (siglas separadas por vírgula)<br><input type="text" name="ufs" value="{{ cfg.novas_ufs }}" placeholder="PE"></label>
+      <label>Atividade principal (CNAE, separados por vírgula)<br><input type="text" name="cnaes" value="{{ cnaes|join(', ') }}" placeholder="6920601, 6822600">
+        <span class="pequeno suave">6920601 = contabilidade · 6822600 = administração de imóveis e condomínios.</span></label>
+      <label class="marcar"><input type="checkbox" name="excluir_listas" {{ 'checked' if cfg.novas_excluir_listas == '1' }}> Deixar de fora quem já está nas listas importadas (Configurações &gt; Integrações &gt; Listas)</label>
       <label>Máximo de empresas por campanha diária<br><input type="number" name="maximo_dia" min="1" max="500" value="{{ cfg.novas_maximo_dia }}">
         <span class="pequeno suave">Os limites de envio continuam valendo (padrão: 80 e-mails por dia, 60 por campanha). Empresas com celular e e-mail entram primeiro.</span></label>
     </div>
@@ -78,6 +85,22 @@
 </form>
 <form method="post" action="/empresas-novas/restaurar-mensagens" data-confirmar="Voltar as mensagens para o texto inicial?" style="margin:-8px 0 16px"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-pequeno">Voltar as mensagens ao texto inicial</button></form>
 {% endif %}
+
+<div class="cartao" id="buscas">
+  <h2>Empresas encontradas na CNPJá</h2>
+  {% if buscas %}
+  <div class="tabela-rolagem"><table>
+    <tr><th>Quando</th><th>Abertas em</th><th>Estados</th><th class="num">Encontradas</th><th class="num">De fora</th><th class="num">Créditos</th><th>Campanha</th></tr>
+    {% for b in buscas %}
+    <tr><td><a href="/empresas-novas/busca/{{ b.id }}">{{ b.criado_em|datahora }}</a>
+        {% if b.teste %}<span class="selo">teste</span>{% elif b.automatica %}<span class="selo selo-azul">automática</span>{% endif %}</td>
+      <td>{{ b.desde.strftime('%d/%m') if b.desde }}{% if b.ate and b.ate != b.desde %} a {{ b.ate.strftime('%d/%m') }}{% endif %}</td>
+      <td>{{ b.ufs }}</td><td class="num">{{ b.encontradas }}</td><td class="num">{{ b.fora }}</td><td class="num">≈ {{ b.creditos }}</td>
+      <td>{% if b.campanha_id %}<a href="/campanhas/{{ b.campanha_id }}">ver campanha</a>{% else %}<a href="/empresas-novas/busca/{{ b.id }}">ver lista</a>{% endif %}</td></tr>
+    {% endfor %}
+  </table></div>
+  {% else %}<p class="suave">Nenhuma busca ainda. Use "Testar a API" para ver como a lista vem.</p>{% endif %}
+</div>
 
 <div class="cartao">
   <h2>Campanhas diárias</h2>

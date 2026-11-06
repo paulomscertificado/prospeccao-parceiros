@@ -423,6 +423,49 @@ class PassoCadencia(Base):
     template: Mapped["Template | None"] = relationship()
 
 
+class BuscaCnpja(Base):
+    """Uma consulta à API da CNPJá (Empresas novas): quando, o quê, quanto achou e a campanha que saiu dela."""
+    __tablename__ = "buscas_cnpja"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    usuario_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    desde: Mapped[date | None] = mapped_column(Date, nullable=True)
+    ate: Mapped[date | None] = mapped_column(Date, nullable=True)
+    ufs: Mapped[str] = mapped_column(String(120), default="")
+    cnaes: Mapped[str] = mapped_column(String(200), default="")
+    teste: Mapped[bool] = mapped_column(Boolean, default=False)       # consulta de teste (10 empresas, 1 crédito)
+    automatica: Mapped[bool] = mapped_column(Boolean, default=False)  # feita pela rotina diária
+    encontradas: Mapped[int] = mapped_column(Integer, default=0)
+    fora: Mapped[int] = mapped_column(Integer, default=0)              # excluídas (listas, repetidas, MEI...)
+    creditos: Mapped[int] = mapped_column(Integer, default=0)          # estimativa: 1 a cada 10 empresas
+    campanha_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, index=True)
+
+
+class EmpresaCnpja(Base):
+    """Empresa que a API da CNPJá devolveu numa busca (a lista que o usuário confere antes/depois da campanha)."""
+    __tablename__ = "buscas_cnpja_empresas"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    busca_id: Mapped[int] = mapped_column(ForeignKey("buscas_cnpja.id", ondelete="CASCADE"), index=True)
+    cnpj: Mapped[str] = mapped_column(String(14), default="", index=True)
+    razao_social: Mapped[str] = mapped_column(String(200), default="")
+    nome_fantasia: Mapped[str] = mapped_column(String(200), default="")
+    cnae: Mapped[str] = mapped_column(String(7), default="")
+    cnae_texto: Mapped[str] = mapped_column(String(200), default="")
+    uf: Mapped[str] = mapped_column(String(2), default="")
+    cidade: Mapped[str] = mapped_column(String(120), default="")
+    endereco: Mapped[str] = mapped_column(String(250), default="")
+    aberta_em: Mapped[date | None] = mapped_column(Date, nullable=True)
+    situacao: Mapped[str] = mapped_column(String(40), default="")
+    porte: Mapped[str] = mapped_column(String(60), default="")
+    natureza: Mapped[str] = mapped_column(String(120), default="")
+    natureza_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    telefones_fixos: Mapped[str] = mapped_column(String(120), default="")  # separados por vírgula (DDD + número)
+    celulares: Mapped[str] = mapped_column(String(120), default="")
+    emails: Mapped[str] = mapped_column(Text, default="")                  # separados por vírgula
+    motivo_fora: Mapped[str] = mapped_column(String(200), default="")      # vazio = pode entrar na campanha
+    lead_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
 class Campanha(Base):
     __tablename__ = "campanhas"
     id: Mapped[int] = mapped_column(primary_key=True)

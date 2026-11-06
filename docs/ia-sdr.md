@@ -208,6 +208,12 @@ permissão `campanhas.ver`; configurar/buscar com `campanhas.gerenciar`).
   `novas_ultima_data`+1 até hoje, no máximo 7 dias; erro da API tenta de novo na próxima volta).
 - Edição de mensagens na campanha de venda usa `sdr.texto_sem_spam` (preço permitido) em vez de `texto_seguro`.
   `rotinas.responder_automaticamente` não responde leads de venda (`empresas_novas.e_lead_de_venda`).
+- Filtro de atividade: `mainActivity.id.in` com `novas_cnaes` (padrão 6920601,6822600). Telefones pelo `type` da
+  CNPJá (LANDLINE = fixo, MOBILE = celular).
+- Cada busca fica em `buscas_cnpja` + `buscas_cnpja_empresas` (`registrar_busca`), com `motivo_fora`: repetida,
+  MEI (opção), já numa lista importada (`novas_excluir_listas`, tabela `bases_empresas`) ou lead já trabalhado.
+  A campanha sai da lista guardada (`criar_campanha_da_busca`, sem gastar crédito). Tela
+  `/empresas-novas/busca/{id}`; teste `/empresas-novas/testar` (`limit=10`, 1 página = 1 crédito, sem campanha).
 - Testes: `testes/test_empresas_novas.py` (API simulada).
 
 ## Reserva do lead por usuário (nov/2026)
