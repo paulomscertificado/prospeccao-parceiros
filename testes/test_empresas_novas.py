@@ -101,13 +101,20 @@ def test_rodada_diaria_respeita_horario_e_roda_uma_vez(cliente, monkeypatch):
     monkeypatch.setattr(empresas_novas, "buscar_e_criar",
                         lambda db, u, desde, ate, automatica=False: chamadas.append((desde, ate))
                         or {"encontradas": 0, "campanha_id": None})
+    hoje = date.today()
     with sessao() as db:
         for c, v in [("novas_ativo", "1"), ("novas_hora", "00:00"), ("novas_dono_id", str(admin_id(db))),
-                     ("novas_ultima_busca", ""), ("novas_ultima_data", (date.today() - timedelta(days=2)).isoformat())]:
+                     ("novas_ultima_busca", ""), ("novas_ultima_data", (hoje - timedelta(days=5)).isoformat())]:
             gravar_config(db, c, v)
     empresas_novas.rodada_diaria()
     empresas_novas.rodada_diaria()  # mesma data: não busca de novo
-    assert chamadas == [(date.today() - timedelta(days=1), date.today())]
+    # continua do dia seguinte ao último buscado e vai até 2 dias atrás (atraso da Receita)
+    assert chamadas == [(hoje - timedelta(days=4), hoje - timedelta(days=2))]
+    with sessao() as db:
+        assert empresas_novas.cfg(db, "novas_ultima_data") == (hoje - timedelta(days=2)).isoformat()
+        gravar_config(db, "novas_ultima_busca", "")
+    empresas_novas.rodada_diaria()  # de novo no mesmo dia (ex.: busca apagada): esses dias já foram, não repete
+    assert len(chamadas) == 1
     with sessao() as db:
         gravar_config(db, "novas_ativo", "0")
 
@@ -242,3 +249,38 @@ def test_chave_da_cnpja_em_configuracoes_e_painel_novo(cliente, monkeypatch):
         assert empresas_novas.cfg(db, "novas_ufs") == "PE,MG"
         gravar_config(db, "novas_ufs", "PE")
         gravar_config(db, "novas_canais", "whatsapp,email")
+
+
+
+def test_teste_olha_um_dia_diferente_e_busca_nao_repete_empresa(cliente, monkeypatch):
+    """Antes o teste pedia sempre "os últimos 7 dias" e vinha a mesma lista. E empresa que já entrou em campanha não
+    pode entrar de novo noutra busca."""
+    from app.modelos import BuscaCnpja, EmpresaCnpja
+
+    pedidos = []
+
+    def falso(url, params=None, headers=None, timeout=None):
+        pedidos.append(dict(params or {}))
+        return _Resposta({"records": [_registro("77777777000177", "REPETIDA LTDA"),
+                                      _registro("88888888000188", "NOVA DE VERDADE LTDA")], "next": None})
+
+    monkeypatch.setattr(empresas_novas.httpx, "get", falso)
+    monkeypatch.setattr(config, "CNPJA_API_KEY", "chave-de-teste")
+    hoje = date.today()
+    with sessao() as db:
+        admin = db.get(Usuario, admin_id(db))
+        primeiro = empresas_novas.testar(db, admin)
+        segundo = empresas_novas.testar(db, admin)
+        assert primeiro["dia"] != segundo["dia"] and hoje - timedelta(days=10) <= segundo["dia"] < hoje
+        assert pedidos[0]["founded.gte"] == pedidos[0]["founded.lte"] == primeiro["dia"].isoformat()  # um dia só
+        assert pedidos[1]["founded.gte"] == pedidos[1]["founded.lte"] == segundo["dia"].isoformat()
+        # teste que não virou campanha não bloqueia a busca diária
+        assert db.get(BuscaCnpja, segundo["busca_id"]).fora == 0
+        # a 1ª busca vira campanha: as mesmas empresas numa busca seguinte ficam de fora
+        empresas_novas.criar_campanha_da_busca(db, db.get(BuscaCnpja, primeiro["busca_id"]), admin)
+        gravar_config(db, "novas_maximo_dia", "60")
+        r = empresas_novas.buscar_e_criar(db, admin, hoje - timedelta(days=3), hoje - timedelta(days=2))
+        assert pedidos[-1]["limit"] == 120  # pede à CNPJá só o dobro do máximo da campanha (economiza crédito)
+        assert r["fora"] == 2 and r["campanha_id"] is None
+        motivos = {e.motivo_fora for e in db.execute(select(EmpresaCnpja).where(EmpresaCnpja.busca_id == r["busca_id"])).scalars()}
+        assert all(m.startswith("já veio na busca de") for m in motivos)

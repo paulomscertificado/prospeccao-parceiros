@@ -168,7 +168,9 @@ Menu **Empresas novas**. Todo dia o sistema busca as empresas que acabaram de ab
    **2.** marque os **estados**; **3.** escolha quem fica de fora (listas importadas, MEI); **4.** escolha o **dono**
    das campanhas diárias (ele assina e envia pelo e-mail/WhatsApp dele) e os **canais**. Clique em **Salvar configuração**.
 
-**Todo dia:** no horário escolhido, o sistema busca as empresas **ativas** abertas desde a última busca, cadastra
+**Todo dia:** no horário escolhido, o sistema busca as empresas **ativas** abertas desde a última busca (continua
+do dia seguinte ao último já buscado, até 2 dias atrás, porque a Receita publica as empresas novas com alguns dias de
+atraso; nenhum dia é buscado duas vezes e empresa que já entrou em campanha nunca entra de novo), cadastra
 como leads (origem "Empresas novas (CNPJá)") e monta a campanha **"Empresas novas dd/mm – PE"**, que fica
 **aguardando aprovação**. Depois de aprovada: o e-mail sai sozinho pela fila (horário e limites) e o WhatsApp
 aparece para o time enviar com 1 clique. São 3 toques: dia 1 (boas-vindas + oferta do e-CNPJ), dia 3 (lembrete)
@@ -187,8 +189,8 @@ leads: as respostas vão para **Oportunidades** e o time conversa.
 - **Ver as empresas encontradas:** no quadro **"Empresas encontradas na CNPJá"**, clique na busca. A lista mostra
   razão social, CNPJ, cidade, data de abertura, **telefone fixo**, **celular**, **e-mails**, atividade e quem ficou
   de fora (e por quê), com o link da campanha.
-- **Testar a API:** o botão **Testar a API (10 empresas · 1 crédito)** busca até 10 empresas abertas nos últimos 7
-  dias e só mostra a lista. Se estiver certa, clique em **Montar a campanha com estas empresas** (não gasta crédito).
+- **Testar a API:** o botão **Testar (10 empresas · 1 crédito)** busca até 10 empresas abertas **num dia** e só
+  mostra a lista. Cada teste olha um dia diferente (ontem, anteontem...), para não vir sempre a mesma lista. Se estiver certa, clique em **Montar a campanha com estas empresas** (não gasta crédito).
 
 ### Intervalo entre os envios automáticos
 

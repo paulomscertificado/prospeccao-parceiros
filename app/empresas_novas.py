@@ -60,6 +60,7 @@ PADRAO = {
     "novas_excluir_listas": "1",       # 1 = deixa de fora quem já está em alguma lista importada (bases_importadas)
 }
 LIMITE_TESTE = 10  # consulta de teste: 10 empresas = 1 crédito
+ATRASO_DIAS = 2    # a busca diária pega as empresas abertas até 2 dias atrás (a Receita publica com atraso)
 
 MENSAGENS_PADRAO = {
     "venda_boas_vindas": {
@@ -310,6 +311,15 @@ def registrar_busca(db, registros: list[dict], desde: date, ate: date, ufs: list
                                          .join(BaseDados, BaseDados.id == EmpresaBase.base_id)
                                          .where(EmpresaBase.cnpj.in_(cnpjs[i:i + 500]))):
                 em_listas.setdefault(cnpj, nome)
+    # Empresa que já veio numa busca anterior que virou campanha (manual, diária ou teste aproveitado): não entra de
+    # novo (senão a mesma empresa receberia a campanha duas vezes). Teste que não virou campanha não conta.
+    ja_vieram: dict[str, date] = {}
+    for i in range(0, len(cnpjs), 500):
+        for cnpj, quando in db.execute(select(EmpresaCnpja.cnpj, BuscaCnpja.criado_em)
+                                       .join(BuscaCnpja, BuscaCnpja.id == EmpresaCnpja.busca_id)
+                                       .where(EmpresaCnpja.cnpj.in_(cnpjs[i:i + 500]), EmpresaCnpja.busca_id != busca.id,
+                                              EmpresaCnpja.motivo_fora == "", BuscaCnpja.campanha_id.is_not(None))):
+            ja_vieram.setdefault(cnpj, quando)
     leads = {}
     if cnpjs:
         for i in range(0, len(cnpjs), 500):
@@ -326,6 +336,8 @@ def registrar_busca(db, registros: list[dict], desde: date, ate: date, ufs: list
             motivo = "repetida na resposta da API"
         elif sem_individual and linha["natureza_id"] == NATUREZA_EMPRESARIO_INDIVIDUAL:
             motivo = "empresário individual / MEI (configurado para ficar de fora)"
+        elif linha["cnpj"] in ja_vieram:
+            motivo = f"já veio na busca de {ja_vieram[linha['cnpj']]:%d/%m/%Y %H:%M}"
         elif linha["cnpj"] in em_listas:
             motivo = f"já está na lista \"{em_listas[linha['cnpj']]}\""
         elif lead and (lead.opt_out or lead.perdido or lead.etapa >= 1 or lead.automacao_pausada):
@@ -434,7 +446,10 @@ def buscar_e_criar(db, usuario: Usuario, desde: date, ate: date, automatica: boo
     """Busca na API, guarda a lista e cria a campanha. Devolve {"encontradas", "campanha_id", "busca_id", "fora"}
     (lança ErroCnpja)."""
     ufs = _ufs(db)
-    registros = buscar_abertas(desde, ate, ufs)
+    # Pede à CNPJá só o que cabe na campanha (o dobro do máximo, para sobrar depois das exclusões): cada empresa
+    # devolvida gasta crédito, e as que não cabem na campanha do dia não seriam contatadas.
+    maximo = util.para_int(cfg(db, "novas_maximo_dia")) or 60
+    registros = buscar_abertas(desde, ate, ufs, limite=min(POR_PAGINA * MAXIMO_PAGINAS, maximo * 2))
     busca = registrar_busca(db, registros, desde, ate, ufs, usuario, automatica=automatica)
     db.commit()
     camp = criar_campanha_da_busca(db, busca, usuario)
@@ -442,15 +457,30 @@ def buscar_e_criar(db, usuario: Usuario, desde: date, ate: date, automatica: boo
             "fora": busca.fora}
 
 
-def testar(db, usuario: Usuario | None, dias: int = 7) -> dict:
-    """Consulta de TESTE: no máximo 10 empresas (1 crédito) abertas nos últimos dias, com os filtros configurados.
+def dia_do_teste(db, hoje: date | None = None) -> date:
+    """Cada teste olha UM dia de abertura diferente (o mais recente que ainda não foi testado, entre 1 e 10 dias
+    atrás). Antes o teste pedia sempre "os últimos 7 dias" e a CNPJá devolvia as mesmas 10 empresas, na mesma ordem."""
+    from .modelos import BuscaCnpja
+
+    hoje = hoje or date.today()
+    testados = {d for (d,) in db.execute(select(BuscaCnpja.desde).where(BuscaCnpja.teste.is_(True),
+                                                                     BuscaCnpja.desde == BuscaCnpja.ate))}
+    for atras in range(1, 11):
+        dia = hoje - timedelta(days=atras)
+        if dia not in testados:
+            return dia
+    return hoje - timedelta(days=1)
+
+
+def testar(db, usuario: Usuario | None) -> dict:
+    """Consulta de TESTE: no máximo 10 empresas (1 crédito) abertas num dia, com os filtros configurados.
     Só guarda a lista para conferência; a campanha sai depois, por um botão na lista (sem gastar crédito)."""
-    hoje = date.today()
+    dia = dia_do_teste(db)
     ufs = _ufs(db)
-    registros = buscar_abertas(hoje - timedelta(days=dias), hoje, ufs, limite=LIMITE_TESTE)
-    busca = registrar_busca(db, registros, hoje - timedelta(days=dias), hoje, ufs, usuario, teste=True)
+    registros = buscar_abertas(dia, dia, ufs, limite=LIMITE_TESTE)
+    busca = registrar_busca(db, registros, dia, dia, ufs, usuario, teste=True)
     db.commit()
-    return {"encontradas": len(registros), "busca_id": busca.id, "fora": busca.fora}
+    return {"encontradas": len(registros), "busca_id": busca.id, "fora": busca.fora, "dia": dia}
 
 
 def buscas_recentes(db, limite: int = 30):
@@ -471,19 +501,26 @@ def rodada_diaria() -> str:
         if usuario is None:
             gravar_config(db, "novas_ultimo_resultado", "Escolha quem é o dono das campanhas diárias.")
             return ""
+        # Janela de datas de abertura SEM sobreposição: continua do dia seguinte ao último já buscado. Termina
+        # "atraso" dias atrás porque a Receita (e a CNPJá) publica as empresas abertas com alguns dias de atraso: buscar
+        # o próprio dia trazia poucas e as que apareciam depois ficavam de fora para sempre.
+        ate = hoje - timedelta(days=ATRASO_DIAS)
         ultima = cfg(db, "novas_ultima_data")
-        desde = (date.fromisoformat(ultima) + timedelta(days=1)) if ultima else hoje - timedelta(days=1)
-        desde = max(desde, hoje - timedelta(days=7))  # parado muitos dias: não busca semanas de uma vez
+        desde = (date.fromisoformat(ultima) + timedelta(days=1)) if ultima else ate
+        desde = max(desde, ate - timedelta(days=6))  # parado muitos dias: no máximo 7 dias de uma vez
         gravar_config(db, "novas_ultima_busca", hoje.isoformat())
+        if desde > ate:
+            return ""  # esses dias já foram buscados
         try:
-            r = buscar_e_criar(db, usuario, desde, hoje, automatica=True)
+            r = buscar_e_criar(db, usuario, desde, ate, automatica=True)
         except ErroCnpja as erro:
             texto = f"{agora():%d/%m %H:%M} – não deu certo: {erro}."
             gravar_config(db, "novas_ultimo_resultado", texto)
             gravar_config(db, "novas_ultima_busca", "")  # tenta de novo na próxima volta do relógio
             return texto
-        gravar_config(db, "novas_ultima_data", hoje.isoformat())
-        texto = (f"{agora():%d/%m %H:%M} – {r['encontradas']} empresas abertas encontradas"
+        gravar_config(db, "novas_ultima_data", ate.isoformat())
+        periodo = f"{desde:%d/%m}" if desde == ate else f"{desde:%d/%m} a {ate:%d/%m}"
+        texto = (f"{agora():%d/%m %H:%M} – {r['encontradas']} empresas abertas em {periodo} encontradas"
                  + (f" ({r['fora']} ficaram de fora)" if r.get("fora") else "")
                  + ("; campanha do dia montada (aguarda aprovação)." if r["campanha_id"] else "; nenhuma nova."))
         gravar_config(db, "novas_ultimo_resultado", texto)

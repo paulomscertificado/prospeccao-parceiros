@@ -38,7 +38,7 @@
       <label class="pequeno">até<br><input type="date" name="ate" value="{{ hoje.isoformat() }}"></label>
       <button class="btn btn-primario" {{ 'disabled' if not tem_chave }}>Buscar e montar campanha</button></form>
     {% if tem_chave %}
-    <form class="inline" method="post" action="/empresas-novas/testar" data-confirmar="Fazer uma consulta de teste com até {{ limite_teste }} empresas abertas nos últimos 7 dias (gasta cerca de 1 crédito)? Não cria campanha: só mostra a lista.">
+    <form class="inline" method="post" action="/empresas-novas/testar" data-confirmar="Fazer uma consulta de teste com até {{ limite_teste }} empresas abertas num dia (cada teste olha um dia diferente; gasta cerca de 1 crédito)? Não cria campanha: só mostra a lista.">
       <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">Testar ({{ limite_teste }} empresas · 1 crédito)</button></form>
     <form class="inline" method="post" action="/empresas-novas/saldo"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">Ver saldo</button></form>{% endif %}
   </div>
@@ -56,7 +56,7 @@
         <span><b>Buscar todo dia sozinho</b><br><span class="pequeno suave">e montar a campanha do dia (você aprova antes de sair)</span></span></label>
       <label style="margin:0">Horário da busca<br><input type="time" name="hora" value="{{ cfg.novas_hora }}" style="width:130px"></label>
     </div>
-    <p class="ajuda">Dica: antes das 08:00. A busca pega as empresas abertas desde a última busca (no máximo 7 dias).</p>
+    <p class="ajuda">Dica: antes das 08:00. Cada dia a busca continua de onde parou: pega as empresas abertas até 2 dias atrás (a Receita publica as empresas novas com alguns dias de atraso), sem repetir nenhuma. Empresa que já entrou em campanha nunca entra de novo.</p>
   </div>
 
   <div class="cartao">
@@ -67,7 +67,7 @@
     </div>
     <p class="ajuda">Empresas de <b>qualquer atividade</b>, só as <b>ativas</b>. Mais estados = mais créditos por dia.</p>
     <label style="max-width:320px">Máximo de empresas por campanha diária<br><input type="number" name="maximo_dia" min="1" max="500" value="{{ cfg.novas_maximo_dia }}"></label>
-    <p class="ajuda">Quem tem celular e e-mail entra primeiro. Os limites de envio continuam valendo (padrão: 80 e-mails por dia).</p>
+    <p class="ajuda">Quem tem celular e e-mail entra primeiro. A busca pede à CNPJá no máximo o dobro desse número (só paga o que pode usar). Os limites de envio continuam valendo (padrão: 80 e-mails por dia).</p>
   </div>
 
   <div class="cartao">

@@ -216,6 +216,15 @@ permissão `campanhas.ver`; configurar/buscar com `campanhas.gerenciar`).
   `/empresas-novas/busca/{id}`; teste `/empresas-novas/testar` (`limit=10`, 1 página = 1 crédito, sem campanha).
 - Testes: `testes/test_empresas_novas.py` (API simulada).
 
+## Empresas novas sem repetição (nov/2026)
+
+- Teste (`testar`): um dia de abertura por vez (`dia_do_teste`: o mais recente entre 1 e 10 dias atrás ainda não
+  testado). Antes era sempre "últimos 7 dias" + `limit=10`, e a CNPJá devolvia as mesmas 10, na mesma ordem.
+- Rotina diária: janela `novas_ultima_data`+1 até hoje − `ATRASO_DIAS` (2), no máximo 7 dias; grava o fim da janela em
+  `novas_ultima_data` (janelas nunca se sobrepõem; a Receita publica com atraso, então o dia de hoje vinha incompleto).
+- `registrar_busca` marca "já veio na busca de..." quem estava apto numa busca anterior que virou campanha.
+- `buscar_e_criar` pede `limit` = 2 × `novas_maximo_dia` (só paga o que cabe na campanha).
+
 ## Intervalo dos envios automáticos (nov/2026)
 
 `campanhas.processar_fila` (e-mail) e `processar_fila_whatsapp`: um envio automático por rodada e por canal; depois

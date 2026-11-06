@@ -65,7 +65,7 @@ def testar_api(request: Request, usuario: Usuario = Depends(exige("campanhas.ger
         return voltar("/empresas-novas")
     registrar_log(db, usuario, "testou_api_cnpja", "busca_cnpja", r["busca_id"], f"{r['encontradas']} empresas", request)
     db.commit()
-    avisar(request, f"Teste feito: {r['encontradas']} empresas (cerca de 1 crédito). Confira a lista abaixo; se estiver "
+    avisar(request, f"Teste feito: {r['encontradas']} empresas abertas em {r['dia']:%d/%m/%Y} (cerca de 1 crédito). Cada teste olha um dia diferente. Confira a lista abaixo; se estiver "
                     "certa, monte a campanha com o botão no fim da página.")
     return voltar(f"/empresas-novas/busca/{r['busca_id']}")
 
