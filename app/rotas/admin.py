@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from .. import autorizacao, base_receita, config, ia, leads_servico, prospeccao, score, util
+from .. import autorizacao, base_receita, bases_importadas, config, ia, leads_servico, prospeccao, score, util
 from ..banco import gravar_config, ler_config, obter_db
 from ..integracoes import dns_email, email_imap, email_smtp, whatsapp_cloud, whatsapp_leads
 from ..modelos import Equipe, Lead, LogAuditoria, Papel, Parceiro, Usuario
@@ -79,6 +79,8 @@ def configuracoes(request: Request, aba: str = "geral", usuario: Usuario = Depen
             ("Banco de dados", True, "PostgreSQL" if "postgres" in config.DATABASE_URL else "SQLite (arquivo local em dados/)"),
         ],
         "fontes": prospeccao.fontes_disponiveis(db), "receita": base_receita.resumo(db),
+        "listas": bases_importadas.listas(db) if aba == "integracoes" else [],
+        "receita_oculta": bases_importadas.receita_oculta(db),
         "demo": db.execute(select(Lead.id).where(Lead.origem == "Demonstração").limit(1)).first() is not None,
         "email": _email_atual() if aba == "email" else None,
         "dns": dns_email.verificar(config.EMAIL_DOMINIO)
@@ -301,6 +303,64 @@ def importar_receita(request: Request, pasta: str = Form(...), usuario: Usuario 
         db.commit()
         avisar(request, "Importação iniciada. Leva uns 3 a 5 minutos; acompanhe nesta tela.")
     return voltar("/configuracoes?aba=integracoes")
+
+
+MAXIMO_UPLOAD_NUVEM = 4 * 1024 * 1024  # a Vercel recusa pedidos maiores que 4,5 MB
+
+
+@rotas.post("/configuracoes/listas/importar", dependencies=[Depends(verificar_csrf)])
+async def importar_lista(request: Request, usuario: Usuario = Depends(exige("configuracoes.alterar")),
+                         db: Session = Depends(obter_db)):
+    """Lista de empresas exportada da CNPJá (.xlsx) → base separada da Receita (ver app/bases_importadas.py)."""
+    form = await request.form()
+    arquivo = form.get("arquivo")
+    nome = str(form.get("nome") or "").strip()
+    if arquivo is None or not getattr(arquivo, "filename", ""):
+        avisar(request, "Escolha o arquivo .xlsx exportado da CNPJá.", "erro")
+        return voltar("/configuracoes?aba=integracoes#listas")
+    conteudo = await arquivo.read()
+    if config.NA_NUVEM and len(conteudo) > MAXIMO_UPLOAD_NUVEM:
+        avisar(request, "Arquivo grande demais para enviar pela internet. No computador da MS, dê dois cliques em "
+                        "importar_lista.bat e escolha o arquivo.", "alerta")
+        return voltar("/configuracoes?aba=integracoes#listas")
+    try:
+        resumo = bases_importadas.importar(db, nome or arquivo.filename.rsplit(".", 1)[0], conteudo,
+                                           arquivo.filename, usuario.id)
+    except bases_importadas.ErroImportacao as erro:
+        avisar(request, str(erro), "erro")
+        return voltar("/configuracoes?aba=integracoes#listas")
+    registrar_log(db, usuario, "importou_lista", "base", resumo["base_id"],
+                  f"{resumo['nome']}: {resumo['importadas']} empresas ({arquivo.filename})", request)
+    db.commit()
+    avisar(request, f"Lista \"{resumo['nome']}\" importada: {resumo['importadas']} empresas ativas"
+                    + (f" ({resumo['inativas']} inativas ficaram de fora)" if resumo["inativas"] else "") + ".")
+    return voltar("/configuracoes?aba=integracoes#listas")
+
+
+@rotas.post("/configuracoes/listas/{lista_id:int}/apagar", dependencies=[Depends(verificar_csrf)])
+def apagar_lista(request: Request, lista_id: int, usuario: Usuario = Depends(exige("configuracoes.alterar")),
+                 db: Session = Depends(obter_db)):
+    nome = bases_importadas.apagar(db, lista_id)
+    if nome:
+        registrar_log(db, usuario, "apagou_lista", "base", lista_id, nome, request)
+        db.commit()
+        avisar(request, f"Lista \"{nome}\" apagada. Os leads que já foram criados a partir dela continuam no sistema.")
+    return voltar("/configuracoes?aba=integracoes#listas")
+
+
+@rotas.post("/configuracoes/listas/receita", dependencies=[Depends(verificar_csrf)])
+def ocultar_receita(request: Request, ocultar: str = Form(""), usuario: Usuario = Depends(exige("configuracoes.alterar")),
+                    db: Session = Depends(obter_db)):
+    esconder = ocultar == "1"
+    if esconder and not bases_importadas.listas(db):
+        avisar(request, "Importe uma lista antes de esconder a base da Receita.", "erro")
+        return voltar("/configuracoes?aba=integracoes#listas")
+    bases_importadas.esconder_receita(db, esconder)
+    registrar_log(db, usuario, "base_receita_" + ("oculta" if esconder else "visivel"), "", None, request=request)
+    db.commit()
+    avisar(request, "A base da Receita foi escondida: os usuários só veem as listas importadas." if esconder
+           else "A base da Receita voltou a aparecer para os usuários.")
+    return voltar("/configuracoes?aba=integracoes#listas")
 
 
 # ---------------------------------------------------------------- LGPD e manutenção

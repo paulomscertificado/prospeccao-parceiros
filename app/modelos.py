@@ -452,6 +452,8 @@ class Campanha(Base):
     conexao_id: Mapped[str] = mapped_column(String(40), default="")  # número escolhido pelo admin (vazio = automático)
     so_fixo: Mapped[str] = mapped_column(Text, default="")  # ids dos leads só com telefone fixo (o usuário liga)
     tipo: Mapped[str] = mapped_column(String(30), default="parceiros", index=True)  # parceiros | empresas_novas
+    # De onde vêm as empresas: "receita" ou "lista:<id>" (lista importada, ver app/bases_importadas.py)
+    base: Mapped[str] = mapped_column(String(30), default="receita")
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
 
     cadencia: Mapped["Cadencia | None"] = relationship()

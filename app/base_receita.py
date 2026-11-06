@@ -393,49 +393,61 @@ def disponivel(db) -> bool:
         return False
 
 
-def contar(db, uf: str = "", cidade: str = "") -> dict[str, int]:
-    """Quantidade de empresas ativas (matrizes) por categoria: Brasil, UF ou cidade."""
-    consulta = select(EmpresaReceita.categoria, func.count()).where(EmpresaReceita.matriz == 1)
+def contar(db, uf: str = "", cidade: str = "", modelo=None, filtro=None, so_matriz: bool = True) -> dict[str, int]:
+    """Quantidade de empresas ativas (matrizes) por categoria: Brasil, UF ou cidade.
+    modelo/filtro: outra base com as mesmas colunas (listas importadas, ver app/bases_importadas.py)."""
+    M = modelo or EmpresaReceita
+    consulta = select(M.categoria, func.count())
+    if filtro is not None:
+        consulta = consulta.where(filtro)
+    if so_matriz:
+        consulta = consulta.where(M.matriz == 1)
     if uf:
-        consulta = consulta.where(EmpresaReceita.uf == uf)
+        consulta = consulta.where(M.uf == uf)
     if cidade:
-        consulta = consulta.where(EmpresaReceita.municipio_chave == util.chave_texto(cidade))
+        consulta = consulta.where(M.municipio_chave == util.chave_texto(cidade))
     try:
-        return {c or "": n for c, n in db.execute(consulta.group_by(EmpresaReceita.categoria)).all()}
+        return {c or "": n for c, n in db.execute(consulta.group_by(M.categoria)).all()}
     except Exception:  # noqa: BLE001
         return {}
 
 
 def buscar(db, cidade: str, uf: str, limite: int, categorias: list[str] | None = None,
-           so_matriz: bool = True, cnaes: list[str] | None = None) -> list[dict]:
+           so_matriz: bool = True, cnaes: list[str] | None = None, modelo=None, filtro=None,
+           origem: str = "Prospecção: base da Receita Federal") -> list[dict]:
     """Empresas da cidade (das categorias pedidas): primeiro as que têm no nome as palavras da categoria
-    (ex.: "condom" em administradoras), depois as com mais contatos e as mais antigas."""
+    (ex.: "condom" em administradoras), depois as com mais contatos e as mais antigas.
+    Sem cidade: o estado inteiro. modelo/filtro/origem: outra base (listas importadas, ver app/bases_importadas.py)."""
     from .modelos import Categoria
 
+    M = modelo or EmpresaReceita
     palavras = []
     if categorias:
         for c in db.execute(select(Categoria).where(Categoria.codigo.in_(categorias))).scalars():
             palavras += [util.chave_texto(p) for p in c.lista("palavras_chave")]
-    consulta = select(EmpresaReceita).where(EmpresaReceita.uf == uf)
+    consulta = select(M)
+    if filtro is not None:
+        consulta = consulta.where(filtro)
+    if uf:
+        consulta = consulta.where(M.uf == uf)
     if cidade:
         chave = util.chave_texto(cidade)
-        existe = db.execute(select(EmpresaReceita.cnpj).where(EmpresaReceita.uf == uf,
-                                                              EmpresaReceita.municipio_chave == chave).limit(1)).first()
+        existe = db.execute(consulta.with_only_columns(M.cnpj).where(M.municipio_chave == chave).limit(1)).first()
         if existe:
-            consulta = consulta.where(EmpresaReceita.municipio_chave == chave)
+            consulta = consulta.where(M.municipio_chave == chave)
         else:  # não é uma cidade do estado: procura como bairro (ex.: "Boa Viagem", em Recife)
-            consulta = consulta.where(EmpresaReceita.bairro.ilike(cidade.strip()))
+            consulta = consulta.where(M.bairro.ilike(cidade.strip()))
     if cnaes:  # filtro direto pela atividade principal (CNAE), qualquer que seja a categoria
-        consulta = consulta.where(EmpresaReceita.cnae.in_(cnaes))
+        consulta = consulta.where(M.cnae.in_(cnaes))
     elif categorias:
-        consulta = consulta.where(EmpresaReceita.categoria.in_(categorias))
+        consulta = consulta.where(M.categoria.in_(categorias))
     if so_matriz:
-        consulta = consulta.where(EmpresaReceita.matriz == 1)
+        consulta = consulta.where(M.matriz == 1)
     if palavras:
         from sqlalchemy import or_
 
-        filtro = or_(*[EmpresaReceita.nome_fantasia.ilike(f"%{p}%") for p in palavras],
-                     *[EmpresaReceita.razao_social.ilike(f"%{p}%") for p in palavras])
+        filtro = or_(*[M.nome_fantasia.ilike(f"%{p}%") for p in palavras],
+                     *[M.razao_social.ilike(f"%{p}%") for p in palavras])
         primeiro = db.execute(consulta.where(filtro).limit(max(limite * 10, 100))).scalars().all()
         resto = db.execute(consulta.where(~filtro).limit(max(limite * 10, 100))).scalars().all()
         linhas = list(primeiro) + list(resto)
@@ -463,6 +475,6 @@ def buscar(db, cidade: str, uf: str, limite: int, categorias: list[str] | None =
             "observacoes": (f"Celular informado à Receita: {util.formatar_telefone(celular)} (confirmar se é WhatsApp). "
                             if celular else "") + (f"Em atividade desde {e.inicio_atividade:%Y}." if e.inicio_atividade else ""),
             "fonte_url": f"https://brasilapi.com.br/api/cnpj/v1/{e.cnpj}",
-            "origem": "Prospecção: base da Receita Federal",
+            "origem": origem,
         })
     return resultados

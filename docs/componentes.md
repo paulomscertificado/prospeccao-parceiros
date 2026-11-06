@@ -18,6 +18,7 @@ prospeccao-parceiros/
 │   ├── vendas_servico.py  calculadora de comissão, registrar venda (+ certificado), alertas de vencimento
 │   ├── prospeccao.py      busca (Receita, OSM, Google), leitura de sites, BrasilAPI; busca em etapas (trabalhos)
 │   ├── base_receita.py    importação dos .zip da Receita (categorias de parceiros; sócio-admin e Simples/MEI) e busca por cidade
+│   ├── bases_importadas.py listas de empresas da CNPJá (.xlsx), separadas da Receita; escolha da base na campanha e na busca
 │   ├── ia.py              camada de IA (abordagem, próximo passo, objeções, templates, perguntas) + regras sem IA
 │   ├── metricas.py        indicadores, séries de gráficos, rankings, perguntas prontas da IA Comercial
 │   ├── planilhas.py       leitura CSV/Excel, validação, geração de CSV/Excel/PDF

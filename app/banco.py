@@ -158,7 +158,7 @@ def migrar_status(db: Session) -> int:
 
 
 def criar_tabelas() -> None:
-    from . import base_receita, modelos  # noqa: F401  (registra as tabelas)
+    from . import base_receita, bases_importadas, modelos  # noqa: F401  (registra as tabelas)
 
     Base.metadata.create_all(motor)
     migrar_colunas()
@@ -176,7 +176,7 @@ _trava_preparo = threading.Lock()
 
 
 def _versao_do_esquema() -> str:
-    from . import base_receita, modelos  # noqa: F401
+    from . import base_receita, bases_importadas, modelos  # noqa: F401
 
     from . import config, modelos_segmento
 

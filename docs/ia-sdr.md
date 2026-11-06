@@ -267,3 +267,22 @@ histórico e, se o lead ainda não conversou, marca Perdido (motivo "CNPJ inativ
 
 **Restaurantes e lanchonetes** (CNAE 5611-2/01 e 5611-2/03): segmento novo; na base da Receita só entram os da Região
 Metropolitana do Recife (importação própria, para não estourar o espaço do banco gratuito).
+
+## Listas importadas (bases separadas da Receita, nov/2026)
+
+`app/bases_importadas.py`. Tabelas `bases_dados` (a lista: nome, origem, total, estados) e `bases_empresas` (as
+empresas, com as MESMAS colunas da `base_receita`, para reaproveitar `base_receita.buscar/contar` com
+`modelo=EmpresaBase, filtro=base_id == id`). Identificação nas telas e em `campanhas.base`: `"receita"` ou
+`"lista:<id>"`.
+
+- Importação: `importar(db, nome, arquivo)` lê a exportação .xlsx da CNPJá (abas Estabelecimentos e Sócios; o
+  cabeçalho é a linha que começa com "CNPJ"). Só situação "Ativa". Responsável = sócio pessoa física com o cargo mais
+  indicado (`base_receita.CARGOS_RESPONSAVEL`); CPF e faixa etária não são guardados. Segmento pelas regras das
+  categorias; sem segmento = `outros`. Mesmo nome = troca as empresas da lista.
+- Telas: Configurações > Integrações > Listas (`/configuracoes/listas/importar`, `/{id}/apagar`, `/receita`);
+  na nuvem só passam arquivos até 4 MB (limite da Vercel): para os maiores, `importar_lista.bat` (grava direto no
+  Supabase pelo `dados/supabase.txt`; `--local` grava no banco deste computador).
+- Escolha da base: Nova campanha (`base`, "Todas as cidades do estado" = `cidade` vazia, só para lista),
+  `/api/contagem?base=`, e "Encontrar novos parceiros" (cada lista vira uma fonte `lista:<id>`).
+- `receita_oculta` (config) esconde a base da Receita das telas (`bases_importadas.opcoes`/`escolher`).
+- Testes: `testes/test_bases_importadas.py`.

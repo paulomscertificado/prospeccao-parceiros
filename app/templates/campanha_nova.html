@@ -38,10 +38,26 @@
       </div>
     </div>
     {% endif %}
+    {# Lista importada: as empresas que não combinam com nenhum segmento ficam em "Outros" #}
+    {% if bases|selectattr('id', 'ne', 'receita')|list %}
+    <div class="grupo-escolha" id="grupo-outros" {{ '' if base.startswith('lista:') else 'hidden' }}>
+      <div class="grupo-escolha-titulo">Da lista, sem segmento definido</div>
+      <div class="cartoes-escolha">
+        {% for c in categorias if c.codigo == 'outros' %}{% include "_escolha_categoria.html" %}{% endfor %}
+      </div>
+    </div>
+    {% endif %}
   </div>
 
   <div class="cartao">
     <h2 class="passo-titulo"><span class="numero-passo">2</span> Onde?</h2>
+    {% if bases|length > 1 or (bases and bases[0].id != 'receita') %}
+    <div class="campos" style="max-width:640px;margin-bottom:10px">
+      <div class="largo"><label for="base">Base de dados</label>
+        <select id="base" name="base">{% for b in bases %}<option value="{{ b.id }}" {{ 'selected' if b.id == base }}>{{ b.nome }} ({{ '{:,}'.format(b.total).replace(',', '.') }} empresas)</option>{% endfor %}</select>
+        <p class="ajuda">De onde vêm as empresas desta campanha.</p></div>
+    </div>
+    {% else %}<input type="hidden" id="base" name="base" value="{{ base }}">{% endif %}
     <div class="campos" style="max-width:640px;grid-template-columns:120px 1fr">
       <div><label for="estado">Estado</label><select id="estado" name="estado" required>{% for u in config.UFS %}<option {{ 'selected' if uf_inicial == u }}>{{ u }}</option>{% endfor %}</select></div>
       <div><label for="lista-cidades">Cidade</label>
@@ -99,21 +115,28 @@
 <script>
 // Atualiza a quantidade de empresas de cada tipo conforme a cidade
 const cidade = document.getElementById('cidade'), estado = document.getElementById('estado');
+const base = document.getElementById('base');
+const TODAS = '__todas__';
+const eLista = () => base.value.startsWith('lista:');
+const nomeBase = () => base.tagName === 'SELECT' ? base.options[base.selectedIndex].text.replace(/ \([\d.]+ empresas\)$/, '') : 'base da Receita';
 let espera;
 async function atualizar() {
-  if (!cidade.value.trim()) return;
+  const todas = cidade.value === TODAS;
+  if (!cidade.value.trim() || (todas && !eLista())) return;
   try {
-    const r = await fetch('/api/contagem?cidade=' + encodeURIComponent(cidade.value) + '&uf=' + estado.value);
+    const r = await fetch('/api/contagem?cidade=' + encodeURIComponent(todas ? '' : cidade.value) + '&uf=' + estado.value
+                          + '&base=' + encodeURIComponent(base.value));
     const dados = await r.json();
     let total = 0;
     document.querySelectorAll('.escolha-qtd').forEach(el => {
       const n = dados[el.dataset.categoria] || 0; total += n;
-      el.textContent = n.toLocaleString('pt-BR') + ' na cidade';
+      el.textContent = n.toLocaleString('pt-BR') + (todas ? ' no estado' : ' na cidade');
       el.closest('.escolha').classList.toggle('vazia', n === 0);
     });
+    const lugar = todas ? 'todo o estado ' + estado.value : cidade.value + '/' + estado.value;
     document.getElementById('total-cidade').textContent = total
-      ? total.toLocaleString('pt-BR') + ' empresas encontradas na base da Receita em ' + cidade.value + '/' + estado.value + '.'
-      : 'Nenhuma empresa encontrada nessa cidade. Confira o nome e o estado.';
+      ? total.toLocaleString('pt-BR') + ' empresas encontradas na ' + (eLista() ? 'lista "' + nomeBase() + '"' : 'base da Receita') + ' em ' + lugar + '.'
+      : 'Nenhuma empresa encontrada em ' + lugar + ' nesta base. Confira a cidade, o estado e a base escolhida.';
   } catch (e) { /* sem contagem, segue normal */ }
 }
 cidade.addEventListener('input', () => { clearTimeout(espera); espera = setTimeout(atualizar, 400); });
@@ -130,12 +153,16 @@ async function carregarCidades() {
   try {
     const r = await fetch('https://servicodados.ibge.gov.br/api/v1/localidades/estados/' + estado.value + '/municipios?orderBy=nome');
     const nomes = (await r.json()).map(m => m.nome);
-    lista.innerHTML = '<option value="">Escolha a cidade…</option>' + nomes.map(n => '<option></option>').join('')
+    const extra = eLista() ? 1 : 0;  // lista importada: dá para pegar o estado inteiro
+    lista.innerHTML = '<option value="">Escolha a cidade…</option>'
+      + (extra ? '<option value="' + TODAS + '">Todas as cidades do estado</option>' : '')
+      + nomes.map(n => '<option></option>').join('')
       + '<option value="' + OUTRA + '">✏️ Outra cidade (digitar)</option>';
-    nomes.forEach((n, i) => { lista.options[i + 1].value = n; lista.options[i + 1].textContent = n; });
+    nomes.forEach((n, i) => { lista.options[i + 1 + extra].value = n; lista.options[i + 1 + extra].textContent = n; });
     lista.required = true;
     const achada = nomes.find(n => semAcento(n) === semAcento(cidade.value));
-    if (achada) { lista.value = achada; cidade.value = achada; cidade.hidden = true; voltar.hidden = true; }
+    if (cidade.value === TODAS && extra) { lista.value = TODAS; cidade.hidden = true; voltar.hidden = true; }
+    else if (achada) { lista.value = achada; cidade.value = achada; cidade.hidden = true; voltar.hidden = true; }
     else if (cidade.value.trim()) { modoDigitar(true); }
     else { cidade.hidden = true; voltar.hidden = true; }
   } catch (e) { lista.hidden = true; lista.required = false; cidade.hidden = false; }  // sem internet: só o campo de digitar
@@ -146,6 +173,15 @@ lista.addEventListener('change', () => {
 });
 voltar.addEventListener('click', ev => { ev.preventDefault(); lista.value = ''; cidade.value = ''; cidade.hidden = true; voltar.hidden = true; });
 estado.addEventListener('change', () => { cidade.value = ''; carregarCidades(); });
+base.addEventListener('change', () => {
+  const grupo = document.getElementById('grupo-outros');
+  if (grupo) grupo.hidden = !eLista();
+  if (!eLista()) {
+    if (grupo) grupo.querySelectorAll('input').forEach(i => { i.checked = false; });
+    if (cidade.value === TODAS) cidade.value = '';
+  }
+  carregarCidades(); atualizar();
+});
 carregarCidades();
 estado.addEventListener('change', atualizar);
 atualizar();

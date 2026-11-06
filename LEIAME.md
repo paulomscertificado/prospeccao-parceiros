@@ -129,6 +129,22 @@ respostas dos parceiros chegam sozinhas na IA SDR. O rodapé do menu mostra se o
 Configure as categorias em Configurações > **Categorias de parceiros** e o que a IA pode responder em
 **Base de conhecimento**. Detalhes técnicos: [`docs/ia-sdr.md`](docs/ia-sdr.md).
 
+### Escolher a base de dados (Receita ou lista da CNPJá)
+
+Além da base da Receita, o sistema guarda **listas de empresas** exportadas da CNPJá (arquivo .xlsx), cada uma
+separada da Receita. Exemplo: "contabilidades e adm cond PE & MG".
+
+- **Escolher:** em **Nova campanha**, passo 2 ("Onde?"), escolha a **Base de dados**. Com uma lista, dá para pegar
+  **Todas as cidades do estado**. Em **Encontrar novos parceiros**, marque a lista em "Fontes de dados".
+- **Segmentos:** o sistema separa as empresas da lista pela atividade (contabilidade, administradora de condomínio...).
+  As que não se encaixam em nenhum segmento aparecem em **"Da lista, sem segmento definido"**.
+- **Importar ou atualizar uma lista:** Configurações > Integrações > **Listas de empresas**: dê o nome e escolha o
+  arquivo. Mesmo nome = a lista é atualizada. Só entram empresas **ativas**.
+  Arquivo com mais de 4 MB (como a lista de 24 MB): no computador da MS, arraste o arquivo em cima do
+  **`importar_lista.bat`** e confirme o nome.
+- **Esconder a base da Receita:** no mesmo lugar, botão "Esconder a base da Receita". Os usuários passam a ver só as
+  listas. Nada é apagado e dá para mostrar de novo.
+
 ### Empresa que cada usuário representa
 
 Cada usuário pode trabalhar por uma empresa diferente (ex.: MS Certificação Digital, Grupo Certy Certificados).

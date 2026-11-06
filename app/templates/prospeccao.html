@@ -42,8 +42,10 @@
       foi importado: peça para incluir nas categorias e importar de novo.</p>
   </details>
   <label style="margin-top:10px">Fontes de dados</label>
-  {% for codigo, nome, ok in fontes %}<label class="marcar"><input type="checkbox" name="fontes" value="{{ codigo }}" {{ 'checked' if ok else 'disabled' }}> {{ nome }}</label>{% endfor %}
-  {% if not fontes[0][2] %}<div class="aviso aviso-alerta" style="margin:6px 0">Para achar escritórios em qualquer cidade, importe a base da Receita Federal (gratuita) em <a href="/configuracoes?aba=integracoes#receita">Configurações &gt; Integrações</a>{% if not pode('configuracoes.alterar') %} (peça ao administrador){% endif %}. O OpenStreetMap tem poucos escritórios cadastrados no Brasil.</div>{% endif %}
+  {% set ns = namespace(lista=false) %}{% for f in fontes %}{% if f[0].startswith('lista:') %}{% set ns.lista = true %}{% endif %}{% endfor %}
+  {% for codigo, nome, ok in fontes %}<label class="marcar"><input type="checkbox" name="fontes" value="{{ codigo }}" {{ 'disabled' if not ok else ('' if ns.lista and codigo == 'receita' else 'checked') }}> {{ nome }}</label>{% endfor %}
+  {% if ns.lista %}<p class="ajuda">Marque só a base que quer pesquisar: a da Receita ou uma das listas importadas.</p>{% endif %}
+  {% if not (fontes|selectattr(2)|rejectattr(0, 'in', ['osm', 'google'])|list) %}<div class="aviso aviso-alerta" style="margin:6px 0">Para achar escritórios em qualquer cidade, importe a base da Receita Federal (gratuita) em <a href="/configuracoes?aba=integracoes#receita">Configurações &gt; Integrações</a>{% if not pode('configuracoes.alterar') %} (peça ao administrador){% endif %}. O OpenStreetMap tem poucos escritórios cadastrados no Brasil.</div>{% endif %}
   <label class="marcar"><input type="checkbox" name="enriquecer" checked> Completar com dados públicos do site e do CNPJ (mais lento, recomendado)</label>
   <div style="margin-top:12px"><button class="btn btn-primario">Buscar escritórios</button></div>
 </form>

@@ -217,20 +217,26 @@ def lista_campanhas(request: Request, ver: str = "todas", de: str = "", usuario:
 
 
 @rotas.get("/campanhas/nova")
-def nova_campanha(request: Request, pedido: str = "", usuario: Usuario = Depends(exige("campanhas.criar")), db: Session = Depends(obter_db)):
-    from .. import base_receita
+def nova_campanha(request: Request, pedido: str = "", base: str = "", usuario: Usuario = Depends(exige("campanhas.criar")),
+                  db: Session = Depends(obter_db)):
+    from .. import bases_importadas
 
     entendido = campanhas.interpretar_pedido(db, pedido) if pedido else None
-    contagem = (base_receita.contar(db, entendido["estado"], entendido["cidade"])
-                if entendido and entendido.get("cidade") and entendido.get("estado") else {})
     ultima = db.execute(select(Campanha).where(Campanha.cidade != "", Campanha.usuario_id == usuario.id)
                         .order_by(Campanha.criado_em.desc()).limit(1)).scalars().first()
+    # base: a pedida, senão a da última campanha do usuário, senão a primeira disponível
+    ultima_base = db.execute(select(Campanha.base).where(Campanha.usuario_id == usuario.id, Campanha.tipo == "parceiros")
+                             .order_by(Campanha.criado_em.desc()).limit(1)).scalar()
+    base = bases_importadas.escolher(db, base or ultima_base or "")
+    contagem = (bases_importadas.contar(db, base, entendido["estado"], entendido["cidade"])
+                if entendido and entendido.get("cidade") and entendido.get("estado") else {})
     if not contagem:
         cidade = (entendido or {}).get("cidade") or (ultima.cidade if ultima else "Recife")
         uf = (entendido or {}).get("estado") or (ultima.estado if ultima else "PE")
-        contagem = base_receita.contar(db, uf, cidade)
+        contagem = bases_importadas.contar(db, base, uf, cidade)
     return tela(request, "campanha_nova.html", {
         "pedido": pedido, "entendido": entendido, "contagem": contagem,
+        "bases": bases_importadas.opcoes(db), "base": base,
         "numeros_admin": _numeros_para_admin(db, usuario),
         "ultima_cidade": ultima.cidade if ultima else "", "ultima_uf": ultima.estado if ultima else "",
         "categorias": db.execute(select(Categoria).where(Categoria.ativa.is_(True)).order_by(Categoria.prioridade)).scalars().all(),
@@ -240,28 +246,36 @@ def nova_campanha(request: Request, pedido: str = "", usuario: Usuario = Depends
 
 
 @rotas.get("/api/contagem")
-def contagem_cidade(cidade: str = "", uf: str = "", usuario: Usuario = Depends(exige("campanhas.criar")), db: Session = Depends(obter_db)):
-    """Quantas empresas de cada categoria existem na cidade (para a tela de nova campanha)."""
-    from .. import base_receita
+def contagem_cidade(cidade: str = "", uf: str = "", base: str = "", usuario: Usuario = Depends(exige("campanhas.criar")),
+                    db: Session = Depends(obter_db)):
+    """Quantas empresas de cada categoria existem na cidade, na base escolhida (para a tela de nova campanha).
+    Lista importada sem cidade = o estado inteiro."""
+    from .. import bases_importadas
 
-    if not cidade.strip() or uf not in config.UFS:
+    base = bases_importadas.escolher(db, base)
+    if uf not in config.UFS or (not cidade.strip() and not bases_importadas.e_lista(base)):
         return {}
-    return base_receita.contar(db, uf, cidade)
+    return bases_importadas.contar(db, base, uf, cidade.strip())
 
 
 @rotas.post("/campanhas/nova", dependencies=[Depends(verificar_csrf)])
 async def criar_campanha(request: Request, usuario: Usuario = Depends(exige("campanhas.criar")), db: Session = Depends(obter_db)):
+    from .. import bases_importadas
+
     form = await request.form()
     cats = [c for c in form.getlist("categorias") if c]
     cidade, uf = str(form.get("cidade", "")).strip(), str(form.get("estado", "")).strip().upper()
-    if not cats or not cidade or uf not in config.UFS:
+    base = bases_importadas.escolher(db, str(form.get("base") or ""))
+    if cidade == "__todas__":
+        cidade = ""  # "Todas as cidades": só vale para lista importada (a da Receita exige a cidade)
+    if not cats or (not cidade and not bases_importadas.e_lista(base)) or uf not in config.UFS:
         avisar(request, "Informe a região (cidade e estado) e pelo menos um segmento.", "erro")
         return voltar("/campanhas/nova?pedido=" + util.chave_texto(str(form.get("pedido", "")))[:200])
     canais = [c for c in form.getlist("canais") if c in ("whatsapp", "email", "linkedin")] or ["whatsapp", "email"]
     cta = str(form.get("cta_livre") or form.get("cta") or "").strip()
     camp = Campanha(
-        nome=str(form.get("nome") or _nome_automatico(db, cats, cidade)).strip()[:160],
-        pedido=str(form.get("pedido", ""))[:2000], categorias=",".join(cats), cidade=cidade, estado=uf,
+        nome=str(form.get("nome") or _nome_automatico(db, cats, cidade or uf)).strip()[:160],
+        pedido=str(form.get("pedido", ""))[:2000], categorias=",".join(cats), cidade=cidade, estado=uf, base=base,
         quantidade=max(1, min(util.para_int(form.get("quantidade")) or util.para_int(form.get("quantidade_outra")) or 20, 500)), canais=",".join(canais),
         objetivo=str(form.get("objetivo") or "Encontrar parceiros")[:200], tom=str(form.get("tom") or "consultivo"),
         cta=cta[:200], cadencia_id=util.para_int(form.get("cadencia_id")), usuario_id=usuario.id,
@@ -270,7 +284,8 @@ async def criar_campanha(request: Request, usuario: Usuario = Depends(exige("cam
     )
     db.add(camp)
     db.flush()
-    registrar_log(db, usuario, "criou_campanha", "campanha", camp.id, f"{camp.nome}: {camp.categorias} {cidade}/{uf}", request)
+    registrar_log(db, usuario, "criou_campanha", "campanha", camp.id,
+                  f"{camp.nome}: {camp.categorias} {cidade or 'todas as cidades'}/{uf} ({bases_importadas.nome(db, base)})", request)
     db.commit()
     campanhas.gerar_em_segundo_plano(camp.id)
     return voltar(f"/campanhas/{camp.id}")
@@ -330,7 +345,10 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(exige("c
     if camp not in testaveis:
         testaveis.insert(0, camp)
     contagem = campanhas.mensagens_para_teste(db, [t.id for t in testaveis])
+    from .. import bases_importadas
+
     return tela(request, "campanha.html", {
+        "nome_base": bases_importadas.nome(db, camp.base or "receita"),
         "testaveis": [{"id": t.id, "nome": t.nome, **contagem[t.id]} for t in testaveis],
         "so_fixo": so_fixo,
         "emails_invalidos": campanhas.emails_invalidos(db, camp),

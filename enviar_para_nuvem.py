@@ -15,7 +15,7 @@ import time
 
 from sqlalchemy import create_engine, delete, func, insert, inspect, select, text, update
 
-from app import base_receita, config, modelos  # noqa: F401  (registra todas as tabelas)
+from app import base_receita, bases_importadas, config, modelos  # noqa: F401  (registra todas as tabelas)
 from app.banco import Base
 
 ARQUIVO_VARIAVEIS = config.PASTA_DADOS / "variaveis_para_vercel.txt"

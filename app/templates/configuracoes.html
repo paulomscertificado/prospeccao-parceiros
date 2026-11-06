@@ -148,6 +148,43 @@
     <button class="btn btn-primario">Importar base</button></form>
   <p class="ajuda">Atualize uma vez por mês. Passo a passo com o link de download em docs/configuracao.md.</p>
 </div>
+<div class="cartao" style="max-width:860px" id="listas"><h2>Listas de empresas (bases separadas da Receita)</h2>
+  <p>Listas exportadas da <b>CNPJá</b> (arquivo .xlsx). Cada lista vira uma base que o usuário escolhe em <b>Nova campanha</b>
+    e em <b>Encontrar novos parceiros</b>. Só entram as empresas com situação <b>Ativa</b>.</p>
+  {% if listas %}
+  <div class="tabela-rolagem"><table>
+    <tr><th>Lista</th><th class="num">Empresas</th><th>Estados</th><th>Atualizada em</th><th></th></tr>
+    {% for b in listas %}<tr><td><b>{{ b.nome }}</b><div class="pequeno suave">{{ b.origem }}{% if b.arquivo %} · {{ b.arquivo }}{% endif %}</div></td>
+      <td class="num">{{ '{:,}'.format(b.total).replace(',', '.') }}</td><td class="pequeno">{{ b.estados }}</td>
+      <td>{{ b.atualizado_em|datahora }}</td>
+      <td>{% if pode('configuracoes.alterar') %}<form method="post" action="/configuracoes/listas/{{ b.id }}/apagar" data-confirmar="Apagar a lista &quot;{{ b.nome }}&quot;? Os leads já criados a partir dela continuam no sistema.">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-pequeno">Apagar</button></form>{% endif %}</td></tr>
+    {% endfor %}
+  </table></div>
+  {% else %}<p class="suave">Nenhuma lista importada ainda.</p>{% endif %}
+  {% if pode('configuracoes.alterar') %}
+  <form method="post" action="/configuracoes/listas/importar" enctype="multipart/form-data" class="filtros" id="form-lista" style="margin-top:10px">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="text" name="nome" placeholder="Nome da lista (ex.: contabilidades e adm cond PE & MG)" maxlength="160" style="flex:1;min-width:260px" aria-label="Nome da lista">
+    <input type="file" name="arquivo" accept=".xlsx" required aria-label="Arquivo da CNPJá">
+    <button class="btn btn-primario">Importar lista</button></form>
+  <p class="ajuda">Mesmo nome de uma lista que já existe = a lista é <b>atualizada</b> (as empresas antigas dela são trocadas pelas novas).
+    {% if config.NA_NUVEM %}Arquivos com mais de 4 MB não passam pela internet: no computador da MS, dê dois cliques em <code>importar_lista.bat</code>.{% endif %}</p>
+  <form method="post" action="/configuracoes/listas/receita" style="margin-top:12px">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% if receita_oculta %}<p><span class="selo selo-alerta">Base da Receita escondida</span> Os usuários só veem as listas importadas.</p>
+    <input type="hidden" name="ocultar" value="0"><button class="btn">Mostrar a base da Receita de novo</button>
+    {% else %}<input type="hidden" name="ocultar" value="1"><button class="btn" {{ 'disabled' if not listas }}>Esconder a base da Receita (usar só as listas)</button>
+    <span class="pequeno suave">Os dados da Receita não são apagados.</span>{% endif %}
+  </form>
+  {% endif %}
+</div>
+{% if config.NA_NUVEM %}<script>
+document.getElementById('form-lista')?.addEventListener('submit', ev => {
+  const f = ev.target.querySelector('input[type=file]').files[0];
+  if (f && f.size > 4 * 1024 * 1024) { ev.preventDefault(); aviso('Arquivo grande demais para enviar pela internet. No computador da MS, dê dois cliques em importar_lista.bat.'); }
+});
+</script>{% endif %}
 
 {% elif aba == 'lgpd' %}
 <div class="grade-2">

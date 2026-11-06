@@ -2,7 +2,7 @@
 {% block titulo %}{{ c.nome }}{% endblock %}
 {% block conteudo %}
 <div class="cabecalho">
-  <div><h1>{{ c.nome }}</h1><div class="suave">{{ c.cidade }}/{{ c.estado }} · {{ c.objetivo }} · tom {{ config.TONS.get(c.tom, c.tom) }}{% if c.pedido %} · pedido: "{{ c.pedido }}"{% endif %}</div></div>
+  <div><h1>{{ c.nome }}</h1><div class="suave">{{ c.cidade or "Todas as cidades" }}/{{ c.estado }} ·{% if c.base and c.base != "receita" %} {{ nome_base }} ·{% endif %} {{ c.objetivo }} · tom {{ config.TONS.get(c.tom, c.tom) }}{% if c.pedido %} · pedido: "{{ c.pedido }}"{% endif %}</div></div>
   <div class="grupo-btn">
     {% if pode_gerenciar %}
     <form class="inline" method="post" action="/campanhas/{{ c.id }}/{{ 'desarquivar' if c.arquivada else 'arquivar' }}">

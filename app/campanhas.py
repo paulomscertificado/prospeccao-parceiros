@@ -14,7 +14,7 @@ from datetime import date, datetime, timedelta
 
 from sqlalchemy import func, select
 
-from . import base_receita, cadencias, config, contas_email, email_validacao, reservas, ia, mensagens, prospeccao, sdr, trabalhos, util
+from . import base_receita, bases_importadas, cadencias, config, contas_email, email_validacao, reservas, ia, mensagens, prospeccao, sdr, trabalhos, util
 from .banco import agora, gravar_config, ler_config, ler_config_int, sessao
 from .leads_servico import criar_lead, historico, mudar_status, registrar_contato
 from .modelos import Cadencia, Campanha, Categoria, Lead, Tarefa, Usuario
@@ -169,7 +169,7 @@ def tem_canal(lead: Lead, canais: list[str]) -> bool:
 
 
 def _buscar_candidatos(campanha_id: int) -> list[int]:
-    """Etapa 1: empresas da base da Receita nas categorias e na região (o dobro, para poder escolher).
+    """Etapa 1: empresas da base escolhida (Receita ou lista importada) nas categorias e na região (o dobro, para poder escolher).
     Cada campanha pega empresas DIFERENTES: pula quem já está em outra campanha ativa, quem já foi contatado,
     pediu para sair ou foi encerrado, e procura mais fundo na base até completar a quantidade."""
     with sessao() as db:
@@ -178,8 +178,10 @@ def _buscar_candidatos(campanha_id: int) -> list[int]:
         cods = [c for c in camp.categorias.split(",") if c]
         cats = {c.codigo: c for c in db.execute(select(Categoria).where(Categoria.codigo.in_(cods))).scalars()}
         quantidade = max(1, camp.quantidade or 50)
-        if not base_receita.disponivel(db):
-            raise RuntimeError("A base da Receita ainda não foi importada (Configurações > Integrações).")
+        base = camp.base or bases_importadas.RECEITA
+        nome_base = bases_importadas.nome(db, base)
+        if not bases_importadas.disponivel(db, base):
+            raise RuntimeError(f"A {nome_base} não tem empresas (importe em Configurações > Integrações).")
         candidatos: list[int] = []
         canais = [c for c in camp.canais.split(",") if c]
         so_fixo: list[int] = []
@@ -188,7 +190,7 @@ def _buscar_candidatos(campanha_id: int) -> list[int]:
         for cod in cods:
             achados, vistos, limite_busca = 0, set(), por_categoria
             while achados < por_categoria:
-                resultados = base_receita.buscar(db, camp.cidade, camp.estado, limite_busca, [cod])
+                resultados = bases_importadas.buscar(db, base, camp.cidade, camp.estado, limite_busca, [cod])
                 for dados in resultados:
                     if achados >= por_categoria:
                         break
@@ -224,8 +226,9 @@ def _buscar_candidatos(campanha_id: int) -> list[int]:
                 limite_busca = min(limite_busca * 4, MAXIMO_BUSCA // 3)
         if not candidatos:
             nomes = ", ".join(c.nome for c in cats.values()) or "das categorias escolhidas"
-            raise RuntimeError(f"Não encontrei empresas novas de {nomes} em \"{camp.cidade}\"/{camp.estado} na base da "
-                               "Receita. Confira o nome da cidade (ou do bairro) e o estado, ou escolha outro segmento.")
+            lugar = f"\"{camp.cidade}\"/{camp.estado}" if camp.cidade else camp.estado
+            raise RuntimeError(f"Não encontrei empresas novas de {nomes} em {lugar} na {nome_base}. Confira o nome da "
+                               "cidade (ou do bairro) e o estado, ou escolha outro segmento ou outra base.")
         return list(dict.fromkeys(candidatos))
 
 
@@ -243,7 +246,9 @@ def etapa_gerar(campanha_id: int, _usuario_id, estado: dict, prazo: float) -> bo
             raise RuntimeError("Nenhuma empresa nova para contatar (todas já estavam cadastradas e em atendimento).")
         estado["fase"] = fase = "montar"
     if fase == "buscar":
-        _anotar(campanha_id, "Procurando empresas na base da Receita...", "gerando")
+        with sessao() as db:
+            onde = bases_importadas.nome(db, (db.get(Campanha, campanha_id).base or "receita"))
+        _anotar(campanha_id, f"Procurando empresas na {onde}...", "gerando")
         estado.update(candidatos=_buscar_candidatos(campanha_id), feitos=0, fase="pesquisar")
         fase = "pesquisar"
     if fase == "pesquisar":

@@ -50,10 +50,19 @@ class ErroBusca(Exception):
 
 
 def fontes_disponiveis(db) -> list[tuple[str, str, bool]]:
-    base = base_receita.resumo(db)
-    return [
-        ("receita", f"Base da Receita Federal ({base['total']} escritórios, atualizada em {base['atualizada_em']})"
-         if base["total"] else "Base da Receita Federal – importe em Configurações > Integrações", base["total"] > 0),
+    from . import bases_importadas
+
+    fontes = []
+    if not bases_importadas.receita_oculta(db):
+        base = base_receita.resumo(db)
+        fontes.append(("receita", f"Base da Receita Federal ({base['total']} escritórios, atualizada em {base['atualizada_em']})"
+                       if base["total"] else "Base da Receita Federal – importe em Configurações > Integrações",
+                       base["total"] > 0))
+    # listas importadas (ex.: exportação da CNPJá), separadas da base da Receita
+    fontes += [(f"{bases_importadas.PREFIXO}{b.id}",
+                f"Lista \"{b.nome}\" ({b.total:,} empresas · {b.estados})".replace(",", "."), b.total > 0)
+               for b in bases_importadas.listas(db)]
+    return fontes + [
         ("osm", "OpenStreetMap (gratuito, poucos escritórios cadastrados no Brasil)", True),
         ("google", "Google Places" + ("" if config.GOOGLE_PLACES_API_KEY else " – configure a chave no .env"),
          bool(config.GOOGLE_PLACES_API_KEY)),
@@ -357,10 +366,13 @@ def _encontrar_e_cadastrar(busca_id: int) -> list[int] | None:
             encontrados = []
             fontes = busca.fontes.split(",")
             categoria = busca.categoria or "contabil"
-            if "receita" in fontes:
-                cnaes = [c for c in (busca.cnaes or "").split(",") if c]
-                encontrados += base_receita.buscar(db, busca.cidade, busca.estado, busca.quantidade, [categoria],
-                                                   cnaes=cnaes)
+            from . import bases_importadas
+
+            cnaes = [c for c in (busca.cnaes or "").split(",") if c]
+            for fonte in fontes:  # base da Receita e listas importadas ("lista:<id>")
+                if fonte == "receita" or bases_importadas.e_lista(fonte):
+                    encontrados += bases_importadas.buscar(db, fonte, busca.cidade, busca.estado, busca.quantidade,
+                                                           [categoria], cnaes=cnaes)
             # O mapa (OSM) só tem marcação para contabilidade; o Google busca pelo nome da categoria.
             if "osm" in fontes and categoria == "contabil":
                 encontrados += buscar_osm(busca.cidade, busca.estado, busca.raio_km, busca.quantidade, busca.tipo_empresa)

@@ -75,7 +75,7 @@
       <a class="titulo" href="/campanhas/{{ c.id }}">{{ c.nome }}</a>
       <div class="linha-info">
         <span class="selo {{ selo[0] }}">{{ selo[1] }}</span>
-        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12zM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/></svg>{{ c.cidade|title }}{{ '/' ~ c.estado if c.estado }}</span>
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12zM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/></svg>{{ (c.cidade or "Todas as cidades")|title }}{{ '/' ~ c.estado if c.estado }}</span>
         {% for cod in c.categorias.split(',') if cod %}<span class="chip">{{ nomes_cat.get(cod, cod) }}</span>{% endfor %}
         {% if not equipe_campanhas is none and equipe_campanhas and c.usuario_id %}<span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/></svg>{{ pessoas.get(c.usuario_id, '') }}</span>{% endif %}
         <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>{{ c.criado_em|data }}</span>

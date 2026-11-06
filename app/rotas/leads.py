@@ -584,7 +584,8 @@ def _cnaes_do_formulario(form) -> list[str]:
 async def prospeccao_buscar(request: Request, usuario: Usuario = Depends(exige("prospeccao.buscar")), db: Session = Depends(obter_db)):
     form = await request.form()
     cidade, uf = str(form.get("cidade", "")).strip(), str(form.get("estado", "")).strip().upper()
-    fontes = [f for f in form.getlist("fontes") if f in ("receita", "osm", "google")]
+    permitidas = {codigo for codigo, _nome, ok in prospeccao.fontes_disponiveis(db) if ok}
+    fontes = [f for f in form.getlist("fontes") if f in permitidas]
     if not cidade or uf not in config.UFS:
         avisar(request, "Informe a cidade e escolha o estado.", "erro")
         return voltar("/prospeccao")
