@@ -5,7 +5,7 @@
   <div><h1>Empresas encontradas na CNPJá{% if busca.teste %} <span class="selo">teste</span>{% endif %}</h1>
     <div class="suave">Busca de {{ busca.criado_em|datahora }}{% if quem %} por {{ quem.nome }}{% endif %}{% if busca.automatica %} (automática){% endif %}
       · abertas {% if busca.desde == busca.ate %}em {{ busca.desde.strftime('%d/%m/%Y') }}{% else %}de {{ busca.desde.strftime('%d/%m/%Y') }} a {{ busca.ate.strftime('%d/%m/%Y') }}{% endif %}
-      · {{ busca.ufs }} · CNAE {{ busca.cnaes }} · só ativas</div></div>
+      · {{ busca.ufs }} · qualquer atividade · só ativas</div></div>
   <a class="btn" href="/empresas-novas">Voltar</a>
 </div>
 

@@ -57,8 +57,6 @@ PADRAO = {
     "novas_ultima_data": "",           # última data de abertura já buscada (AAAA-MM-DD)
     "novas_ultima_busca": "",          # dia em que a busca automática rodou (AAAA-MM-DD)
     "novas_ultimo_resultado": "",
-    # Atividade principal (CNAE) das empresas buscadas: contabilidade e administração de imóveis/condomínios
-    "novas_cnaes": "6920601,6822600",
     "novas_excluir_listas": "1",       # 1 = deixa de fora quem já está em alguma lista importada (bases_importadas)
 }
 LIMITE_TESTE = 10  # consulta de teste: 10 empresas = 1 crédito
@@ -155,15 +153,12 @@ def saldo() -> dict:
     return _pedir("/credit")
 
 
-def buscar_abertas(desde: date, ate: date, ufs: list[str], cnaes: list[str] | None = None,
-                   limite: int | None = None) -> list[dict]:
-    """Estabelecimentos ATIVOS abertos entre as datas nos estados (e com a atividade principal nos CNAEs).
-    Custa 1 crédito a cada 10 empresas. limite: no máximo essa quantidade (ex.: 10 no teste = 1 crédito)."""
+def buscar_abertas(desde: date, ate: date, ufs: list[str], limite: int | None = None) -> list[dict]:
+    """Estabelecimentos ATIVOS abertos entre as datas nos estados, de QUALQUER atividade (a venda do e-CNPJ serve
+    para toda empresa nova). Custa 1 crédito a cada 10 empresas. limite: no máximo essa quantidade (teste: 10)."""
     params = {"founded.gte": desde.isoformat(), "founded.lte": ate.isoformat(),
               "address.state.in": ",".join(ufs), "status.id.in": "2",
               "limit": min(POR_PAGINA, limite) if limite else POR_PAGINA}
-    if cnaes:
-        params["mainActivity.id.in"] = ",".join(cnaes)
     registros = []
     for _ in range(MAXIMO_PAGINAS):
         pagina = _pedir("/office", params)
@@ -173,11 +168,6 @@ def buscar_abertas(desde: date, ate: date, ufs: list[str], cnaes: list[str] | No
             break
         params = {"token": proximo}
     return registros[:limite] if limite else registros
-
-
-def cnaes(db) -> list[str]:
-    """CNAEs configurados (7 dígitos), aceitando "6920-6/01" ou "6920601"."""
-    return [c for c in (util.so_digitos(p) for p in re.split(r"[,; \n]+", cfg(db, "novas_cnaes"))) if len(c) == 7]
 
 
 def telefones(registro: dict) -> tuple[list[str], list[str]]:
@@ -299,8 +289,7 @@ def textos_do_lead(db, lead: Lead, usuario: Usuario | None) -> dict:
             for a, m in mensagens(db).items()}
 
 
-def registrar_busca(db, registros: list[dict], desde: date, ate: date, ufs: list[str], lista_cnaes: list[str],
-                    usuario: Usuario | None, teste: bool = False, automatica: bool = False):
+def registrar_busca(db, registros: list[dict], desde: date, ate: date, ufs: list[str], usuario: Usuario | None, teste: bool = False, automatica: bool = False):
     """Guarda a lista das empresas que a API devolveu (para o usuário conferir) e marca quem fica de fora da campanha:
     repetida, empresário individual/MEI (se configurado), já está numa lista importada (lista de exclusão) ou já é
     lead em atendimento/que pediu para sair."""
@@ -308,7 +297,7 @@ def registrar_busca(db, registros: list[dict], desde: date, ate: date, ufs: list
     from .modelos import BuscaCnpja, EmpresaCnpja
 
     busca = BuscaCnpja(usuario_id=usuario.id if usuario else None, desde=desde, ate=ate, ufs=",".join(ufs)[:120],
-                       cnaes=",".join(lista_cnaes)[:200], teste=teste, automatica=automatica,
+                       teste=teste, automatica=automatica,
                        encontradas=len(registros), creditos=-(-len(registros) // 10))
     db.add(busca)
     db.flush()
@@ -444,9 +433,9 @@ def _ufs(db) -> list[str]:
 def buscar_e_criar(db, usuario: Usuario, desde: date, ate: date, automatica: bool = False) -> dict:
     """Busca na API, guarda a lista e cria a campanha. Devolve {"encontradas", "campanha_id", "busca_id", "fora"}
     (lança ErroCnpja)."""
-    ufs, lista_cnaes = _ufs(db), cnaes(db)
-    registros = buscar_abertas(desde, ate, ufs, lista_cnaes)
-    busca = registrar_busca(db, registros, desde, ate, ufs, lista_cnaes, usuario, automatica=automatica)
+    ufs = _ufs(db)
+    registros = buscar_abertas(desde, ate, ufs)
+    busca = registrar_busca(db, registros, desde, ate, ufs, usuario, automatica=automatica)
     db.commit()
     camp = criar_campanha_da_busca(db, busca, usuario)
     return {"encontradas": len(registros), "campanha_id": camp.id if camp else None, "busca_id": busca.id,
@@ -457,9 +446,9 @@ def testar(db, usuario: Usuario | None, dias: int = 7) -> dict:
     """Consulta de TESTE: no máximo 10 empresas (1 crédito) abertas nos últimos dias, com os filtros configurados.
     Só guarda a lista para conferência; a campanha sai depois, por um botão na lista (sem gastar crédito)."""
     hoje = date.today()
-    ufs, lista_cnaes = _ufs(db), cnaes(db)
-    registros = buscar_abertas(hoje - timedelta(days=dias), hoje, ufs, lista_cnaes, limite=LIMITE_TESTE)
-    busca = registrar_busca(db, registros, hoje - timedelta(days=dias), hoje, ufs, lista_cnaes, usuario, teste=True)
+    ufs = _ufs(db)
+    registros = buscar_abertas(hoje - timedelta(days=dias), hoje, ufs, limite=LIMITE_TESTE)
+    busca = registrar_busca(db, registros, hoje - timedelta(days=dias), hoje, ufs, usuario, teste=True)
     db.commit()
     return {"encontradas": len(registros), "busca_id": busca.id, "fora": busca.fora}
 

@@ -61,7 +61,7 @@ def test_busca_monta_campanha_de_venda(cliente, monkeypatch):
     assert r["encontradas"] == 5 and cid
     assert pedidos[0][1]["founded.gte"] == (date.today() - timedelta(days=1)).isoformat()
     assert pedidos[0][1]["address.state.in"] == "PE" and pedidos[0][1]["status.id.in"] == "2"
-    assert pedidos[0][1]["mainActivity.id.in"] == "6920601,6822600"  # só contabilidade e adm. de condomínios
+    assert "mainActivity.id.in" not in pedidos[0][1]  # qualquer atividade: toda empresa nova precisa de e-CNPJ
 
     with sessao() as db:  # montagem em etapas (aqui roda direto, como o agendador faria)
         t = db.execute(select(Trabalho).where(Trabalho.ref_id == cid, Trabalho.tipo == "campanha")).scalars().first()

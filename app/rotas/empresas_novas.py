@@ -31,7 +31,7 @@ def tela_empresas_novas(request: Request, usuario: Usuario = Depends(exige("camp
         "tem_chave": bool(empresas_novas.chave_api()), "campanhas": campanhas, "empresas_por_campanha": contagem,
         "usuarios": usuarios, "dono": empresas_novas.dono(db), "hoje": date.today(),
         "ontem": date.today() - timedelta(days=1), "buscas": empresas_novas.buscas_recentes(db),
-        "cnaes": empresas_novas.cnaes(db), "limite_teste": empresas_novas.LIMITE_TESTE,
+        "limite_teste": empresas_novas.LIMITE_TESTE,
     })
 
 
@@ -116,12 +116,6 @@ async def configurar(request: Request, usuario: Usuario = Depends(exige("campanh
                              ("novas_dono_id", str(dono_id or "")),
                              ("novas_excluir_listas", "1" if form.get("excluir_listas") else "0")]:
         gravar_config(db, chave_cfg, valor)
-    if "cnaes" in form:  # atividade principal (CNAE) das empresas buscadas
-        lista = [c for c in (util.so_digitos(p) for p in str(form.get("cnaes")).replace(";", ",").split(",")) if len(c) == 7]
-        if not lista:
-            avisar(request, "Informe pelo menos um CNAE com 7 números (ex.: 6920601).", "erro")
-            return voltar("/empresas-novas")
-        gravar_config(db, "novas_cnaes", ",".join(dict.fromkeys(lista)))
     registrar_log(db, usuario, "configurou_empresas_novas", "configuracao", None, request=request)
     db.commit()
     if form.get("ativo") and not empresas_novas.chave_api():

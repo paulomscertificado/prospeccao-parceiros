@@ -18,8 +18,7 @@
     <li>Chave da API da CNPJá: {% if tem_chave %}<span class="selo selo-ok">configurada</span>{% else %}<span class="selo selo-erro">falta colocar</span>{% endif %}</li>
     <li>Dono das campanhas diárias: {{ dono.nome if dono else 'ninguém escolhido ainda' }}</li>
     <li>Estados: {{ cfg.novas_ufs }} · até {{ cfg.novas_maximo_dia }} empresas por dia{% if cfg.novas_sem_individual == '1' %} · sem empresário individual/MEI{% endif %}</li>
-    <li>Atividade principal (CNAE): {% for c in cnaes %}<code>{{ c[:4] }}-{{ c[4] }}/{{ c[5:] }}</code>{{ ', ' if not loop.last }}{% endfor %} · só empresas ativas
-      {% if cfg.novas_excluir_listas == '1' %} · sem quem já está nas listas importadas{% endif %}</li>
+    <li>Empresas de qualquer atividade, só as ativas{% if cfg.novas_excluir_listas == '1' %} · sem quem já está nas listas importadas{% endif %}</li>
     {% if cfg.novas_ultimo_resultado %}<li>Última busca automática: {{ cfg.novas_ultimo_resultado }}</li>{% endif %}
   </ul>
   {% if pode('campanhas.gerenciar') %}
@@ -46,8 +45,6 @@
       <label class="marcar"><input type="checkbox" name="ativo" {{ 'checked' if cfg.novas_ativo == '1' }}> Buscar todo dia sozinho e montar a campanha do dia</label>
       <label>Horário da busca<br><input type="time" name="hora" value="{{ cfg.novas_hora }}"></label>
       <label>Estados (siglas separadas por vírgula)<br><input type="text" name="ufs" value="{{ cfg.novas_ufs }}" placeholder="PE"></label>
-      <label>Atividade principal (CNAE, separados por vírgula)<br><input type="text" name="cnaes" value="{{ cnaes|join(', ') }}" placeholder="6920601, 6822600">
-        <span class="pequeno suave">6920601 = contabilidade · 6822600 = administração de imóveis e condomínios.</span></label>
       <label class="marcar"><input type="checkbox" name="excluir_listas" {{ 'checked' if cfg.novas_excluir_listas == '1' }}> Deixar de fora quem já está nas listas importadas (Configurações &gt; Integrações &gt; Listas)</label>
       <label>Máximo de empresas por campanha diária<br><input type="number" name="maximo_dia" min="1" max="500" value="{{ cfg.novas_maximo_dia }}">
         <span class="pequeno suave">Os limites de envio continuam valendo (padrão: 80 e-mails por dia, 60 por campanha). Empresas com celular e e-mail entram primeiro.</span></label>
