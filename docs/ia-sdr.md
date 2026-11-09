@@ -225,6 +225,14 @@ permissão `campanhas.ver`; configurar/buscar com `campanhas.gerenciar`).
 - `registrar_busca` marca "já veio na busca de..." quem estava apto numa busca anterior que virou campanha.
 - `buscar_e_criar` pede `limit` = 2 × `novas_maximo_dia` (só paga o que cabe na campanha).
 
+## Horários dos toques nunca no passado (nov/2026)
+
+`cadencias.hora_natural(db, dia)`: para hoje, só horários a partir de agora + 15 min (`FOLGA_MINUTOS`); `None` se o
+horário de envio de hoje acabou. `cadencias.dia_e_hora_futuros` acha o próximo dia/horário livre (respeita
+`pular_fim_de_semana`). `cadencias.aplicar` usa isso nos toques de campanha; `campanhas.aprovar` chama
+`_sem_horario_no_passado` (campanha aprovada depois do horário marcado: o toque que já passou ganha horário novo e os
+seguintes da mesma empresa nunca ficam antes dele). Testes: `testes/test_horarios_futuros.py`.
+
 ## Intervalo dos envios automáticos (nov/2026)
 
 `campanhas.processar_fila` (e-mail) e `processar_fila_whatsapp`: um envio automático por rodada e por canal; depois

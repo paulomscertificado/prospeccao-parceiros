@@ -441,10 +441,36 @@ def aprovar(db, camp: Campanha, usuario: Usuario) -> int:
             if (t.hora or "09:00").endswith(("0", "5")):  # campanha montada antes: horário redondo vira natural
                 t.hora = cadencias.hora_natural(db)
             t.data = util.proximo_dia_util(t.data + timedelta(days=atraso)) if atraso else t.data
+        _sem_horario_no_passado(db, rascunhos)
     camp.status = "ativa"
     camp.aprovado_por_id = usuario.id if usuario else None
     camp.aprovado_em = agora()
     return len(rascunhos)
+
+
+def _sem_horario_no_passado(db, tarefas: list[Tarefa]) -> int:
+    """Aprovada depois do horário marcado (ex.: montada de manhã e aprovada à tarde): o toque de hoje que já passou ganha
+    um horário novo daqui a pouco (ou vai para o próximo dia, se o horário de envio de hoje acabou). Os toques seguintes
+    da mesma empresa nunca ficam antes dele. Devolve quantos mudaram."""
+    agora_txt = agora().strftime("%Y-%m-%d %H:%M")
+    mudou = 0
+    por_lead: dict[int, list[Tarefa]] = {}
+    for t in tarefas:
+        por_lead.setdefault(t.lead_id, []).append(t)
+    for lista in por_lead.values():
+        lista.sort(key=lambda t: (t.data, t.hora or "", t.id or 0))
+        anterior = None
+        for t in lista:
+            if f"{t.data:%Y-%m-%d} {t.hora or '00:00'}" <= agora_txt:
+                t.data, t.hora = cadencias.dia_e_hora_futuros(db, t.data)
+                mudou += 1
+            if anterior and (t.data, t.hora or "") < (anterior.data, anterior.hora or ""):
+                t.data, t.hora = cadencias.dia_e_hora_futuros(db, anterior.data)
+                if (t.data, t.hora) <= (anterior.data, anterior.hora or ""):
+                    t.data, t.hora = cadencias.dia_e_hora_futuros(db, anterior.data + timedelta(days=1))
+                mudou += 1
+            anterior = t
+    return mudou
 
 
 def cancelar(db, camp: Campanha, usuario: Usuario) -> int:

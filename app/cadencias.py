@@ -20,21 +20,54 @@ def _minutos(hhmm: str, padrao: int) -> int:
         return padrao
 
 
-def hora_natural(db: Session) -> str:
+FOLGA_MINUTOS = 15  # toque marcado para hoje: pelo menos 15 minutos depois de agora
+
+
+def hora_natural(db: Session, dia: date | None = None) -> str | None:
     """Horário "quebrado" e diferente para cada mensagem de campanha (ex.: 09:47, 14:13), dentro do horário de envio
-    e fora do almoço (12:00–13:30): mensagens em horário redondo, todas juntas, parecem disparo automático."""
+    e fora do almoço (12:00–13:30): mensagens em horário redondo, todas juntas, parecem disparo automático.
+    dia = hoje: só horários que ainda não passaram; None se o horário de envio de hoje já acabou."""
+    from .banco import agora
+
     inicio = _minutos(ler_config(db, "horario_envio_inicio") or "08:30", 8 * 60 + 30)
     fim = _minutos(ler_config(db, "horario_envio_fim") or "18:00", 18 * 60) - 20  # folga para sair antes do fim
     if fim <= inicio:
         fim = inicio + 60
+    if dia is not None and dia <= agora().date():
+        if dia < agora().date():
+            return None  # dia que já passou
+        minimo = agora().hour * 60 + agora().minute + FOLGA_MINUTOS
+        if minimo > fim:
+            return None  # o horário de envio de hoje já acabou
+        if 12 * 60 <= minimo < 13 * 60 + 30 and fim < 13 * 60 + 30:
+            return None
+        inicio = max(inicio, minimo)
     for _ in range(20):
         minuto = random.randint(inicio, fim)
         if minuto % 5 == 0:
             minuto += random.randint(1, 4)  # nada de 09:00, 10:15, 14:30...
         if not (12 * 60 <= minuto < 13 * 60 + 30) and minuto <= fim + 4:
             return f"{minuto // 60:02d}:{minuto % 60:02d}"
-    minuto = inicio + 7
+    minuto = inicio + 7 if not (12 * 60 <= inicio + 7 < 13 * 60 + 30) else 13 * 60 + 37
     return f"{minuto // 60:02d}:{minuto % 60:02d}"
+
+
+def dia_e_hora_futuros(db: Session, dia: date, pular_fds: bool | None = None) -> tuple[date, str]:
+    """O dia pedido (ou o próximo, se o horário de envio dele já passou) e um horário natural que ainda não passou."""
+    from .banco import agora
+
+    if pular_fds is None:
+        pular_fds = ler_config(db, "pular_fim_de_semana") == "1"
+    dia = max(dia, agora().date())
+    for _ in range(15):
+        if pular_fds and dia.weekday() >= 5:
+            dia += timedelta(days=1)
+            continue
+        hora = hora_natural(db, dia)
+        if hora:
+            return dia, hora
+        dia += timedelta(days=1)
+    return dia, hora_natural(db) or "09:07"
 
 
 def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario, inicio: date | None = None,
@@ -77,6 +110,12 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
             if pular_fds:
                 while data.weekday() >= 5 or (dia_anterior and data <= dia_anterior):
                     data += timedelta(days=1)
+            if dia_anterior and data < dia_anterior:
+                data = dia_anterior  # o toque anterior pulou para outro dia: este não fica antes dele
+            hora = passo.hora or "09:00"
+            if campanha_id:
+                # nunca num horário que já passou: hoje, só daqui a 15 min em diante; sem tempo hoje, amanhã
+                data, hora = dia_e_hora_futuros(db, data, pular_fds)
             dia_anterior = data
             canal = passo.canal
             modelos = {}
@@ -105,7 +144,7 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
             db.add(Tarefa(
                 tipo="prospeccao", lead_id=lead.id, passo_id=passo.id, campanha_id=campanha_id,
                 usuario_id=responsavel.id if responsavel else None, canal=canal, data=data,
-                hora=hora_natural(db) if campanha_id else (passo.hora or "09:00"), acao=passo.acao or f"Contato por {canal}",
+                hora=hora, acao=passo.acao or f"Contato por {canal}",
                 assunto=assunto, mensagem=corpo, angulo=passo.angulo or "", status=status_tarefa, **modelos,
             ))
             resultado["tarefas"] += 1
