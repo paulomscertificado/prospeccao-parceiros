@@ -255,3 +255,72 @@ def test_corrigir_recusa_email_ruim(cliente, monkeypatch):
             except ValueError:
                 pass
         assert lead.email_invalido
+
+
+DEVOLUCAO_COM_RESPOSTA_A = DEVOLUCAO_GMAIL.replace(
+    b"Message-ID: <devolucao-1@mx.google.com>",
+    b"Message-ID: <devolucao-2@mx.google.com>\nIn-Reply-To: <enviado-123@mscertificados.com.br>\n"
+    b"References: <enviado-123@mscertificados.com.br>")
+RESPOSTA_DE_VERDADE = (
+    "From: Leo <leoi@terra.com.br>\nSubject: Re: Parceria\nMessage-ID: <resposta-1@terra.com.br>\n"
+    "In-Reply-To: <enviado-123@mscertificados.com.br>\nContent-Type: text/plain; charset=utf-8\n\n"
+    "Tenho interesse, me liga amanhã.\n").encode("utf-8")
+
+
+class _CaixaFalsa:
+    """Caixa IMAP de mentira com as mensagens dadas (para testar a leitura sem servidor)."""
+
+    def __init__(self, mensagens):
+        self.mensagens = mensagens
+
+    def __call__(self, *a, **k):
+        return self
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def login(self, *a):
+        return "OK", []
+
+    def select(self, *a, **k):
+        return "OK", []
+
+    def search(self, *a):
+        return "OK", [b" ".join(str(i + 1).encode() for i in range(len(self.mensagens)))]
+
+    def fetch(self, num, _partes):
+        return "OK", [(b"x", self.mensagens[int(num) - 1])]
+
+
+def test_devolucao_nao_vira_resposta_do_lead(monkeypatch):
+    """Caso real: o Gmail devolve "Endereço não encontrado" respondendo ao nosso e-mail (In-Reply-To). A leitura de
+    respostas tratava isso como resposta do lead, respondia "Obrigado pelo retorno!" e vinha outra devolução."""
+    monkeypatch.setattr(email_imap, "_acesso", lambda conta=None: ("imap.teste", 993, "u", "s"))
+    monkeypatch.setattr(email_imap.imaplib, "IMAP4_SSL", _CaixaFalsa([DEVOLUCAO_COM_RESPOSTA_A, RESPOSTA_DE_VERDADE]))
+    achados = email_imap.ler_respostas({"leoi@terra.com.br"}, {"<enviado-123@mscertificados.com.br>"}, set(),
+                                       desde=None)
+    assert [a["message_id"] for a in achados] == ["<resposta-1@terra.com.br>"]  # só a resposta de verdade
+    assert email_validacao.texto_de_devolucao("** Endereço não encontrado **\n\nSua mensagem não foi entregue a x@y.com")
+    assert not email_validacao.texto_de_devolucao("Tenho interesse, me liga amanhã.")
+
+
+def test_devolucao_que_escapar_nao_e_processada_nem_respondida(cliente, monkeypatch):
+    from app import sdr
+
+    lead_id, _ = _lead_com_toque("leoi@terra.com.br")
+    chamadas = []
+    monkeypatch.setattr(sdr, "processar_resposta", lambda *a, **k: chamadas.append(a) or {})
+    monkeypatch.setattr(email_imap, "ler_respostas", lambda *a, **k: [{
+        "de": "mailer-daemon@googlemail.com", "assunto": "Delivery Status Notification (Failure)",
+        "texto": "** Endereço não encontrado **\n\nSua mensagem não foi entregue a leoi@terra.com.br porque o endereço "
+                 "não foi encontrado.", "message_id": "<devolucao-3@mx.google.com>", "responde_a": ["<enviado-9@ms>"]}])
+    rotinas._ler_caixa(None, set(), {"<enviado-9@ms>": lead_id}, set(), None)
+    assert chamadas == []  # não virou "resposta" do lead
+    with sessao() as db:
+        lead = db.get(Lead, lead_id)
+        lead.email_invalido = True
+        assert rotinas.responder_automaticamente(db, lead, "email", {"resposta_sugerida": "Obrigado pelo retorno!"}) \
+            is False  # e-mail que não existe nunca recebe resposta automática

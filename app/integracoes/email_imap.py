@@ -99,8 +99,9 @@ def ler_respostas(emails_de_leads: set[str], enviados: set[str] | None = None, j
     """[{"de", "assunto", "texto", "message_id", "responde_a"}] dos e-mails recentes de leads (ou que respondem a um
     e-mail enviado pelo sistema) ainda não processados. Não marca nada como lido: a caixa fica como a equipe deixou.
     enviados: Message-IDs dos e-mails que o sistema mandou; ja_processados: Message-IDs já tratados;
-    desde: ignora e-mails mais antigos (a 1ª leitura não reprocessa respostas já tratadas)."""
-    from .. import arquivo_env
+    desde: ignora e-mails mais antigos (a 1ª leitura não reprocessa respostas já tratadas).
+    Devoluções ("Endereço não encontrado", "Undeliverable") ficam de fora: não são resposta do lead."""
+    from .. import arquivo_env, email_validacao
 
     arquivo_env.carregar_do_banco(forcar=True)  # na nuvem: a senha salva há pouco já vale aqui
     servidor, porta, login, senha = _acesso(conta)
@@ -118,11 +119,14 @@ def ler_respostas(emails_de_leads: set[str], enviados: set[str] | None = None, j
             _, dados = caixa.search(None, "SINCE", _data_imap(inicio))
             for num in dados[0].split()[-300:]:
                 _, cab_bruto = caixa.fetch(
-                    num, "(BODY.PEEK[HEADER.FIELDS (FROM DATE SUBJECT MESSAGE-ID IN-REPLY-TO REFERENCES)])")
+                    num, "(BODY.PEEK[HEADER.FIELDS (FROM DATE SUBJECT MESSAGE-ID IN-REPLY-TO REFERENCES CONTENT-TYPE)])")
                 cab = email.message_from_bytes(cab_bruto[0][1])
                 message_id = id_da_mensagem(cab)
                 if message_id in ja_processados:
                     continue
+                if email_validacao.parece_devolucao(cab.get("From", ""), str(make_header(decode_header(
+                        cab.get("Subject", "")))), cab.get("Content-Type", "")):
+                    continue  # "Endereço não encontrado" NÃO é resposta do lead (é tratada em ler_devolucoes)
                 quando = _quando(cab)
                 if quando and quando < inicio:
                     continue

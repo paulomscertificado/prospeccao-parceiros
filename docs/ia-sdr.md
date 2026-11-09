@@ -284,6 +284,11 @@ Empresas novas, que virou um painel em 4 passos (estados por caixinha, `name="uf
   devolvido, cria um toque de reenvio hoje com a última mensagem enviada.
 - Botão **Conferir e-mails** na campanha (`POST /campanhas/{id}/conferir-emails`, `campanhas.conferir_emails`).
 - Testes: `testes/test_emails_inexistentes.py`; a variável `CONFERIR_DOMINIO_EMAIL=0` desliga o DNS nos testes.
+- Correção (nov/2026): a devolução do Gmail vem com `In-Reply-To` do nosso e-mail e era lida como RESPOSTA do lead
+  (status "Respondeu", oportunidade e resposta automática "Obrigado pelo retorno!" para o endereço inexistente, que
+  gerava outra devolução). Agora `email_imap.ler_respostas` pula o que `parece_devolucao`, `rotinas._ler_caixa` pula
+  texto de devolução (`email_validacao.texto_de_devolucao`), `responder_automaticamente` nunca responde e-mail
+  inválido e `ler_respostas_por_email` lê as devoluções ANTES das respostas.
 
 ## CNPJ inativo
 

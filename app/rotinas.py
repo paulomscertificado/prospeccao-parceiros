@@ -33,6 +33,8 @@ def responder_automaticamente(db, lead: Lead, canal: str, analise: dict, conexao
 
     if empresas_novas.e_lead_de_venda(lead):
         return False  # venda para empresa nova: quem responde é o time, não a SDR de parcerias
+    if canal == "email" and lead.email_invalido:
+        return False  # e-mail que não existe: responder só gera outra devolução
     from datetime import timedelta
 
     from sqlalchemy import select
@@ -116,11 +118,13 @@ def ler_respostas_por_email() -> int:
         if conta is None:
             continue
         inicio = desde if conta.principal else max(desde, criada_em)  # conta nova: só o que chegou depois dela
-        total += _ler_caixa(conta, emails, enviados, ja_processados, inicio)
+        # Devoluções PRIMEIRO: o e-mail inexistente fica marcado (e a campanha para ele é cancelada) antes de
+        # qualquer resposta ser tratada.
         try:
             _ler_devolucoes(conta, enviados)
         except Exception:  # noqa: BLE001 — devolução com problema não pode parar a leitura das respostas
             log.exception("Erro ao ler as devoluções de e-mail")
+        total += _ler_caixa(conta, emails, enviados, ja_processados, inicio)
     return total
 
 
@@ -177,6 +181,10 @@ def _ler_caixa(conta, emails: set[str], enviados: dict, ja_processados: set[str]
                 lead = db.get(Lead, lead_id) if lead_id else None
             if not lead:
                 continue
+            from . import email_validacao
+
+            if email_validacao.texto_de_devolucao(item["texto"]):
+                continue  # devolução ("Endereço não encontrado"): não é resposta (ver _ler_devolucoes)
             if not item["texto"]:
                 # e-mail sem texto (só anexo): fica registrado (não volta na próxima leitura) e avisa quem cuida
                 from . import mensagens

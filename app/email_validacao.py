@@ -149,6 +149,18 @@ def parece_devolucao(remetente: str, assunto: str, tipo_conteudo: str = "") -> b
         bool(_ASSUNTO_DEVOLUCAO.search(assunto or "") and re.search(r"daemon|postmaster|delivery", remetente or "", re.I))
 
 
+_TEXTO_DEVOLUCAO = re.compile(
+    r"\*\* *endere[çc]o n[ãa]o encontrado *\*\*|sua mensagem n[ãa]o foi entregue|\*\* *address not found *\*\*|"
+    r"your message (wasn'?t|was not|could not be) delivered|delivery to the following recipient|"
+    r"this is the mail system at host|mail delivery (failed|subsystem)|undeliverable:", re.I)
+
+
+def texto_de_devolucao(texto: str) -> bool:
+    """O começo do texto é de uma devolução ("** Endereço não encontrado ** Sua mensagem não foi entregue...")?
+    Segurança extra para uma devolução nunca ser tratada como resposta do lead (ver rotinas._ler_caixa)."""
+    return bool(_TEXTO_DEVOLUCAO.search((texto or "")[:600]))
+
+
 def analisar_devolucao(msg) -> dict:
     """Lê uma mensagem de devolução (email.message.Message). Devolve
     {"destinatarios": [...], "permanente": bool, "motivo": str, "ids_originais": [...]}."""
