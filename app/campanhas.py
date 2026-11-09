@@ -495,7 +495,7 @@ def andamento(db, camp: Campanha) -> list[dict]:
         else:
             situacao = {"rascunho": "rascunho", "pendente": "programado", "feita": "enviado", "cancelada": "cancelado",
                         "pulada": "cancelado"}.get(t.status, t.status)
-        linha["toques"].append({"canal": t.canal, "data": t.data, "angulo": t.angulo, "situacao": situacao,
+        linha["toques"].append({"canal": t.canal, "data": t.data, "hora": t.hora or "", "angulo": t.angulo, "situacao": situacao,
                                 "quando": m.criado_em if m else None, "erro": m.erro if m else ""})
         linha.setdefault("tarefas", []).append(t)
     for linha in linhas.values():  # tirada da campanha: nada mais sai para ela

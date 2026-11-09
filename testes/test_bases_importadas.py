@@ -108,6 +108,12 @@ def test_importa_lista_separada_e_campanha_usa_so_ela(cliente, monkeypatch):
         assert set(leads) == {"81000001000101", "81000002000102"}  # sem a inapta e sem a de MG
         assert leads["81000001000101"].responsavel == "Ana Maria de Souza"
         assert "CNPJá" in leads["81000001000101"].origem
+        hora = db.execute(select(Tarefa.hora).where(Tarefa.campanha_id == cid)).scalars().first()
+    # a tela da campanha mostra o horário agendado de cada mensagem, além do dia
+    import re
+
+    assert re.match(r"\d\d:\d\d$", hora)
+    assert f"às {hora}" in cliente.get(f"/campanhas/{cid}").text
 
 
 def test_telas_escolhem_a_base_e_escondem_a_receita(cliente):
