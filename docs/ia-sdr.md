@@ -216,6 +216,12 @@ permissão `campanhas.ver`; configurar/buscar com `campanhas.gerenciar`).
   `/empresas-novas/busca/{id}`; teste `/empresas-novas/testar` (`limit=10`, 1 página = 1 crédito, sem campanha).
 - Testes: `testes/test_empresas_novas.py` (API simulada).
 
+## Empresas novas: e-mail E WhatsApp (nov/2026)
+
+`cadencias.aplicar(..., todos_os_canais=True)` (usado por `_montar` quando `Campanha.tipo == "empresas_novas"`): cada
+passo "auto" vira um toque por canal que a empresa tem (e-mail válido e/ou WhatsApp) e que a campanha usa, cada um
+no seu horário. WhatsApp para quem nunca conversou continua saindo com 1 clique do time (Minha fila / campanha).
+
 ## Empresas novas sem repetição (nov/2026)
 
 - Teste (`testar`): um dia de abertura por vez (`dia_do_teste`: o mais recente entre 1 e 10 dias atrás ainda não

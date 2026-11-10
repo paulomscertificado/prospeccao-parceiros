@@ -52,6 +52,16 @@ def test_busca_monta_campanha_de_venda(cliente, monkeypatch):
 
     monkeypatch.setattr(empresas_novas.httpx, "get", falso)
     monkeypatch.setattr(config, "CNPJA_API_KEY", "chave-de-teste")
+    from app import trabalhos
+
+    class _SemLinha:  # a montagem roda aqui embaixo, não numa linha de execução paralela (evita corrida no teste)
+        def __init__(self, *a, **k):
+            pass
+
+        def start(self):
+            pass
+
+    monkeypatch.setattr(trabalhos.threading, "Thread", _SemLinha)
     with sessao() as db:
         admin = db.execute(select(Usuario).where(Usuario.perfil == "admin")).scalars().first()
         gravar_config(db, "novas_sem_individual", "1")
@@ -81,7 +91,14 @@ def test_busca_monta_campanha_de_venda(cliente, monkeypatch):
         assert lead.origem == empresas_novas.ORIGEM and lead.whatsapp == "(81) 99136-3335"
         primeira = [t for t in tarefas if t.lead_id == lead.id and t.angulo == "venda_boas_vindas"][0]
         assert "R$" not in primeira.mensagem_whatsapp and "acabou de abrir" in primeira.mensagem_whatsapp
-        assert len([t for t in tarefas if t.lead_id == lead.id]) == 3  # dia 1, 3 e 7
+        dela = [t for t in tarefas if t.lead_id == lead.id]
+        # dia 1, 3 e 7 por e-mail E por WhatsApp (a empresa tem os dois), cada um no seu horário
+        assert sorted(t.canal for t in dela) == ['email'] * 3 + ['whatsapp'] * 3
+        zap = [t for t in dela if t.canal == 'whatsapp' and t.angulo == 'venda_boas_vindas'][0]
+        email = [t for t in dela if t.canal == 'email' and t.angulo == 'venda_boas_vindas'][0]
+        assert zap.data == email.data and 'acabou de abrir' in zap.mensagem and zap.assunto == ''
+        sem_zap = [t for t in tarefas if 'Sem Contato' in t.lead.empresa or 'SEM CONTATO' in t.lead.empresa]
+        assert {t.canal for t in sem_zap} == {'whatsapp'}  # sem e-mail nem celular: só o toque a pesquisar
         assert lead.reservado_por_id == admin_id(db)
 
 
