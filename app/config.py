@@ -86,6 +86,8 @@ EXIGIR_2FA = os.environ.get("EXIGIR_2FA", "1") != "0"
 # Envios AUTOMÁTICOS das campanhas (e-mail e WhatsApp): um de cada vez, com 3 a 4 minutos sorteados entre eles
 # (regra da Maria). Os testes desligam com ESPACAR_ENVIOS=0 para mandar vários de uma vez.
 ESPACAR_ENVIOS = os.environ.get("ESPACAR_ENVIOS", "1") != "0"
+# Lista de exclusão na CNPJá (Empresas novas): quem já veio não volta nem é cobrado. Testes desligam (sem internet).
+LISTA_EXCLUSAO_CNPJA = os.environ.get("LISTA_EXCLUSAO_CNPJA", "1") != "0"
 
 # ---------------------------------------------------------------- Integrações (todas opcionais)
 

@@ -224,6 +224,13 @@ no seu horário. WhatsApp para quem nunca conversou continua saindo com 1 clique
 
 ## Empresas novas sem repetição (nov/2026)
 
+- **Lista de exclusão na CNPJá** (`atualizar_lista_exclusao`): depois de cada busca, TODOS os CNPJs já trazidos vão
+  para uma lista na conta da CNPJá ("Prospeccao MS - ja buscadas"; código em config `novas_lista_exclusao`; criar e
+  atualizar com `items` não gasta crédito, conferido em 10/11/2026). Cada pesquisa manda `taxId.nin=<código>`: a CNPJá
+  não devolve nem cobra quem já veio. Lista recusada (400/404) = busca sem ela e esquece o código (recria na próxima).
+  As já pagas numa busca sem campanha (ex.: teste) entram pelo que está guardado (`reaproveitaveis`).
+  Testes: `LISTA_EXCLUSAO_CNPJA=0` (conftest) e `test_buscar_de_novo_nao_paga_quem_ja_veio`.
+
 - Teste (`testar`): um dia de abertura por vez (`dia_do_teste`: o mais recente entre 1 e 10 dias atrás ainda não
   testado). Antes era sempre "últimos 7 dias" + `limit=10`, e a CNPJá devolvia as mesmas 10, na mesma ordem.
 - Rotina diária: janela `novas_ultima_data`+1 até hoje − `ATRASO_DIAS` (2), no máximo 7 dias; grava o fim da janela em

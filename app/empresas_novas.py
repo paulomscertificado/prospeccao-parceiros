@@ -129,12 +129,16 @@ def dono(db) -> Usuario | None:
 
 # ---------------------------------------------------------------- API da CNPJá
 
-def _pedir(caminho: str, params: dict | None = None) -> dict:
+def _pedir(caminho: str, params: dict | None = None, metodo: str = "GET", corpo: dict | None = None) -> dict:
     chave = chave_api()
     if not chave:
-        raise ErroCnpja("a chave da API da CNPJá ainda não foi colocada (Empresas novas > Configurar)")
+        raise ErroCnpja("a chave da API da CNPJá ainda não foi colocada (Configurações > Integrações)")
     try:
-        r = httpx.get(URL_API + caminho, params=params, headers={"Authorization": chave}, timeout=60)
+        if metodo == "GET":
+            r = httpx.get(URL_API + caminho, params=params, headers={"Authorization": chave}, timeout=60)
+        else:
+            r = httpx.request(metodo, URL_API + caminho, params=params, json=corpo, headers={"Authorization": chave},
+                              timeout=60)
     except httpx.HTTPError as erro:
         raise ErroCnpja(f"a CNPJá não respondeu ({erro}). Tento de novo mais tarde") from None
     if r.status_code == 401:
@@ -154,21 +158,99 @@ def saldo() -> dict:
     return _pedir("/credit")
 
 
-def buscar_abertas(desde: date, ate: date, ufs: list[str], limite: int | None = None) -> list[dict]:
+def buscar_abertas(desde: date, ate: date, ufs: list[str], limite: int | None = None,
+                   lista_exclusao: str = "") -> list[dict]:
     """Estabelecimentos ATIVOS abertos entre as datas nos estados, de QUALQUER atividade (a venda do e-CNPJ serve
-    para toda empresa nova). Custa 1 crédito a cada 10 empresas. limite: no máximo essa quantidade (teste: 10)."""
+    para toda empresa nova). Custa 1 crédito a cada 10 empresas. limite: no máximo essa quantidade (teste: 10).
+    lista_exclusao: código da lista de CNPJs na CNPJá (taxId.nin) com quem já veio antes: a CNPJá nem devolve (nem
+    cobra) essas empresas de novo."""
     params = {"founded.gte": desde.isoformat(), "founded.lte": ate.isoformat(),
               "address.state.in": ",".join(ufs), "status.id.in": "2",
               "limit": min(POR_PAGINA, limite) if limite else POR_PAGINA}
+    if lista_exclusao:
+        params["taxId.nin"] = lista_exclusao
     registros = []
     for _ in range(MAXIMO_PAGINAS):
-        pagina = _pedir("/office", params)
+        try:
+            pagina = _pedir("/office", params)
+        except ErroCnpja as erro:
+            if "taxId.nin" in params and ("erro 400" in str(erro) or "erro 404" in str(erro)):
+                log.warning("Lista de exclusão da CNPJá recusada (%s): busca sem ela", erro)
+                params.pop("taxId.nin")  # lista apagada na CNPJá: busca sem ela (a exclusão daqui continua valendo)
+                _esquecer_lista_exclusao()
+                continue
+            raise
         registros += pagina.get("records") or []
         proximo = pagina.get("next")
         if not proximo or (limite and len(registros) >= limite):
             break
         params = {"token": proximo}
     return registros[:limite] if limite else registros
+
+
+LISTA_EXCLUSAO_TITULO = "Prospeccao MS - ja buscadas"
+
+
+def _esquecer_lista_exclusao() -> None:
+    with sessao() as db:
+        gravar_config(db, "novas_lista_exclusao", "")
+
+
+def lista_exclusao(db) -> str:
+    """Código (na CNPJá) da lista com TODOS os CNPJs que já vieram nas buscas daqui. Vai em cada pesquisa
+    (taxId.nin): buscar de novo o mesmo dia não gasta crédito com quem já veio. Vazio = ainda não existe."""
+    if not config.LISTA_EXCLUSAO_CNPJA:
+        return ""
+    return ler_config(db, "novas_lista_exclusao")
+
+
+def atualizar_lista_exclusao(db) -> str:
+    """Manda para a CNPJá a lista de todos os CNPJs já buscados (cria a lista na 1ª vez). Criar e atualizar lista
+    com CNPJs não gasta crédito. Falha aqui não pode parar a busca: devolve o código que tinha e segue."""
+    from .modelos import EmpresaCnpja
+
+    if not config.LISTA_EXCLUSAO_CNPJA:
+        return ""
+    cnpjs = sorted({c for (c,) in db.execute(select(EmpresaCnpja.cnpj).where(EmpresaCnpja.cnpj != "")) if len(c) == 14})
+    atual = ler_config(db, "novas_lista_exclusao")
+    if not cnpjs:
+        return atual
+    try:
+        if atual:
+            try:
+                _pedir(f"/list/{atual}", metodo="PATCH", corpo={"items": cnpjs})
+                return atual
+            except ErroCnpja as erro:
+                if "erro 404" not in str(erro) and "erro 400" not in str(erro):
+                    raise
+        criada = _pedir("/list", metodo="POST", corpo={
+            "title": LISTA_EXCLUSAO_TITULO, "items": cnpjs,
+            "description": "Empresas que o sistema de Prospecção da MS já buscou (não buscar de novo)."})
+        gravar_config(db, "novas_lista_exclusao", criada.get("id", ""))
+        return criada.get("id", "")
+    except ErroCnpja as erro:
+        log.warning("Não consegui atualizar a lista de exclusão na CNPJá: %s", erro)
+        return atual
+
+
+def reaproveitaveis(db, desde: date, ate: date, ufs: list[str]) -> list[dict]:
+    """Empresas abertas no período que já vieram (e foram pagas) numa busca que NÃO virou campanha, ex.: um teste.
+    Como a lista de exclusão faz a CNPJá não devolver de novo, elas entram na busca nova a partir do que está guardado."""
+    from .modelos import BuscaCnpja, EmpresaCnpja
+
+    com_campanha = {c for (c,) in db.execute(select(EmpresaCnpja.cnpj).join(BuscaCnpja, BuscaCnpja.id == EmpresaCnpja.busca_id)
+                                             .where(BuscaCnpja.campanha_id.is_not(None)))}
+    vistas, linhas = set(), []
+    for e in db.execute(select(EmpresaCnpja).join(BuscaCnpja, BuscaCnpja.id == EmpresaCnpja.busca_id).where(
+            BuscaCnpja.campanha_id.is_(None), EmpresaCnpja.motivo_fora == "", EmpresaCnpja.aberta_em >= desde,
+            EmpresaCnpja.aberta_em <= ate, EmpresaCnpja.uf.in_(ufs)).order_by(EmpresaCnpja.id)).scalars():
+        if e.cnpj in com_campanha or e.cnpj in vistas:
+            continue
+        vistas.add(e.cnpj)
+        linhas.append({c: getattr(e, c) for c in (
+            "cnpj", "razao_social", "nome_fantasia", "cnae", "cnae_texto", "uf", "cidade", "endereco", "aberta_em",
+            "situacao", "porte", "natureza", "natureza_id", "telefones_fixos", "celulares", "emails")})
+    return linhas
 
 
 def telefones(registro: dict) -> tuple[list[str], list[str]]:
@@ -290,7 +372,8 @@ def textos_do_lead(db, lead: Lead, usuario: Usuario | None) -> dict:
             for a, m in mensagens(db).items()}
 
 
-def registrar_busca(db, registros: list[dict], desde: date, ate: date, ufs: list[str], usuario: Usuario | None, teste: bool = False, automatica: bool = False):
+def registrar_busca(db, registros: list[dict], desde: date, ate: date, ufs: list[str], usuario: Usuario | None,
+                    teste: bool = False, automatica: bool = False, reaproveitadas: list[dict] | None = None):
     """Guarda a lista das empresas que a API devolveu (para o usuário conferir) e marca quem fica de fora da campanha:
     repetida, empresário individual/MEI (se configurado), já está numa lista importada (lista de exclusão) ou já é
     lead em atendimento/que pediu para sair."""
@@ -302,7 +385,9 @@ def registrar_busca(db, registros: list[dict], desde: date, ate: date, ufs: list
                        encontradas=len(registros), creditos=-(-len(registros) // 10))
     db.add(busca)
     db.flush()
-    linhas = [dados_da_empresa(r) for r in registros]
+    # reaproveitadas: já pagas numa busca que não virou campanha (ver reaproveitaveis): entram sem gastar crédito
+    linhas = [dados_da_empresa(r) for r in registros] + list(reaproveitadas or [])
+    busca.encontradas = len(linhas)
     cnpjs = [l["cnpj"] for l in linhas if l["cnpj"]]
     em_listas: dict[str, str] = {}
     if cnpjs and cfg(db, "novas_excluir_listas") == "1":
@@ -452,12 +537,19 @@ def buscar_e_criar(db, usuario: Usuario, desde: date, ate: date, automatica: boo
     # Pede à CNPJá só o que cabe na campanha (o dobro do máximo, para sobrar depois das exclusões): cada empresa
     # devolvida gasta crédito, e as que não cabem na campanha do dia não seriam contatadas.
     maximo = util.para_int(cfg(db, "novas_maximo_dia")) or 60
-    registros = buscar_abertas(desde, ate, ufs, limite=min(POR_PAGINA * MAXIMO_PAGINAS, maximo * 2))
-    busca = registrar_busca(db, registros, desde, ate, ufs, usuario, automatica=automatica)
+    # Lista de exclusão na CNPJá: quem já veio em qualquer busca anterior não volta (nem é cobrado) de novo. As já
+    # pagas que ainda não entraram em campanha (ex.: de um teste) entram pelo que está guardado aqui.
+    reaproveitadas = reaproveitaveis(db, desde, ate, ufs)
+    limite = min(POR_PAGINA * MAXIMO_PAGINAS, maximo * 2)
+    registros = buscar_abertas(desde, ate, ufs, limite=max(1, limite - len(reaproveitadas)),
+                               lista_exclusao=lista_exclusao(db)) if len(reaproveitadas) < limite else []
+    busca = registrar_busca(db, registros, desde, ate, ufs, usuario, automatica=automatica, reaproveitadas=reaproveitadas)
+    db.commit()
+    atualizar_lista_exclusao(db)
     db.commit()
     camp = criar_campanha_da_busca(db, busca, usuario)
-    return {"encontradas": len(registros), "campanha_id": camp.id if camp else None, "busca_id": busca.id,
-            "fora": busca.fora}
+    return {"encontradas": busca.encontradas, "campanha_id": camp.id if camp else None, "busca_id": busca.id,
+            "fora": busca.fora, "pagas": len(registros)}
 
 
 def dia_do_teste(db, hoje: date | None = None) -> date:
@@ -480,8 +572,10 @@ def testar(db, usuario: Usuario | None) -> dict:
     Só guarda a lista para conferência; a campanha sai depois, por um botão na lista (sem gastar crédito)."""
     dia = dia_do_teste(db)
     ufs = _ufs(db)
-    registros = buscar_abertas(dia, dia, ufs, limite=LIMITE_TESTE)
+    registros = buscar_abertas(dia, dia, ufs, limite=LIMITE_TESTE, lista_exclusao=lista_exclusao(db))
     busca = registrar_busca(db, registros, dia, dia, ufs, usuario, teste=True)
+    db.commit()
+    atualizar_lista_exclusao(db)
     db.commit()
     return {"encontradas": len(registros), "busca_id": busca.id, "fora": busca.fora, "dia": dia}
 

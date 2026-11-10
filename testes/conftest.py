@@ -14,6 +14,7 @@ os.environ["GOOGLE_PLACES_API_KEY"] = ""
 os.environ["WHATSAPP_TOKEN"] = ""
 os.environ["SMTP_HOST"] = ""
 os.environ["CONFERIR_DOMINIO_EMAIL"] = "0"                    # testes nunca consultam o DNS de verdade
+os.environ["LISTA_EXCLUSAO_CNPJA"] = "0"                       # nunca fala com a CNPJá de verdade
 os.environ["ESPACAR_ENVIOS"] = "0"                             # a regra de 3-4 min tem teste próprio
 os.environ["EXIGIR_2FA"] = "0"                                 # os testes do 2FA ligam só neles
 os.environ["WHATSAPP_LEADS_TOKEN"] = ""                       # nunca fala com o WhatsApp Leads de verdade

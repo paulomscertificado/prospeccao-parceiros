@@ -320,3 +320,45 @@ def test_empresa_baixada_fica_de_fora_mesmo_vindo_da_api(cliente, monkeypatch):
         linhas = {e.cnpj: e.motivo_fora for e in db.execute(
             select(EmpresaCnpja).where(EmpresaCnpja.busca_id == r["busca_id"])).scalars()}
     assert "Baixada" in linhas["66666666000166"] and linhas["67676767000167"] == ""
+
+
+def test_buscar_de_novo_nao_paga_quem_ja_veio(cliente, monkeypatch):
+    """Pedido da Maria: buscar mais de uma vez no dia não pode gastar crédito com as mesmas empresas. Depois de cada
+    busca, todos os CNPJs vão para uma lista na CNPJá, e a pesquisa seguinte manda essa lista em taxId.nin."""
+    from app.modelos import BuscaCnpja
+
+    monkeypatch.setattr(config, "LISTA_EXCLUSAO_CNPJA", True)
+    monkeypatch.setattr(config, "CNPJA_API_KEY", "chave-de-teste")
+    pesquisas, listas = [], []
+    ja_veio = {"90000001000101", "90000002000102"}
+
+    def get(url, params=None, headers=None, timeout=None):
+        pesquisas.append(dict(params or {}))
+        excluir = bool((params or {}).get("taxId.nin"))
+        registros = [_registro(c, f"EMPRESA {c[-4:]} LTDA") for c in sorted(ja_veio) if not excluir]
+        registros.append(_registro(f"9000000{len(pesquisas)}000199", f"NOVA {len(pesquisas)} LTDA"))
+        for r in registros:
+            r["founded"] = params["founded.gte"]  # abertas no dia pesquisado (como a CNPJá devolve)
+        return _Resposta({"records": registros, "next": None})
+
+    def request(metodo, url, params=None, json=None, headers=None, timeout=None):
+        listas.append((metodo, url.rsplit("/", 2)[-2:], len((json or {}).get("items", []))))
+        return _Resposta({"id": "11111111-2222-3333-4444-555555555555"})
+
+    monkeypatch.setattr(empresas_novas.httpx, "get", get)
+    monkeypatch.setattr(empresas_novas.httpx, "request", request)
+    with sessao() as db:
+        gravar_config(db, "novas_lista_exclusao", "")
+        admin = db.get(Usuario, admin_id(db))
+        primeiro = empresas_novas.testar(db, admin)  # 3 empresas (teste, sem campanha)
+        assert "taxId.nin" not in pesquisas[0]  # 1ª vez: ainda não existe lista
+        assert listas[0][0] == "POST"  # criou a lista na CNPJá com os CNPJs que vieram
+        assert empresas_novas.cfg(db, "novas_lista_exclusao") == "11111111-2222-3333-4444-555555555555"
+        dia = primeiro["dia"]
+        r = empresas_novas.buscar_e_criar(db, admin, dia, dia)  # buscar de novo o mesmo dia
+        assert pesquisas[1]["taxId.nin"] == "11111111-2222-3333-4444-555555555555"
+        assert r["pagas"] == 1  # a CNPJá só devolveu (e cobrou) a empresa nova
+        assert r["encontradas"] == 4  # + as 3 do teste, reaproveitadas sem gastar crédito
+        assert listas[-1][0] == "PATCH"  # a lista na CNPJá ganhou os CNPJs novos
+        assert db.get(BuscaCnpja, r["busca_id"]).creditos == 1
+        gravar_config(db, "novas_lista_exclusao", "")

@@ -185,6 +185,8 @@ leads: as respostas vão para **Oportunidades** e o time conversa.
 - Opção para deixar de fora **empresário individual** (inclui os MEIs, que muitas vezes não precisam de e-CNPJ).
 - **E-mail e WhatsApp:** cada toque sai pelos dois canais que a empresa tiver, em horários diferentes. O e-mail sai
   sozinho; o WhatsApp (contato frio) o time envia com 1 clique em **Minha fila** ou na campanha.
+- **Buscar de novo não gasta à toa:** toda empresa que já veio entra numa lista de exclusão guardada na própria
+  CNPJá. Buscando o mesmo dia de novo, a CNPJá só traz (e só cobra) as empresas que ainda não vieram.
 - **Atividade:** a busca pega empresas novas de **qualquer atividade** (toda empresa nova pode precisar do e-CNPJ).
 - **Lista de exclusão:** com a opção marcada, quem já está em alguma **lista importada** (Configurações >
   Integrações > Listas) fica de fora. Também ficam de fora: repetidas, leads já em atendimento e quem pediu para sair.
