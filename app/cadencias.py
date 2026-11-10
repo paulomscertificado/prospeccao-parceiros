@@ -120,7 +120,7 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
             dia_anterior = data
             canal = passo.canal
             modelos = {}
-            tambem_whatsapp = False
+            canal_extra = ""  # o outro canal do mesmo toque (e-mail E WhatsApp)
             if passo.canal == "auto" or passo.angulo:
                 canal = sdr.escolher_canal(db, lead, canais) if passo.canal == "auto" else passo.canal
                 if foco_whatsapp and passo.canal == "auto" and lead.whatsapp and "whatsapp" in (canais or []):
@@ -138,8 +138,13 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
                            "assunto_email": (msg.get("assunto", "") or "")[:200]}
                 # pedido da Maria: campanha com WhatsApp cria a mensagem de WhatsApp para todas as empresas; quem está
                 # com o campo WhatsApp em branco fica com ela pronta, esperando cadastrarem o número (não sai antes)
-                tambem_whatsapp = (da_ia and canal != "whatsapp" and "whatsapp" in (canais or [])
-                                   and not (lead.whatsapp or "").strip() and bool((msg.get("whatsapp") or "").strip()))
+                if (da_ia and canal != "whatsapp" and "whatsapp" in (canais or [])
+                        and not (lead.whatsapp or "").strip() and (msg.get("whatsapp") or "").strip()):
+                    canal_extra = "whatsapp"
+                # pedido da Maria: quem tem WhatsApp e e-mail recebe os dois em cada toque (Empresas novas: só WhatsApp)
+                elif (da_ia and canal == "whatsapp" and not foco_whatsapp and "email" in (canais or [])
+                        and lead.email and not lead.email_invalido and (msg.get("email") or "").strip()):
+                    canal_extra = "email"
             elif da_ia and canal not in ("email", "whatsapp"):
                 continue  # campanha da IA só manda e-mail e WhatsApp: ligação/LinkedIn o usuário faz por conta própria
             else:
@@ -149,16 +154,23 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
 
             assunto, corpo = marca.aplicar(assunto, responsavel), marca.aplicar(corpo, responsavel)
             modelos = {k: marca.aplicar(v, responsavel) for k, v in modelos.items()}
-            if tambem_whatsapp:
+            if canal_extra:
                 # cada mensagem fica num canal só (sem reserva do outro), para o mesmo toque nunca sair duas vezes
+                if canal_extra == "whatsapp":
+                    extra = {"assunto": "", "mensagem": modelos["mensagem_whatsapp"],
+                             "mensagem_whatsapp": modelos["mensagem_whatsapp"]}
+                    modelos["mensagem_whatsapp"] = ""
+                else:
+                    extra = {"assunto": modelos["assunto_email"], "mensagem": modelos["mensagem_email"],
+                             "mensagem_email": modelos["mensagem_email"], "assunto_email": modelos["assunto_email"]}
+                    modelos["mensagem_email"] = modelos["assunto_email"] = ""
                 db.add(Tarefa(
                     tipo="prospeccao", lead_id=lead.id, passo_id=passo.id, campanha_id=campanha_id,
-                    usuario_id=responsavel.id if responsavel else None, canal="whatsapp", data=data,
-                    hora=hora, acao="Contato por whatsapp", assunto="", mensagem=modelos["mensagem_whatsapp"],
-                    angulo=passo.angulo or "", status=status_tarefa, mensagem_whatsapp=modelos["mensagem_whatsapp"],
+                    usuario_id=responsavel.id if responsavel else None, canal=canal_extra, data=data,
+                    hora=hora, acao=f"Contato por {canal_extra}", angulo=passo.angulo or "", status=status_tarefa,
+                    **extra,
                 ))
                 resultado["tarefas"] += 1
-                modelos["mensagem_whatsapp"] = ""
             db.add(Tarefa(
                 tipo="prospeccao", lead_id=lead.id, passo_id=passo.id, campanha_id=campanha_id,
                 usuario_id=responsavel.id if responsavel else None, canal=canal, data=data,

@@ -95,6 +95,7 @@ preço nem comissão e não fecha parceria.
    os demais, a Agenda mostra o botão para enviar com um clique. LinkedIn: sempre com um clique.
    Toda empresa da campanha ganha a mensagem de WhatsApp. Se o campo **WhatsApp** da empresa estiver em branco, a
    mensagem fica pronta e **não sai**: cadastre o número na ficha da empresa e ela fica liberada.
+   Empresa com WhatsApp **e** e-mail recebe os dois em cada toque (nas Empresas novas, só o WhatsApp).
 5. Quando alguém responde com interesse, a automação para e aparece em **Oportunidades** (🔥) com o resumo.
    Clique em **Assumir lead**, ligue, marque a reunião e siga com a negociação.
 6. Veja em **Inteligência** qual segmento, canal e mensagem funcionam melhor.

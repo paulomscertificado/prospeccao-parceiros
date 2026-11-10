@@ -232,6 +232,9 @@ pronta, que espera o número. As duas tarefas ficam sem a reserva do outro canal
 Toque de campanha **nunca** sai com o campo WhatsApp em branco (nem pelo telefone fixo): `sdr.enviar_whatsapp_conectado`
 recusa com `sdr.SEM_WHATSAPP`, e `para_disparar`, `enviar_toque_agora` e `processar_fila_whatsapp` pulam esse toque.
 Minha fila mostra "WhatsApp em branco: cadastre o número…". Teste: `testes/test_whatsapp_em_branco.py`.
+Quem tem WhatsApp **e** e-mail válido recebe os dois em cada toque (duas tarefas, cada uma num canal, sem reserva do
+outro). O controle de frequência é por canal, então um não segura o outro. Exceção: Empresas novas (`foco_whatsapp`)
+continuam só no WhatsApp para quem tem celular.
 
 ## Empresas novas sem repetição (nov/2026)
 
