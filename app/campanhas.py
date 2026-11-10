@@ -12,7 +12,7 @@ import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 
 from . import base_receita, bases_importadas, cadencias, config, contas_email, email_validacao, reservas, ia, mensagens, prospeccao, sdr, trabalhos, util
 from .banco import agora, gravar_config, ler_config, ler_config_int, sessao
@@ -439,8 +439,8 @@ def aprovar(db, camp: Campanha, usuario: Usuario) -> int:
         atraso = max(0, (date.today() - primeiro).days)
         for t in rascunhos:
             t.status = "pendente"
-            if (t.hora or "09:00").endswith(("0", "5")):  # campanha montada antes: horário redondo vira natural
-                t.hora = cadencias.hora_natural(db)
+            if (t.hora or "09:00").endswith(":00"):  # campanha montada antes (09:00 do passo): vira horário natural
+                t.hora = cadencias.hora_natural(db)  # (horário escolhido à mão, como 10:20, fica como está)
             t.data = util.proximo_dia_util(t.data + timedelta(days=atraso)) if atraso else t.data
         _sem_horario_no_passado(db, rascunhos)
     camp.status = "ativa"
@@ -646,6 +646,17 @@ def _anotar_envio(db, canal: str) -> None:
         gravar_config(db, f"proximo_envio_automatico:{canal}", proximo.isoformat(timespec="seconds"))
 
 
+def _ja_na_hora(hoje: date, hora: str):
+    """Filtro SQL: toques de dias anteriores ou de hoje cujo horário já chegou. Antes isso era conferido um a um
+    depois da consulta, e os toques de mais tarde ocupavam as vagas da consulta (limit) à toa."""
+    return or_(Tarefa.data < hoje, and_(Tarefa.data == hoje, func.coalesce(Tarefa.hora, "") <= hora))
+
+
+def _limite_da_campanha(motivo: str) -> bool:
+    """O bloqueio é só desta campanha (limite diário da campanha): as outras campanhas continuam saindo."""
+    return "desta campanha" in motivo.lower()
+
+
 def processar_fila(db, maximo: int = 25) -> dict:
     """Envia os e-mails automáticos das campanhas aprovadas, respeitando horário, limites e o intervalo de 3 a 4
     minutos entre um e-mail e outro (_vez_do_canal)."""
@@ -659,15 +670,19 @@ def processar_fila(db, maximo: int = 25) -> dict:
     if not _vez_do_canal(db, "email"):
         return feito  # o último e-mail automático saiu há menos de 3 minutos
     hora = agora().strftime("%H:%M")
+    # Só o que já está na hora (filtro no banco) e uma consulta folgada: toques que esperam (responsável sem e-mail,
+    # caixa pausada, campanha no limite do dia) não podem tomar as vagas e travar os das outras campanhas.
     consulta = (select(Tarefa).join(Campanha, Tarefa.campanha_id == Campanha.id)
                 .where(Tarefa.status == "pendente", Tarefa.tipo == "prospeccao", Tarefa.canal == "email",
-                       Tarefa.data <= date.today(), Campanha.status == "ativa",
+                       _ja_na_hora(date.today(), hora), Campanha.status == "ativa",
                        Campanha.aprovado_em.is_not(None))  # só campanhas aprovadas na IA SDR
-                .order_by(Tarefa.data, Tarefa.hora, Tarefa.id).limit(maximo * 3))
+                .order_by(Tarefa.data, Tarefa.hora, Tarefa.id).limit(max(maximo * 3, 400)))
+    campanhas_no_limite: set[int] = set()
     for t in db.execute(consulta).scalars():
         if feito["enviados"] >= maximo:
             break
-        if t.data == date.today() and (t.hora or "00:00") > hora:
+        if t.campanha_id in campanhas_no_limite:
+            feito["bloqueados"] += 1
             continue
         lead = t.lead
         if not lead or not sdr.automacao_ativa(lead) or not lead.email:
@@ -676,8 +691,11 @@ def processar_fila(db, maximo: int = 25) -> dict:
         bloqueio = mensagens.bloqueio_de_envio(db, lead, "email", t.campanha_id)
         if bloqueio:
             feito["bloqueados"] += 1
+            if _limite_da_campanha(bloqueio):
+                campanhas_no_limite.add(t.campanha_id)
+                continue  # só esta campanha chegou ao limite do dia: as outras seguem
             if "limite" in bloqueio.lower() and "domínio" not in bloqueio:
-                break  # limite do canal/campanha: o resto espera a próxima rodada
+                break  # limite do canal (dia/hora): o resto espera a próxima rodada
             continue
         try:
             conta = conta_do_toque(db, t)
@@ -994,16 +1012,25 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
         return feito  # a última mensagem automática saiu há menos de 3 minutos
     if not whatsapp_leads.status().get("disponivel"):
         return feito  # computador com o WhatsApp Leads desligado: tudo espera, nada se perde
+    from .modelos import Mensagem
+
     hora = agora().strftime("%H:%M")
+    # Só quem pode receber sozinho (filtro no banco): campo WhatsApp preenchido e contato que já conversou ou autorizou.
+    # Antes os toques frios (que esperam o clique e continuam pendentes) ocupavam as 200 vagas da consulta e os
+    # liberados que viessem depois deles nunca saíam.
+    conversou = (select(Mensagem.id).where(Mensagem.lead_id == Lead.id, Mensagem.canal == "whatsapp",
+                                           Mensagem.status == "recebida").exists())
     consulta = (select(Tarefa).join(Campanha, Tarefa.campanha_id == Campanha.id)
                 .join(Lead, Tarefa.lead_id == Lead.id)
                 .where(Tarefa.status == "pendente", Tarefa.tipo == "prospeccao", Tarefa.canal == "whatsapp",
-                       Tarefa.data <= date.today(), Campanha.status == "ativa", Campanha.aprovado_em.is_not(None))
+                       _ja_na_hora(date.today(), hora), Campanha.status == "ativa", Campanha.aprovado_em.is_not(None),
+                       func.coalesce(Lead.whatsapp, "") != "", or_(Lead.consentimento.is_(True), conversou))
                 .order_by(Tarefa.data, Tarefa.hora, Tarefa.id).limit(200))
+    campanhas_no_limite: set[int] = set()
     for t in db.execute(consulta).scalars():
         if feito["enviados"] >= maximo:
             break
-        if t.data == date.today() and (t.hora or "00:00") > hora:
+        if t.campanha_id in campanhas_no_limite:
             continue
         lead = t.lead
         if not (lead.whatsapp or "").strip():
@@ -1021,6 +1048,10 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
             if "limite" in texto and "este número" in texto:
                 feito["bloqueados"] += 1
                 continue  # este número chegou ao limite: os leads de outros números seguem
+            if _limite_da_campanha(texto):
+                feito["bloqueados"] += 1
+                campanhas_no_limite.add(t.campanha_id)
+                continue  # só esta campanha chegou ao limite do dia: as outras seguem
             if "limite" in texto or "whatsapp leads" in texto or "desligado" in texto:
                 feito["bloqueados"] += 1
                 break  # limite do canal ou WhatsApp fora do ar: o resto espera a próxima rodada
@@ -1055,18 +1086,22 @@ def finalizar_cadencias(db) -> int:
     """Depois do último toque sem resposta: 'Perdido – Sem resposta'. Não continua infinitamente."""
     dias = ler_config_int(db, "dias_sem_resposta", 3)
     limite = agora() - timedelta(days=dias)
-    candidatos = db.execute(select(Lead).where(Lead.status.in_(["Abordagem criada", "Contatado", "Aguardando resposta"]),
-                                               Lead.respondeu_em.is_(None))).scalars().all()
+    # Uma consulta só (antes era 1 + 1 por lead, a cada hora, o que fica lento na nuvem com muitos leads): lead sem
+    # toque em aberto e cujo último toque feito/pulado foi há mais de `dias` dias.
+    em_aberto = select(Tarefa.lead_id).where(Tarefa.tipo == "prospeccao", Tarefa.status.in_(["pendente", "rascunho"]),
+                                             Tarefa.lead_id.is_not(None))  # sem NULL: o NOT IN não pode falhar
+    ultimo = (select(Tarefa.lead_id.label("lead_id"), func.max(Tarefa.concluida_em).label("quando"))
+              .where(Tarefa.tipo == "prospeccao", Tarefa.status.in_(["feita", "pulada"]),
+                     Tarefa.concluida_em.is_not(None), Tarefa.lead_id.is_not(None))
+              .group_by(Tarefa.lead_id).subquery())
+    candidatos = db.execute(select(Lead).join(ultimo, ultimo.c.lead_id == Lead.id).where(
+        Lead.status.in_(["Abordagem criada", "Contatado", "Aguardando resposta"]), Lead.respondeu_em.is_(None),
+        ultimo.c.quando < limite, Lead.id.not_in(em_aberto))).scalars().all()
     total = 0
     for lead in candidatos:
-        tarefas = db.execute(select(Tarefa).where(Tarefa.lead_id == lead.id, Tarefa.tipo == "prospeccao")).scalars().all()
-        if not tarefas or any(t.status in ("pendente", "rascunho") for t in tarefas):
-            continue
-        feitas = [t.concluida_em for t in tarefas if t.status in ("feita", "pulada") and t.concluida_em]
-        if feitas and max(feitas) < limite:
-            mudar_status(db, lead, "Perdido", None, "Sem resposta")
-            historico(db, lead.id, "sistema", "Cadência concluída sem resposta: lead marcado como SEM RESPOSTA.")
-            total += 1
+        mudar_status(db, lead, "Perdido", None, "Sem resposta")
+        historico(db, lead.id, "sistema", "Cadência concluída sem resposta: lead marcado como SEM RESPOSTA.")
+        total += 1
     for camp in db.execute(select(Campanha).where(Campanha.status == "ativa")).scalars():
         pendentes = db.execute(select(func.count(Tarefa.id)).where(Tarefa.campanha_id == camp.id,
                                                                    Tarefa.status == "pendente")).scalar()

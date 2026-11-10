@@ -353,3 +353,20 @@ empresas, com as MESMAS colunas da `base_receita`, para reaproveitar `base_recei
   `/api/contagem?base=`, e "Encontrar novos parceiros" (cada lista vira uma fonte `lista:<id>`).
 - `receita_oculta` (config) esconde a base da Receita das telas (`bases_importadas.opcoes`/`escolher`).
 - Testes: `testes/test_bases_importadas.py`.
+
+## Revisão geral das filas e da busca diária (nov/2026)
+
+- **Filas sem entupir** (`campanhas.processar_fila` / `processar_fila_whatsapp`): o horário (`_ja_na_hora`) é filtrado no
+  banco. No WhatsApp, a consulta já traz só quem pode receber sozinho (campo WhatsApp preenchido e
+  `consentimento` ou mensagem recebida). Antes, toques frios ou de mais tarde ocupavam as vagas da consulta e os
+  liberados não saíam.
+- **Limite diário da campanha** (`limite_diario_campanha`): segura só aquela campanha (`_limite_da_campanha`). Antes
+  o `break` parava a fila de todas as campanhas.
+- **Aprovar**: só o horário `HH:00` (o 09:00 do passo, em campanha antiga) vira horário natural. Horário escolhido à
+  mão (ex.: 10:20) fica.
+- **Fim de cadência** (`finalizar_cadencias`): uma consulta só, em vez de uma por lead a cada hora.
+- **Trava da rodada** (`/api/cron`): 300 s, o tempo máximo da função na Vercel. Duas rodadas nunca andam juntas.
+- **CNPJá**: erro no meio da paginação fica com as páginas já pagas. A busca diária grava `novas_ultima_busca` antes
+  de chamar a API e tenta no máximo `TENTATIVAS_POR_DIA` (3) vezes no dia (`novas_tentativas`), para um erro
+  repetido não gastar crédito a cada 15 minutos.
+- Testes: `testes/test_revisao_filas.py`.

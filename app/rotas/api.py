@@ -83,7 +83,8 @@ def cron(request: Request):
         return JSONResponse({"erro": "senha inválida"}, status_code=403)
     prazo = time.monotonic() + config.SEGUNDOS_POR_RODADA
     resultado = {"rodada": False, "etapas": 0}
-    if trabalhos.pegar_trava("rodada", 170):  # duas chamadas ao mesmo tempo não podem enviar o mesmo e-mail
+    if trabalhos.pegar_trava("rodada", 300):  # duas chamadas ao mesmo tempo não podem enviar o mesmo e-mail
+        # (300 s = tempo máximo da função na Vercel: uma rodada demorada nunca roda junto com a seguinte)
         try:
             rodada(None)
             resultado["rodada"] = True

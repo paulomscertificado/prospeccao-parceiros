@@ -35,6 +35,7 @@ TIPO_CAMPANHA = "empresas_novas"
 URL_API = "https://api.cnpja.com"
 POR_PAGINA = 1000
 MAXIMO_PAGINAS = 5  # 5 mil empresas por busca, no máximo (proteção dos créditos)
+TENTATIVAS_POR_DIA = 3  # busca diária que dá erro: tenta de novo no máximo 3 vezes no dia (proteção dos créditos)
 
 ANGULOS = {
     "venda_boas_vindas": "Boas-vindas à empresa nova + oferta do e-CNPJ",
@@ -179,6 +180,11 @@ def buscar_abertas(desde: date, ate: date, ufs: list[str], limite: int | None = 
                 params.pop("taxId.nin")  # lista apagada na CNPJá: busca sem ela (a exclusão daqui continua valendo)
                 _esquecer_lista_exclusao()
                 continue
+            if registros:
+                # as páginas anteriores já foram pagas: fica com elas (e elas são guardadas) em vez de perder tudo
+                # e pagar de novo na próxima tentativa
+                log.warning("CNPJá falhou no meio da busca (%s): seguindo com %s empresas", erro, len(registros))
+                break
             raise
         registros += pagina.get("records") or []
         proximo = pagina.get("next")
@@ -605,15 +611,29 @@ def rodada_diaria() -> str:
         ultima = cfg(db, "novas_ultima_data")
         desde = (date.fromisoformat(ultima) + timedelta(days=1)) if ultima else ate
         desde = max(desde, ate - timedelta(days=6))  # parado muitos dias: no máximo 7 dias de uma vez
-        gravar_config(db, "novas_ultima_busca", hoje.isoformat())
         if desde > ate:
+            gravar_config(db, "novas_ultima_busca", hoje.isoformat())
             return ""  # esses dias já foram buscados
+        # Tentativas de hoje: no máximo TENTATIVAS_POR_DIA (cada tentativa pode gastar crédito).
+        dia_tentativas, _, feitas = cfg(db, "novas_tentativas").partition(":")
+        feitas = util.para_int(feitas) if dia_tentativas == hoje.isoformat() else 0
+        if feitas >= TENTATIVAS_POR_DIA:
+            gravar_config(db, "novas_ultima_busca", hoje.isoformat())
+            return ""
+        gravar_config(db, "novas_tentativas", f"{hoje.isoformat()}:{feitas + 1}")
+        # Gravado ANTES de buscar: se algo quebrar no meio (depois de pagar a CNPJá), não busca de novo a cada 15 min.
+        gravar_config(db, "novas_ultima_busca", hoje.isoformat())
+        db.commit()
         try:
             r = buscar_e_criar(db, usuario, desde, ate, automatica=True)
         except ErroCnpja as erro:
-            texto = f"{agora():%d/%m %H:%M} – não deu certo: {erro}."
+            db.rollback()
+            ultima_vez = feitas + 1 >= TENTATIVAS_POR_DIA
+            texto = (f"{agora():%d/%m %H:%M} – não deu certo: {erro}."
+                     + (" Tento de novo amanhã." if ultima_vez else ""))
             gravar_config(db, "novas_ultimo_resultado", texto)
-            gravar_config(db, "novas_ultima_busca", "")  # tenta de novo na próxima volta do relógio
+            if not ultima_vez:
+                gravar_config(db, "novas_ultima_busca", "")  # tenta de novo na próxima volta do relógio
             return texto
         gravar_config(db, "novas_ultima_data", ate.isoformat())
         periodo = f"{desde:%d/%m}" if desde == ate else f"{desde:%d/%m} a {ate:%d/%m}"
