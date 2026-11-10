@@ -169,7 +169,11 @@ def test_campanha_de_whatsapp_leva_quem_so_tem_fixo_para_o_time_pesquisar(client
     r = cliente.post(f"/campanhas/{cid}/whatsapp-lead", data={"csrf": csrf, "lead_id": fixo_id, "whatsapp": "(81) 99111-2222"})
     assert "WhatsApp de Contabil So Fixo salvo" in r.text
     with sessao() as db:
-        assert db.get(Lead, fixo_id).whatsapp == "81991112222"
+        salvo = db.get(Lead, fixo_id)
+        # formatado e com a chave: é a chave que liga a resposta pelo WhatsApp a esta empresa (antes ficava vazia)
+        assert salvo.whatsapp == "(81) 99111-2222" and salvo.chave_whatsapp == "81991112222"
+        com_celular = db.execute(select(Lead).where(Lead.empresa == "Contabil Com Celular")).scalars().one()
+        assert com_celular.whatsapp and com_celular.chave_whatsapp  # celular da Receita também ganha a chave
     cliente.post(f"/campanhas/{cid}/trocar-canal", data={"csrf": csrf, "tarefa_id": trocar_id})
     with sessao() as db:
         t = db.get(Tarefa, trocar_id)

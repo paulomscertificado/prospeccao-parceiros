@@ -369,4 +369,8 @@ empresas, com as MESMAS colunas da `base_receita`, para reaproveitar `base_recei
 - **CNPJá**: erro no meio da paginação fica com as páginas já pagas. A busca diária grava `novas_ultima_busca` antes
   de chamar a API e tenta no máximo `TENTATIVAS_POR_DIA` (3) vezes no dia (`novas_tentativas`), para um erro
   repetido não gastar crédito a cada 15 minutos.
+- **Chave do WhatsApp**: o WhatsApp gravado direto no lead (celular da Receita em `_buscar_candidatos`/`etapa_gerar` e
+  "Pesquisar WhatsApp" na campanha, `rotas/sdr.py`) agora passa por `limpar_campos`, que formata e preenche
+  `chave_whatsapp`. Sem a chave, a resposta pelo WhatsApp não era ligada à empresa (`sdr.lead_pelo_telefone`) quando
+  o telefone fixo era outro.
 - Testes: `testes/test_revisao_filas.py`.

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from .. import agenda_horarios, autorizacao, campanhas, config, ia, metricas, sdr, util
 from ..banco import agora, obter_db
-from ..leads_servico import historico
+from ..leads_servico import historico, limpar_campos
 from ..modelos import (Cadencia, Campanha, Categoria, Conhecimento, Lead, Mensagem, Notificacao, Oportunidade, Tarefa,
                        Usuario)
 from ..seguranca import exige, registrar_log, ve_tudo, verificar_csrf
@@ -469,6 +469,7 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
             avisar(request, "Digite o WhatsApp com DDD, por exemplo (81) 99999-0000.", "erro")
         else:
             lead.whatsapp = digitos
+            limpar_campos(lead)  # formata e recalcula a chave: sem ela, a resposta pelo WhatsApp não acha a empresa
             historico(db, lead.id, "contato", f"WhatsApp encontrado pelo time e cadastrado: {util.formatar_telefone(digitos)}",
                       usuario)
             avisar(request, f"WhatsApp de {lead.empresa} salvo. As mensagens da campanha vão para este número.")

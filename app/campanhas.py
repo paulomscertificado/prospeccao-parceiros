@@ -16,7 +16,7 @@ from sqlalchemy import and_, func, or_, select
 
 from . import base_receita, bases_importadas, cadencias, config, contas_email, email_validacao, reservas, ia, mensagens, prospeccao, sdr, trabalhos, util
 from .banco import agora, gravar_config, ler_config, ler_config_int, sessao
-from .leads_servico import criar_lead, historico, mudar_status, registrar_contato
+from .leads_servico import criar_lead, historico, limpar_campos, mudar_status, registrar_contato
 from .modelos import Cadencia, Campanha, Categoria, Lead, Tarefa, Usuario
 from .modelos import NOME_CADENCIA_SDR
 
@@ -212,6 +212,7 @@ def _buscar_candidatos(campanha_id: int) -> list[int]:
                         lead.categoria = cats[cod]
                     if "whatsapp" in canais and not lead.whatsapp:
                         lead.whatsapp = celular_do_lead(lead)
+                        limpar_campos(lead)  # formata e recalcula a chave: sem ela, a resposta não acha a empresa
                     if "email" in canais and lead.email:
                         email_validacao.utilizavel(db, lead)  # domínio sem e-mail: já entra sem esse canal
                     if not tem_canal(lead, canais):
@@ -268,6 +269,7 @@ def etapa_gerar(campanha_id: int, _usuario_id, estado: dict, prazo: float) -> bo
             for l in elegiveis:
                 if "whatsapp" in canais and not l.whatsapp:
                     l.whatsapp = celular_do_lead(l)  # celular informado à Receita: a campanha tenta o WhatsApp nele
+                    limpar_campos(l)  # formata e recalcula a chave: sem ela, a resposta não acha a empresa
             # Quem já tem WhatsApp/e-mail vem primeiro; quem só tem telefone fixo entra também (WhatsApp sem número:
             # o time pesquisa o contato na internet e cadastra na própria campanha).
             elegiveis.sort(key=lambda l: (not tem_canal(l, canais), -l.score, l.id))
