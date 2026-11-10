@@ -228,6 +228,8 @@ no seu horário. WhatsApp para quem nunca conversou continua saindo com 1 clique
   testado). Antes era sempre "últimos 7 dias" + `limit=10`, e a CNPJá devolvia as mesmas 10, na mesma ordem.
 - Rotina diária: janela `novas_ultima_data`+1 até hoje − `ATRASO_DIAS` (2), no máximo 7 dias; grava o fim da janela em
   `novas_ultima_data` (janelas nunca se sobrepõem; a Receita publica com atraso, então o dia de hoje vinha incompleto).
+- `registrar_busca` deixa de fora quem não está "Ativa" (a CNPJá às vezes devolve empresa baixada no mesmo dia,
+  mesmo com `status.id.in=2`).
 - `registrar_busca` marca "já veio na busca de..." quem estava apto numa busca anterior que virou campanha.
 - `buscar_e_criar` pede `limit` = 2 × `novas_maximo_dia` (só paga o que cabe na campanha).
 

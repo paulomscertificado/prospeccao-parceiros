@@ -301,3 +301,22 @@ def test_teste_olha_um_dia_diferente_e_busca_nao_repete_empresa(cliente, monkeyp
         assert r["fora"] == 2 and r["campanha_id"] is None
         motivos = {e.motivo_fora for e in db.execute(select(EmpresaCnpja).where(EmpresaCnpja.busca_id == r["busca_id"])).scalars()}
         assert all(m.startswith("já veio na busca de") for m in motivos)
+
+
+def test_empresa_baixada_fica_de_fora_mesmo_vindo_da_api(cliente, monkeypatch):
+    """Caso real (10/11): a busca pede só ativas, mas a CNPJá devolveu uma empresa "Baixada"."""
+    from app.modelos import EmpresaCnpja
+
+    baixada = _registro("66666666000166", "BAIXADA NO MESMO DIA LTDA")
+    baixada["status"] = {"id": 8, "text": "Baixada"}
+    ativa = _registro("67676767000167", "ATIVA DE VERDADE LTDA")
+    ativa["status"] = {"id": 2, "text": "Ativa"}
+    monkeypatch.setattr(empresas_novas.httpx, "get",
+                        lambda *a, **k: _Resposta({"records": [baixada, ativa], "next": None}))
+    monkeypatch.setattr(config, "CNPJA_API_KEY", "chave-de-teste")
+    with sessao() as db:
+        admin = db.get(Usuario, admin_id(db))
+        r = empresas_novas.testar(db, admin)
+        linhas = {e.cnpj: e.motivo_fora for e in db.execute(
+            select(EmpresaCnpja).where(EmpresaCnpja.busca_id == r["busca_id"])).scalars()}
+    assert "Baixada" in linhas["66666666000166"] and linhas["67676767000167"] == ""

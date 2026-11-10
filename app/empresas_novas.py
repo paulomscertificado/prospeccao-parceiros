@@ -332,6 +332,9 @@ def registrar_busca(db, registros: list[dict], desde: date, ate: date, ufs: list
         lead = leads.get(linha["cnpj"])
         if not linha["cnpj"] or not (linha["razao_social"] or linha["nome_fantasia"]):
             motivo = "sem CNPJ ou sem nome"
+        elif util.chave_texto(linha["situacao"]) != "ativa":
+            # a busca já pede só ativas (status.id.in=2), mas a CNPJá às vezes devolve quem foi baixada no mesmo dia
+            motivo = f"situação {linha['situacao']} na Receita (só entram empresas ativas)"
         elif linha["cnpj"] in vistos:
             motivo = "repetida na resposta da API"
         elif sem_individual and linha["natureza_id"] == NATUREZA_EMPRESARIO_INDIVIDUAL:
