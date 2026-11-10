@@ -92,11 +92,10 @@ def test_busca_monta_campanha_de_venda(cliente, monkeypatch):
         primeira = [t for t in tarefas if t.lead_id == lead.id and t.angulo == "venda_boas_vindas"][0]
         assert "R$" not in primeira.mensagem_whatsapp and "acabou de abrir" in primeira.mensagem_whatsapp
         dela = [t for t in tarefas if t.lead_id == lead.id]
-        # dia 1, 3 e 7 por e-mail E por WhatsApp (a empresa tem os dois), cada um no seu horário
-        assert sorted(t.canal for t in dela) == ['email'] * 3 + ['whatsapp'] * 3
-        zap = [t for t in dela if t.canal == 'whatsapp' and t.angulo == 'venda_boas_vindas'][0]
-        email = [t for t in dela if t.canal == 'email' and t.angulo == 'venda_boas_vindas'][0]
-        assert zap.data == email.data and 'acabou de abrir' in zap.mensagem and zap.assunto == ''
+        # foco no WhatsApp: a empresa tem celular, então os 3 toques (dia 1, 3 e 7) são por WhatsApp, sem e-mail
+        assert sorted(t.canal for t in dela) == ['whatsapp'] * 3
+        zap = [t for t in dela if t.angulo == 'venda_boas_vindas'][0]
+        assert 'acabou de abrir' in zap.mensagem and zap.assunto == ''
         sem_zap = [t for t in tarefas if 'Sem Contato' in t.lead.empresa or 'SEM CONTATO' in t.lead.empresa]
         assert {t.canal for t in sem_zap} == {'whatsapp'}  # sem e-mail nem celular: só o toque a pesquisar
         assert lead.reservado_por_id == admin_id(db)

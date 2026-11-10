@@ -73,7 +73,7 @@ def dia_e_hora_futuros(db: Session, dia: date, pular_fds: bool | None = None) ->
 def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario, inicio: date | None = None,
             campanha_id: int | None = None, mensagens_sdr: dict | None = None, canais: list[str] | None = None,
             status_tarefa: str = "pendente", cta: str = "", tom: str = "consultivo",
-            todos_os_canais: bool = False) -> dict:
+            foco_whatsapp: bool = False) -> dict:
     """Cria as tarefas da cadência para cada lead. Pula quem tem opt-out, está encerrado, foi assumido
     por um humano ou já tem uma cadência em andamento.
 
@@ -122,6 +122,8 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
             modelos = {}
             if passo.canal == "auto" or passo.angulo:
                 canal = sdr.escolher_canal(db, lead, canais) if passo.canal == "auto" else passo.canal
+                if foco_whatsapp and passo.canal == "auto" and lead.whatsapp and "whatsapp" in (canais or []):
+                    canal = "whatsapp"  # Empresas novas: o foco é sempre o WhatsApp; e-mail só para quem não tem
                 if da_ia and canal not in ("email", "whatsapp"):
                     if "whatsapp" not in (canais or ["whatsapp"]):
                         continue  # campanha só de e-mail e empresa sem e-mail: não entra
@@ -149,23 +151,6 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
                 assunto=assunto, mensagem=corpo, angulo=passo.angulo or "", status=status_tarefa, **modelos,
             ))
             resultado["tarefas"] += 1
-            if todos_os_canais and passo.canal == "auto" and modelos:
-                # Empresas novas: o mesmo toque também pelo outro canal que a empresa tem (e-mail + WhatsApp), num
-                # horário diferente. WhatsApp para quem nunca conversou continua sendo enviado pelo time, com 1 clique.
-                for outro in ("email", "whatsapp"):
-                    tem = (lead.email and not lead.email_invalido) if outro == "email" else bool(lead.whatsapp)
-                    if outro == canal or outro not in (canais or []) or not tem:
-                        continue
-                    _, hora_outro = dia_e_hora_futuros(db, data, pular_fds)
-                    db.add(Tarefa(
-                        tipo="prospeccao", lead_id=lead.id, passo_id=passo.id, campanha_id=campanha_id,
-                        usuario_id=responsavel.id if responsavel else None, canal=outro, data=data, hora=hora_outro,
-                        acao=passo.acao or f"Contato por {outro}",
-                        assunto=modelos.get("assunto_email", "") if outro == "email" else "",
-                        mensagem=modelos.get("mensagem_email" if outro == "email" else "mensagem_whatsapp", ""),
-                        angulo=passo.angulo or "", status=status_tarefa, **modelos,
-                    ))
-                    resultado["tarefas"] += 1
         if lead.vendedor_id is None and usuario.perfil != "parceiro" and not autorizacao.ve_tudo(usuario, "leads.ver"):
             lead.vendedor_id = usuario.id
         if lead.status in ("Novo", "Pesquisando"):

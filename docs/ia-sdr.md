@@ -216,11 +216,12 @@ permissão `campanhas.ver`; configurar/buscar com `campanhas.gerenciar`).
   `/empresas-novas/busca/{id}`; teste `/empresas-novas/testar` (`limit=10`, 1 página = 1 crédito, sem campanha).
 - Testes: `testes/test_empresas_novas.py` (API simulada).
 
-## Empresas novas: e-mail E WhatsApp (nov/2026)
+## Empresas novas: foco no WhatsApp (nov/2026)
 
-`cadencias.aplicar(..., todos_os_canais=True)` (usado por `_montar` quando `Campanha.tipo == "empresas_novas"`): cada
-passo "auto" vira um toque por canal que a empresa tem (e-mail válido e/ou WhatsApp) e que a campanha usa, cada um
-no seu horário. WhatsApp para quem nunca conversou continua saindo com 1 clique do time (Minha fila / campanha).
+`cadencias.aplicar(..., foco_whatsapp=True)` (usado por `_montar` quando `Campanha.tipo == "empresas_novas"`): empresa
+com celular recebe todos os toques por WhatsApp (sem e-mail); e-mail só para quem não tem celular. WhatsApp para quem
+nunca conversou sai com 1 clique do time (Minha fila / campanha). Pedido da Maria em 10/11/2026 (antes era e-mail E
+WhatsApp).
 
 ## Empresas novas sem repetição (nov/2026)
 

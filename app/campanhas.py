@@ -313,7 +313,7 @@ def _montar(campanha_id: int, escolhidos: list[int], textos: dict[int, dict], so
                 reservas.reservar(db, lead, usuario, f"campanha \"{camp.nome}\"")
         r = cadencias.aplicar(db, cad, leads, usuario, camp.inicio or date.today(), camp.id, textos,
                               [c for c in camp.canais.split(",") if c], "rascunho", camp.cta, camp.tom,
-                              todos_os_canais=camp.tipo == "empresas_novas")  # venda: e-mail E WhatsApp
+                              foco_whatsapp=camp.tipo == "empresas_novas")  # venda: WhatsApp; e-mail se não tiver
         camp.etapa = (f"Pronta: {r['leads']} empresas, {r['tarefas']} mensagens"
                       + (f" ({len(r['pulados'])} puladas)" if r["pulados"] else "") + ".")
         if so_fixo:

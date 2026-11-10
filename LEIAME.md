@@ -183,8 +183,8 @@ leads: as respostas vão para **Oportunidades** e o time conversa.
 - Os celulares que a Receita guarda sem o 9 ganham o 9 na frente (é um palpite: confira antes de enviar).
 - Empresas com o mesmo telefone/e-mail (do contador) **não** são juntadas: só o CNPJ conta como repetido.
 - Opção para deixar de fora **empresário individual** (inclui os MEIs, que muitas vezes não precisam de e-CNPJ).
-- **E-mail e WhatsApp:** cada toque sai pelos dois canais que a empresa tiver, em horários diferentes. O e-mail sai
-  sozinho; o WhatsApp (contato frio) o time envia com 1 clique em **Minha fila** ou na campanha.
+- **Foco no WhatsApp:** empresa com celular recebe os 3 toques **por WhatsApp** (o time envia com 1 clique em
+  **Minha fila** ou na campanha). O **e-mail** só é usado para quem não tem celular, e sai sozinho pela fila.
 - **Buscar de novo não gasta à toa:** toda empresa que já veio entra numa lista de exclusão guardada na própria
   CNPJá. Buscando o mesmo dia de novo, a CNPJá só traz (e só cobra) as empresas que ainda não vieram.
 - **Atividade:** a busca pega empresas novas de **qualquer atividade** (toda empresa nova pode precisar do e-CNPJ).
