@@ -695,6 +695,10 @@ class EnvioRecusado(Exception):
     """Motivo pronto para mostrar na tela."""
 
 
+SEM_WHATSAPP = ("O campo WhatsApp desta empresa está em branco: cadastre o número na ficha dela e a mensagem "
+                "fica liberada para envio.")
+
+
 def enviar_whatsapp_conectado(db, texto: str, usuario: Usuario | None, lead: Lead | None = None,
                               telefone: str = "", nome: str = "", tarefa: Tarefa | None = None,
                               conexao: str | None = None) -> Mensagem:
@@ -712,6 +716,9 @@ def enviar_whatsapp_conectado(db, texto: str, usuario: Usuario | None, lead: Lea
         raise EnvioRecusado("A mensagem está vazia.")
     texto = marca.aplicar(texto, usuario or (lead.vendedor if lead is not None else None))
     if lead is not None:
+        if tarefa is not None and tarefa.campanha_id and not (lead.whatsapp or "").strip():
+            # pedido da Maria: toque de campanha só sai com o campo WhatsApp preenchido (nada de usar o fixo)
+            raise EnvioRecusado(SEM_WHATSAPP)
         telefone = lead.whatsapp or lead.telefone
         nome = lead.responsavel or lead.empresa
     if not telefone:

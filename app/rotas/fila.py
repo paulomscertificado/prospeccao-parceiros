@@ -43,8 +43,8 @@ def _motivo_pendente(db, t: Tarefa, hoje: date, no_horario: bool, liberados: dic
         if t.data == hoje and (t.hora or "00:00") > agora().strftime("%H:%M"):
             return f"Programado para hoje às {t.hora}"
         return "Sai na próxima rodada da fila (a cada minuto)"
-    if not (lead.whatsapp or campanhas.celular_do_lead(lead)):
-        return "Sem WhatsApp: pesquise o número na campanha"
+    if not (lead.whatsapp or "").strip():
+        return "WhatsApp em branco: cadastre o número na ficha da empresa para a mensagem sair"
     if lead.id not in liberados:
         liberados[lead.id] = campanhas.whatsapp_liberado(db, lead)
     if liberados[lead.id] and ler_config(db, "enviar_whatsapp_automatico") == "1":

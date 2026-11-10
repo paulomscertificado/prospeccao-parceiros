@@ -223,6 +223,16 @@ com celular recebe todos os toques por WhatsApp (sem e-mail); e-mail só para qu
 nunca conversou sai com 1 clique do time (Minha fila / campanha). Pedido da Maria em 10/11/2026 (antes era e-mail E
 WhatsApp).
 
+## WhatsApp primeiro e campo WhatsApp em branco (nov/2026)
+
+Pedido da Maria em 10/11/2026. A configuração `prioridade_canais` volta a `whatsapp,email,linkedin`: quem tem WhatsApp
+recebe o toque por ele. Em campanha com o canal WhatsApp, `cadencias.aplicar` cria a mensagem de WhatsApp para **todas**
+as empresas. Quem está com o campo WhatsApp em branco recebe o toque por e-mail e também ganha uma tarefa de WhatsApp
+pronta, que espera o número. As duas tarefas ficam sem a reserva do outro canal, para o mesmo toque não sair duas vezes.
+Toque de campanha **nunca** sai com o campo WhatsApp em branco (nem pelo telefone fixo): `sdr.enviar_whatsapp_conectado`
+recusa com `sdr.SEM_WHATSAPP`, e `para_disparar`, `enviar_toque_agora` e `processar_fila_whatsapp` pulam esse toque.
+Minha fila mostra "WhatsApp em branco: cadastre o número…". Teste: `testes/test_whatsapp_em_branco.py`.
+
 ## Empresas novas sem repetição (nov/2026)
 
 - **Lista de exclusão na CNPJá** (`atualizar_lista_exclusao`): depois de cada busca, TODOS os CNPJs já trazidos vão

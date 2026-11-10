@@ -831,7 +831,7 @@ def para_disparar(db, camp: Campanha) -> dict[str, list[Tarefa]]:
         if not lead or not sdr.automacao_ativa(lead):
             continue
         for canal in ("whatsapp", "email"):
-            contato = (lead.whatsapp or celular_do_lead(lead)) if canal == "whatsapp" else lead.email
+            contato = lead.whatsapp if canal == "whatsapp" else lead.email  # WhatsApp em branco: não sai
             if contato and _texto_do_canal(t, canal)[1] and t.lead_id not in vistos[canal]:
                 vistos[canal].add(t.lead_id)
                 feito[canal].append(t)
@@ -882,8 +882,8 @@ def enviar_toque_agora(db, t: Tarefa, usuario: Usuario, canal: str = "") -> str:
         return "Este toque não é de e-mail nem de WhatsApp."
     if not _texto_do_canal(t, canal)[1]:
         return f"Este toque não tem versão de {'e-mail' if canal == 'email' else 'WhatsApp'}."
-    if canal == "whatsapp" and not (lead and (lead.whatsapp or lead.telefone)):
-        return "Este lead não tem WhatsApp/telefone cadastrado."
+    if canal == "whatsapp" and not (lead and (lead.whatsapp or "").strip()):
+        return sdr.SEM_WHATSAPP
     if canal == "email" and not (lead and lead.email):
         return "Este lead não tem e-mail."
     original = (t.canal, t.mensagem, t.assunto, t.mensagem_whatsapp, t.mensagem_email, t.assunto_email)
@@ -1006,6 +1006,8 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
         if t.data == date.today() and (t.hora or "00:00") > hora:
             continue
         lead = t.lead
+        if not (lead.whatsapp or "").strip():
+            continue  # campo WhatsApp em branco: a mensagem espera alguém cadastrar o número
         if not sdr.automacao_ativa(lead) or not whatsapp_liberado(db, lead) or not (t.mensagem or "").strip():
             continue  # contato frio (ou já com um humano): fica na Agenda para o clique
         try:

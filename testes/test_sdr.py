@@ -737,7 +737,7 @@ def test_minha_fila_mostra_pendentes_fila_e_historico(cliente):
     r = cliente.get("/fila")
     assert r.status_code == 200
     for texto in ("Minha fila de disparos", "Fila Visivel Ltda", "Na fila agora", "Caixa cheia", "atrasado",
-                  "Sem WhatsApp: pesquise o número na campanha"):
+                  "WhatsApp em branco: cadastre o número na ficha da empresa para a mensagem sair"):
         assert texto in r.text, texto
     assert cliente.get("/fila?de=todos&canal=email").status_code == 200
 

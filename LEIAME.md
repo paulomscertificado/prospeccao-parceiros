@@ -93,6 +93,8 @@ preço nem comissão e não fecha parceria.
 4. E-mails saem sozinhos (com limites). WhatsApp: com o celular conectado, sai **sozinho para quem já conversou com
    a MS** (respondeu pelo WhatsApp ou tem marcado na ficha "Autorizou receber mensagens da MS pelo WhatsApp"); para
    os demais, a Agenda mostra o botão para enviar com um clique. LinkedIn: sempre com um clique.
+   Toda empresa da campanha ganha a mensagem de WhatsApp. Se o campo **WhatsApp** da empresa estiver em branco, a
+   mensagem fica pronta e **não sai**: cadastre o número na ficha da empresa e ela fica liberada.
 5. Quando alguém responde com interesse, a automação para e aparece em **Oportunidades** (🔥) com o resumo.
    Clique em **Assumir lead**, ligue, marque a reunião e siga com a negociação.
 6. Veja em **Inteligência** qual segmento, canal e mensagem funcionam melhor.
