@@ -131,9 +131,11 @@ async def acoes_em_lote(request: Request, usuario: Usuario = Depends(exige("lead
             historico(db, l.id, "sistema", "Vendedor responsável alterado.", usuario)
         db.commit()
         avisar(request, f"{len(leads)} leads atribuídos.")
+    elif acao == "status" and form.get("status") in config.STATUS_PERDIDO and not form.get("motivo_perda"):
+        avisar(request, "Para marcar como Perdido, escolha o motivo da perda. Nada foi alterado.", "erro")
     elif acao == "status" and form.get("status") in config.STATUS_LEAD:
         for l in leads:
-            leads_servico.mudar_status(db, l, form.get("status"), usuario)
+            leads_servico.mudar_status(db, l, form.get("status"), usuario, form.get("motivo_perda", ""))
         db.commit()
         avisar(request, f"Status de {len(leads)} leads alterado.")
     elif acao == "recalcular":
@@ -169,6 +171,8 @@ async def api_mudar_status(lead_id: int, request: Request, usuario: Usuario = De
     novo = corpo.get("status", "")
     if novo not in config.STATUS_LEAD:
         return JSONResponse({"erro": "Status inválido."}, status_code=400)
+    if novo in config.STATUS_PERDIDO and not str(corpo.get("motivo", "")).strip():
+        return JSONResponse({"erro": "Escolha o motivo da perda."}, status_code=400)
     leads_servico.mudar_status(db, lead, novo, usuario, corpo.get("motivo", ""))
     db.commit()
     return {"ok": True, "status": lead.status, "score": lead.score, "potencial": lead.potencial}
@@ -241,7 +245,9 @@ async def salvar(request: Request, lead_id: int, usuario: Usuario = Depends(exig
     lead = _lead(db, lead_id, usuario)
     form = await request.form()
     if "empresa" not in form:  # só mudança de status (ex.: botão "Mudar status para...")
-        if form.get("status") in config.STATUS_LEAD:
+        if form.get("status") in config.STATUS_PERDIDO and not form.get("motivo_perda") and lead.status != form.get("status"):
+            avisar(request, "Para marcar como Perdido, escolha o motivo da perda.", "erro")
+        elif form.get("status") in config.STATUS_LEAD:
             leads_servico.mudar_status(db, lead, form.get("status"), usuario, form.get("motivo_perda", ""))
             db.commit()
             avisar(request, f"Status alterado para {lead.status}.")
@@ -264,6 +270,10 @@ async def salvar(request: Request, lead_id: int, usuario: Usuario = Depends(exig
         avisar(request, f"Não salvei: o lead \"{duplicado.empresa}\" (nº {duplicado.id}) já usa o mesmo {motivo}.", "erro")
         return voltar(f"/leads/{lead_id}")
     novo_status = form.get("status")
+    if novo_status in config.STATUS_PERDIDO and novo_status != lead.status and not form.get("motivo_perda"):
+        db.rollback()
+        avisar(request, "Não salvei: para marcar como Perdido, escolha o motivo da perda.", "erro")
+        return voltar(f"/leads/{lead_id}")
     if novo_status and novo_status != lead.status:
         leads_servico.mudar_status(db, lead, novo_status, usuario, form.get("motivo_perda", ""))
     score.atualizar(db, lead)

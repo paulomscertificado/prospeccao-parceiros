@@ -81,7 +81,7 @@ def test_descartar_varias_e_voltar_para_novas(cliente):
     filtrada = cliente.get("/oportunidades?busca=descarte lote&temperatura=morna").text
     assert "Descartar as 2 mostradas" in filtrada
     r = cliente.post("/oportunidades/descartar-varias",
-                     data={"csrf": csrf_de(filtrada), "ids": ",".join(map(str, ids)),
+                     data={"csrf": csrf_de(filtrada), "ids": ",".join(map(str, ids)), "motivo": "Sem interesse",
                            "voltar_para": "/oportunidades?busca=descarte+lote"})
     assert "2 oportunidade(s) descartada(s)" in r.text
     with sessao() as db:
@@ -91,7 +91,8 @@ def test_descartar_varias_e_voltar_para_novas(cliente):
         assert db.execute(select(Historico).where(Historico.lead_id == lead_id,
                                                   Historico.descricao.like("%descartada por%"))).first()
     assert "Nenhuma oportunidade para descartar" in cliente.post(
-        "/oportunidades/descartar-varias", data={"csrf": csrf_de(filtrada), "ids": ",".join(map(str, ids))}).text
+        "/oportunidades/descartar-varias", data={"csrf": csrf_de(filtrada), "ids": ",".join(map(str, ids)),
+                                                 "motivo": "Sem interesse"}).text
 
     # Desfazer: volta para Novas
     r = cliente.post(f"/oportunidades/{ids[0]}/reabrir",
@@ -105,10 +106,12 @@ def test_descartar_varias_e_voltar_para_novas(cliente):
     assert cliente.post("/oportunidades/999999/reabrir", data={"csrf": csrf_de(filtrada)}).status_code == 404
     # o descarte de um cartão volta para a tela de onde veio (com os filtros)
     r = cliente.post(f"/oportunidades/{ids[0]}/descartar",
-                     data={"csrf": csrf_de(filtrada), "voltar_para": "/oportunidades?busca=descarte+lote"},
+                     data={"csrf": csrf_de(filtrada), "voltar_para": "/oportunidades?busca=descarte+lote",
+                           "motivo": "Fora do perfil"},
                      follow_redirects=False)
     assert r.headers["location"] == "/oportunidades?busca=descarte+lote"
-    r = cliente.post(f"/oportunidades/{outra}/descartar", data={"csrf": csrf_de(filtrada), "voltar_para": "//fora.com"},
+    r = cliente.post(f"/oportunidades/{outra}/descartar", data={"csrf": csrf_de(filtrada), "voltar_para": "//fora.com",
+                                                                 "motivo": "Outro"},
                      follow_redirects=False)
     assert r.headers["location"] == "/oportunidades"  # nunca manda para fora do sistema
 
@@ -155,8 +158,8 @@ def test_vendedor_ve_so_as_dele_e_nao_ve_todas_as_respostas(cliente):
     assert "Todas as respostas" not in pagina
     assert "Todas as respostas dos contatos" not in c.get("/oportunidades?ver=respostas").text  # volta para Novas
     csrf = csrf_de(pagina)
-    assert c.post(f"/oportunidades/{alheia}/descartar", data={"csrf": csrf}).status_code == 404
-    c.post("/oportunidades/descartar-varias", data={"csrf": csrf, "ids": f"{minha},{alheia}"})
+    assert c.post(f"/oportunidades/{alheia}/descartar", data={"csrf": csrf, "motivo": "Outro"}).status_code == 404
+    c.post("/oportunidades/descartar-varias", data={"csrf": csrf, "ids": f"{minha},{alheia}", "motivo": "Outro"})
     with sessao() as db:
         assert db.get(Oportunidade, minha).status == "descartada"
         assert db.get(Oportunidade, alheia).status == "nova"  # a de outra pessoa não é mexida

@@ -19,6 +19,7 @@
   .op-detalhe summary { cursor: pointer; color: var(--azul); font-size: .82rem; }
   .op-detalhe .grade-2 { margin-top: 8px; }
   .aviso-lista { font-size: .82rem; color: var(--suave); margin: 4px 0 0; }
+  .form-descarte select, form select[name=motivo] { width: auto; max-width: 260px; font-size: .82rem; padding: 4px 6px; }
   @media (max-width: 760px) {
     .linha-op { grid-template-columns: 1fr 1fr; } .linha-op .acoes-op { justify-content: flex-start; }
   }
@@ -38,10 +39,10 @@
   <a class="kpi kpi-link" href="{{ url_op(ver='novas', **dict(sem_filtros, temperatura='quente')) }}" title="Ver só os leads quentes">
     <div class="rotulo">🔥 Quentes esperando</div><div class="valor" style="{{ 'color:var(--erro)' if resumo.quentes }}">{{ resumo.quentes }}</div>
     <div class="detalhe">querem conversar</div></a>
-  <a class="kpi kpi-link" href="{{ url_op(ver='novas', **sem_filtros) }}" title="Ver as novas (as que esperam demais ficam em vermelho)">
-    <div class="rotulo">Esperando há mais de {{ ESPERA_DEMAIS_H }} h</div>
+  <a class="kpi kpi-link" href="{{ url_op(ver='novas', **sem_filtros) }}" title="Ver as novas (as fora do prazo ficam em vermelho)">
+    <div class="rotulo">Fora do prazo</div>
     <div class="valor" style="{{ 'color:var(--erro)' if resumo.esperando_demais }}">{{ resumo.esperando_demais }}</div>
-    <div class="detalhe">quanto antes, mais chance</div></a>
+    <div class="detalhe">prazo: assumir em 2 horas úteis</div></a>
   <div class="kpi" title="Quanto tempo a oportunidade esperou até alguém assumir ou descartar (metade levou menos que isso)">
     <div class="rotulo">Tempo até atender</div><div class="valor">{{ resumo.tempo_mediano or '—' }}</div>
     <div class="detalhe">tempo típico · {{ resumo.tratadas_30 }} atendida{{ 's' if resumo.tratadas_30 != 1 }} em 30 dias</div></div>
@@ -93,6 +94,7 @@
         data-confirmar="Descartar as {{ ids_mostrados|length }} oportunidades mostradas? Elas vão para a aba Descartadas (lá dá para voltar com elas).">
     <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar_para" value="{{ voltar }}">
     <input type="hidden" name="ids" value="{{ ids_mostrados|join(',') }}">
+    <select name="motivo" required aria-label="Motivo do descarte"><option value="">Motivo do descarte…</option>{% for m in config.MOTIVOS_DESCARTE %}<option>{{ m }}</option>{% endfor %}</select>
     <button class="btn btn-pequeno btn-perigo">Descartar as {{ ids_mostrados|length }} mostradas</button></form>
   {% endif %}
 </div>
@@ -105,7 +107,7 @@
 <div class="cartao op-card {{ o.temperatura }}" id="op-{{ o.id }}">
   <div class="op-topo">
     <h2>{{ '🔥 NOVO LEAD QUENTE' if o.temperatura == 'quente' else 'Resposta para analisar' }} · <a href="/leads/{{ l.id }}">{{ l.empresa }}</a></h2>
-    <span class="selo espera {{ 'selo-erro' if i.esperando_demais else 'selo-alerta' }}" title="Respondeu em {{ o.criado_em|datahora }}">⏱ esperando há {{ i.espera }}</span>
+    <span class="selo espera {{ 'selo-erro' if i.esperando_demais else 'selo-alerta' }}" title="Respondeu em {{ o.criado_em|datahora }}. Prazo para assumir: {{ i.prazo|datahora }} (2 horas úteis)">⏱ esperando há {{ i.espera }}{{ ' · fora do prazo' if i.esperando_demais else ' · assumir até ' ~ (i.prazo.strftime('%H:%M') if i.prazo.date() == hoje else i.prazo.strftime('%d/%m %H:%M')) }}</span>
   </div>
   <div class="pequeno suave" style="margin:2px 0 8px">respondeu em {{ o.criado_em|datahora }}</div>
 
@@ -145,8 +147,10 @@
     <form class="inline" method="post" action="/leads/{{ l.id }}/assumir"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar_para" value="{{ voltar }}"><button class="btn btn-verde">ASSUMIR LEAD</button></form>
     {% if l.whatsapp %}<a class="btn" href="{{ l.whatsapp|whats }}" target="_blank" rel="noopener">INICIAR WHATSAPP</a>{% endif %}
     {% if l.whatsapp and pode('conversas.ver') %}<a class="btn" href="/conversas?telefone={{ l.whatsapp|urlencode }}">Ver conversa</a>{% endif %}
-    <form class="inline" method="post" action="/oportunidades/{{ o.id }}/descartar" data-confirmar="Descartar esta oportunidade? Ela vai para a aba Descartadas.">
-      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar_para" value="{{ voltar }}"><button class="btn btn-perigo">Descartar</button></form>
+    <form class="inline form-descarte" method="post" action="/oportunidades/{{ o.id }}/descartar" data-confirmar="Descartar esta oportunidade? Ela vai para a aba Descartadas.">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar_para" value="{{ voltar }}">
+      <select name="motivo" required aria-label="Motivo do descarte"><option value="">Motivo do descarte…</option>{% for m in config.MOTIVOS_DESCARTE %}<option>{{ m }}</option>{% endfor %}</select>
+      <button class="btn btn-perigo">Descartar</button></form>
   </div>
 </div>
 {% endfor %}
@@ -166,7 +170,8 @@
     <div><a href="/leads/{{ l.id }}"><b>{{ l.empresa }}</b></a>
       <div class="pequeno suave">{{ '💬 WhatsApp' if o.canal == 'whatsapp' else ('✉️ E-mail' if o.canal == 'email' else (o.canal or 'canal não informado')) }} · respondeu em {{ o.criado_em|datahora }}</div></div>
     <div><span class="selo {{ 'selo-erro' if o.temperatura == 'quente' else 'selo-alerta' }}">{{ o.classificacao or ('quente' if o.temperatura == 'quente' else 'para analisar') }}</span>
-      <div class="pequeno motivo">{{ 'Assumida' if o.status == 'assumida' else 'Descartada' }} por {{ o.responsavel.nome if o.responsavel else 'alguém' }}{% if i.levou %} · {{ i.levou }} depois da resposta{% endif %}</div></div>
+      <div class="pequeno motivo">{{ 'Assumida' if o.status == 'assumida' else 'Descartada' }} por {{ o.responsavel.nome if o.responsavel else 'alguém' }}{% if i.levou %} · {{ i.levou }} depois da resposta{% endif %}</div>
+      {% if o.status == 'descartada' and o.motivo %}<div class="pequeno"><b>Motivo:</b> {{ o.motivo }}</div>{% endif %}</div>
     <div class="acoes-op">
       {% if l.whatsapp and pode('conversas.ver') %}<a class="btn btn-pequeno" href="/conversas?telefone={{ l.whatsapp|urlencode }}">Ver conversa</a>{% endif %}
       {% if o.status == 'descartada' %}

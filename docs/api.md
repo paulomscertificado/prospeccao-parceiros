@@ -40,7 +40,7 @@ pessoa: veja a lista e as regras em [permissoes.md](permissoes.md). Sem a permis
 | `GET/POST /ia` | A G V | IA Comercial (`?pergunta=codigo` para as perguntas prontas) |
 | `GET /configuracoes` e `POST /configuracoes/...` | A | Geral, score, usuários, integrações, base da Receita, LGPD, logs; `POST /configuracoes/alertas/teste` manda o e-mail de teste dos avisos de problema |
 | `GET /portal`, `/portal/indicar`, `/portal/clientes`, `/portal/vencimentos` | P | Portal do parceiro |
-| `GET /oportunidades` · `POST /oportunidades/{id}/descartar` · `/descartar-varias` · `/{id}/reabrir` | A G V | Oportunidades (handoff): `?ver=` novas, assumidas, descartadas ou respostas, filtros `periodo`, `temperatura`, `canal`, `classe`, `busca` |
+| `GET /oportunidades` · `POST /oportunidades/{id}/descartar` · `/descartar-varias` (os dois exigem `motivo`) · `/{id}/reabrir` | A G V | Oportunidades (handoff): `?ver=` novas, assumidas, descartadas ou respostas, filtros `periodo`, `temperatura`, `canal`, `classe`, `busca` |
 | `POST /leads/{id}/assumir` | A G V | Assumir lead: para toda automação |
 | `GET/POST /leads/{id}/agendar` | A G V | Horários livres reais e marcação de reunião |
 | `POST /leads/{id}/pesquisar` · `/abordagem-sdr` | A G V | Perfil do parceiro e mensagens SDR (4 ângulos) |

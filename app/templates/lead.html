@@ -228,7 +228,7 @@
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <div class="campos">
         <div><label>Status</label><select name="status">{% for s in config.STATUS_LEAD %}<option {{ 'selected' if lead.status == s }}>{{ s }}</option>{% endfor %}</select></div>
-        <div><label>Motivo (se perdido)</label><select name="motivo_perda"><option value=""></option>{% for m in config.MOTIVOS_PERDA %}<option {{ 'selected' if lead.motivo_perda == m }}>{{ m }}</option>{% endfor %}</select></div>
+        <div><label>Motivo (obrigatório se Perdido)</label><select name="motivo_perda"><option value=""></option>{% for m in config.MOTIVOS_PERDA %}<option {{ 'selected' if lead.motivo_perda == m }}>{{ m }}</option>{% endfor %}</select></div>
       </div>
       {% include "_campos_lead.html" %}
       <div style="margin-top:12px"><button class="btn btn-primario">Salvar alterações</button></div>

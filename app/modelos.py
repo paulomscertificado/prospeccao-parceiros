@@ -675,6 +675,7 @@ class Oportunidade(Base):
     interesse: Mapped[str] = mapped_column(String(60), default="")
     proximo_passo: Mapped[str] = mapped_column(String(250), default="")
     status: Mapped[str] = mapped_column(String(20), default="nova", index=True)  # nova, assumida, descartada
+    motivo: Mapped[str] = mapped_column(String(80), default="")  # por que foi descartada (config.MOTIVOS_DESCARTE)
     responsavel_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"), nullable=True)
     assumida_em: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, index=True)

@@ -49,7 +49,7 @@ no navegador, de qualquer lugar: não precisa do `iniciar.bat`. O passo a passo 
 |---|---|
 | Encontrar escritórios numa cidade | **Prospecção**: escreva "Quero encontrar 100 escritórios contábeis em Recife" e clique em Buscar |
 | Ver e filtrar meus leads | **Leads** (lista) ou **Leads > Pipeline** (Kanban: arraste os cards) |
-| Saber com quem falar hoje | **Agenda**: "Hoje você possui X follow-ups pendentes" |
+| Saber com quem falar hoje | **Dashboard**, quadro **Quem precisa de mim hoje** (respostas quentes com prazo, tarefas e leads esfriando) |
 | Mandar a mensagem | Na Agenda ou na ficha do lead: **Copiar mensagem** ou **Abrir no WhatsApp** |
 | Registrar que o lead respondeu | Botão **Respondeu** na Agenda (cole a resposta: o sistema sugere o que responder) |
 | Qualificar e gerar abordagem | Ficha do lead: **Qualificar lead**, **Gerar abordagem com IA**, **Qual é o próximo melhor passo?** |
@@ -135,9 +135,12 @@ ver os de hoje e os atrasados. Admin e gestor podem ver a fila de outra pessoa o
 
 **Oportunidades (menu 🔥):** os leads que responderam, em 4 abas:
 - **Novas:** esperam alguém assumir. Ficam separadas por dia (Hoje, Ontem, o dia da semana) e, em cada dia, as
-  **quentes vêm primeiro**. Cada cartão mostra há quanto tempo o lead está **esperando** (fica vermelho depois de 2
-  horas), a campanha, o canal, o que enviamos, o que o lead respondeu e o que a IA entendeu. Botões: **Assumir lead**,
-  **Iniciar WhatsApp**, **Ver conversa** (abre a conversa em Conversas) e **Descartar**.
+  **quentes vêm primeiro**. Cada cartão mostra há quanto tempo o lead está **esperando** e até quando assumir: o
+  **prazo é de 2 horas úteis** (horário de envio, de segunda a sexta; uma resposta das 17h30 tem prazo até 10h do dia
+  útil seguinte). Passou do prazo, fica vermelho. Mostra também a campanha, o canal, o que enviamos, o que o lead
+  respondeu e o que a IA entendeu. Botões: **Assumir lead**, **Iniciar WhatsApp**, **Ver conversa** (abre a conversa
+  em Conversas) e **Descartar**: para descartar é preciso **escolher o motivo** (sem interesse, já tem parceiro,
+  resposta de robô, pessoa errada...). O motivo aparece na aba Descartadas e ensina o que ajustar nas campanhas.
 - **Assumidas:** quem assumiu, quando e quanto tempo depois da resposta.
 - **Descartadas:** o que foi descartado. Descartou sem querer? O botão **Voltar para Novas** desfaz.
 - **Todas as respostas** (só administrador e gestor): tudo o que os leads responderam, inclusive "sem interesse",
@@ -147,9 +150,23 @@ Para achar uma oportunidade, use os filtros: **Quando** (tudo, hoje, ontem, últ
 **Tipo** (quentes ou para analisar), **Resposta** (na aba Todas as respostas), **Canal** e a **busca pelo nome da
 empresa**. Cada filtro mostra quantas há nele. Com um filtro escolhido aparece **Descartar as N mostradas**, para
 descartar de uma vez, por exemplo, todas as "para analisar" de ontem (o sistema pede confirmação; dá para voltar com
-elas pela aba Descartadas). Os números do topo mostram quantas esperam, quantas são quentes, quantas esperam há
-mais de 2 horas e o tempo típico até alguém atender. Cada pessoa vê as oportunidades dos leads dela (administrador e
+elas pela aba Descartadas). Os números do topo mostram quantas esperam, quantas são quentes, quantas passaram do
+prazo de 2 horas úteis e o tempo típico até alguém atender. Cada pessoa vê as oportunidades dos leads dela (administrador e
 gestor veem todas, conforme as permissões).
+
+**Quem precisa de mim hoje (topo do Dashboard):** a lista de trabalho de cada pessoa, para nenhum interessado ser
+esquecido:
+- **Respostas quentes** esperando alguém assumir, com o prazo de 2 horas úteis ("assumir até 10:30" ou "fora do
+  prazo há 3 h") e o botão **Assumir** ali mesmo;
+- **Respostas para analisar** (mornas): decidir se insiste ou descarta, com o motivo;
+- **Suas tarefas** de hoje e as atrasadas (reuniões, ligações, follow-ups; os toques das campanhas ficam na Minha fila);
+- **Leads esfriando:** os seus, em conversa (respondeu, interessado, assumido, reunião, negociação), sem nada
+  acontecer há 7 dias ou mais e sem nada agendado. Abra e agende o próximo passo;
+- **Parceiros sem venda** há muito tempo.
+Quando está tudo em dia, o quadro diz "Tudo em dia".
+
+**Lead perdido precisa de motivo:** para marcar um lead como **Perdido** (na ficha, na mudança em lote ou arrastando no
+Pipeline) é obrigatório escolher o motivo da perda.
 
 **Disparar campanha (qualquer pessoa da equipe):** na página da campanha ativa, **🚀 Disparar campanha** tem os
 botões **Disparar campanha WhatsApp** e **Disparar campanha e-mail**. Eles mandam na hora o toque de hoje de cada

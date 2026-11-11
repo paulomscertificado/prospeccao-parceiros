@@ -431,6 +431,21 @@ empresas, com as MESMAS colunas da `base_receita`, para reaproveitar `base_recei
   caminho do próprio sistema (`_destino_seguro`).
 - Testes: `testes/test_oportunidades_tela.py`.
 
+## Quem precisa de mim hoje e motivo obrigatório (auditoria P1.7, nov/2026)
+
+- `app/hoje.py`, quadro no topo do Dashboard (`rotas/painel.py`, `templates/dashboard.html`): respostas quentes
+  esperando (oportunidades "nova" no alcance de `oportunidades.ver`, da mais antiga para a mais nova), contagem das
+  mornas, tarefas da pessoa de hoje e atrasadas (`Tarefa.tipo != "prospeccao"`; os toques ficam na Minha fila), leads
+  da pessoa (`vendedor_id` ou `humano_id`) em `STATUS_COM_HUMANO` sem histórico há `dias_lead_parado` dias e sem
+  tarefa pendente de hoje em diante ("esfriando") e `metricas.parceiros_parados`.
+- Prazo: `hoje.prazo_para_assumir` = 2 horas úteis (`somar_horas_uteis`, com `horario_envio_inicio/fim`, segunda a
+  sexta, sem feriados). A tela Oportunidades usa o mesmo prazo no selo ("assumir até 10:30" / "fora do prazo") e no
+  número "Fora do prazo". Meta da auditoria: mediana até assumir abaixo de 2 h úteis (era 18,6 h).
+- Motivo obrigatório: `Oportunidade.motivo` (coluna nova, entra sozinha no banco) com `config.MOTIVOS_DESCARTE`;
+  descartar (um ou vários) sem motivo não faz nada e avisa; "Voltar para Novas" limpa o motivo. Lead "Perdido" sem
+  `motivo_perda` é recusado na ficha, na mudança em lote e na API do Pipeline (o Pipeline já perguntava).
+- Testes: `testes/test_quem_precisa_hoje.py`.
+
 ## Auditoria P0: brecha do WhatsApp, teto de frios e avisos por e-mail (nov/2026)
 
 - **Robô não libera WhatsApp sozinho (P0.3).** Antes, qualquer mensagem recebida (inclusive "recebemos sua

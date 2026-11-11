@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from .. import agenda_horarios, autorizacao, campanhas, config, ia, metricas, sdr, util
+from .. import agenda_horarios, autorizacao, campanhas, config, hoje as fila_hoje, ia, metricas, sdr, util
 from ..banco import agora, obter_db
 from ..leads_servico import historico, limpar_campos
 from ..modelos import (Cadencia, Campanha, Categoria, Conhecimento, Lead, Mensagem, Notificacao, Oportunidade, Tarefa,
@@ -46,7 +46,6 @@ CLASSES_OP = [("interesse", "Com interesse", "selo-ok"), ("analisar", "Para anal
 LIMITE_CARTOES = 50    # cartões completos na aba Novas (cada um junta campanha, canal e a conversa)
 LIMITE_LINHAS = 200    # linhas nas outras abas (a página não pode ficar pesada; os filtros acham o resto)
 LIMITE_OLHADOS = 3000  # registros olhados para os filtros e as contagens (os mais recentes)
-ESPERA_DEMAIS = timedelta(hours=2)  # oportunidade nova esperando mais que isso fica em vermelho
 
 
 def _no_periodo_op(quando: datetime, periodo: str, hoje: date) -> bool:
@@ -157,7 +156,7 @@ def oportunidades(request: Request, ver: str = "novas", periodo: str = "tudo", t
     resumo = {
         "novas": len(novas_leves),
         "quentes": sum(1 for t, _ in novas_leves if t == "quente"),
-        "esperando_demais": sum(1 for _, c in novas_leves if momento - c > ESPERA_DEMAIS),
+        "esperando_demais": sum(1 for _, c in novas_leves if momento > fila_hoje.prazo_para_assumir(db, c)),
         "tratadas_30": len(esperas),
         "tempo_mediano": _tempo_curto(timedelta(seconds=esperas[len(esperas) // 2])) if esperas else "",
         "respostas_7": db.execute(select(func.count()).select_from(
@@ -167,7 +166,6 @@ def oportunidades(request: Request, ver: str = "novas", periodo: str = "tudo", t
 
     contexto = {"ver": ver, "periodo": periodo, "temperatura": temperatura, "canal": canal, "classe": classe,
                 "busca": busca, "abas": abas, "resumo": resumo, "ve_tudo": ve_respostas,
-                "ESPERA_DEMAIS_H": int(ESPERA_DEMAIS.total_seconds() // 3600),
                 "cor_classe": {c: cor for c, _, cor in CLASSES_OP},
                 "filtrando": bool(periodo != "tudo" or temperatura or canal or classe or termo)}
     filtros = {"periodo": lambda i: _no_periodo_op(i["quando"], periodo, hoje),
@@ -241,7 +239,8 @@ def oportunidades(request: Request, ver: str = "novas", periodo: str = "tudo", t
         for i in mostrados:
             o = i["o"] = ops[i["id"]]
             i["espera"] = _tempo_curto(momento - o.criado_em)
-            i["esperando_demais"] = momento - o.criado_em > ESPERA_DEMAIS
+            i["prazo"] = fila_hoje.prazo_para_assumir(db, o.criado_em)  # 2 horas úteis
+            i["esperando_demais"] = momento > i["prazo"]
             i["levou"] = _tempo_curto(o.assumida_em - o.criado_em) if o.assumida_em else ""
         # Resumo completo (campanha, dono, canal, o que enviamos) só nos cartões da aba Novas
         contexto["resumos"] = {i["o"].id: sdr.resumo_handoff(db, i["o"].lead) for i in mostrados} if ver == "novas" else {}
@@ -268,22 +267,28 @@ def _destino_seguro(destino: str) -> str:
     return destino if destino.startswith("/") and not destino.startswith("//") else "/oportunidades"
 
 
-def _descartar(db: Session, op: Oportunidade, usuario: Usuario) -> None:
-    """Descarta a oportunidade (e os cartões repetidos do mesmo lead que ainda estão em Novas)."""
+def _descartar(db: Session, op: Oportunidade, usuario: Usuario, motivo: str) -> None:
+    """Descarta a oportunidade (e os cartões repetidos do mesmo lead que ainda estão em Novas), com o motivo."""
     for o in db.execute(select(Oportunidade).where(Oportunidade.lead_id == op.lead_id,
                                                    Oportunidade.status == "nova")).scalars():
-        o.status, o.responsavel_id, o.assumida_em = "descartada", usuario.id, agora()
-    op.status, op.responsavel_id, op.assumida_em = "descartada", usuario.id, agora()
-    historico(db, op.lead_id, "sistema", f"Oportunidade descartada por {usuario.nome}.", usuario)
+        o.status, o.responsavel_id, o.assumida_em, o.motivo = "descartada", usuario.id, agora(), motivo
+    op.status, op.responsavel_id, op.assumida_em, op.motivo = "descartada", usuario.id, agora(), motivo
+    historico(db, op.lead_id, "sistema", f"Oportunidade descartada por {usuario.nome} ({motivo}).", usuario)
+
+
+SEM_MOTIVO = "Escolha o motivo do descarte (ele ensina o que ajustar nas campanhas). Nada foi descartado."
 
 
 @rotas.post("/oportunidades/{oid:int}/descartar", dependencies=[Depends(verificar_csrf)])
-def descartar(request: Request, oid: int, voltar_para: str = Form("/oportunidades"),
+def descartar(request: Request, oid: int, voltar_para: str = Form("/oportunidades"), motivo: str = Form(""),
               usuario: Usuario = Depends(exige("oportunidades.ver")), db: Session = Depends(obter_db)):
     op = db.get(Oportunidade, oid)
     if not op or not autorizacao.pode(usuario, "oportunidades.ver", op, sem_dono=True):
         raise HTTPException(404)
-    _descartar(db, op, usuario)
+    if motivo not in config.MOTIVOS_DESCARTE:
+        avisar(request, SEM_MOTIVO, "erro")
+        return voltar(_destino_seguro(voltar_para))
+    _descartar(db, op, usuario, motivo)
     db.commit()
     avisar(request, f"Oportunidade de {op.lead.empresa if op.lead else 'lead'} descartada (está na aba Descartadas; "
                     "lá dá para voltar com ela para Novas).")
@@ -292,13 +297,17 @@ def descartar(request: Request, oid: int, voltar_para: str = Form("/oportunidade
 
 @rotas.post("/oportunidades/descartar-varias", dependencies=[Depends(verificar_csrf)])
 def descartar_varias(request: Request, ids: str = Form(""), voltar_para: str = Form("/oportunidades"),
-                     usuario: Usuario = Depends(exige("oportunidades.ver")), db: Session = Depends(obter_db)):
-    """Botão "Descartar as N mostradas" (aba Novas, só com algum filtro escolhido)."""
+                     motivo: str = Form(""), usuario: Usuario = Depends(exige("oportunidades.ver")),
+                     db: Session = Depends(obter_db)):
+    """Botão "Descartar as N mostradas" (aba Novas, só com algum filtro escolhido), com um motivo para todas."""
+    if motivo not in config.MOTIVOS_DESCARTE:
+        avisar(request, SEM_MOTIVO, "erro")
+        return voltar(_destino_seguro(voltar_para))
     escolhidas = [i for i in (util.para_int(x) for x in ids.split(",")) if i][:LIMITE_CARTOES]
     total = 0
     for op in db.execute(select(Oportunidade).where(Oportunidade.id.in_(escolhidas))).scalars().all() if escolhidas else []:
         if op.status == "nova" and autorizacao.pode(usuario, "oportunidades.ver", op, sem_dono=True):
-            _descartar(db, op, usuario)
+            _descartar(db, op, usuario, motivo)
             total += 1
     if total:
         registrar_log(db, usuario, "descartou_oportunidades", "oportunidade", None,
@@ -320,7 +329,7 @@ def reabrir(request: Request, oid: int, voltar_para: str = Form("/oportunidades?
     if op.status != "descartada":
         avisar(request, "Só dá para voltar com uma oportunidade descartada.", "alerta")
     else:
-        op.status, op.responsavel_id, op.assumida_em = "nova", None, None
+        op.status, op.responsavel_id, op.assumida_em, op.motivo = "nova", None, None, ""
         historico(db, op.lead_id, "sistema", f"Oportunidade voltou para Novas ({usuario.nome} desfez o descarte).",
                   usuario)
         db.commit()

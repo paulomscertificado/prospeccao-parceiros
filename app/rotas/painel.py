@@ -6,8 +6,8 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import autorizacao, ia, metricas, planilhas, util
-from ..banco import obter_db
+from .. import autorizacao, hoje as fila_hoje, ia, metricas, planilhas, util
+from ..banco import ler_config_int, obter_db
 from ..leads_servico import filtrar_por_usuario
 from ..modelos import Certificado, Cliente, Lead, Parceiro, Usuario, Venda
 from ..seguranca import SemPermissao, exige, registrar_log, usuario_logado, ve_tudo, verificar_csrf
@@ -54,6 +54,8 @@ def dashboard(request: Request, periodo: str = "30d", vendedor: str = "",
         Certificado.status.in_(["Ativo", "Em renovação"]),
         Certificado.data_vencimento <= hoje + timedelta(days=30)).order_by(Certificado.data_vencimento).limit(8)).scalars().all()
     return tela(request, "dashboard.html", {
+        "fila_hoje": fila_hoje.itens(db, usuario),  # "Quem precisa de mim hoje" (auditoria P1.7)
+        "dias_lead_parado": ler_config_int(db, "dias_lead_parado", 7),
         "ind": ind, "p": p, "periodo": periodo, "graficos": graficos, "ranking": ranking[:5], "regioes": regioes,
         "vendedores_perf": vendedores, "vendedores": _vendedores(db) if ve_tudo(usuario, metricas.NUMEROS) else [],
         "vendedor_sel": vendedor, "followups": metricas.contar_followups_hoje(db, usuario),
