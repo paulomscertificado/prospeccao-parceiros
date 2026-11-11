@@ -82,9 +82,9 @@
 </form>
 {% endmacro %}
 
-<section {{ 'hidden' if aba != 'enviados' }}>
+{% if aba == 'enviados' %}<section>
 <div class="cartao">
-  {% if aba == 'enviados' %}{{ filtros_comuns() }}{% endif %}
+  {{ filtros_comuns() }}
   {{ filtros_chips('Período', op_periodo, filtros.periodo, url_envios, 'periodo') }}
   {{ filtros_chips('Situação', op_status, filtros.status, url_envios, 'status', 'Todas') }}
   <p class="pequeno suave" style="margin:4px 0 0">O que a MS mandou, o mais novo primeiro. 🧪 = teste da campanha: vai só para quem testou, nunca para a empresa.
@@ -134,15 +134,16 @@
     {% else %}Nenhum envio neste período. Quando uma campanha for aprovada, os e-mails e WhatsApps aparecem aqui, com a situação de cada um.{% endif %}</p>
   {% endif %}
 </div>
-</section>
+</section>{% endif %}
 
-<section {{ 'hidden' if aba != 'proximos' }}>
+{% if aba == 'proximos' %}<section>
 <div class="cartao">
-  {% if aba == 'proximos' %}{{ filtros_comuns() }}{% endif %}
+  {{ filtros_comuns() }}
   {{ filtros_chips('Quando', op_quando, filtros.quando, url_envios, 'quando') }}
   {{ filtros_chips('Situação', op_situacao, filtros.situacao, url_envios, 'situacao', 'Todas') }}
   <p class="pequeno suave" style="margin:4px 0 0">Toques das campanhas ativas que ainda não saíram (atrasados, de hoje e dos próximos 7 dias). A hora é a <b>programada</b>: "atrasado" quer dizer que a hora passou e o envio ainda espera, com o motivo ao lado.
-    {% if filtrando_proximos %}Mostrando <b>{{ total_prox_filtrados }}</b> de {{ total_proximos }}.{% endif %}</p>
+    {% if filtrando_proximos %}Mostrando <b>{{ [total_prox_filtrados, limite_mostrar]|min }}</b> de {{ total_proximos }}.{% endif %}
+    {% if total_prox_filtrados > limite_mostrar %}<b>Aparecem os {{ limite_mostrar }} primeiros de {{ total_prox_filtrados }}:</b> use os filtros para achar os outros.{% endif %}</p>
   {% set voltar = '/envios' ~ ('?' ~ request.url.query if request.url.query else '') %}
   {% for g in grupos_proximos %}
   <h3 class="dia-fila {{ 'dia-atrasado' if g.atrasado }}">{{ g.titulo }} <span class="detalhe-dia">{{ g.detalhe }}</span>
@@ -151,9 +152,9 @@
   {% endfor %}
   {% if not grupos_proximos %}<p class="vazio">{% if filtrando_proximos %}Nenhum envio com esses filtros.{% else %}Nada programado. Aprove uma campanha para começar.{% endif %}</p>{% endif %}
 </div>
-</section>
+</section>{% endif %}
 
-<section {{ 'hidden' if aba != 'regras' }}>
+{% if aba == 'regras' %}<section>
 <div class="cartao">
   <h2>Como funcionam os disparos</h2>
   <ul class="regras pequeno" style="padding-left:18px;margin-top:10px">
@@ -167,5 +168,5 @@
   </ul>
   <p class="pequeno suave">Os limites ficam em Configurações &gt; Geral (administrador).</p>
 </div>
-</section>
+</section>{% endif %}
 {% endblock %}

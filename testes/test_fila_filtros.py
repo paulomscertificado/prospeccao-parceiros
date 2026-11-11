@@ -83,5 +83,5 @@ def test_fila_abas_e_atalhos_dos_numeros(cliente):
     assert 'href="/fila?aba=historico"' in pagina
     # a aba escolhida aparece; as outras ficam escondidas
     historico = cliente.get("/fila?aba=historico").text
-    assert "<section hidden>" in historico and "Histórico dos envios" in historico
+    assert "Histórico dos envios" in historico and 'aria-label="Campanha"' not in historico  # só a aba aberta
     assert cliente.get("/fila?aba=nao-existe&periodo=errado&situacao=x").status_code == 200

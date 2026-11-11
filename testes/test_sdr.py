@@ -736,9 +736,11 @@ def test_minha_fila_mostra_pendentes_fila_e_historico(cliente):
         db.commit()
     r = cliente.get("/fila")
     assert r.status_code == 200
-    for texto in ("Minha fila de disparos", "Fila Visivel Ltda", "Na fila agora", "Caixa cheia", "atrasado",
+    for texto in ("Minha fila de disparos", "Fila Visivel Ltda", "atrasado",
                   "WhatsApp em branco: cadastre o número na ficha da empresa para a mensagem sair"):
         assert texto in r.text, texto
+    assert "Na fila agora" in cliente.get("/fila?aba=fila").text  # cada aba monta só o seu conteúdo
+    assert "Caixa cheia" in cliente.get("/fila?aba=historico").text
     assert cliente.get("/fila?de=todos&canal=email").status_code == 200
 
 
@@ -776,7 +778,7 @@ def test_minha_fila_mostra_hora_e_envia_agora(cliente, monkeypatch):
     assert enviados == ["agora@envioagora.com.br"]
     with sessao() as db:
         assert db.get(Tarefa, tid).status == "feita"
-    pagina = cliente.get("/fila").text
+    pagina = cliente.get("/fila?aba=historico").text
     assert "Reenviar por E-mail" in pagina and f"hist-" in pagina
 
 

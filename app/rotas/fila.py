@@ -44,6 +44,7 @@ SITUACOES = {
 }
 DIAS_SEMANA = ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado", "domingo"]
 LIMITE_PENDENTES = 600  # toques olhados por vez (atrasados primeiro)
+LIMITE_MOSTRAR = 200    # toques mostrados de uma vez (a página não pode ficar pesada; os filtros acham o resto)
 
 
 def _situacao(t: Tarefa, hoje: date, no_horario: bool, conversaram: set[int], email_auto: bool,
@@ -228,7 +229,8 @@ def minha_fila(request: Request, de: str = "", canal: str = "", aba: str = "prox
         # aba Próximos envios: filtros, contagens e grupos por dia
         "aba": aba, "periodo": periodo, "situacao": situacao, "campanha": camp_id, "busca": busca.strip(),
         "PERIODOS": PERIODOS, "SITUACOES": SITUACOES, "contagem_periodo": contagem_periodo,
-        "contagem_situacao": contagem_situacao, "grupos": _agrupar_por_dia(filtrados, hoje),
+        "contagem_situacao": contagem_situacao, "grupos": _agrupar_por_dia(filtrados[:LIMITE_MOSTRAR], hoje),
+        "limite_mostrar": LIMITE_MOSTRAR,
         "total_filtrados": len(filtrados), "opcoes_campanha": opcoes_campanha, "url_fila": url_fila,
         "filtrando": bool(situacao or camp_id or termo or periodo != "todos"),
     })

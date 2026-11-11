@@ -228,7 +228,8 @@ def tela_envios(request: Request, canal: str = "", status: str = "", campanha: s
                       if contagem_status[k] or status == k],
         "filtrando_enviados": bool(status or camp_id or termo or canal or periodo != "7d"),
         # aba Próximos envios
-        "grupos_proximos": fila._agrupar_por_dia(prox_filtrados, hoje), "total_proximos": len(proximos),
+        "grupos_proximos": fila._agrupar_por_dia(prox_filtrados[:fila.LIMITE_MOSTRAR], hoje),
+        "total_proximos": len(proximos), "limite_mostrar": fila.LIMITE_MOSTRAR,
         "total_prox_filtrados": len(prox_filtrados),
         "op_quando": [(k, nome, contagem_quando[k], "") for k, nome in fila.PERIODOS],
         "op_situacao": [(k, nome, contagem_situacao[k], cor) for k, (nome, cor) in fila.SITUACOES.items()

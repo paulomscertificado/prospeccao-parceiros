@@ -54,7 +54,7 @@ def test_envios_mostra_teste_da_campanha_e_o_que_espera_clique(cliente):
     assert "Teste da campanha" in enviados and "(81) 99323-0157" in enviados and "não foi para nenhuma empresa" in enviados
     assert "Ontem" in enviados and "Contábil Enviada Ontem Tela" in enviados  # agrupado por dia
     # o toque frio cuja hora já passou está em Próximos envios, como atrasado e esperando o clique
-    proximos = _aba(pagina, "proximos")
+    proximos = _aba(cliente.get("/envios?aba=proximos").text, "proximos")
     assert "Leandro Frio Envios Tela" in proximos and "Aguardando seu clique" in proximos and "atrasado há 1 dia" in proximos
     assert "Enviar por WhatsApp" in proximos
     assert 'href="/envios?aba=proximos&amp;quando=ate_hoje&amp;situacao=clique"' in pagina  # atalho no topo
@@ -72,3 +72,4 @@ def test_envios_mostra_teste_da_campanha_e_o_que_espera_clique(cliente):
 def test_envios_filtros_invalidos_nao_quebram(cliente):
     r = cliente.get("/envios?aba=xx&periodo=zz&status=yy&quando=ww&situacao=vv&campanha=abc")
     assert r.status_code == 200 and "Como funcionam os disparos" in r.text
+    assert "4 toques por empresa" in cliente.get("/envios?aba=regras").text

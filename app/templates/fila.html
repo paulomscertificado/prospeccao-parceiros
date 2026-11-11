@@ -53,7 +53,7 @@
   <a class="{{ 'ativa' if aba == 'registro' }}" href="{{ url_fila(aba='registro') }}">🧾 Registro dos disparos</a>
 </nav>
 
-<section {{ 'hidden' if aba != 'proximos' }}>
+{% if aba == 'proximos' %}<section>
 <div class="cartao">
   <form class="filtros-prox" method="get">
     {% if filtro_de %}<input type="hidden" name="de" value="{{ filtro_de }}">{% endif %}
@@ -78,7 +78,8 @@
     <a class="chip-f {{ 'ativo' if situacao == chave }}" href="{{ url_fila(situacao=chave) }}"><span class="ponto {{ info[1] }}"></span>{{ info[0] }} <span class="n">{{ contagem_situacao[chave] }}</span></a>{% endif %}{% endfor %}
   </div>
   <p class="pequeno suave" style="margin:4px 0 0">Toques das campanhas ativas: atrasados, de hoje e dos próximos 7 dias, na ordem em que vão sair.
-    {% if filtrando %}Mostrando <b>{{ total_filtrados }}</b> de {{ pendentes|length }}.{% endif %}</p>
+    {% if filtrando %}Mostrando <b>{{ [total_filtrados, limite_mostrar]|min }}</b> de {{ pendentes|length }}.{% endif %}
+    {% if total_filtrados > limite_mostrar %}<b>Aparecem os {{ limite_mostrar }} primeiros de {{ total_filtrados }}:</b> use os filtros para achar os outros.{% endif %}</p>
 
   {% for g in grupos %}
   <h3 class="dia-fila {{ 'dia-atrasado' if g.atrasado }}">{{ g.titulo }} <span class="detalhe-dia">{{ g.detalhe }}</span>
@@ -87,9 +88,9 @@
   {% for p in g.itens %}{{ linha_proximo(p, voltar) }}{% endfor %}{% endfor %}
   {% if not grupos %}<p class="vazio">{% if filtrando %}Nenhum envio com esses filtros. <a href="{{ url_fila(periodo='todos', situacao='', campanha='', busca='') }}">Limpar filtros</a>{% else %}Nenhum envio pendente nas campanhas ativas.{% endif %}</p>{% endif %}
 </div>
-</section>
+</section>{% endif %}
 
-<section {{ 'hidden' if aba != 'fila' }}>
+{% if aba == 'fila' %}<section>
 <div class="cartao">
   <h2>💬 Na fila do WhatsApp agora <span class="selo selo-azul">{{ na_fila|length }}</span></h2>
   {% if na_fila %}
@@ -103,9 +104,9 @@
   <p class="ajuda">Saem pelo WhatsApp Leads, uma de cada vez, com pausas e o limite diário do número. Se o computador do WhatsApp estiver desligado, esperam.</p>
   {% else %}<p class="suave">Nada na fila agora.</p>{% endif %}
 </div>
-</section>
+</section>{% endif %}
 
-<section {{ 'hidden' if aba != 'historico' }}>
+{% if aba == 'historico' %}<section>
 <div class="cartao">
   <h2>📋 Histórico dos envios <span class="pequeno suave">(últimos 7 dias)</span></h2>
   {% if historico %}
@@ -150,9 +151,9 @@
   {% endfor %}
   {% else %}<p class="suave">Nenhum envio nos últimos 7 dias.</p>{% endif %}
 </div>
-</section>
+</section>{% endif %}
 
-<section {{ 'hidden' if aba != 'registro' }}>
+{% if aba == 'registro' %}<section>
 <div class="cartao">
   <h2>🧾 Registro dos disparos <span class="pequeno suave">(últimos 30 dias)</span></h2>
   {% if logs %}
@@ -165,5 +166,5 @@
   {% endfor %}
   {% else %}<p class="suave">Nenhum disparo ou teste registrado.</p>{% endif %}
 </div>
-</section>
+</section>{% endif %}
 {% endblock %}
