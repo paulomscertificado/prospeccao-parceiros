@@ -172,9 +172,10 @@ def tela_envios(request: Request, canal: str = "", status: str = "", campanha: s
     conversaram = campanhas.leads_que_conversaram(db, [t.lead_id for t in tarefas if t.canal == "whatsapp"])
     email_auto = ler_config(db, "enviar_email_automatico") == "1"
     whats_auto = ler_config(db, "enviar_whatsapp_automatico") == "1"
+    automaticas = campanhas.campanhas_que_saem_sozinhas(db)
     proximos = []
     for t in tarefas:
-        chave, motivo = fila._situacao(t, hoje, no_horario, conversaram, email_auto, whats_auto)
+        chave, motivo = fila._situacao(t, hoje, no_horario, conversaram, email_auto, whats_auto, automaticas)
         rotulo, classe = fila.SITUACOES[chave]
         proximos.append({"t": t, "situacao": chave, "rotulo": rotulo, "classe": classe, "motivo": motivo,
                          "atrasado": t.data < hoje, "dias": (hoje - t.data).days})

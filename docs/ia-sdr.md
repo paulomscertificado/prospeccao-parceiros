@@ -407,3 +407,17 @@ empresas, com as MESMAS colunas da `base_receita`, para reaproveitar `base_recei
   `templates/_proximo_envio.html` (a mesma da Minha fila). Caso que motivou (11/11/2026): "Hoje 10:28" em Próximos
   envios parecia já enviado, mas era a hora programada de um WhatsApp frio esperando o clique.
   Testes: `testes/test_envios_tela.py`.
+
+## Empresas novas: WhatsApp sai sozinho depois da aprovação (nov/2026)
+
+- Pedido da Maria em 11/11/2026 ("se eu aprovei a campanha, era para entrar na fila de disparos"). Antes, o WhatsApp
+  para quem nunca conversou com a MS esperava o clique em todas as campanhas (inclusive as da IA SDR: dos 121
+  WhatsApps de parceiros, 106 saíram por clique).
+- `campanhas.campanhas_que_saem_sozinhas` (tipos em `TIPOS_QUE_SAEM_SOZINHOS` = Empresas novas, ativas e aprovadas) e
+  `toque_sai_sozinho` (até `DIAS_ATRASO_AUTOMATICO` = 2 dias de atraso; mais velho espera o clique, para não sair
+  uma rajada). `processar_fila_whatsapp` inclui esses toques no filtro do banco e grava o resultado "Enviada sozinha
+  (campanha de Empresas novas aprovada)". Valem as mesmas travas da fila automática: `_vez_do_canal` (1 a cada 3 min),
+  limite por hora (15), por dia e por número (40), horário de envio, controle de frequência e SAIR.
+- Minha fila e Envios (`fila._situacao`, parâmetro `automaticas`): "Sai sozinho: campanha de Empresas novas aprovada";
+  toque futuro mostra "(sai sozinho)" ou "(vai esperar o seu clique)".
+- Campanhas de parceiros: sem mudança (contato frio = clique). Testes: `testes/test_empresas_novas_automatico.py`.

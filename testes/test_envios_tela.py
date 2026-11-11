@@ -1,6 +1,7 @@
 """Tela Envios (nov/2026): abas Enviados / Próximos envios, grupos por dia, testes da campanha e a situação de cada
 toque que ainda vai sair. Caso real: a campanha aprovada às 10:16 mostrava "Hoje 10:28" em Próximos envios e a
-equipe achou que tinha saído; o teste das 10:15 aparecia nas Conversas no contato de quem testou."""
+equipe achou que tinha saído; o teste das 10:15 aparecia nas Conversas no contato de quem testou. (Desde então as
+campanhas de Empresas novas saem sozinhas; o caso do clique continua valendo nas campanhas de parceiros.)"""
 
 from datetime import date, timedelta
 
@@ -32,8 +33,8 @@ def _aba(html: str, nome: str) -> str:
 def test_envios_mostra_teste_da_campanha_e_o_que_espera_clique(cliente):
     with sessao() as db:
         admin = _admin(db)
-        camp = Campanha(nome="Empresas Teste Envios Tela", categorias="contabil", cidade="Recife", estado="PE",
-                        status="ativa", aprovado_em=agora(), usuario_id=admin.id, tipo="empresas_novas")
+        camp = Campanha(nome="Parceiros Teste Envios Tela", categorias="contabil", cidade="Recife", estado="PE",
+                        status="ativa", aprovado_em=agora(), usuario_id=admin.id, tipo="parceiros")
         db.add(camp)
         db.flush()
         frio = _lead(db, "Leandro Frio Envios Tela", whatsapp="81977661234")
@@ -54,7 +55,7 @@ def test_envios_mostra_teste_da_campanha_e_o_que_espera_clique(cliente):
     assert "Teste da campanha" in enviados and "(81) 99323-0157" in enviados and "não foi para nenhuma empresa" in enviados
     assert "Ontem" in enviados and "Contábil Enviada Ontem Tela" in enviados  # agrupado por dia
     # o toque frio cuja hora já passou está em Próximos envios, como atrasado e esperando o clique
-    proximos = _aba(cliente.get("/envios?aba=proximos").text, "proximos")
+    proximos = _aba(cliente.get(f"/envios?aba=proximos&campanha={camp_id}").text, "proximos")
     assert "Leandro Frio Envios Tela" in proximos and "Aguardando seu clique" in proximos and "atrasado há 1 dia" in proximos
     assert "Enviar por WhatsApp" in proximos
     assert 'href="/envios?aba=proximos&amp;quando=ate_hoje&amp;situacao=clique"' in pagina  # atalho no topo
@@ -65,8 +66,13 @@ def test_envios_mostra_teste_da_campanha_e_o_que_espera_clique(cliente):
     assert "Leandro Frio Envios Tela" in _aba(da_campanha, "proximos")
     # busca sem acento acha "Contábil"
     assert "Contábil Enviada Ontem Tela" in _aba(cliente.get("/envios?busca=contabil enviada ontem").text, "enviados")
-    clique = _aba(cliente.get("/envios?aba=proximos&situacao=clique&quando=ate_hoje").text, "proximos")
+    clique = _aba(cliente.get(f"/envios?aba=proximos&situacao=clique&quando=ate_hoje&campanha={camp_id}").text, "proximos")
     assert "Leandro Frio Envios Tela" in clique
+    with sessao() as db:  # não deixa o toque na fila dos outros testes
+        camp = db.get(Campanha, camp_id)
+        camp.status = "pausada"
+        for t in db.execute(select(Tarefa).where(Tarefa.campanha_id == camp_id)).scalars():
+            t.status = "cancelada"
 
 
 def test_envios_filtros_invalidos_nao_quebram(cliente):

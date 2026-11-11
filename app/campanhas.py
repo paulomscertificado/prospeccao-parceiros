@@ -1020,6 +1020,27 @@ def whatsapp_liberado(db, lead: Lead) -> bool:
     return bool(lead.consentimento) or lead.id in leads_que_conversaram(db, [lead.id])
 
 
+TIPOS_QUE_SAEM_SOZINHOS = ("empresas_novas",)
+DIAS_ATRASO_AUTOMATICO = 2  # toque com mais atraso que isto não sai sozinho (espera o clique): evita rajada
+
+
+def campanhas_que_saem_sozinhas(db) -> set[int]:
+    """Campanhas cujo WhatsApp sai sozinho depois da aprovação, mesmo para quem nunca conversou com a MS: as de
+    Empresas novas (pedido da Maria em 11/11/2026: "se eu aprovei a campanha, era para entrar na fila de disparos").
+    Saem pela mesma fila automática, com as mesmas travas: um a cada 3 minutos, limite por hora, por dia e por
+    número, horário de envio, controle de frequência e SAIR. Nas campanhas de parceiros o contato frio continua com
+    o clique de uma pessoa."""
+    return set(db.execute(select(Campanha.id).where(Campanha.tipo.in_(TIPOS_QUE_SAEM_SOZINHOS),
+                                                    Campanha.status == "ativa",
+                                                    Campanha.aprovado_em.is_not(None))).scalars())
+
+
+def toque_sai_sozinho(t: Tarefa, automaticas: set[int], hoje: date | None = None) -> bool:
+    """O toque é de uma campanha que sai sozinha e não está atrasado demais?"""
+    hoje = hoje or date.today()
+    return t.campanha_id in automaticas and t.data >= hoje - timedelta(days=DIAS_ATRASO_AUTOMATICO)
+
+
 def leads_que_conversaram(db, ids) -> set[int]:
     """Dos leads informados, os que já mandaram mensagem pelo WhatsApp (a regra de whatsapp_liberado, numa consulta
     só: a tela Minha fila confere centenas de toques de uma vez)."""
@@ -1049,17 +1070,23 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
     from .modelos import Mensagem
 
     hora = agora().strftime("%H:%M")
-    # Só quem pode receber sozinho (filtro no banco): campo WhatsApp preenchido e contato que já conversou ou autorizou.
+    hoje = date.today()
+    # Só quem pode receber sozinho (filtro no banco): campo WhatsApp preenchido e contato que já conversou ou autorizou,
+    # ou toque de campanha que sai sozinha depois da aprovação (Empresas novas, sem atraso grande).
     # Antes os toques frios (que esperam o clique e continuam pendentes) ocupavam as 200 vagas da consulta e os
     # liberados que viessem depois deles nunca saíam.
     conversou = (select(Mensagem.id).where(Mensagem.lead_id == Lead.id, Mensagem.canal == "whatsapp",
                                            Mensagem.status == "recebida").exists())
+    da_campanha_automatica = and_(Campanha.tipo.in_(TIPOS_QUE_SAEM_SOZINHOS),
+                                  Tarefa.data >= hoje - timedelta(days=DIAS_ATRASO_AUTOMATICO))
     consulta = (select(Tarefa).join(Campanha, Tarefa.campanha_id == Campanha.id)
                 .join(Lead, Tarefa.lead_id == Lead.id)
                 .where(Tarefa.status == "pendente", Tarefa.tipo == "prospeccao", Tarefa.canal == "whatsapp",
-                       _ja_na_hora(date.today(), hora), Campanha.status == "ativa", Campanha.aprovado_em.is_not(None),
-                       func.coalesce(Lead.whatsapp, "") != "", or_(Lead.consentimento.is_(True), conversou))
+                       _ja_na_hora(hoje, hora), Campanha.status == "ativa", Campanha.aprovado_em.is_not(None),
+                       func.coalesce(Lead.whatsapp, "") != "",
+                       or_(Lead.consentimento.is_(True), conversou, da_campanha_automatica))
                 .order_by(Tarefa.data, Tarefa.hora, Tarefa.id).limit(200))
+    automaticas = campanhas_que_saem_sozinhas(db)
     campanhas_no_limite: set[int] = set()
     for t in db.execute(consulta).scalars():
         if feito["enviados"] >= maximo:
@@ -1069,8 +1096,11 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
         lead = t.lead
         if not (lead.whatsapp or "").strip():
             continue  # campo WhatsApp em branco: a mensagem espera alguém cadastrar o número
-        if not sdr.automacao_ativa(lead) or not whatsapp_liberado(db, lead) or not (t.mensagem or "").strip():
-            continue  # contato frio (ou já com um humano): fica na Agenda para o clique
+        automatica = toque_sai_sozinho(t, automaticas, hoje)
+        if not sdr.automacao_ativa(lead) or not (t.mensagem or "").strip():
+            continue  # lead respondeu, saiu ou está com um humano
+        if not automatica and not whatsapp_liberado(db, lead):
+            continue  # contato frio de campanha de parceiros: fica na Agenda para o clique
         try:
             sdr.enviar_whatsapp_conectado(db, t.mensagem, None, lead=lead, tarefa=t)
         except sdr.EnvioRecusado as erro:
@@ -1091,7 +1121,8 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
                 break  # limite do canal ou WhatsApp fora do ar: o resto espera a próxima rodada
             feito["bloqueados"] += 1
             continue
-        t.resultado = "Enviada sozinha pela IA SDR (contato já conversou com a MS)"
+        t.resultado = ("Enviada sozinha (campanha de Empresas novas aprovada)" if automatica
+                       else "Enviada sozinha pela IA SDR (contato já conversou com a MS)")
         feito["enviados"] += 1
         if config.ESPACAR_ENVIOS:
             _anotar_envio(db, "whatsapp")

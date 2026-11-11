@@ -185,8 +185,10 @@ Menu **Empresas novas**. Todo dia o sistema busca as empresas que acabaram de ab
 do dia seguinte ao último já buscado, até 2 dias atrás, porque a Receita publica as empresas novas com alguns dias de
 atraso; nenhum dia é buscado duas vezes e empresa que já entrou em campanha nunca entra de novo), cadastra
 como leads (origem "Empresas novas (CNPJá)") e monta a campanha **"Empresas novas dd/mm – PE"**, que fica
-**aguardando aprovação**. Depois de aprovada: o e-mail sai sozinho pela fila (horário e limites) e o WhatsApp
-aparece para o time enviar com 1 clique. São 3 toques: dia 1 (boas-vindas + oferta do e-CNPJ), dia 3 (lembrete)
+**aguardando aprovação**. Depois de aprovada, **tudo sai sozinho, sem clique**: o e-mail e o WhatsApp entram na fila
+e saem cada um no seu horário, um por vez, com as pausas e os limites do número (no máximo 1 a cada 3 minutos,
+15 por hora, 40 por dia por número, só no horário de envio; quem pede SAIR não recebe mais). Toque atrasado mais
+de 2 dias não sai sozinho (espera um clique em **Minha fila**), para não sair tudo de uma vez. São 3 toques: dia 1 (boas-vindas + oferta do e-CNPJ), dia 3 (lembrete)
 e dia 7 (último contato). As mensagens podem ser editadas na própria tela. A IA não responde sozinha esses
 leads: as respostas vão para **Oportunidades** e o time conversa.
 
@@ -196,8 +198,10 @@ leads: as respostas vão para **Oportunidades** e o time conversa.
 - Os celulares que a Receita guarda sem o 9 ganham o 9 na frente (é um palpite: confira antes de enviar).
 - Empresas com o mesmo telefone/e-mail (do contador) **não** são juntadas: só o CNPJ conta como repetido.
 - Opção para deixar de fora **empresário individual** (inclui os MEIs, que muitas vezes não precisam de e-CNPJ).
-- **Foco no WhatsApp:** empresa com celular recebe os 3 toques **por WhatsApp** (o time envia com 1 clique em
-  **Minha fila** ou na campanha). O **e-mail** só é usado para quem não tem celular, e sai sozinho pela fila.
+- **Foco no WhatsApp:** empresa com celular recebe os 3 toques **por WhatsApp**, que saem sozinhos depois da
+  aprovação (o botão **Enviar** da **Minha fila** ou da campanha só adianta). O **e-mail** só é usado para quem não
+  tem celular, e também sai sozinho pela fila. Nas campanhas de **parceiros** o WhatsApp para quem nunca conversou
+  com a MS continua saindo com 1 clique.
 - **Buscar de novo não gasta à toa:** toda empresa que já veio entra numa lista de exclusão guardada na própria
   CNPJá. Buscando o mesmo dia de novo, a CNPJá só traz (e só cobra) as empresas que ainda não vieram.
 - **Atividade:** a busca pega empresas novas de **qualquer atividade** (toda empresa nova pode precisar do e-CNPJ).
