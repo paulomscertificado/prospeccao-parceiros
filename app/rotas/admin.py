@@ -6,8 +6,8 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from .. import autorizacao, base_receita, bases_importadas, config, ia, leads_servico, prospeccao, score, util
-from ..banco import gravar_config, ler_config, obter_db
+from .. import alertas, autorizacao, base_receita, bases_importadas, config, ia, leads_servico, prospeccao, score, util
+from ..banco import gravar_config, ler_config, ler_config_json, obter_db
 from ..integracoes import dns_email, email_imap, email_smtp, whatsapp_cloud, whatsapp_leads
 from ..modelos import Equipe, Lead, LogAuditoria, Papel, Parceiro, Usuario
 from ..seguranca import exige, problema_na_senha, registrar_log, resumir_senha, verificar_csrf
@@ -36,6 +36,10 @@ CAMPOS_GERAIS = [
     ("prioridade_canais", "IA SDR · prioridade dos canais (ex.: whatsapp,email,linkedin)", "texto"),
     ("limite_hora_email", "IA SDR · limite de e-mails por hora", "numero"),
     ("limite_hora_whatsapp", "IA SDR · limite de WhatsApp por hora", "numero"),
+    ("limite_frios_whatsapp", "WhatsApp · contatos frios por número por dia (quem nunca conversou com a MS; "
+     "protege o número contra bloqueio; 0 = sem teto)", "numero"),
+    ("pausa_frios_sair", "WhatsApp · pedidos de SAIR no mesmo dia que pausam os contatos frios do número até amanhã "
+     "(0 = não pausa)", "numero"),
     ("limite_diario_campanha", "IA SDR · limite diário de mensagens por campanha", "numero"),
     ("limite_diario_dominio", "IA SDR · limite diário de e-mails para o mesmo domínio", "numero"),
     ("horario_envio_inicio", "IA SDR · envio automático a partir de (HH:MM, dias úteis)", "texto"),
@@ -47,6 +51,9 @@ CAMPOS_GERAIS = [
      "ou autorizou (1 = sim, 0 = não). Primeiro contato frio: sempre 1 clique", "numero"),
     ("aprovacao_obrigatoria", "IA SDR · campanha só começa com aprovação (1 = sim, 0 = não)", "numero"),
     ("notificar_por_email", "IA SDR · avisar o responsável por e-mail quando surgir oportunidade (1 = sim)", "numero"),
+    ("alertas_emails", "Avisos de problema · e-mails que recebem (separados por vírgula; vazio = os administradores)",
+     "texto"),
+    ("limite_banco_mb", "Avisos de problema · tamanho do banco contratado em MB (o aviso sai em 80%)", "numero"),
 ]
 
 
@@ -83,6 +90,11 @@ def configuracoes(request: Request, aba: str = "geral", usuario: Usuario = Depen
         "listas": bases_importadas.listas(db) if aba == "integracoes" else [],
         "receita_oculta": bases_importadas.receita_oculta(db),
         "tem_chave_cnpja": bool(_chave_cnpja()) if aba == "integracoes" else False,
+        "painel_avisos": {"ativos": alertas.ativos(db), "para": alertas.destinatarios(db), "ligado": alertas.ligado(),
+                   "email_ok": email_smtp.configurado(), "banco_mb": alertas.tamanho_do_banco_mb(db),
+                   "banco_limite": int(float(ler_config(db, "limite_banco_mb") or 0) or 0),
+                   "backup": ler_config_json(db, "backup_ultimo", {}) or {}}
+        if aba == "integracoes" else None,
         "demo": db.execute(select(Lead.id).where(Lead.origem == "Demonstração").limit(1)).first() is not None,
         "email": _email_atual() if aba == "email" else None,
         "dns": dns_email.verificar(config.EMAIL_DOMINIO)
@@ -328,6 +340,31 @@ def salvar_chave_cnpja(request: Request, chave: str = Form(""), usuario: Usuario
     db.commit()
     avisar(request, "Chave da CNPJá salva. Clique em \"Testar a chave\" para conferir o saldo.")
     return voltar("/configuracoes?aba=integracoes#cnpja")
+
+
+@rotas.post("/configuracoes/alertas/teste", dependencies=[Depends(verificar_csrf)])
+def testar_alertas(request: Request, usuario: Usuario = Depends(exige("configuracoes.alterar")),
+                   db: Session = Depends(obter_db)):
+    """Manda um aviso de teste para quem recebe os avisos de problema (para conferir que o e-mail chega)."""
+    para = alertas.destinatarios(db)
+    if not email_smtp.configurado():
+        avisar(request, "O e-mail de envio ainda não foi configurado (Configurações > E-mail): os avisos aparecem só "
+                        "no sino do sistema.", "erro")
+        return voltar("/configuracoes?aba=integracoes#avisos")
+    try:
+        for destino in para:
+            email_smtp.enviar(destino, "[Prospecção MS] Teste dos avisos de problema",
+                              f"Este é um teste pedido por {usuario.nome}. Quando algo parar no sistema (WhatsApp, "
+                              "e-mails, banco, agendador), o aviso chega assim, neste endereço.\n\n"
+                              f"Abrir o sistema: {config.URL_PUBLICA}/configuracoes?aba=integracoes", com_rodape=False)
+    except email_smtp.ErroEmail as erro:
+        avisar(request, f"O e-mail de teste não saiu: {erro}", "erro")
+        return voltar("/configuracoes?aba=integracoes#avisos")
+    registrar_log(db, usuario, "testou_alertas", "configuracao", None, ", ".join(para), request)
+    db.commit()
+    avisar(request, f"E-mail de teste enviado para {', '.join(para) or 'ninguém (cadastre um e-mail)'}. Confira a caixa de "
+                    "entrada (e o spam).")
+    return voltar("/configuracoes?aba=integracoes#avisos")
 
 
 @rotas.post("/configuracoes/cnpja/saldo", dependencies=[Depends(verificar_csrf)])

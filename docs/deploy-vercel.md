@@ -28,7 +28,10 @@ O modo nuvem liga sozinho quando a variável `VERCEL` existe (a Vercel cria) ou 
   `GET https://SEU-SITE/api/cron` a cada minuto pelo **Agendador de Tarefas do Windows** (`dados\chamar_cron.ps1`, que
   também religa o WhatsApp Leads escondido com `iniciar.py --escondido` se ele estiver fechado), com o cabeçalho
   `Authorization: Bearer <CRON_SECRET>`. Computador desligado = sistema parado até a reserva das 6h.
-  Alternativa sem depender do computador: cron-job.org (grátis, a cada minuto, aceita cabeçalho).
+  Alternativa sem depender do computador: cron-job.org (grátis, a cada minuto, aceita cabeçalho) ou o pg_cron +
+  pg_net do próprio Supabase (grátis; chama `/api/cron` com o cabeçalho; precisa ligar as extensões no projeto).
+  Enquanto depender do computador, `app/alertas.py` avisa por e-mail quando o agendador volta depois de mais de
+  30 minutos parado (`alertas.marcar_rodada`).
   No Pro, volte o `vercel.json` para `* * * * *` e desligue a tarefa do Windows.
 - **Termos da Vercel.** O Hobby é para uso pessoal não comercial, e a Vercel conta como comercial qualquer site
   feito por alguém pago para isso ([fair use](https://vercel.com/docs/limits/fair-use-guidelines)). A MS
@@ -38,8 +41,16 @@ O modo nuvem liga sozinho quando a variável `VERCEL` existe (a Vercel cria) ou 
   da cópia (`select pg_size_pretty(pg_database_size('postgres'))`). Projeto parado 7 dias é pausado (com o
   agendador isso não acontece) e o plano grátis **não tem backup automático**: por isso existe o backup diário
   abaixo.
-- **Backup diário.** `fazer_backup.py` copia o banco da nuvem (tudo menos `base_receita`, que se reimporta dos .zip)
-  para `dados/backups/nuvem_AAAA-MM-DD.db` (SQLite, ~55 MB, ~1,5 min) e guarda 14 dias. Roda sozinho 1 vez por dia, a
+- **Backup diário (criptografado desde 11/2026, auditoria P0.5).** `fazer_backup.py` copia o banco da nuvem (tudo
+  menos `base_receita`) para um SQLite temporário, compacta e criptografa (AES-256-GCM, chave derivada com scrypt da
+  senha em `dados/senha_backup.txt`, criada no primeiro backup) em `dados/backups/nuvem_AAAA-MM-DD.db.cripto`, abre a
+  cópia de novo e confere (`pragma integrity_check` + contagem de leads/usuários) e apaga o temporário: nada fica
+  aberto no computador. Cópia fora do PC: `BACKUP_PASTA_FORA` no `.env` ou, sozinho, o Google Drive para computador
+  (`<letra>:\Meu Drive\Backups Prospeccao MS`). Guarda 14 dias aqui e lá (`apagar_antigos`, contando as cópias
+  abertas antigas). Grava `backup_ultimo` na nuvem; `app/alertas.py` avisa se passar de 84 h. O
+  `dados/chamar_cron.ps1` considera feito o dia que tem `.db` ou `.db.cripto`. Restaurar: `restaurar_backup.py` aceita
+  os dois tipos, daqui e do Google Drive, e pede a senha se o arquivo não existir (computador novo). Testes:
+  `testes/test_backup_criptografado.py`. Roda sozinho 1 vez por dia, a
   partir das 12:00, pelo `dados/chamar_cron.ps1` (escondido; se falhar, tenta de novo depois de 2 h; saída em
   `dados/backups/saida.txt` e `erros.txt`). À mão: `fazer_backup.bat`. Para voltar uma cópia (emergência, APAGA o que
   está na nuvem menos a base da Receita): `restaurar_backup.bat`, que pede para digitar SIM. Cada backup gasta ~55 MB

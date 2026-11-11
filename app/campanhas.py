@@ -1030,6 +1030,10 @@ def motivo_curto(texto: str) -> str:
         return "recebeu mensagem há pouco (controle de frequência)"
     if "inválido" in t or "anonimizado" in t:
         return "número marcado como inválido"
+    if "contatos frios" in t and "pausad" in t:
+        return "número pausado hoje: pedidos para sair"
+    if "contatos frios" in t:
+        return "número chegou ao teto de contatos frios do dia"
     return (texto or "motivo desconhecido").strip().rstrip(".")
 
 
@@ -1067,15 +1071,19 @@ def toque_sai_sozinho(t: Tarefa, automaticas: set[int], hoje: date | None = None
 
 
 def leads_que_conversaram(db, ids) -> set[int]:
-    """Dos leads informados, os que já mandaram mensagem pelo WhatsApp (a regra de whatsapp_liberado, numa consulta
-    só: a tela Minha fila confere centenas de toques de uma vez)."""
+    """Dos leads informados, os que já mandaram mensagem DE GENTE pelo WhatsApp (a regra de whatsapp_liberado, numa
+    consulta só: a tela Minha fila confere centenas de toques de uma vez). Resposta de robô, chatbot ou ausência não
+    conta (auditoria de 11/11/2026: 37 respostas de robô liberavam WhatsApp sozinho): as marcadas como "robo" e as
+    antigas que têm cara de robô (sdr.e_resposta_automatica)."""
     from .modelos import Mensagem
 
     ids = [i for i in set(ids or []) if i]
     if not ids:
         return set()
-    return set(db.execute(select(Mensagem.lead_id).where(Mensagem.lead_id.in_(ids), Mensagem.canal == "whatsapp",
-                                                         Mensagem.status == "recebida").distinct()).scalars())
+    linhas = db.execute(select(Mensagem.lead_id, Mensagem.corpo).where(
+        Mensagem.lead_id.in_(ids), Mensagem.canal == "whatsapp", Mensagem.status == "recebida",
+        Mensagem.modo != "robo")).all()
+    return {lid for lid, corpo in linhas if not sdr.e_resposta_automatica(corpo or "")}
 
 
 def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
@@ -1101,7 +1109,7 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
     # Antes os toques frios (que esperam o clique e continuam pendentes) ocupavam as 200 vagas da consulta e os
     # liberados que viessem depois deles nunca saíam.
     conversou = (select(Mensagem.id).where(Mensagem.lead_id == Lead.id, Mensagem.canal == "whatsapp",
-                                           Mensagem.status == "recebida").exists())
+                                           Mensagem.status == "recebida", Mensagem.modo != "robo").exists())
     da_campanha_automatica = and_(Campanha.tipo.in_(TIPOS_QUE_SAEM_SOZINHOS),
                                   Tarefa.data >= hoje - timedelta(days=DIAS_ATRASO_AUTOMATICO))
     consulta = (select(Tarefa).join(Campanha, Tarefa.campanha_id == Campanha.id)

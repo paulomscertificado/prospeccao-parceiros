@@ -75,6 +75,12 @@ Geral > "Mostrar Vendas, Vencimentos e Comissões" = 1 > Salvar.
 - O sistema **nunca dispara mensagens sozinho**. Cada mensagem é enviada por uma pessoa.
 - Há **limite diário** de mensagens e um **intervalo mínimo** entre mensagens para o mesmo lead (Configurações).
   No WhatsApp, o limite (40 por dia) vale para **cada número** conectado.
+- **Proteção dos números de WhatsApp contra bloqueio:** cada número faz no máximo **20 contatos frios por dia**
+  (mensagem para quem nunca conversou com a MS; vale também para o botão Disparar e para as Empresas novas). Quem já
+  conversou ou autorizou não entra nessa conta. Se **3 pessoas pedirem para sair no mesmo dia**, os contatos frios
+  daquele número param até o dia seguinte (e chega um aviso por e-mail). **Resposta automática de robô** ("recebemos
+  sua mensagem...") **não conta** como conversa: não libera envio automático. Os dois números se ajustam em
+  Configurações > Geral.
 - Áudio, foto ou documento sem texto não recebem resposta automática: viram uma oportunidade para alguém ouvir/ver.
 - Depois que alguém da equipe assume o lead, e nas mensagens de parceiros, a IA não responde nem muda a etapa:
   só avisa quem cuida.
@@ -400,6 +406,9 @@ permissão, a conta para de enviar na hora.
 | "Os servidores do OpenStreetMap estão ocupados" | Tente de novo em alguns minutos ou use a base da Receita |
 | "O limite diário... foi atingido" | Continue amanhã ou aumente o limite em Configurações |
 | "Já houve uma mensagem para este lead há menos de 20 horas" | Controle de frequência: contate amanhã |
+| "Este número já fez 20 contatos frios hoje" | Proteção contra bloqueio: o resto sai amanhã (ou por outro número). O teto fica em Configurações > Geral |
+| "Este número está com os contatos frios pausados até amanhã" | 3 pessoas pediram para sair hoje: revise o texto e a lista da campanha. Amanhã volta sozinho |
+| E-mail "[Prospecção MS] ⚠️ ..." | Aviso automático de problema: o próprio e-mail diz o que fazer. Quando resolver, chega o "✅ Resolvido" |
 | (site na internet) "O computador com o WhatsApp Leads está desligado" | Ligue o computador e abra o `iniciar.bat` do WhatsApp Leads; em até 1 minuto volta |
 | (site na internet) Campanha ou busca parada em "Na fila" | Espere 1 minuto. Se continuar, avise o suporte: o agendador da Vercel (Cron Jobs) pode estar desligado |
 | A IA não escreve as mensagens | Sem a chave da IA, o sistema usa os templates. Veja `docs/configuracao.md` |
@@ -407,9 +416,27 @@ permissão, a conta para de enviar na hora.
 **Seus dados ficam na pasta `dados/`. Não apague essa pasta.** Faça cópia dela de vez em quando (backup).
 
 **Cópia de segurança do sistema na internet:** todo dia, a partir do meio-dia, este computador guarda sozinho uma
-cópia do banco da nuvem em `dadosackups` (ficam os últimos 14 dias). Para fazer uma na hora: dois cliques em
-`fazer_backup.bat`. Só em emergência (dados apagados por engano): `restaurar_backup.bat` volta uma cópia. Ele
-apaga o que está hoje no sistema e pede para digitar SIM.
+cópia do banco da nuvem em `dados\backups` (ficam os últimos 14 dias). Desde novembro/2026 a cópia sai
+**criptografada** (ninguém abre sem a senha) e é **aberta e conferida** logo depois de feita.
+- **A senha das cópias** fica no arquivo `dados\senha_backup.txt` (criado sozinho no primeiro backup).
+  **Guarde uma cópia dessa senha fora do computador** (gerenciador de senhas, cofre ou papel guardado): sem ela,
+  nenhuma cópia abre. Não mande essa senha por e-mail nem WhatsApp.
+- **Cópia fora do computador:** instale o **Google Drive para computador** (entrando com o e-mail da MS). A partir
+  daí cada backup também vai sozinho para `Meu Drive\Backups Prospeccao MS`. Se o computador quebrar, as cópias
+  estão lá.
+- O sistema da nuvem fica sabendo de cada backup e manda um e-mail de aviso se ficar mais de 3 dias e meio sem.
+
+Para fazer uma cópia na hora: dois cliques em `fazer_backup.bat`. Só em emergência (dados apagados por engano):
+`restaurar_backup.bat` volta uma cópia (deste computador ou do Google Drive). Ele apaga o que está hoje no sistema
+e pede para digitar SIM. Num computador novo, ele pede a senha das cópias.
+
+**Avisos por e-mail quando algo para:** o sistema da nuvem confere tudo a cada 5 minutos e manda um e-mail para os
+administradores quando: o computador do WhatsApp Leads para de responder (mais de 15 minutos), um número de WhatsApp
+em uso fica desconectado (mais de 15 minutos), os e-mails da fila não saem, uma rotina dá erro 3 vezes seguidas, o
+banco chega a 80% do tamanho, o backup fica dias sem ser feito ou o agendador fica parado (o aviso chega quando ele
+volta). Vem um lembrete a cada 12 horas enquanto o problema durar e outro e-mail quando volta ao normal. O aviso
+também aparece no sino. Quem recebe: os administradores, ou a lista em **Configurações > Geral > "Avisos de
+problema · e-mails que recebem"**. Para testar: **Configurações > Integrações > Mandar e-mail de teste do aviso**.
 
 Testes automáticos: dois cliques em `testar.bat` (não mexe nos seus dados).
 

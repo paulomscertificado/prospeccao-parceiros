@@ -222,58 +222,86 @@ def _na_vez(numero: int | None, chave: str, minutos: int) -> bool:
     return True
 
 
+def _passo(nome: str, funcao) -> None:
+    """Roda uma parte da rodada. Erro numa parte não para as outras e conta para os avisos por e-mail
+    (3 falhas seguidas = aviso; app/alertas.py)."""
+    from . import alertas
+
+    try:
+        funcao()
+    except Exception as erro:  # noqa: BLE001
+        log.exception("Erro na %s", alertas.NOMES_ROTINAS.get(nome, nome))
+        alertas.falhou(nome, erro)
+    else:
+        alertas.funcionou(nome)
+
+
+def _fila_email() -> None:
+    with sessao() as db:
+        resultado = campanhas.processar_fila(db)
+        if resultado["enviados"]:
+            log.info("Fila: %s e-mails enviados", resultado["enviados"])
+
+
+def _fila_whatsapp() -> None:
+    with sessao() as db:
+        r = campanhas.processar_fila_whatsapp(db)
+        if r["enviados"]:
+            log.info("Fila do WhatsApp: %s mensagens para contatos que já conversaram", r["enviados"])
+
+
+def _sincronizar_whatsapp() -> None:
+    with sessao() as db:
+        r = sdr.sincronizar_whatsapp_conectado(db)
+        if r["respostas"]:
+            log.info("WhatsApp conectado: %s respostas de parceiros processadas", r["respostas"])
+
+
+def _ler_emails() -> None:
+    lidas = ler_respostas_por_email()
+    if lidas:
+        log.info("Respostas por e-mail processadas: %s", lidas)
+
+
+def _empresas_novas() -> None:
+    from . import empresas_novas
+
+    r = empresas_novas.rodada_diaria()
+    if r:
+        log.info("Empresas novas: %s", r)
+
+
+def _rotina_hora() -> None:
+    from . import reservas
+    from .vendas_servico import processar_vencimentos
+
+    with sessao() as db:
+        processar_vencimentos(db)
+        campanhas.finalizar_cadencias(db)
+    with sessao() as db:
+        reservas.preencher_reservas_antigas(db)  # só na primeira vez
+        liberadas = reservas.liberar_vencidas(db)
+        if liberadas:
+            log.info("Reservas: %s empresas voltaram para a base (60 dias sem mudança)", liberadas)
+
+
 def rodada(numero: int | None) -> None:
     """Uma rodada do relógio (chamado a cada minuto; na nuvem, pelo agendador em /api/cron)."""
-    try:
-        with sessao() as db:
-            resultado = campanhas.processar_fila(db)
-            if resultado["enviados"]:
-                log.info("Fila: %s e-mails enviados", resultado["enviados"])
-    except Exception:  # noqa: BLE001
-        log.exception("Erro na fila de envio")
-    try:
-        with sessao() as db:
-            r = campanhas.processar_fila_whatsapp(db)
-            if r["enviados"]:
-                log.info("Fila do WhatsApp: %s mensagens para contatos que já conversaram", r["enviados"])
-    except Exception:  # noqa: BLE001
-        log.exception("Erro na fila de WhatsApp")
-    try:
-        with sessao() as db:
-            r = sdr.sincronizar_whatsapp_conectado(db)
-            if r["respostas"]:
-                log.info("WhatsApp conectado: %s respostas de parceiros processadas", r["respostas"])
-    except Exception:  # noqa: BLE001
-        log.exception("Erro ao sincronizar com o WhatsApp Leads")
+    from . import alertas
+
+    if numero is None:
+        alertas.marcar_rodada()  # avisa se o agendador tinha ficado parado mais de 30 minutos
+    _passo("fila_email", _fila_email)
+    _passo("fila_whatsapp", _fila_whatsapp)
+    _passo("sincronizar_whatsapp", _sincronizar_whatsapp)
     if _na_vez(numero, "ultima_leitura_email", 5):
-        try:
-            lidas = ler_respostas_por_email()
-            if lidas:
-                log.info("Respostas por e-mail processadas: %s", lidas)
-        except Exception:  # noqa: BLE001
-            log.exception("Erro ao ler respostas por e-mail")
+        _passo("ler_emails", _ler_emails)
     if _na_vez(numero, "ultima_busca_empresas_novas", 15):
-        from . import empresas_novas
-
-        try:
-            r = empresas_novas.rodada_diaria()
-            if r:
-                log.info("Empresas novas: %s", r)
-        except Exception:  # noqa: BLE001
-            log.exception("Erro na busca de empresas novas")
+        _passo("empresas_novas", _empresas_novas)
     if _na_vez(numero, "ultima_rotina_hora", 60):
-        from .vendas_servico import processar_vencimentos
-
+        _passo("rotina_hora", _rotina_hora)
+    if alertas.ligado() and _na_vez(numero, "ultima_verificacao_alertas", 5):
         try:
-            with sessao() as db:
-                processar_vencimentos(db)
-                campanhas.finalizar_cadencias(db)
-            from . import reservas
-
-            with sessao() as db:
-                reservas.preencher_reservas_antigas(db)  # só na primeira vez
-                liberadas = reservas.liberar_vencidas(db)
-                if liberadas:
-                    log.info("Reservas: %s empresas voltaram para a base (60 dias sem mudança)", liberadas)
+            alertas.verificar()  # e-mail para os administradores quando algo para (e quando volta)
         except Exception:  # noqa: BLE001
-            log.exception("Erro na rotina de hora em hora")
+            log.exception("Erro ao conferir os avisos")

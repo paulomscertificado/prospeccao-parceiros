@@ -38,7 +38,7 @@ pessoa: veja a lista e as regras em [permissoes.md](permissoes.md). Sem a permis
 | `GET /relatorios` · `/relatorios/exportar.{csv|xlsx|pdf}` | A G V | Relatórios |
 | `GET /exportar/{tipo}.{csv|xlsx|pdf}` | A G V | tipo = leads, parceiros, clientes, vendas, comissoes, vencimentos |
 | `GET/POST /ia` | A G V | IA Comercial (`?pergunta=codigo` para as perguntas prontas) |
-| `GET /configuracoes` e `POST /configuracoes/...` | A | Geral, score, usuários, integrações, base da Receita, LGPD, logs |
+| `GET /configuracoes` e `POST /configuracoes/...` | A | Geral, score, usuários, integrações, base da Receita, LGPD, logs; `POST /configuracoes/alertas/teste` manda o e-mail de teste dos avisos de problema |
 | `GET /portal`, `/portal/indicar`, `/portal/clientes`, `/portal/vencimentos` | P | Portal do parceiro |
 | `GET /oportunidades` · `POST /oportunidades/{id}/descartar` · `/descartar-varias` · `/{id}/reabrir` | A G V | Oportunidades (handoff): `?ver=` novas, assumidas, descartadas ou respostas, filtros `periodo`, `temperatura`, `canal`, `classe`, `busca` |
 | `POST /leads/{id}/assumir` | A G V | Assumir lead: para toda automação |

@@ -76,6 +76,8 @@ elif DATABASE_URL.startswith("postgresql://"):
 
 # Senha do agendador (Vercel Cron ou cron-job.org) que chama /api/cron a cada minuto.
 CRON_SECRET = os.environ.get("CRON_SECRET", "")
+# Avisos por e-mail quando algo para (app/alertas.py): sempre na nuvem; no computador, só com ALERTAS_LIGADOS=1
+ALERTAS_LIGADOS = os.environ.get("ALERTAS_LIGADOS", "0") == "1"
 # Segundos que cada chamada do agendador pode trabalhar (a Vercel corta em maxDuration do vercel.json).
 SEGUNDOS_POR_RODADA = int(os.environ.get("SEGUNDOS_POR_RODADA", "240"))
 
@@ -252,6 +254,10 @@ CONFIG_PADRAO = {
     "prioridade_canais": "whatsapp,email,linkedin",
     "limite_hora_email": "20",
     "limite_hora_whatsapp": "15",
+    "limite_frios_whatsapp": "20",         # contatos frios (quem nunca conversou) por número por dia
+    "pausa_frios_sair": "3",               # pedidos de SAIR no dia que pausam os frios do número até amanhã
+    "limite_banco_mb": "500",              # tamanho do banco contratado (aviso por e-mail em 80%)
+    "alertas_emails": "",                  # quem recebe os avisos de problema (vazio = os administradores)
     "limite_diario_campanha": "60",
     "limite_diario_dominio": "3",
     "horario_envio_inicio": "08:30",

@@ -450,6 +450,14 @@ def com_humano(lead: Lead) -> bool:
     return bool(lead.humano_id) or lead.etapa >= config.ETAPA_DO_STATUS["Humano assumiu"]
 
 
+def contato_frio(db, lead: Lead) -> bool:
+    """WhatsApp para quem nunca conversou com a MS: não autorizou, nunca respondeu de verdade (resposta de robô não
+    conta), não é parceiro e ninguém da equipe cuida dele. Estes contam no teto de frios de cada número."""
+    from . import campanhas
+
+    return not (campanhas.whatsapp_liberado(db, lead) or lead.parceiro_id or com_humano(lead))
+
+
 def processar_resposta(db, lead: Lead, texto: str, canal: str, usuario: Usuario | None = None,
                        registrar_entrada: bool = True, id_externo: str = "") -> dict:
     """Registra e interpreta a resposta do lead. Interesse → para tudo e entrega ao humano.
@@ -559,7 +567,8 @@ def _resposta_de_robo(db, lead: Lead, texto: str, canal: str, usuario, registrar
     (a próxima mensagem pode chegar numa pessoa)."""
     if registrar_entrada:
         enviada = ultima_mensagem_enviada(db, lead.id)
-        entrada = mensagens.registrar(db, lead.id, canal, texto, usuario, status="recebida", id_externo=id_externo)
+        entrada = mensagens.registrar(db, lead.id, canal, texto, usuario, status="recebida", id_externo=id_externo,
+                                      modo="robo")  # "robo": não conta como conversa (não libera WhatsApp sozinho)
         entrada.direcao = "entrada"
         entrada.campanha_id = enviada.campanha_id if enviada else None
         entrada.categoria_id = lead.categoria_id
@@ -734,6 +743,8 @@ def enviar_whatsapp_conectado(db, texto: str, usuario: Usuario | None, lead: Lea
         except conexoes.SemNumero as erro:
             raise EnvioRecusado(str(erro)) from None
     bloqueio = mensagens.limite_do_numero(db, conexao)
+    if not bloqueio and lead is not None and contato_frio(db, lead):
+        bloqueio = mensagens.limite_de_frios(db, conexao)  # teto de contatos frios do número e pausa por SAIR
     if bloqueio:
         raise EnvioRecusado(bloqueio)
     try:

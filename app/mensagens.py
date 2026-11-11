@@ -110,6 +110,60 @@ def limite_do_numero(db: Session, conexao: str) -> str:
     return ""
 
 
+def frios_hoje(db: Session, conexao: str) -> int:
+    """WhatsApps de hoje deste número para quem ainda não tinha conversado com a MS na hora do envio (não autorizou e
+    não tinha mandado mensagem de gente antes; parceiro e lead com alguém da equipe não contam)."""
+    from .sdr import com_humano, e_resposta_automatica
+
+    inicio = datetime.combine(agora().date(), datetime.min.time())
+    envios = db.execute(select(Mensagem.lead_id, Mensagem.criado_em).where(
+        Mensagem.direcao == "saida", Mensagem.canal == "whatsapp", Mensagem.conexao == conexao,
+        Mensagem.status.in_(ENVIADAS), Mensagem.criado_em >= inicio, Mensagem.lead_id.is_not(None))).all()
+    if not envios:
+        return 0
+    ids = {lid for lid, _ in envios}
+    leads = {l.id: l for l in db.execute(select(Lead).where(Lead.id.in_(ids))).scalars()}
+    primeira_de_gente: dict[int, datetime] = {}
+    for lid, quando, corpo in db.execute(select(Mensagem.lead_id, Mensagem.criado_em, Mensagem.corpo).where(
+            Mensagem.lead_id.in_(ids), Mensagem.canal == "whatsapp", Mensagem.status == "recebida",
+            Mensagem.modo != "robo")).all():
+        if not e_resposta_automatica(corpo or ""):
+            primeira_de_gente[lid] = min(quando, primeira_de_gente.get(lid, quando))
+    frios = 0
+    for lid, quando in envios:
+        lead = leads.get(lid)
+        if lead is None or lead.consentimento or lead.parceiro_id or com_humano(lead):
+            continue
+        if lid in primeira_de_gente and primeira_de_gente[lid] < quando:
+            continue
+        frios += 1
+    return frios
+
+
+def pedidos_para_sair_hoje(db: Session, conexao: str) -> int:
+    """Quantos pediram para sair (opt-out) hoje entre os que receberam WhatsApp deste número nos últimos 7 dias."""
+    inicio = datetime.combine(agora().date(), datetime.min.time())
+    sairam = select(Lead.id).where(Lead.opt_out_em >= inicio)
+    return db.execute(select(func.count(func.distinct(Mensagem.lead_id))).where(
+        Mensagem.lead_id.in_(sairam), Mensagem.direcao == "saida", Mensagem.canal == "whatsapp",
+        Mensagem.conexao == conexao, Mensagem.criado_em >= inicio - timedelta(days=7))).scalar() or 0
+
+
+def limite_de_frios(db: Session, conexao: str) -> str:
+    """Proteção do número contra bloqueio (auditoria de 11/11/2026): no máximo N contatos frios por número por dia
+    (limite_frios_whatsapp) e pausa dos frios até amanhã quando N pessoas pedem para sair no dia
+    (pausa_frios_sair). Quem já conversou com a MS não entra nesta conta. Vazio = pode."""
+    teto = ler_config_int(db, "limite_frios_whatsapp", 0)
+    if teto and frios_hoje(db, conexao) >= teto:
+        return (f"Este número já fez {teto} contatos frios hoje (limite de contatos frios por número, para não ser "
+                "bloqueado). O resto sai amanhã ou por outro número.")
+    pausa = ler_config_int(db, "pausa_frios_sair", 0)
+    if pausa and pedidos_para_sair_hoje(db, conexao) >= pausa:
+        return (f"Este número está com os contatos frios pausados até amanhã: {pausa} pessoas pediram para sair hoje "
+                "(limite de proteção contra bloqueio).")
+    return ""
+
+
 def enviadas_hoje_campanha(db: Session, campanha_id: int) -> int:
     return _contar_saida(db, datetime.combine(agora().date(), datetime.min.time()), Mensagem.campanha_id == campanha_id)
 

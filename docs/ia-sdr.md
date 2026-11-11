@@ -431,6 +431,31 @@ empresas, com as MESMAS colunas da `base_receita`, para reaproveitar `base_recei
   caminho do próprio sistema (`_destino_seguro`).
 - Testes: `testes/test_oportunidades_tela.py`.
 
+## Auditoria P0: brecha do WhatsApp, teto de frios e avisos por e-mail (nov/2026)
+
+- **Robô não libera WhatsApp sozinho (P0.3).** Antes, qualquer mensagem recebida (inclusive "recebemos sua
+  mensagem...") contava como conversa em `campanhas.whatsapp_liberado` (37 respostas de robô liberavam envio
+  automático). Agora `sdr._resposta_de_robo` grava a entrada com `modo="robo"` e `leads_que_conversaram` ignora
+  essas e as antigas que têm cara de robô (`sdr.e_resposta_automatica`). O filtro do banco em
+  `processar_fila_whatsapp` também ignora `modo="robo"`.
+- **Teto de contatos frios por número (P0.3).** `sdr.contato_frio` = não autorizou, nunca respondeu de gente, não é
+  parceiro e ninguém da equipe cuida. `sdr.enviar_whatsapp_conectado` (clique, Disparar, fila automática e Empresas
+  novas) chama `mensagens.limite_de_frios(db, conexao)` depois de escolher o número: no máximo
+  `limite_frios_whatsapp` (padrão 20) frios por número por dia (`mensagens.frios_hoje`, que confere se o lead já tinha
+  conversado na hora de cada envio) e pausa dos frios do número até amanhã com `pausa_frios_sair` (padrão 3) pedidos
+  de SAIR no dia entre quem recebeu dele nos últimos 7 dias (`pedidos_para_sair_hoje`). Os textos têm "limite" e
+  "este número" para a fila automática seguir com os outros números; no Disparar viram "número chegou ao teto de
+  contatos frios do dia" / "número pausado hoje: pedidos para sair" (`motivo_curto`). Dados de 11/11/2026: o número
+  u2 mandou 36 frios das Empresas novas no dia; o u6 chegou a 39 em 03/11. Testes: `testes/test_brecha_whatsapp.py`.
+- **Avisos por e-mail (P0.2).** `app/alertas.py`, chamado por `rotinas.rodada` a cada 5 minutos (só na nuvem ou com
+  `ALERTAS_LIGADOS=1`): ponte parada > 15 min, número em uso (enviou nos últimos 7 dias) desconectado > 15 min, banco
+  >= 80% de `limite_banco_mb`, rotina com 3 falhas seguidas (`rotinas._passo` chama `alertas.falhou/funcionou`),
+  e-mails falhando (5+ na última hora e metade ou mais), número pausado por SAIR, backup parado > 84 h e agendador
+  parado > 30 min (`marcar_rodada`, avisa quando volta). Estado em `alertas_estado` (config JSON): 1 e-mail por
+  problema, lembrete a cada 12 h, "✅ Resolvido" quando some. Vai para `alertas_emails` ou os administradores, e
+  também para o sino. Tela: Configurações > Integrações > "Avisos de problema por e-mail" (com e-mail de teste,
+  `POST /configuracoes/alertas/teste`). Testes: `testes/test_alertas.py`.
+
 ## Empresas novas: WhatsApp sai sozinho depois da aprovação (nov/2026)
 
 - Pedido da Maria em 11/11/2026 ("se eu aprovei a campanha, era para entrar na fila de disparos"). Antes, o WhatsApp

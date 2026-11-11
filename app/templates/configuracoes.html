@@ -134,6 +134,28 @@
   <p class="ajuda" style="margin-top:12px">As chaves ficam no arquivo <code>.env</code> da pasta do sistema (nunca na tela nem no banco). Passo a passo em <code>docs/configuracao.md</code>. Depois de mudar o .env, feche e abra o sistema de novo.</p>
   <p class="ajuda">Webhook do WhatsApp (para receber respostas e "SAIR" automaticamente): <code>{{ config.URL_PUBLICA }}/api/webhooks/whatsapp</code></p>
 </div>
+{% if painel_avisos %}<div class="cartao" style="max-width:860px" id="avisos"><h2>Avisos de problema por e-mail</h2>
+  <p>Quando algo para (o computador do WhatsApp, um número desconectado, e-mails falhando, o banco quase cheio, uma
+    rotina com erro ou o agendador parado), o sistema manda um e-mail na hora, um lembrete a cada 12 horas e outro
+    quando volta ao normal. O aviso também aparece no sino.</p>
+  <p>Recebem: {% if painel_avisos.para %}<b>{{ painel_avisos.para|join(', ') }}</b>{% else %}<span class="selo selo-erro">ninguém</span>{% endif %}
+    <span class="pequeno suave">(troque em Geral &gt; "Avisos de problema · e-mails que recebem")</span></p>
+  {% if not painel_avisos.ligado %}<p class="aviso aviso-info">Os avisos só funcionam no sistema da nuvem.</p>{% endif %}
+  {% if not painel_avisos.email_ok %}<p class="aviso aviso-erro">O e-mail de envio não está configurado: os avisos aparecem só no sino.</p>{% endif %}
+  {% if painel_avisos.banco_mb is not none %}<p>Banco de dados: <b>{{ '%.0f'|format(painel_avisos.banco_mb) }} MB</b>{% if painel_avisos.banco_limite %} de {{ painel_avisos.banco_limite }} MB
+    <span class="selo {{ 'selo-erro' if painel_avisos.banco_mb >= 0.8 * painel_avisos.banco_limite else 'selo-ok' }}">{{ '%.0f'|format(100 * painel_avisos.banco_mb / painel_avisos.banco_limite) }}%</span>{% endif %}</p>{% endif %}
+  {% set b = painel_avisos.backup %}
+  <p>Cópia de segurança (backup): {% if b.em %}<b>{{ b.em[8:10] }}/{{ b.em[5:7] }} às {{ b.em[11:16] }}</b>, {{ b.tamanho_mb }} MB,
+    criptografada e conferida ·
+    {% if b.fora_do_pc %}<span class="selo selo-ok">cópia fora do computador</span>{% else %}<span class="selo selo-alerta">só no computador da MS</span>
+    <span class="pequeno suave">(instale o Google Drive para computador com o e-mail da MS e a próxima cópia vai para lá)</span>{% endif %}
+    {% else %}<span class="selo selo-alerta">ainda sem registro</span> <span class="pequeno suave">(o computador da MS faz todo dia depois do meio-dia)</span>{% endif %}</p>
+  {% if painel_avisos.ativos %}<h3>Problemas abertos agora</h3>
+  <ul>{% for a in painel_avisos.ativos %}<li><b>{{ a.titulo }}</b> <span class="pequeno suave">desde {{ a.desde[8:10] }}/{{ a.desde[5:7] }} {{ a.desde[11:16] }}{{ ' · e-mail enviado' if a.avisado_em else ' · esperando confirmar' }}</span></li>{% endfor %}</ul>
+  {% else %}<p><span class="selo selo-ok">Nenhum problema aberto</span></p>{% endif %}
+  {% if pode('configuracoes.alterar') %}<form method="post" action="/configuracoes/alertas/teste" style="margin-top:8px">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">Mandar e-mail de teste do aviso</button></form>{% endif %}
+</div>{% endif %}
 <div class="cartao" style="max-width:860px" id="cnpja"><h2>CNPJá (Empresas novas)</h2>
   <p>A API paga da <b>CNPJá</b> traz, todo dia, as empresas que acabaram de abrir para a campanha de venda do e-CNPJ
     (menu <a href="/empresas-novas">Empresas novas</a>). Cada 10 empresas encontradas gastam 1 crédito.</p>
