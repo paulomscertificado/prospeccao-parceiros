@@ -62,6 +62,15 @@
 </div>
 {% endmacro %}
 
+{# Cancelar de uma vez os envios que estão na tela. Só aparece com algum filtro escolhido (evita cancelar tudo sem querer). #}
+{% macro cancelar_mostrados(ids, voltar) %}{% if ids %}
+<form class="inline" method="post" action="/fila/cancelar-varios"
+      data-confirmar="Cancelar os {{ ids|length }} envios mostrados? Eles não vão mais sair.">
+  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar_para" value="{{ voltar }}">
+  <input type="hidden" name="ids" value="{{ ids|join(',') }}">
+  <button class="btn btn-pequeno btn-perigo">Cancelar os {{ ids|length }} envios mostrados</button></form>
+{% endif %}{% endmacro %}
+
 {# Um toque que ainda vai sair: hora, empresa, canais (ver e editar a mensagem), situação e o botão certo. #}
 {% macro linha_proximo(p, voltar) %}{% set t = p.t %}{% set canais_t = canais_do_toque(t) %}
 <div class="linha-fila linha-prox">
@@ -101,6 +110,10 @@
         <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="canal" value="{{ c }}">
         <input type="hidden" name="voltar_para" value="{{ voltar }}">
         <button class="btn btn-pequeno {{ 'btn-verde' if c == 'whatsapp' else 'btn-primario' }}">{{ 'Enviar por WhatsApp' if c == 'whatsapp' else 'Enviar por e-mail' }}</button></form>
-      {% endif %}{% endfor %}</div></div>
+      {% endif %}{% endfor %}
+      <form class="inline" method="post" action="/fila/cancelar/{{ t.id }}"
+            data-confirmar="Cancelar este envio para {{ t.lead.empresa if t.lead else 'a empresa' }}? Ele não vai mais sair.">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar_para" value="{{ voltar }}">
+        <button class="btn btn-pequeno btn-perigo" title="Cancelar este envio: ele não vai sair">Cancelar</button></form></div></div>
 </div>
 {% endmacro %}

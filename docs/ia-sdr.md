@@ -421,3 +421,8 @@ empresas, com as MESMAS colunas da `base_receita`, para reaproveitar `base_recei
 - Minha fila e Envios (`fila._situacao`, parâmetro `automaticas`): "Sai sozinho: campanha de Empresas novas aprovada";
   toque futuro mostra "(sai sozinho)" ou "(vai esperar o seu clique)".
 - Campanhas de parceiros: sem mudança (contato frio = clique). Testes: `testes/test_empresas_novas_automatico.py`.
+- **Cancelar envios** (Minha fila e Envios, nov/2026): `POST /fila/cancelar/{id}` (um toque) e `POST /fila/cancelar-varios`
+  (os ids mostrados na tela, no máximo `LIMITE_MOSTRAR`; o botão só aparece com algum filtro escolhido). Permissão
+  `fila.enviar` + dono da campanha ou responsável pelo lead (`_toque_permitido`). `campanhas.cancelar_toques` cancela
+  só os toques escolhidos, grava histórico e registro (`cancelou_envio`/`cancelou_envios`) e devolve a empresa sem
+  toque em aberto para "Pesquisando"/"Novo". Testes: `testes/test_fila_cancelar.py`.

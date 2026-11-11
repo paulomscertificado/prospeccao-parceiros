@@ -117,6 +117,9 @@ numa conversa sem fim. Se o mesmo lead mandar várias mensagens, tudo fica na me
   Para achar um envio, use os filtros: **Quando** (todos, hoje e atrasados, atrasados, hoje, amanhã, próximos dias),
   **Situação**, a **campanha** e a **busca pelo nome da empresa**. Cada filtro mostra quantos envios há nele;
   **Limpar filtros** volta a mostrar tudo.
+  **Cancelar:** o botão vermelho **Cancelar** de cada envio tira só aquele envio da fila (ele não sai mais; os outros
+  toques da empresa continuam). Com um filtro escolhido aparece também **Cancelar os N envios mostrados**, para
+  cancelar de uma vez, por exemplo, todos os atrasados de uma campanha. O sistema pede confirmação antes.
 - **Na fila do WhatsApp:** o que está saindo agora, um por vez;
 - **Histórico (7 dias):** o que saiu ou falhou, com o erro de quem não saiu;
 - **Registro dos disparos:** disparos e testes.

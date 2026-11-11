@@ -487,6 +487,31 @@ def cancelar(db, camp: Campanha, usuario: Usuario) -> int:
     return len(tarefas)
 
 
+def cancelar_toques(db, tarefas: list[Tarefa], usuario: Usuario, origem: str = "Minha fila") -> int:
+    """Botão Cancelar da Minha fila e de Envios: cancela só os toques escolhidos que ainda não saíram (os outros toques
+    da empresa continuam). A empresa que fica sem nenhum toque em aberto volta para "Pesquisando"/"Novo", como ao
+    cancelar a campanha, e pode entrar em outra campanha. Devolve quantos foram cancelados."""
+    cancelados = 0
+    afetados: dict[int, Lead] = {}
+    for t in tarefas:
+        if t.status not in ("pendente", "rascunho"):
+            continue  # já saiu ou já foi cancelado
+        t.status, t.concluida_em = "cancelada", agora()
+        t.resultado = f"Cancelado por {usuario.nome} ({origem})"
+        cancelados += 1
+        if t.lead_id:
+            afetados[t.lead_id] = t.lead
+            historico(db, t.lead_id, "campanha", f"Envio de {config.CANAIS.get(t.canal, t.canal)} programado para "
+                                                 f"{t.data:%d/%m} cancelado por {usuario.nome} ({origem}).", usuario)
+    db.flush()
+    for lead_id, lead in afetados.items():
+        em_aberto = db.execute(select(Tarefa.id).where(Tarefa.lead_id == lead_id, Tarefa.tipo == "prospeccao",
+                                                       Tarefa.status.in_(["pendente", "rascunho"])).limit(1)).first()
+        if not em_aberto and lead is not None and lead.status == "Abordagem criada":
+            lead.status = "Pesquisando" if lead.pesquisado_em else "Novo"
+    return cancelados
+
+
 def excluir(db, camp: Campanha, usuario: Usuario) -> None:
     """Apaga a campanha. Antes cancela o que estava programado; as empresas (leads) e o histórico das mensagens
     já enviadas continuam no sistema."""

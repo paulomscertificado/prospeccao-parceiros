@@ -245,7 +245,7 @@ def minha_fila(request: Request, de: str = "", canal: str = "", aba: str = "prox
         "aba": aba, "periodo": periodo, "situacao": situacao, "campanha": camp_id, "busca": busca.strip(),
         "PERIODOS": PERIODOS, "SITUACOES": SITUACOES, "contagem_periodo": contagem_periodo,
         "contagem_situacao": contagem_situacao, "grupos": _agrupar_por_dia(filtrados[:LIMITE_MOSTRAR], hoje),
-        "limite_mostrar": LIMITE_MOSTRAR,
+        "limite_mostrar": LIMITE_MOSTRAR, "ids_mostrados": [p["t"].id for p in filtrados[:LIMITE_MOSTRAR]],
         "total_filtrados": len(filtrados), "opcoes_campanha": opcoes_campanha, "url_fila": url_fila,
         "filtrando": bool(situacao or camp_id or termo or periodo != "todos"),
     })
@@ -279,6 +279,56 @@ async def enviar_agora(request: Request, tid: int, usuario: Usuario = Depends(ex
         avisar(request, "Mensagem colocada na fila do WhatsApp." if t.canal == "whatsapp" else "E-mail enviado.")
     db.commit()
     return voltar(str(form.get("voltar_para") or "/fila"))
+
+
+def _toque_permitido(db, usuario: Usuario, tid: int) -> Tarefa | None:
+    """O toque de campanha, se a pessoa pode mexer nele (o dono da campanha ou o responsável pelo lead)."""
+    t = db.get(Tarefa, tid)
+    camp = db.get(Campanha, t.campanha_id) if t and t.campanha_id else None
+    if t is None or camp is None:
+        return None
+    lead = t.lead
+    if not autorizacao.pode(usuario, "fila.enviar", dono={camp.usuario_id, lead.vendedor_id if lead else None}):
+        return None
+    return t
+
+
+@rotas.post("/fila/cancelar/{tid:int}", dependencies=[Depends(verificar_csrf)])
+async def cancelar_envio(request: Request, tid: int, usuario: Usuario = Depends(exige("fila.enviar")),
+                         db: Session = Depends(obter_db)):
+    """Botão Cancelar de um envio que ainda não saiu (Minha fila e Envios)."""
+    form = await request.form()
+    destino = str(form.get("voltar_para") or "/fila")
+    t = _toque_permitido(db, usuario, tid)
+    if t is None:
+        raise HTTPException(404)
+    if t.status != "pendente":
+        avisar(request, "Este envio já saiu ou já foi cancelado.", "alerta")
+        return voltar(destino)
+    nome = t.lead.empresa if t.lead else "a empresa"
+    campanhas.cancelar_toques(db, [t], usuario)
+    registrar_log(db, usuario, "cancelou_envio", "tarefa", t.id, f"{t.canal} de {t.data:%d/%m} ({nome})", request)
+    avisar(request, f"Envio para {nome} cancelado: ele não vai mais sair.")
+    db.commit()
+    return voltar(destino)
+
+
+@rotas.post("/fila/cancelar-varios", dependencies=[Depends(verificar_csrf)])
+async def cancelar_varios(request: Request, usuario: Usuario = Depends(exige("fila.enviar")),
+                          db: Session = Depends(obter_db)):
+    """Botão "Cancelar os N envios mostrados": cancela os envios que estão na tela com os filtros escolhidos."""
+    form = await request.form()
+    destino = str(form.get("voltar_para") or "/fila")
+    ids = [i for i in (util.para_int(x) for x in str(form.get("ids") or "").split(",")) if i][:LIMITE_MOSTRAR]
+    tarefas = [t for t in (_toque_permitido(db, usuario, i) for i in ids) if t is not None and t.status == "pendente"]
+    total = campanhas.cancelar_toques(db, tarefas, usuario)
+    if total:
+        registrar_log(db, usuario, "cancelou_envios", "fila", None, f"{total} envios cancelados de uma vez", request)
+        avisar(request, f"{total} envio(s) cancelado(s): eles não vão mais sair.")
+    else:
+        avisar(request, "Nenhum envio para cancelar (já saíram ou já foram cancelados).", "alerta")
+    db.commit()
+    return voltar(destino)
 
 
 @rotas.post("/fila/mensagem/{tid:int}", dependencies=[Depends(verificar_csrf)])

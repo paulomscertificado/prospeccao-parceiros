@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}Envios{% endblock %}
 {% block conteudo %}
-{% from "_proximo_envio.html" import estilos_proximos, filtros_chips, linha_proximo with context %}
+{% from "_proximo_envio.html" import estilos_proximos, filtros_chips, linha_proximo, cancelar_mostrados with context %}
 {{ estilos_proximos() }}
 <style>
   .kpis-envio { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); margin-bottom: 16px; }
@@ -144,6 +144,7 @@
   <p class="pequeno suave" style="margin:4px 0 0">Toques das campanhas ativas que ainda não saíram (atrasados, de hoje e dos próximos 7 dias). A hora é a <b>programada</b>: "atrasado" quer dizer que a hora passou e o envio ainda espera, com o motivo ao lado.
     {% if filtrando_proximos %}Mostrando <b>{{ [total_prox_filtrados, limite_mostrar]|min }}</b> de {{ total_proximos }}.{% endif %}
     {% if total_prox_filtrados > limite_mostrar %}<b>Aparecem os {{ limite_mostrar }} primeiros de {{ total_prox_filtrados }}:</b> use os filtros para achar os outros.{% endif %}</p>
+  {% if filtrando_proximos %}<div style="margin:8px 0 0">{{ cancelar_mostrados(ids_mostrados, '/envios' ~ ('?' ~ request.url.query if request.url.query else '')) }}</div>{% endif %}
   {% set voltar = '/envios' ~ ('?' ~ request.url.query if request.url.query else '') %}
   {% for g in grupos_proximos %}
   <h3 class="dia-fila {{ 'dia-atrasado' if g.atrasado }}">{{ g.titulo }} <span class="detalhe-dia">{{ g.detalhe }}</span>
