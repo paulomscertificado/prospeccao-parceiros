@@ -94,7 +94,11 @@ pessoas escolhidas). Conversas filtram por número acessível.
 **Tela Conversas** (`rotas/conversas.py`, menu "Conversas"): a troca manda `desde_conversas` e o retorno traz
 `conversas` = todas as mensagens do WhatsApp Leads (qualquer contato, entrada e saída) depois desse id, de 300 em
 300 (`integracao.conversas_desde`), mais o status das enviadas nas últimas 6 h. Ficam em `mensagens_whatsapp`
-(chave = telefone com DDD, sem 55). Enquanto há lote cheio (`wl_conv_pendente`) a ponte troca a cada 3 s.
+(chave = telefone com DDD, sem 55 e **com o 9 dos celulares**: `util.com_nono_digito`, em `_guardar_conversas` e
+em `conversas._chave`). O WhatsApp entrega muitos celulares antigos sem o 9; até nov/2026 a chave ficava sem ele e a
+mensagem escrita na tela (com o 9) ia para outra conversa e "sumia". As linhas antigas foram ajustadas por
+`banco.migrar_conversas_com_nono` (roda em `criar_tabelas`; a marca `dados:conversas-com-nono` na versão do esquema
+faz a nuvem rodar uma vez). A busca por número acha com ou sem o 9. Enquanto há lote cheio (`wl_conv_pendente`) a ponte troca a cada 3 s.
 O que se escreve na tela vira `ponte_whatsapp.manual = 1` → `integracao.enviar_manual` → fila "manual" (sai na
 hora). Opt-out da Prospecção bloqueia; quando o número é de um lead, entra no histórico dele.
 

@@ -77,6 +77,16 @@ def normalizar_telefone(telefone: str) -> str:
     return d if len(d) in (10, 11) else ""
 
 
+def com_nono_digito(telefone: str) -> str:
+    """Celular brasileiro sempre com o 9 da frente. O WhatsApp entrega muitos celulares antigos sem ele
+    ((81) 8888-7777 é o mesmo que (81) 98888-7777). Fixo (começa com 2 a 5) fica como está; vazio se não for
+    telefone brasileiro."""
+    d = normalizar_telefone(telefone)
+    if len(d) == 10 and d[2] in "6789":
+        return d[:2] + "9" + d[2:]
+    return d
+
+
 def formatar_telefone(telefone: str) -> str:
     d = normalizar_telefone(telefone)
     if len(d) == 11:

@@ -533,12 +533,16 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
         r = campanhas.disparar(db, camp, usuario, canal)
         partes = [f"{r['enviados']} mensagem(ns) de {nome} "
                   + ("na fila do WhatsApp (sai uma por vez, com pausas)" if canal == "whatsapp" else "enviada(s)")]
+        motivos = campanhas.resumo_dos_motivos(r["motivos"])
         if r["bloqueados"]:
-            partes.append(f"{r['bloqueados']} não saíram agora (controle de frequência ou opt-out)")
+            partes.append(f"{r['bloqueados']} não saíram agora" + (f": {motivos}" if motivos else ""))
         if r["parou"]:
             partes.append("Parou: " + r["parou"])
         partes += r["erros"]
-        registrar_log(db, usuario, f"disparou_campanha_{canal}", "campanha", cid, f"{r['enviados']} enviadas", request)
+        # o motivo fica no registro: dá para entender depois por que um disparo saiu com 0
+        detalhes = f"{r['enviados']} enviadas" + (f"; não saíram: {motivos}" if motivos else "") \
+            + (f"; parou: {r['parou']}" if r["parou"] else "")
+        registrar_log(db, usuario, f"disparou_campanha_{canal}", "campanha", cid, detalhes[:1000], request)
         avisar(request, ". ".join(partes) + ".", "ok" if r["enviados"] and not (r["parou"] or r["erros"]) else "alerta")
         db.commit()
         return voltar(f"/campanhas/{cid}#disparar")

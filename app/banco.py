@@ -157,6 +157,28 @@ def migrar_status(db: Session) -> int:
     return total
 
 
+def migrar_conversas_com_nono(db: Session) -> int:
+    """Cópia das conversas do WhatsApp: celular guardado sem o 9 (como o WhatsApp entrega os números antigos)
+    passa a ter o 9, igual ao que se digita na tela Conversas (util.com_nono_digito). Sem isso, a mensagem enviada
+    pela tela ia para outra conversa e não aparecia. Pode rodar de novo: só mexe no que ainda está sem o 9."""
+    from sqlalchemy import text
+
+    from .modelos import ContatoWhatsApp
+
+    sem_nove = "length(telefone) = 10 AND substr(telefone, 3, 1) IN ('6', '7', '8', '9')"
+    total = db.execute(text("UPDATE mensagens_whatsapp SET telefone = substr(telefone, 1, 2) || '9' || "
+                            f"substr(telefone, 3) WHERE {sem_nove}")).rowcount or 0
+    for contato in db.execute(select(ContatoWhatsApp).where(text(sem_nove))).scalars().all():
+        novo = contato.telefone[:2] + "9" + contato.telefone[2:]
+        existente = db.get(ContatoWhatsApp, novo)
+        if existente is None:
+            db.add(ContatoWhatsApp(telefone=novo, nome=contato.nome, atualizado_em=contato.atualizado_em))
+        elif not existente.nome:
+            existente.nome = contato.nome
+        db.delete(contato)
+    return total
+
+
 def criar_tabelas() -> None:
     from . import base_receita, bases_importadas, modelos  # noqa: F401  (registra as tabelas)
 
@@ -177,6 +199,7 @@ def criar_tabelas() -> None:
         autorizacao.preparar(db)
         migrar_status(db)
         base_receita.ajustar_base_antiga(db)
+        migrar_conversas_com_nono(db)
 
 
 _banco_pronto = False
@@ -194,6 +217,7 @@ def _versao_do_esquema() -> str:
     from .autorizacao import CATALOGO
 
     partes += [f"{p.codigo}:{p.padrao}" for p in CATALOGO]  # permissão nova: a nuvem dá o padrão aos papéis
+    partes += ["dados:conversas-com-nono"]  # ajuste de dados novo (migrar_conversas_com_nono): roda uma vez na nuvem
     return hashlib.sha256("|".join(partes).encode()).hexdigest()[:16]
 
 

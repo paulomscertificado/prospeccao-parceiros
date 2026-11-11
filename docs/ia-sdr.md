@@ -374,3 +374,16 @@ empresas, com as MESMAS colunas da `base_receita`, para reaproveitar `base_recei
   `chave_whatsapp`. Sem a chave, a resposta pelo WhatsApp não era ligada à empresa (`sdr.lead_pelo_telefone`) quando
   o telefone fixo era outro.
 - Testes: `testes/test_revisao_filas.py`.
+
+## Ligação com o WhatsApp (nov/2026)
+
+- **Conversas com o 9**: ver `docs/deploy-vercel.md` (Tela Conversas). A mensagem escrita na tela para um celular
+  antigo ia para a conversa "sem o 9" e não aparecia para quem enviou.
+- **Disparo com motivo** (`campanhas.disparar`): cada mensagem que não sai conta em `motivos` (`motivo_curto`:
+  WhatsApp em branco, opt-out, controle de frequência, número inválido ou o texto do erro, ex.: lead sem
+  responsável). O aviso mostra `resumo_dos_motivos` e o registro (`disparou_campanha_*`, tela Fila de envios) também.
+  Antes tudo virava "controle de frequência ou opt-out".
+- **WhatsApp Leads** (computador): uma cópia só por vez (`iniciar.pegar_trava`) e religamento sozinho quando a conexão
+  não consegue falar com o WhatsApp ao ligar (ver `whatsapp-leads/docs/api.md`, seção 8).
+- Testes: `testes/test_nuvem.py::test_conversa_de_celular_antigo_fica_com_o_9` e
+  `testes/test_revisao_filas.py::test_disparo_explica_por_que_nao_saiu`.

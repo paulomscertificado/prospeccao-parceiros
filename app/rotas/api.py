@@ -165,7 +165,8 @@ def _guardar_conversas(db, conversas: dict) -> None:
     for m in mensagens:
         if int(m["id"]) in existentes:
             continue
-        telefone = util.normalizar_telefone(m.get("telefone", "")) or util.so_digitos(m.get("telefone", ""))
+        # celular sempre com o 9 (o WhatsApp entrega números antigos sem ele): é a chave da conversa na tela
+        telefone = util.com_nono_digito(m.get("telefone", "")) or util.so_digitos(m.get("telefone", ""))
         try:
             criado = datetime.fromisoformat(str(m.get("criado_em", ""))[:19])
         except ValueError:

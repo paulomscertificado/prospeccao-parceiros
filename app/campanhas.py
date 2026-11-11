@@ -948,7 +948,11 @@ def disparar(db, camp: Campanha, usuario: Usuario, canal: str) -> dict:
     """Clique em "Disparar campanha" (WhatsApp ou e-mail): manda AGORA, pelo canal escolhido, o toque de hoje de
     cada empresa. Continua 1 a 1, com horário, limites, controle de frequência e opt-out; o WhatsApp entra na fila
     do WhatsApp Leads (pausas e limite diário de lá). O que não sair agora continua programado."""
-    feito = {"enviados": 0, "bloqueados": 0, "erros": [], "parou": ""}
+    from collections import Counter
+
+    # "motivos": por que cada uma não saiu (antes tudo virava "controle de frequência ou opt-out", até o
+    # WhatsApp em branco na ficha, e a pessoa não sabia o que corrigir)
+    feito = {"enviados": 0, "bloqueados": 0, "erros": [], "parou": "", "motivos": Counter()}
     if canal not in ("whatsapp", "email"):
         return feito
     if not mensagens.dentro_do_horario(db):
@@ -963,6 +967,7 @@ def disparar(db, camp: Campanha, usuario: Usuario, canal: str) -> dict:
             if "limite" in bloqueio.lower() and "domínio" not in bloqueio:
                 feito["parou"] = bloqueio
                 break
+            feito["motivos"][motivo_curto(bloqueio)] += 1
             continue
         if canal == "email":
             erro = _enviar_email_da_tarefa(db, t, usuario, f"Disparado por {usuario.nome}")
@@ -982,10 +987,30 @@ def disparar(db, camp: Campanha, usuario: Usuario, canal: str) -> dict:
                     feito["parou"] = texto_erro
                     break
                 feito["bloqueados"] += 1
+                feito["motivos"][motivo_curto(texto_erro)] += 1
                 continue
             t.resultado = f"Disparado por {usuario.nome}"
         feito["enviados"] += 1
     return feito
+
+
+def motivo_curto(texto: str) -> str:
+    """Por que uma mensagem do disparo não saiu, em poucas palavras (as do mesmo motivo são contadas juntas)."""
+    t = (texto or "").lower()
+    if texto == sdr.SEM_WHATSAPP or "não tem whatsapp/telefone" in t:
+        return "campo WhatsApp em branco na ficha"
+    if "opt-out" in t:
+        return "pediu para não receber mensagens (opt-out)"
+    if "controle de frequência" in t:
+        return "recebeu mensagem há pouco (controle de frequência)"
+    if "inválido" in t or "anonimizado" in t:
+        return "número marcado como inválido"
+    return (texto or "motivo desconhecido").strip().rstrip(".")
+
+
+def resumo_dos_motivos(motivos) -> str:
+    """Ex.: "campo WhatsApp em branco na ficha (3); recebeu mensagem há pouco (controle de frequência) (1)"."""
+    return "; ".join(f"{m} ({n})" for m, n in motivos.most_common())
 
 
 def whatsapp_liberado(db, lead: Lead) -> bool:

@@ -176,3 +176,32 @@ def test_fim_de_cadencia_numa_consulta_so(cliente):
         assert parado.status == "Perdido" and parado.motivo_perda == "Sem resposta"
         assert ativo.status == "Contatado"  # ainda tem toque pela frente
         db.rollback()
+
+
+def test_disparo_explica_por_que_nao_saiu(cliente, monkeypatch):
+    """Antes, toda mensagem que não saía no "Disparar" virava "controle de frequência ou opt-out" (até número sem
+    responsável). Agora o aviso e o registro dizem o motivo de cada uma, agrupado."""
+    from collections import Counter
+
+    assert campanhas.motivo_curto(sdr.SEM_WHATSAPP) == "campo WhatsApp em branco na ficha"
+    assert campanhas.motivo_curto("Este contato pediu para não receber mensagens (opt-out).").startswith("pediu")
+    assert campanhas.motivo_curto("Este lead não tem responsável. Defina o vendedor.") == \
+        "Este lead não tem responsável. Defina o vendedor"
+    assert campanhas.resumo_dos_motivos(Counter({"a": 1, "campo WhatsApp em branco na ficha": 3})) == \
+        "campo WhatsApp em branco na ficha (3); a (1)"
+    monkeypatch.setattr(campanhas.mensagens, "dentro_do_horario", lambda db: True)
+    monkeypatch.setattr(campanhas.mensagens, "bloqueio_de_envio", lambda db, lead, canal, campanha_id=None: (
+        "Já houve um WhatsApp para este lead há menos de 72 horas (controle de frequência do WhatsApp)."))
+    with sessao() as db:
+        camp = _campanha(db, "Disparo com motivos")
+        lead = Lead(empresa="Contabil Motivo Disparo", whatsapp="(81) 99876-1001", cidade="Recife", estado="PE")
+        db.add(lead)
+        db.flush()
+        t = Tarefa(tipo="prospeccao", lead_id=lead.id, canal="whatsapp", data=date.today(), campanha_id=camp.id,
+                   status="pendente", mensagem="Oi", mensagem_whatsapp="Oi")
+        db.add(t)
+        db.flush()
+        r = campanhas.disparar(db, camp, _admin(db), "whatsapp")
+        camp.status, t.status = "pausada", "cancelada"  # não deixa nada na fila dos outros testes
+    assert r["enviados"] == 0 and r["bloqueados"] == 1
+    assert r["motivos"] == Counter({"recebeu mensagem há pouco (controle de frequência)": 1})

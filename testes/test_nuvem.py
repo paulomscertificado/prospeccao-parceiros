@@ -330,3 +330,44 @@ def test_nome_do_contato_editavel(cliente, nuvem):
     # nome digitado na "Nova mensagem" também fica guardado
     cliente.post("/conversas/api/enviar", json={"telefone": "81911110002", "nome": "Pedro Novo", "texto": "Oi"}, headers=h)
     assert cliente.get("/conversas/api/conversa/81911110002").json()["nome"] == "Pedro Novo"
+
+
+def test_conversa_de_celular_antigo_fica_com_o_9(cliente, nuvem):
+    """O WhatsApp entrega muitos celulares antigos sem o 9 ((81) 8777-0005). A conversa guarda o número com o 9: quem
+    procura ou escreve pelo número completo vê tudo. Antes, a mensagem enviada pela tela ia para uma conversa "sem o
+    9" e não aparecia (15 casos na nuvem até 10/11/2026)."""
+    from app import util
+    from app.banco import migrar_conversas_com_nono
+    from app.modelos import ContatoWhatsApp, MensagemWhatsApp
+
+    assert util.com_nono_digito("+55 81 8777-0005") == "81987770005"
+    assert util.com_nono_digito("(81) 3333-4444") == "8133334444"  # fixo fica como está
+    assert util.com_nono_digito("81987770005") == "81987770005"
+    cab = {"x-token": TOKEN_PONTE}
+    inicio = cliente.post("/api/ponte/troca", json={"status": {}}, headers=cab).json()["desde_conversas"]
+    msgs = [{"id": inicio + 1, "direcao": "entrada", "texto": "Oi, sou cliente antigo", "status": "recebida", "erro": "",
+             "origem": "celular", "criado_em": "2026-11-10 09:00:00", "telefone": "+558187770005", "nome": "Antigo"},
+            {"id": inicio + 2, "direcao": "saida", "texto": "Olá! Já te respondo.", "status": "enviada", "erro": "",
+             "origem": "manual", "criado_em": "2026-11-10 09:01:00", "telefone": "+558187770005", "nome": "Antigo"}]
+    cliente.post("/api/ponte/retorno", headers=cab, json={"confirmados": [], "novidades": {},
+                                                          "conversas": {"mensagens": msgs, "status": [],
+                                                                        "ultimo_id": inicio + 2}})
+    textos = ["Oi, sou cliente antigo", "Olá! Já te respondo."]
+    assert [m["texto"] for m in cliente.get("/conversas/api/conversa/81987770005").json()["mensagens"]] == textos
+    assert [m["texto"] for m in cliente.get("/conversas/api/conversa/8187770005").json()["mensagens"]] == textos
+    for busca in ("81987770005", "8187770005", "(81) 98777-0005", "8777-0005"):
+        lista = cliente.get("/conversas/api/lista", params={"busca": busca}).json()["conversas"]
+        assert any(c["telefone"] == "81987770005" for c in lista), busca
+    with sessao() as db:  # conversas já guardadas sem o 9 são ajustadas uma vez (na nuvem, ao publicar)
+        db.add(MensagemWhatsApp(id_wl=inicio + 50, telefone="8186660006", direcao="entrada", texto="antiga sem 9"))
+        db.add(MensagemWhatsApp(id_wl=inicio + 51, telefone="8133336666", direcao="entrada", texto="fixo"))
+        db.add(ContatoWhatsApp(telefone="8186660006", nome="Nome Escolhido"))
+    with sessao() as db:
+        assert migrar_conversas_com_nono(db) == 1
+    with sessao() as db:
+        tel = {m.id_wl: m.telefone for m in db.execute(select(MensagemWhatsApp).where(
+            MensagemWhatsApp.id_wl.in_([inicio + 50, inicio + 51]))).scalars()}
+        assert tel == {inicio + 50: "81986660006", inicio + 51: "8133336666"}
+        assert db.get(ContatoWhatsApp, "81986660006").nome == "Nome Escolhido"
+        assert db.get(ContatoWhatsApp, "8186660006") is None
+        assert migrar_conversas_com_nono(db) == 0  # rodar de novo não muda nada

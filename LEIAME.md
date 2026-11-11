@@ -32,6 +32,8 @@ no navegador, de qualquer lugar: não precisa do `iniciar.bat`. O passo a passo 
 - Menu **Conversas**: todas as conversas do número conectado (lista à esquerda, conversa à direita), com
   busca por nome ou telefone. Escreva e aperte **Enter** para responder. **+ Nova mensagem** manda para qualquer
   celular (digite com DDD). Sai na hora pelo número da MS; quem pediu SAIR não recebe.
+  O celular aparece sempre com o 9 na frente, mesmo quando o WhatsApp entrega o número antigo sem ele; a busca
+  acha o contato digitando o número com ou sem o 9.
   Para trocar o nome de um contato, abra a conversa e clique em **✏️ Editar nome** (o nome muda também no
   WhatsApp Leads).
   As conversas antigas (até 1 ano) chegam quando o celular é conectado pelo QR code. Para puxar de novo: menu
@@ -118,7 +120,9 @@ Admin e gestor podem ver a fila de outra pessoa ou da equipe toda.
 
 **Disparar campanha (qualquer pessoa da equipe):** na página da campanha ativa, **🚀 Disparar campanha** tem os
 botões **Disparar campanha WhatsApp** e **Disparar campanha e-mail**. Eles mandam na hora o toque de hoje de cada
-empresa pelo canal escolhido, um por vez, com horário, limites, controle de frequência e opt-out.
+empresa pelo canal escolhido, um por vez, com horário, limites, controle de frequência e opt-out. Quando alguma
+não sai, o aviso diz o motivo de cada uma (ex.: "recebeu mensagem há pouco (controle de frequência) (2)"), e o mesmo
+fica registrado em **Fila de envios**.
 
 **Número que dispara (só administrador):** no passo 4 da campanha (ou depois, na página da campanha), o
 administrador escolhe **"WhatsApp que vai disparar"**. Em "Automático", cada mensagem sai pelo número do responsável

@@ -25,8 +25,10 @@ rotas = APIRouter()
 
 
 def _chave(telefone: str) -> str:
-    """Chave da conversa: DDD + número, sem o 55 (números estrangeiros: só os dígitos)."""
-    return util.normalizar_telefone(telefone) or util.so_digitos(telefone)
+    """Chave da conversa: DDD + número, sem o 55 e com o 9 dos celulares (números estrangeiros: só os dígitos).
+    Com o 9 sempre, a conversa é a mesma quer o WhatsApp entregue o número antigo (sem o 9), quer a pessoa
+    digite o número completo. Antes a mensagem enviada aqui ia para uma conversa "sem o 9" e não aparecia."""
+    return util.com_nono_digito(telefone) or util.so_digitos(telefone)
 
 
 def _nomes_escolhidos(db: Session) -> dict[str, str]:
@@ -99,6 +101,8 @@ def lista(busca: str = "", numero: str = "", usuario: Usuario = Depends(exige("c
                                                  .where(ContatoWhatsApp.nome.ilike(f"%{termo}%")))]
         if util.so_digitos(termo):
             filtros.append(MensagemWhatsApp.telefone.like(f"%{util.so_digitos(termo)}%"))
+            if util.com_nono_digito(termo):  # número completo digitado sem o 9: acha a conversa (guardada com o 9)
+                filtros.append(MensagemWhatsApp.telefone == util.com_nono_digito(termo))
         consulta = consulta.where(or_(*filtros))
     resultado = []
     escolhidos = _nomes_escolhidos(db)
@@ -172,7 +176,7 @@ def conversa(telefone: str, numero: str = "", usuario: Usuario = Depends(exige("
 async def enviar(request: Request, usuario: Usuario = Depends(exige("conversas.enviar")), db: Session = Depends(obter_db)):
     dados = await request.json()
     texto = str(dados.get("texto", "")).strip()
-    chave = util.normalizar_telefone(str(dados.get("telefone", "")))
+    chave = util.com_nono_digito(str(dados.get("telefone", "")))
     if not chave:
         return JSONResponse({"erro": "Digite um celular com DDD, por exemplo (81) 99999-0000."}, status_code=400)
     if not texto:
