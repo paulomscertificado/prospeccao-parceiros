@@ -18,7 +18,7 @@
 | WhatsApp | `app/integracoes/whatsapp_cloud.py` | API oficial: templates aprovados, resposta dentro da janela de 24 h, webhook com assinatura |
 | CRM | `app/config.py` (status), pipeline | Novo → Pesquisando → Abordagem criada → Contatado → Aguardando resposta → Respondeu → Interessado → Humano assumiu → Reunião → Negociação → Parceiro → Parceiro ativo / Perdido |
 | Calendar | `app/agenda_horarios.py` | Horários livres = expediente do responsável − reuniões marcadas (nunca inventa horário) |
-| Human Handoff | `Oportunidade`, `/oportunidades` | Tela "Novas oportunidades", botão **Assumir lead**, avisos |
+| Human Handoff | `Oportunidade`, `/oportunidades` | Tela "Oportunidades" (Novas, Assumidas, Descartadas, Todas as respostas), botão **Assumir lead**, avisos |
 | Analytics | `app/metricas.py` (`inteligencia`) | Painel "Inteligência de Prospecção", ranking de segmentos, sugestões |
 | Knowledge Base | tabela `base_conhecimento`, `/conhecimento` | O que a SDR pode responder sozinha |
 | Partner Management | módulo Parceiros (já existente) | Parceiros, vendas, comissão, vencimentos |
@@ -407,6 +407,29 @@ empresas, com as MESMAS colunas da `base_receita`, para reaproveitar `base_recei
   `templates/_proximo_envio.html` (a mesma da Minha fila). Caso que motivou (11/11/2026): "Hoje 10:28" em Próximos
   envios parecia já enviado, mas era a hora programada de um WhatsApp frio esperando o clique.
   Testes: `testes/test_envios_tela.py`.
+
+## Oportunidades em abas e com filtros (nov/2026)
+
+- `rotas/sdr.py`, `GET /oportunidades`: abas `?ver=novas|assumidas|descartadas|respostas` (`ABAS_OPORTUNIDADES`;
+  o endereço antigo `?ver=tratadas` abre Assumidas; Todas as respostas só com `oportunidades.respostas`).
+  Filtros `periodo` (`PERIODOS_OP`, regra em `_no_periodo_op`), `temperatura`, `canal`, `classe` (só respostas:
+  `_classe_op` agrupa a `classificacao_resposta` do lead) e `busca` (nome da empresa, sem acento). Cada botão mostra
+  quantos há com os outros filtros aplicados (`quantos`); `url_op(...)` monta os links (padrão fica fora do endereço).
+- Leitura leve: busca só as colunas usadas nos filtros (até `LIMITE_OLHADOS` = 3000, as mais recentes), filtra aqui e
+  carrega os registros completos só do que aparece (`LIMITE_CARTOES` = 50 cartões em Novas, `LIMITE_LINHAS` = 200
+  linhas nas outras abas). `sdr.resumo_handoff` só nos cartões de Novas. Com os dados da nuvem: 15 a 25 consultas.
+- Ordem e grupos (`_grupos_por_dia`): Novas pela data da resposta, com as quentes primeiro em cada dia (antes o
+  `order_by(temperatura)` punha as mornas na frente); Assumidas/Descartadas pela data em que alguém assumiu ou
+  descartou (`assumida_em`); respostas pela chegada. "Esperando há..." fica vermelho depois de `ESPERA_DEMAIS` (2 h).
+- Números do topo: novas, quentes, esperando há mais de 2 h, tempo típico até atender (mediana de `assumida_em -
+  criado_em` das assumidas e descartadas dos últimos 30 dias) e respostas dos últimos 7 dias (mesma regra de dias do
+  filtro, para o número bater com a lista).
+- Ações: `POST /oportunidades/{id}/descartar` (agora volta para a tela de onde veio, `voltar_para`),
+  `POST /oportunidades/descartar-varias` (ids mostrados, no máximo 50; o botão só aparece com filtro) e
+  `POST /oportunidades/{id}/reabrir` (desfaz um descarte: volta para Novas, com histórico). Todas conferem
+  `oportunidades.ver` e o alcance de cada oportunidade (de outra pessoa: 404 / não mexe); `voltar_para` só aceita
+  caminho do próprio sistema (`_destino_seguro`).
+- Testes: `testes/test_oportunidades_tela.py`.
 
 ## Empresas novas: WhatsApp sai sozinho depois da aprovação (nov/2026)
 

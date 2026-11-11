@@ -3,11 +3,12 @@ Categorias de parceiros, Base de conhecimento e avisos."""
 
 import json
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from .. import agenda_horarios, autorizacao, campanhas, config, ia, metricas, sdr, util
 from ..banco import agora, obter_db
@@ -16,6 +17,7 @@ from ..modelos import (Cadencia, Campanha, Categoria, Conhecimento, Lead, Mensag
                        Usuario)
 from ..seguranca import exige, registrar_log, ve_tudo, verificar_csrf
 from ..web import avisar, tela, voltar
+from .fila import DIAS_SEMANA
 
 rotas = APIRouter()
 
@@ -31,51 +33,299 @@ def _equipe(db: Session):
 
 # ---------------------------------------------------------------- Novas oportunidades (handoff)
 
+ABAS_OPORTUNIDADES = ("novas", "assumidas", "descartadas", "respostas")
+STATUS_DA_ABA = {"novas": "nova", "assumidas": "assumida", "descartadas": "descartada"}
+PERIODOS_OP = [("tudo", "Tudo"), ("hoje", "Hoje"), ("ontem", "Ontem"), ("7d", "Últimos 7 dias"),
+               ("30d", "Últimos 30 dias"), ("antes", "Mais de 30 dias")]
+TEMPERATURAS_OP = [("quente", "🔥 Quentes", "selo-erro"), ("morna", "Para analisar (mornas)", "selo-alerta")]
+CANAIS_OP = [("whatsapp", "💬 WhatsApp", ""), ("email", "✉️ E-mail", ""), ("outro", "Outro canal", "")]
+# Tipos de resposta (aba Todas as respostas), pela classificação da IA
+CLASSES_OP = [("interesse", "Com interesse", "selo-ok"), ("analisar", "Para analisar", "selo-alerta"),
+              ("sem_interesse", "Sem interesse", "selo-erro"), ("saiu", "Pediu para sair", "selo-erro"),
+              ("robo", "Resposta automática (robô)", "selo-baixo"), ("outras", "Outras", "selo-azul")]
+LIMITE_CARTOES = 50    # cartões completos na aba Novas (cada um junta campanha, canal e a conversa)
+LIMITE_LINHAS = 200    # linhas nas outras abas (a página não pode ficar pesada; os filtros acham o resto)
+LIMITE_OLHADOS = 3000  # registros olhados para os filtros e as contagens (os mais recentes)
+ESPERA_DEMAIS = timedelta(hours=2)  # oportunidade nova esperando mais que isso fica em vermelho
+
+
+def _no_periodo_op(quando: datetime, periodo: str, hoje: date) -> bool:
+    d = quando.date()
+    if periodo == "hoje":
+        return d == hoje
+    if periodo == "ontem":
+        return d == hoje - timedelta(days=1)
+    if periodo == "7d":
+        return d > hoje - timedelta(days=7)
+    if periodo == "30d":
+        return d > hoje - timedelta(days=30)
+    if periodo == "antes":
+        return d <= hoje - timedelta(days=30)
+    return True
+
+
+def _canal_op(canal: str) -> str:
+    return canal if canal in ("whatsapp", "email") else "outro"
+
+
+def _classe_op(classificacao: str) -> str:
+    """Tipo da resposta para o filtro da aba Todas as respostas."""
+    if classificacao in config.CLASSES_QUENTES:
+        return "interesse"
+    if classificacao in config.CLASSES_MORNAS:
+        return "analisar"
+    return {"SEM INTERESSE": "sem_interesse", "OPT-OUT": "saiu", config.CLASSE_AUTOMATICA: "robo"}.get(classificacao,
+                                                                                                       "outras")
+
+
+def _tempo_curto(delta: timedelta) -> str:
+    """12 min, 3 h, 2 dias (para "esperando há..." e "levou...")."""
+    minutos = max(int(delta.total_seconds() // 60), 0)
+    if minutos < 60:
+        return f"{minutos} min"
+    horas = minutos // 60
+    return f"{horas} h" if horas < 48 else f"{horas // 24} dias"
+
+
+def _grupos_por_dia(itens: list[dict], hoje: date) -> list[dict]:
+    """Um grupo por dia, do mais recente: Hoje, Ontem, o dia da semana (últimos 7 dias) e depois a data.
+    Os itens já chegam em ordem (do mais recente para o mais antigo); cada um traz "quando"."""
+    grupos: list[dict] = []
+    for item in itens:
+        d = item["quando"].date()
+        if not grupos or grupos[-1]["data"] != d:
+            semana = DIAS_SEMANA[d.weekday()]
+            if d == hoje:
+                titulo, detalhe = "Hoje", f"{semana}, {d:%d/%m}"
+            elif d == hoje - timedelta(days=1):
+                titulo, detalhe = "Ontem", f"{semana}, {d:%d/%m}"
+            elif d > hoje - timedelta(days=7):
+                titulo, detalhe = semana.capitalize(), f"{d:%d/%m}"
+            else:
+                titulo, detalhe = f"{d:%d/%m/%Y}", semana
+            grupos.append({"data": d, "titulo": titulo, "detalhe": detalhe, "itens": []})
+        grupos[-1]["itens"].append(item)
+    return grupos
+
+
 @rotas.get("/oportunidades")
-def oportunidades(request: Request, ver: str = "novas", usuario: Usuario = Depends(exige("oportunidades.ver")), db: Session = Depends(obter_db)):
-    consulta = autorizacao.filtrar(select(Oportunidade).join(Lead, Oportunidade.lead_id == Lead.id), usuario,
-                                   "oportunidades.ver", Lead.vendedor_id, sem_dono=True)
-    consulta = consulta.where(Oportunidade.status == "nova") if ver == "novas" else consulta.where(
-        Oportunidade.status != "nova")
-    lista = db.execute(consulta.order_by(Oportunidade.temperatura, Oportunidade.criado_em.desc()).limit(200)).scalars().all()
+def oportunidades(request: Request, ver: str = "novas", periodo: str = "tudo", temperatura: str = "", canal: str = "",
+                  classe: str = "", busca: str = "", usuario: Usuario = Depends(exige("oportunidades.ver")),
+                  db: Session = Depends(obter_db)):
+    hoje, momento = date.today(), agora()
+    ve_respostas = autorizacao.pode(usuario, "oportunidades.respostas")
+    ver = "assumidas" if ver == "tratadas" else ver  # endereço antigo (Assumidas/descartadas)
+    if ver not in ABAS_OPORTUNIDADES or (ver == "respostas" and not ve_respostas):
+        ver = "novas"
+    periodo = periodo if periodo in dict(PERIODOS_OP) else "tudo"
+    temperatura = temperatura if temperatura in {c for c, *_ in TEMPERATURAS_OP} else ""
+    canal = canal if canal in {c for c, *_ in CANAIS_OP} else ""
+    classe = classe if classe in {c for c, *_ in CLASSES_OP} else ""
+    busca = busca.strip()[:100]
+    termo = util.chave_texto(busca)
+
     # Avisos sobre oportunidades contam como lidos ao abrir a tela.
     for n in db.execute(select(Notificacao).where(Notificacao.usuario_id == usuario.id, Notificacao.lida.is_(False),
                                                   Notificacao.link.like("/oportunidades%"))).scalars():
         n.lida = True
     db.commit()
-    respostas, ops_do_lead = [], {}
-    if ver == "respostas" and autorizacao.pode(usuario, "oportunidades.respostas"):
+
+    def visiveis(*colunas):
+        """As oportunidades que a pessoa alcança (dela, da equipe ou todas, conforme a permissão)."""
+        return autorizacao.filtrar(select(*colunas).join(Lead, Oportunidade.lead_id == Lead.id), usuario,
+                                   "oportunidades.ver", Lead.vendedor_id, sem_dono=True)
+
+    por_status = dict(db.execute(visiveis(Oportunidade.status, func.count(Oportunidade.id))
+                                 .group_by(Oportunidade.status)).all())
+    respostas_q = (select(Mensagem.id, Mensagem.criado_em, Mensagem.canal, Lead.empresa, Lead.classificacao_resposta)
+                   .join(Lead, Mensagem.lead_id == Lead.id).where(Mensagem.status == "recebida"))
+    abas = {"novas": por_status.get("nova", 0), "assumidas": por_status.get("assumida", 0),
+            "descartadas": por_status.get("descartada", 0),
+            "respostas": db.execute(select(func.count()).select_from(respostas_q.subquery())).scalar() or 0
+            if ve_respostas else 0}
+
+    # Números do topo: o que espera alguém, quanto tempo levou para alguém atender e quantas respostas chegaram.
+    # "Últimos N dias" = hoje e os N-1 dias antes (igual ao botão de filtro, para o número bater com a lista).
+    desde_7d = datetime.combine(hoje - timedelta(days=6), datetime.min.time())
+    desde_30d = datetime.combine(hoje - timedelta(days=29), datetime.min.time())
+    novas_leves = db.execute(visiveis(Oportunidade.temperatura, Oportunidade.criado_em)
+                             .where(Oportunidade.status == "nova")).all()
+    tratadas_30 = db.execute(visiveis(Oportunidade.criado_em, Oportunidade.assumida_em)
+                             .where(Oportunidade.status != "nova", Oportunidade.assumida_em.is_not(None),
+                                    Oportunidade.assumida_em >= desde_30d)).all()
+    esperas = sorted(max((a - c).total_seconds(), 0) for c, a in tratadas_30)
+    resumo = {
+        "novas": len(novas_leves),
+        "quentes": sum(1 for t, _ in novas_leves if t == "quente"),
+        "esperando_demais": sum(1 for _, c in novas_leves if momento - c > ESPERA_DEMAIS),
+        "tratadas_30": len(esperas),
+        "tempo_mediano": _tempo_curto(timedelta(seconds=esperas[len(esperas) // 2])) if esperas else "",
+        "respostas_7": db.execute(select(func.count()).select_from(
+            respostas_q.where(Mensagem.criado_em >= desde_7d).subquery())).scalar() or 0
+        if ve_respostas else 0,
+    }
+
+    contexto = {"ver": ver, "periodo": periodo, "temperatura": temperatura, "canal": canal, "classe": classe,
+                "busca": busca, "abas": abas, "resumo": resumo, "ve_tudo": ve_respostas,
+                "ESPERA_DEMAIS_H": int(ESPERA_DEMAIS.total_seconds() // 3600),
+                "cor_classe": {c: cor for c, _, cor in CLASSES_OP},
+                "filtrando": bool(periodo != "tudo" or temperatura or canal or classe or termo)}
+    filtros = {"periodo": lambda i: _no_periodo_op(i["quando"], periodo, hoje),
+               "canal": lambda i: not canal or i["canal"] == canal}
+
+    if ver == "respostas":
         # Admin/gestor: TODAS as respostas que chegaram (inclusive sem interesse e opt-out, que não viram oportunidade)
-        respostas = db.execute(select(Mensagem).where(Mensagem.status == "recebida", Mensagem.lead_id.is_not(None))
-                               .order_by(Mensagem.criado_em.desc()).limit(300)).scalars().all()
-        ids = {m.lead_id for m in respostas}
-        for o in db.execute(select(Oportunidade).where(Oportunidade.lead_id.in_(ids))).scalars() if ids else []:
-            ops_do_lead.setdefault(o.lead_id, o)
-        lista = []
-    resposta = tela(request, "oportunidades.html", {
-        "oportunidades": lista, "ver": ver, "respostas": respostas, "ops_do_lead": ops_do_lead,
-        "leads_resposta": {l.id: l for l in db.execute(select(Lead).where(Lead.id.in_({m.lead_id for m in respostas})))
-                           .scalars()} if respostas else {},
-        "nomes_camp": {c.id: c.nome for c in db.execute(select(Campanha)).scalars()} if respostas else {},
-        "ve_tudo": autorizacao.pode(usuario, "oportunidades.respostas"),
-        "resumos": {o.id: sdr.resumo_handoff(db, o.lead) for o in lista},
-    })
+        linhas = db.execute(respostas_q.order_by(Mensagem.criado_em.desc(), Mensagem.id.desc())
+                            .limit(LIMITE_OLHADOS)).all()
+        itens = [{"id": mid, "quando": criado, "canal": _canal_op(c), "classe": _classe_op(cl or "")}
+                 for mid, criado, c, empresa, cl in linhas if not termo or termo in util.chave_texto(empresa)]
+        filtros["classe"] = lambda i: not classe or i["classe"] == classe
+        limite = LIMITE_LINHAS
+    else:
+        linhas = db.execute(visiveis(Oportunidade.id, Oportunidade.temperatura, Oportunidade.canal,
+                                     Oportunidade.criado_em, Oportunidade.assumida_em, Lead.empresa)
+                            .where(Oportunidade.status == STATUS_DA_ABA[ver])
+                            .order_by((Oportunidade.criado_em if ver == "novas" else
+                                       func.coalesce(Oportunidade.assumida_em, Oportunidade.criado_em)).desc())
+                            .limit(LIMITE_OLHADOS)).all()
+        # Novas: pela data da resposta. Assumidas e descartadas: pela data em que alguém assumiu ou descartou
+        itens = [{"id": oid, "temperatura": temp, "canal": _canal_op(c), "criado": criado,
+                  "quando": criado if ver == "novas" else (assumida or criado)}
+                 for oid, temp, c, criado, assumida, empresa in linhas if not termo or termo in util.chave_texto(empresa)]
+        filtros["temperatura"] = lambda i: not temperatura or i["temperatura"] == temperatura
+        limite = LIMITE_CARTOES if ver == "novas" else LIMITE_LINHAS
+        # Em cada dia, as quentes primeiro; depois da mais nova para a mais antiga
+        itens.sort(key=lambda i: (i["quando"].date(), ver == "novas" and i["temperatura"] == "quente", i["quando"]),
+                   reverse=True)
+
+    def quantos(chave: str, nesta_opcao) -> int:
+        """O número em cada botão de filtro: quantos passam nesta opção e nos OUTROS filtros (como na Minha fila)."""
+        return sum(1 for i in itens if nesta_opcao(i) and all(f(i) for nome, f in filtros.items() if nome != chave))
+
+    # Botões de filtro: (opção, nome, quantos, cor do ponto). Canal e tipo de resposta sem nenhum ficam escondidos.
+    chips = {"periodo": [(c, nome, quantos("periodo", lambda i, c=c: _no_periodo_op(i["quando"], c, hoje)), "")
+                         for c, nome in PERIODOS_OP]}
+    for chave, opcoes, escolhida in (("canal", CANAIS_OP, canal), ("temperatura", TEMPERATURAS_OP, temperatura),
+                                     ("classe", CLASSES_OP, classe)):
+        if chave in filtros:
+            chips[chave] = [(c, nome, n, ponto) for c, nome, ponto in opcoes
+                            for n in [quantos(chave, lambda i, c=c, k=chave: i[k] == c)]
+                            if n or escolhida == c or chave == "temperatura"]
+    contexto["chips"] = chips
+    filtrados = [i for i in itens if all(f(i) for f in filtros.values())]
+    mostrados = filtrados[:limite]
+    ids = [i["id"] for i in mostrados]
+    contexto.update({"total_filtrados": len(filtrados), "limite": limite, "olhou_tudo": len(linhas) < LIMITE_OLHADOS,
+                     "ids_mostrados": ids})
+
+    if ver == "respostas":
+        mensagens_por_id = {m.id: m for m in db.execute(select(Mensagem).where(Mensagem.id.in_(ids))).scalars()} if ids else {}
+        ids_leads = {m.lead_id for m in mensagens_por_id.values()}
+        ops_do_lead: dict[int, Oportunidade] = {}
+        for o in db.execute(select(Oportunidade).where(Oportunidade.lead_id.in_(ids_leads))
+                            .order_by(Oportunidade.criado_em.desc())).scalars() if ids_leads else []:
+            ops_do_lead.setdefault(o.lead_id, o)  # a mais recente de cada lead
+        ids_camp = {m.campanha_id for m in mensagens_por_id.values() if m.campanha_id}
+        for i in mostrados:
+            i["m"] = mensagens_por_id[i["id"]]
+        contexto.update({
+            "leads_resposta": {l.id: l for l in db.execute(select(Lead).where(Lead.id.in_(ids_leads))).scalars()}
+            if ids_leads else {},
+            "ops_do_lead": ops_do_lead,
+            "nomes_camp": {c.id: c.nome for c in db.execute(select(Campanha).where(Campanha.id.in_(ids_camp))).scalars()}
+            if ids_camp else {},
+        })
+    else:
+        ops = {o.id: o for o in db.execute(select(Oportunidade).where(Oportunidade.id.in_(ids)).options(
+            selectinload(Oportunidade.lead), selectinload(Oportunidade.responsavel))).scalars()} if ids else {}
+        for i in mostrados:
+            o = i["o"] = ops[i["id"]]
+            i["espera"] = _tempo_curto(momento - o.criado_em)
+            i["esperando_demais"] = momento - o.criado_em > ESPERA_DEMAIS
+            i["levou"] = _tempo_curto(o.assumida_em - o.criado_em) if o.assumida_em else ""
+        # Resumo completo (campanha, dono, canal, o que enviamos) só nos cartões da aba Novas
+        contexto["resumos"] = {i["o"].id: sdr.resumo_handoff(db, i["o"].lead) for i in mostrados} if ver == "novas" else {}
+    contexto["grupos"] = _grupos_por_dia(mostrados, hoje)
+
+    atuais = {"ver": ver, "periodo": periodo, "temperatura": temperatura, "canal": canal, "classe": classe,
+              "busca": busca}
+
+    def url_op(**mudancas) -> str:
+        """Endereço desta tela com os filtros atuais e as mudanças pedidas (valor padrão fica fora do endereço)."""
+        params = {k: v for k, v in {**atuais, **mudancas}.items()
+                  if v and not (k == "ver" and v == "novas") and not (k == "periodo" and v == "tudo")}
+        return "/oportunidades" + ("?" + urlencode(params) if params else "")
+
+    contexto["url_op"] = url_op
+    contexto["voltar"] = url_op()
+    resposta = tela(request, "oportunidades.html", contexto)
     resposta.headers["Cache-Control"] = "no-store"  # voltar no navegador recarrega (sem cartão já assumido)
     return resposta
 
 
-@rotas.post("/oportunidades/{oid:int}/descartar", dependencies=[Depends(verificar_csrf)])
-def descartar(request: Request, oid: int, usuario: Usuario = Depends(exige("oportunidades.ver")), db: Session = Depends(obter_db)):
-    op = db.get(Oportunidade, oid)
-    if not op or not autorizacao.pode(usuario, "oportunidades.ver", op, sem_dono=True):
-        raise HTTPException(404)
+def _destino_seguro(destino: str) -> str:
+    """Só volta para uma tela do próprio sistema."""
+    return destino if destino.startswith("/") and not destino.startswith("//") else "/oportunidades"
+
+
+def _descartar(db: Session, op: Oportunidade, usuario: Usuario) -> None:
+    """Descarta a oportunidade (e os cartões repetidos do mesmo lead que ainda estão em Novas)."""
     for o in db.execute(select(Oportunidade).where(Oportunidade.lead_id == op.lead_id,
-                                                   Oportunidade.status == "nova")).scalars():  # cartões repetidos juntos
+                                                   Oportunidade.status == "nova")).scalars():
         o.status, o.responsavel_id, o.assumida_em = "descartada", usuario.id, agora()
     op.status, op.responsavel_id, op.assumida_em = "descartada", usuario.id, agora()
     historico(db, op.lead_id, "sistema", f"Oportunidade descartada por {usuario.nome}.", usuario)
+
+
+@rotas.post("/oportunidades/{oid:int}/descartar", dependencies=[Depends(verificar_csrf)])
+def descartar(request: Request, oid: int, voltar_para: str = Form("/oportunidades"),
+              usuario: Usuario = Depends(exige("oportunidades.ver")), db: Session = Depends(obter_db)):
+    op = db.get(Oportunidade, oid)
+    if not op or not autorizacao.pode(usuario, "oportunidades.ver", op, sem_dono=True):
+        raise HTTPException(404)
+    _descartar(db, op, usuario)
     db.commit()
-    return voltar("/oportunidades")
+    avisar(request, f"Oportunidade de {op.lead.empresa if op.lead else 'lead'} descartada (está na aba Descartadas; "
+                    "lá dá para voltar com ela para Novas).")
+    return voltar(_destino_seguro(voltar_para))
+
+
+@rotas.post("/oportunidades/descartar-varias", dependencies=[Depends(verificar_csrf)])
+def descartar_varias(request: Request, ids: str = Form(""), voltar_para: str = Form("/oportunidades"),
+                     usuario: Usuario = Depends(exige("oportunidades.ver")), db: Session = Depends(obter_db)):
+    """Botão "Descartar as N mostradas" (aba Novas, só com algum filtro escolhido)."""
+    escolhidas = [i for i in (util.para_int(x) for x in ids.split(",")) if i][:LIMITE_CARTOES]
+    total = 0
+    for op in db.execute(select(Oportunidade).where(Oportunidade.id.in_(escolhidas))).scalars().all() if escolhidas else []:
+        if op.status == "nova" and autorizacao.pode(usuario, "oportunidades.ver", op, sem_dono=True):
+            _descartar(db, op, usuario)
+            total += 1
+    if total:
+        registrar_log(db, usuario, "descartou_oportunidades", "oportunidade", None,
+                      f"{total} oportunidades descartadas de uma vez", request)
+        avisar(request, f"{total} oportunidade(s) descartada(s). Estão na aba Descartadas, se precisar voltar com alguma.")
+    else:
+        avisar(request, "Nenhuma oportunidade para descartar (já foram assumidas ou descartadas).", "alerta")
+    db.commit()
+    return voltar(_destino_seguro(voltar_para))
+
+
+@rotas.post("/oportunidades/{oid:int}/reabrir", dependencies=[Depends(verificar_csrf)])
+def reabrir(request: Request, oid: int, voltar_para: str = Form("/oportunidades?ver=descartadas"),
+            usuario: Usuario = Depends(exige("oportunidades.ver")), db: Session = Depends(obter_db)):
+    """Desfaz um descarte: a oportunidade volta para a aba Novas."""
+    op = db.get(Oportunidade, oid)
+    if not op or not autorizacao.pode(usuario, "oportunidades.ver", op, sem_dono=True):
+        raise HTTPException(404)
+    if op.status != "descartada":
+        avisar(request, "Só dá para voltar com uma oportunidade descartada.", "alerta")
+    else:
+        op.status, op.responsavel_id, op.assumida_em = "nova", None, None
+        historico(db, op.lead_id, "sistema", f"Oportunidade voltou para Novas ({usuario.nome} desfez o descarte).",
+                  usuario)
+        db.commit()
+        avisar(request, f"A oportunidade de {op.lead.empresa if op.lead else 'lead'} voltou para Novas.")
+    return voltar(_destino_seguro(voltar_para))
 
 
 @rotas.post("/leads/{lead_id:int}/assumir", dependencies=[Depends(verificar_csrf)])
@@ -86,9 +336,10 @@ def assumir(request: Request, lead_id: int, voltar_para: str = Form(""), usuario
     registrar_log(db, usuario, "assumiu_lead", "lead", lead.id, request=request)
     db.commit()
     avisar(request, f"Você assumiu {lead.empresa}. A automação deste lead foi parada"
-                    + (" e a oportunidade saiu das novas (está em Assumidas/descartadas)." if voltar_para == "/oportunidades"
+                    + (" e a oportunidade saiu das novas (está na aba Assumidas)." if voltar_para.startswith("/oportunidades")
                        else "."))
-    return voltar(voltar_para if voltar_para.startswith("/") else f"/leads/{lead_id}#handoff")
+    return voltar(voltar_para if voltar_para.startswith("/") and not voltar_para.startswith("//")
+                  else f"/leads/{lead_id}#handoff")
 
 
 @rotas.get("/leads/{lead_id:int}/agendar")

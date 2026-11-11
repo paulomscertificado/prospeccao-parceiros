@@ -99,7 +99,7 @@ preço nem comissão e não fecha parceria.
    mensagem fica pronta e **não sai**: cadastre o número na ficha da empresa e ela fica liberada.
    Empresa com WhatsApp **e** e-mail recebe os dois em cada toque (nas Empresas novas, só o WhatsApp).
 5. Quando alguém responde com interesse, a automação para e aparece em **Oportunidades** (🔥) com o resumo.
-   Clique em **Assumir lead**, ligue, marque a reunião e siga com a negociação.
+   Clique em **Assumir lead**, ligue, marque a reunião e siga com a negociação (veja **Oportunidades** abaixo).
 6. Veja em **Inteligência** qual segmento, canal e mensagem funcionam melhor.
 
 **E-mail:** as campanhas saem do e-mail @mscertificados.com.br configurado em **Configurações > E-mail**
@@ -126,6 +126,24 @@ numa conversa sem fim. Se o mesmo lead mandar várias mensagens, tudo fica na me
 
 Os números do topo também são atalhos: clique em **Atrasados** para ver só os atrasados, em **Para sair hoje** para
 ver os de hoje e os atrasados. Admin e gestor podem ver a fila de outra pessoa ou da equipe toda.
+
+**Oportunidades (menu 🔥):** os leads que responderam, em 4 abas:
+- **Novas:** esperam alguém assumir. Ficam separadas por dia (Hoje, Ontem, o dia da semana) e, em cada dia, as
+  **quentes vêm primeiro**. Cada cartão mostra há quanto tempo o lead está **esperando** (fica vermelho depois de 2
+  horas), a campanha, o canal, o que enviamos, o que o lead respondeu e o que a IA entendeu. Botões: **Assumir lead**,
+  **Iniciar WhatsApp**, **Ver conversa** (abre a conversa em Conversas) e **Descartar**.
+- **Assumidas:** quem assumiu, quando e quanto tempo depois da resposta.
+- **Descartadas:** o que foi descartado. Descartou sem querer? O botão **Voltar para Novas** desfaz.
+- **Todas as respostas** (só administrador e gestor): tudo o que os leads responderam, inclusive "sem interesse",
+  "pediu para sair" e respostas de robô.
+
+Para achar uma oportunidade, use os filtros: **Quando** (tudo, hoje, ontem, últimos 7 ou 30 dias, mais de 30 dias),
+**Tipo** (quentes ou para analisar), **Resposta** (na aba Todas as respostas), **Canal** e a **busca pelo nome da
+empresa**. Cada filtro mostra quantas há nele. Com um filtro escolhido aparece **Descartar as N mostradas**, para
+descartar de uma vez, por exemplo, todas as "para analisar" de ontem (o sistema pede confirmação; dá para voltar com
+elas pela aba Descartadas). Os números do topo mostram quantas esperam, quantas são quentes, quantas esperam há
+mais de 2 horas e o tempo típico até alguém atender. Cada pessoa vê as oportunidades dos leads dela (administrador e
+gestor veem todas, conforme as permissões).
 
 **Disparar campanha (qualquer pessoa da equipe):** na página da campanha ativa, **🚀 Disparar campanha** tem os
 botões **Disparar campanha WhatsApp** e **Disparar campanha e-mail**. Eles mandam na hora o toque de hoje de cada

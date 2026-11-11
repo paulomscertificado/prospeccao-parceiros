@@ -1,36 +1,113 @@
 {% extends "base.html" %}
-{% block titulo %}Novas oportunidades{% endblock %}
+{% block titulo %}Oportunidades{% endblock %}
 {% block conteudo %}
+{% from "_proximo_envio.html" import estilos_proximos, filtros_chips with context %}
+{{ estilos_proximos() }}
+<style>
+  .kpis-op { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); margin-bottom: 16px; }
+  .op-card .op-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+  .op-card .op-topo h2 { margin: 0; }
+  .espera { white-space: nowrap; }
+  .linha-op { display: grid; grid-template-columns: 70px minmax(0, 1.5fr) minmax(0, 1.2fr) minmax(0, 1fr); gap: 10px;
+              align-items: start; padding: 10px 0; border-top: 1px solid var(--borda); font-size: .86rem; }
+  .dia-fila + .linha-op { border-top: 0; }
+  .linha-op .quando { font-family: var(--fonte-mono); font-size: .74rem; color: #6b7686; }
+  .linha-op .acoes-op { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+  .linha-op .largura-toda { grid-column: 1 / -1; }
+  .texto-resposta { white-space: pre-wrap; background: #f6f9fc; border-radius: 8px; padding: 8px 12px; font-size: .88rem;
+                    max-height: 220px; overflow: auto; }
+  .op-detalhe summary { cursor: pointer; color: var(--azul); font-size: .82rem; }
+  .op-detalhe .grade-2 { margin-top: 8px; }
+  .aviso-lista { font-size: .82rem; color: var(--suave); margin: 4px 0 0; }
+  @media (max-width: 760px) {
+    .linha-op { grid-template-columns: 1fr 1fr; } .linha-op .acoes-op { justify-content: flex-start; }
+  }
+</style>
+
 <div class="cabecalho">
-  <div><h1>Novas oportunidades</h1><div class="suave">Leads que responderam: a IA parou e entregou para o time humano.</div></div>
-  <div class="acoes"><a class="btn {{ 'btn-primario' if ver == 'novas' }}" href="?ver=novas">Novas</a><a class="btn {{ 'btn-primario' if ver == 'tratadas' }}" href="?ver=tratadas">Assumidas/descartadas</a>{% if ve_tudo %}<a class="btn {{ 'btn-primario' if ver == 'respostas' }}" href="?ver=respostas">Todas as respostas</a>{% endif %}</div>
+  <div><h1>Oportunidades</h1>
+    <div class="suave">Leads que responderam: a IA parou e entregou para o time humano. Assuma as novas o quanto antes.</div></div>
 </div>
 <div class="passos-ia"><span>A IA encontra</span><span>pesquisa</span><span>qualifica</span><span>faz o 1º contato</span><span>identifica a resposta</span><span>→ você conversa, negocia e fecha</span></div>
 
-{% if ver == 'respostas' and ve_tudo %}
-<div class="cartao">
-  <h2>Todas as respostas dos contatos <span class="selo">{{ respostas|length }}</span></h2>
-  <p class="pequeno suave">Tudo o que os leads responderam, por e-mail ou WhatsApp, inclusive "sem interesse" e "pediu para sair"
-    (esses não viram oportunidade). Só administrador e gestor veem esta lista.</p>
-  {% for m in respostas %}{% set l = leads_resposta.get(m.lead_id) %}{% set o = ops_do_lead.get(m.lead_id) %}
-  <div style="border-top:1px solid var(--borda);padding:10px 0">
-    <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
-      <div><b>{% if l %}<a href="/leads/{{ l.id }}">{{ l.empresa }}</a>{% else %}—{% endif %}</b>
-        <span class="pequeno suave">· {{ '✉️ E-mail' if m.canal == 'email' else '💬 WhatsApp' }} · {{ m.criado_em|datahora }}
-        {% if m.campanha_id %} · {{ nomes_camp.get(m.campanha_id, '') }}{% endif %}</span></div>
-      <div>{% if l and l.classificacao_resposta %}<span class="selo {{ 'selo-ok' if l.classificacao_resposta in config.CLASSES_QUENTES else ('selo-erro' if l.classificacao_resposta in ('OPT-OUT', 'SEM INTERESSE') else 'selo-alerta') }}">{{ l.classificacao_resposta }}</span>{% endif %}
-        {% if o %}<span class="selo">{{ 'oportunidade nova' if o.status == 'nova' else ('assumida' if o.status == 'assumida' else o.status) }}</span>{% endif %}</div>
-    </div>
-    <div class="corpo" style="white-space:pre-wrap;background:#f6f9fc;border-radius:8px;padding:8px 12px;margin-top:6px;font-size:.88rem">{{ (m.corpo or '')[:1500] }}</div>
-  </div>
-  {% else %}<p class="suave">Nenhuma resposta recebida ainda.</p>{% endfor %}
+{% set sem_filtros = {'periodo': 'tudo', 'temperatura': '', 'canal': '', 'classe': '', 'busca': ''} %}
+<div class="kpis-op">
+  <a class="kpi destaque kpi-link" href="{{ url_op(ver='novas', **sem_filtros) }}" title="Ver as oportunidades que esperam alguém assumir">
+    <div class="rotulo">Novas para assumir</div><div class="valor">{{ resumo.novas }}</div>
+    <div class="detalhe">{{ resumo.quentes }} quente{{ 's' if resumo.quentes != 1 }}</div></a>
+  <a class="kpi kpi-link" href="{{ url_op(ver='novas', **dict(sem_filtros, temperatura='quente')) }}" title="Ver só os leads quentes">
+    <div class="rotulo">🔥 Quentes esperando</div><div class="valor" style="{{ 'color:var(--erro)' if resumo.quentes }}">{{ resumo.quentes }}</div>
+    <div class="detalhe">querem conversar</div></a>
+  <a class="kpi kpi-link" href="{{ url_op(ver='novas', **sem_filtros) }}" title="Ver as novas (as que esperam demais ficam em vermelho)">
+    <div class="rotulo">Esperando há mais de {{ ESPERA_DEMAIS_H }} h</div>
+    <div class="valor" style="{{ 'color:var(--erro)' if resumo.esperando_demais }}">{{ resumo.esperando_demais }}</div>
+    <div class="detalhe">quanto antes, mais chance</div></a>
+  <div class="kpi" title="Quanto tempo a oportunidade esperou até alguém assumir ou descartar (metade levou menos que isso)">
+    <div class="rotulo">Tempo até atender</div><div class="valor">{{ resumo.tempo_mediano or '—' }}</div>
+    <div class="detalhe">tempo típico · {{ resumo.tratadas_30 }} atendida{{ 's' if resumo.tratadas_30 != 1 }} em 30 dias</div></div>
+  {% if ve_tudo %}
+  <a class="kpi kpi-link" href="{{ url_op(ver='respostas', **dict(sem_filtros, periodo='7d')) }}" title="Ver todas as respostas dos últimos 7 dias">
+    <div class="rotulo">Respostas (7 dias)</div><div class="valor">{{ resumo.respostas_7 }}</div>
+    <div class="detalhe">inclusive sem interesse</div></a>
+  {% endif %}
 </div>
+
+<nav class="abas" aria-label="Partes das oportunidades">
+  <a class="{{ 'ativa' if ver == 'novas' }}" href="{{ url_op(ver='novas', **dict(sem_filtros, busca=busca)) }}">🔥 Novas <span class="selo {{ 'selo-erro' if abas.novas }}">{{ abas.novas }}</span></a>
+  <a class="{{ 'ativa' if ver == 'assumidas' }}" href="{{ url_op(ver='assumidas', **dict(sem_filtros, busca=busca)) }}">✅ Assumidas <span class="selo">{{ abas.assumidas }}</span></a>
+  <a class="{{ 'ativa' if ver == 'descartadas' }}" href="{{ url_op(ver='descartadas', **dict(sem_filtros, busca=busca)) }}">🗑️ Descartadas <span class="selo">{{ abas.descartadas }}</span></a>
+  {% if ve_tudo %}<a class="{{ 'ativa' if ver == 'respostas' }}" href="{{ url_op(ver='respostas', **dict(sem_filtros, busca=busca)) }}">💬 Todas as respostas <span class="selo">{{ abas.respostas }}</span></a>{% endif %}
+</nav>
+
+{% if ver == 'respostas' %}
+<h2 style="margin:0 0 4px">Todas as respostas dos contatos</h2>
+<p class="pequeno suave" style="margin:0 0 10px">Tudo o que os leads responderam, por e-mail ou WhatsApp, inclusive "sem interesse" e
+  "pediu para sair" (esses não viram oportunidade). Só administrador e gestor veem esta lista.</p>
 {% endif %}
 
-{% for o in oportunidades %}{% set l = o.lead %}{% set r = resumos[o.id] %}
+<div class="cartao">
+  <form class="filtros-prox" method="get">
+    {% if ver != 'novas' %}<input type="hidden" name="ver" value="{{ ver }}">{% endif %}
+    {% if periodo != 'tudo' %}<input type="hidden" name="periodo" value="{{ periodo }}">{% endif %}
+    {% if temperatura %}<input type="hidden" name="temperatura" value="{{ temperatura }}">{% endif %}
+    {% if canal %}<input type="hidden" name="canal" value="{{ canal }}">{% endif %}
+    {% if classe %}<input type="hidden" name="classe" value="{{ classe }}">{% endif %}
+    <input type="search" name="busca" value="{{ busca }}" placeholder="Buscar empresa" aria-label="Buscar empresa">
+    <button class="btn">Buscar</button>
+    {% if filtrando %}<a class="btn" href="{{ url_op(**sem_filtros) }}">Limpar filtros</a>{% endif %}
+  </form>
+  {{ filtros_chips('Quando', chips.periodo, periodo, url_op, 'periodo') }}
+  {% if chips.temperatura %}{{ filtros_chips('Tipo', chips.temperatura, temperatura, url_op, 'temperatura', 'Todas') }}{% endif %}
+  {% if chips.classe %}{{ filtros_chips('Resposta', chips.classe, classe, url_op, 'classe', 'Todas') }}{% endif %}
+  {% if chips.canal %}{{ filtros_chips('Canal', chips.canal, canal, url_op, 'canal', 'Todos') }}{% endif %}
+  <p class="aviso-lista">
+    {% if ver == 'novas' %}Pela data em que o lead respondeu. Em cada dia, as quentes primeiro.
+    {% elif ver == 'assumidas' %}Pela data em que alguém assumiu.
+    {% elif ver == 'descartadas' %}Pela data do descarte. Descartou sem querer? Use "Voltar para Novas".
+    {% else %}Pela data em que a resposta chegou.{% endif %}
+    {% if total_filtrados > ids_mostrados|length %}<b>Mostrando as {{ ids_mostrados|length }} mais recentes de {{ total_filtrados }}</b>: use os filtros ou a busca para achar as outras.{% endif %}
+    {% if not olhou_tudo %}Os números dos filtros contam os 3.000 registros mais recentes.{% endif %}
+  </p>
+  {% if ver == 'novas' and filtrando and ids_mostrados %}
+  <form class="inline" method="post" action="/oportunidades/descartar-varias" style="display:block;margin-top:8px"
+        data-confirmar="Descartar as {{ ids_mostrados|length }} oportunidades mostradas? Elas vão para a aba Descartadas (lá dá para voltar com elas).">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar_para" value="{{ voltar }}">
+    <input type="hidden" name="ids" value="{{ ids_mostrados|join(',') }}">
+    <button class="btn btn-pequeno btn-perigo">Descartar as {{ ids_mostrados|length }} mostradas</button></form>
+  {% endif %}
+</div>
+
+{# ------------------------------------------------ Novas: cartão completo para decidir na hora #}
+{% if ver == 'novas' %}
+{% for g in grupos %}
+<h3 class="dia-fila">{{ g.titulo }} <span class="detalhe-dia">{{ g.detalhe }} · {{ g.itens|length }} oportunidade{{ 's' if g.itens|length != 1 }}</span></h3>
+{% for i in g.itens %}{% set o = i.o %}{% set l = o.lead %}{% set r = resumos[o.id] %}
 <div class="cartao op-card {{ o.temperatura }}" id="op-{{ o.id }}">
-  <h2>{{ '🔥 NOVO LEAD QUENTE' if o.temperatura == 'quente' else 'Resposta para analisar' }} · <a href="/leads/{{ l.id }}">{{ l.empresa }}</a>
-    <span class="pequeno suave">respondeu em {{ o.criado_em|datahora }}{{ ' · assumido por ' ~ o.responsavel.nome if o.responsavel }}</span></h2>
+  <div class="op-topo">
+    <h2>{{ '🔥 NOVO LEAD QUENTE' if o.temperatura == 'quente' else 'Resposta para analisar' }} · <a href="/leads/{{ l.id }}">{{ l.empresa }}</a></h2>
+    <span class="selo espera {{ 'selo-erro' if i.esperando_demais else 'selo-alerta' }}" title="Respondeu em {{ o.criado_em|datahora }}">⏱ esperando há {{ i.espera }}</span>
+  </div>
+  <div class="pequeno suave" style="margin:2px 0 8px">respondeu em {{ o.criado_em|datahora }}</div>
 
   <div class="op-origem">
     <div><span class="rotulo">Campanha</span>{% if r.campanha_id %}<a href="/campanhas/{{ r.campanha_id }}">{{ r.campanha_nome }}</a>{% else %}<span class="suave">sem campanha (contato avulso)</span>{% endif %}</div>
@@ -64,15 +141,84 @@
         </dl></details>
     </div>
   </div>
-  {% if o.status == 'nova' %}
   <div class="grupo-btn" style="margin-top:10px">
-    <form class="inline" method="post" action="/leads/{{ l.id }}/assumir"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar_para" value="/oportunidades"><button class="btn btn-verde">ASSUMIR LEAD</button></form>
+    <form class="inline" method="post" action="/leads/{{ l.id }}/assumir"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar_para" value="{{ voltar }}"><button class="btn btn-verde">ASSUMIR LEAD</button></form>
     {% if l.whatsapp %}<a class="btn" href="{{ l.whatsapp|whats }}" target="_blank" rel="noopener">INICIAR WHATSAPP</a>{% endif %}
-    <form class="inline" method="post" action="/oportunidades/{{ o.id }}/descartar" data-confirmar="Descartar esta oportunidade?"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-perigo">Descartar</button></form>
+    {% if l.whatsapp and pode('conversas.ver') %}<a class="btn" href="/conversas?telefone={{ l.whatsapp|urlencode }}">Ver conversa</a>{% endif %}
+    <form class="inline" method="post" action="/oportunidades/{{ o.id }}/descartar" data-confirmar="Descartar esta oportunidade? Ela vai para a aba Descartadas.">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar_para" value="{{ voltar }}"><button class="btn btn-perigo">Descartar</button></form>
   </div>
-  {% endif %}
 </div>
-{% else %}{% if ver != 'respostas' %}
-<div class="cartao vazio">Nenhuma oportunidade {{ 'nova' if ver == 'novas' else 'tratada' }}. Quando um lead responder com interesse, ele aparece aqui na hora (e você recebe um aviso).</div>{% endif %}
 {% endfor %}
+{% else %}
+<div class="cartao vazio">{% if filtrando %}Nenhuma oportunidade nova com esses filtros. <a href="{{ url_op(**sem_filtros) }}">Limpar filtros</a>
+  {% else %}Nenhuma oportunidade nova. Quando um lead responder com interesse, ele aparece aqui na hora (e você recebe um aviso).{% endif %}</div>
+{% endfor %}
+
+{# ------------------------------------------------ Assumidas e descartadas: uma linha por oportunidade #}
+{% elif ver in ('assumidas', 'descartadas') %}
+<div class="cartao">
+  {% for g in grupos %}
+  <h3 class="dia-fila">{{ g.titulo }} <span class="detalhe-dia">{{ g.detalhe }} · {{ g.itens|length }}</span></h3>
+  {% for i in g.itens %}{% set o = i.o %}{% set l = o.lead %}
+  <div class="linha-op" id="op-{{ o.id }}">
+    <div class="quando"><span class="hora-grande">{{ i.quando.strftime('%H:%M') }}</span><br>{{ 'assumida' if o.status == 'assumida' else 'descartada' }}</div>
+    <div><a href="/leads/{{ l.id }}"><b>{{ l.empresa }}</b></a>
+      <div class="pequeno suave">{{ '💬 WhatsApp' if o.canal == 'whatsapp' else ('✉️ E-mail' if o.canal == 'email' else (o.canal or 'canal não informado')) }} · respondeu em {{ o.criado_em|datahora }}</div></div>
+    <div><span class="selo {{ 'selo-erro' if o.temperatura == 'quente' else 'selo-alerta' }}">{{ o.classificacao or ('quente' if o.temperatura == 'quente' else 'para analisar') }}</span>
+      <div class="pequeno motivo">{{ 'Assumida' if o.status == 'assumida' else 'Descartada' }} por {{ o.responsavel.nome if o.responsavel else 'alguém' }}{% if i.levou %} · {{ i.levou }} depois da resposta{% endif %}</div></div>
+    <div class="acoes-op">
+      {% if l.whatsapp and pode('conversas.ver') %}<a class="btn btn-pequeno" href="/conversas?telefone={{ l.whatsapp|urlencode }}">Ver conversa</a>{% endif %}
+      {% if o.status == 'descartada' %}
+      <form class="inline" method="post" action="/oportunidades/{{ o.id }}/reabrir">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar_para" value="{{ voltar }}">
+        <button class="btn btn-pequeno" title="Desfazer o descarte: volta para a aba Novas">Voltar para Novas</button></form>
+      {% endif %}
+    </div>
+    <details class="op-detalhe largura-toda"><summary>O que enviamos, o que o lead respondeu e o que a IA entendeu</summary>
+      <div class="grade-2">
+        <div>
+          <div class="rotulo">1. O que enviamos</div><div class="mensagem">{{ o.mensagem_enviada or '—' }}</div>
+          <div class="rotulo" style="margin-top:8px">2. O que o lead respondeu · {{ o.criado_em|datahora }}</div>
+          <div class="mensagem op-resposta">{{ o.resposta or '—' }}</div>
+        </div>
+        <div>
+          <div class="rotulo">3. O que a IA entendeu</div>
+          <p style="margin:4px 0">{{ o.resumo or '—' }}</p>
+          {% if o.objecoes %}<p class="pequeno" style="margin:4px 0"><b>Objeções:</b> {{ o.objecoes }}</p>{% endif %}
+          {% if o.proximo_passo %}<p class="pequeno" style="margin:4px 0"><b>Próxima ação sugerida:</b> {{ o.proximo_passo }}</p>{% endif %}
+        </div>
+      </div>
+    </details>
+  </div>
+  {% endfor %}
+  {% else %}
+  <p class="suave" style="margin:6px 0">Nenhuma oportunidade {{ 'assumida' if ver == 'assumidas' else 'descartada' }}{{ ' com esses filtros' if filtrando }}.</p>
+  {% endfor %}
+</div>
+
+{# ------------------------------------------------ Todas as respostas (admin e gestor) #}
+{% else %}
+<div class="cartao">
+  {% for g in grupos %}
+  <h3 class="dia-fila">{{ g.titulo }} <span class="detalhe-dia">{{ g.detalhe }} · {{ g.itens|length }} resposta{{ 's' if g.itens|length != 1 }}</span></h3>
+  {% for i in g.itens %}{% set m = i.m %}{% set l = leads_resposta.get(m.lead_id) %}{% set o = ops_do_lead.get(m.lead_id) %}
+  <div class="linha-op">
+    <div class="quando"><span class="hora-grande">{{ m.criado_em.strftime('%H:%M') }}</span></div>
+    <div>{% if l %}<a href="/leads/{{ l.id }}"><b>{{ l.empresa }}</b></a>{% else %}—{% endif %}
+      <div class="pequeno suave">{{ '✉️ E-mail' if m.canal == 'email' else '💬 WhatsApp' }}{% if m.campanha_id %} · {{ nomes_camp.get(m.campanha_id, '') }}{% endif %}</div></div>
+    <div>{% if l and l.classificacao_resposta %}<span class="selo {{ cor_classe[i.classe] }}">{{ l.classificacao_resposta }}</span>{% endif %}
+      {% if o %}<div class="pequeno motivo" style="margin-top:3px">{{ 'oportunidade nova (esperando alguém assumir)' if o.status == 'nova' else ('oportunidade assumida' ~ (' por ' ~ o.responsavel.nome if o.responsavel else '') if o.status == 'assumida' else 'oportunidade descartada') }}</div>{% endif %}</div>
+    <div class="acoes-op">
+      {% if o and o.status == 'nova' %}<a class="btn btn-pequeno btn-verde" href="/oportunidades#op-{{ o.id }}">Ver oportunidade</a>{% endif %}
+      {% if m.canal == 'whatsapp' and l and l.whatsapp and pode('conversas.ver') %}<a class="btn btn-pequeno" href="/conversas?telefone={{ l.whatsapp|urlencode }}">Ver conversa</a>{% endif %}
+    </div>
+    <div class="texto-resposta largura-toda">{{ (m.corpo or '')[:1500] }}</div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <p class="suave" style="margin:6px 0">{{ 'Nenhuma resposta com esses filtros.' if filtrando else 'Nenhuma resposta recebida ainda.' }}</p>
+  {% endfor %}
+</div>
+{% endif %}
 {% endblock %}
