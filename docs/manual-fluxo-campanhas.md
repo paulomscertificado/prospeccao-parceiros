@@ -165,7 +165,7 @@ O que não sair agora continua programado. Os próximos toques (Dia 3, 7 e 12) s
 | **Campanha → WhatsApp de hoje** | Os WhatsApps do dia para enviar com um clique |
 | **Agenda** | As suas tarefas do dia, inclusive os WhatsApps da campanha |
 | **Minha fila** | A sua fila em abas: os próximos envios por dia (com filtros de período, situação, campanha e busca), o que está saindo agora, o que falhou e o registro dos seus disparos |
-| **Envios** | Todos os e-mails e WhatsApps enviados |
+| **Envios** | Em abas: os enviados por dia (com os testes da campanha) e os próximos envios com o motivo de ainda não terem saído |
 | **Oportunidades** | Quem respondeu com interesse |
 
 ---

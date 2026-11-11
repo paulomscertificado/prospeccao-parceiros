@@ -1,0 +1,106 @@
+{# Peças usadas pela Minha fila e pela tela Envios: o mesmo jeito de mostrar um envio que ainda vai sair.
+   Importar com contexto: {% from "_proximo_envio.html" import estilos_proximos, filtros_chips, linha_proximo with context %}
+   A linha usa do contexto: csrf, config, CANAIS, nomes_camp, canais_do_toque e texto_do_canal. #}
+
+{% macro estilos_proximos() %}
+<style>
+  .kpi-link { display: block; color: inherit; transition: border-color .15s, box-shadow .15s; }
+  .kpi-link:hover { text-decoration: none; border-color: var(--azul); box-shadow: 0 0 0 2px var(--azul-claro); }
+  .kpi-link.destaque:hover { box-shadow: 0 0 0 3px var(--azul-claro); }
+  .abas .selo { margin-left: 4px; }
+  .filtros-prox { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+  .filtros-prox select { width: auto; max-width: 320px; }
+  .filtros-prox input[type=search] { width: 240px; }
+  .chips-filtro { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 8px; }
+  .rotulo-chips { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: var(--suave); width: 70px; }
+  .chip-f { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border: 1px solid var(--borda);
+            border-radius: 999px; font-size: .8rem; font-weight: 600; color: var(--texto); background: #fff; }
+  .chip-f:hover { text-decoration: none; border-color: var(--azul); color: var(--azul); }
+  .chip-f.ativo { background: var(--azul); border-color: var(--azul); color: #fff; }
+  .chip-f .n { font-variant-numeric: tabular-nums; font-weight: 700; opacity: .7; }
+  .chip-f.chip-zero { opacity: .45; }
+  .ponto { width: 8px; height: 8px; border-radius: 50%; display: inline-block; padding: 0; }
+  .ponto.selo-erro { background: var(--erro); } .ponto.selo-alerta { background: var(--alerta); }
+  .ponto.selo-azul { background: var(--azul); } .ponto.selo-ok { background: var(--verde); } .ponto.selo-baixo { background: #98a2b3; }
+  .ponto.selo-roxo { background: var(--roxo); }
+  .dia-fila { display: flex; align-items: baseline; gap: 10px; margin: 22px 0 0; padding-bottom: 6px;
+              border-bottom: 2px solid var(--borda); font-size: 1rem; }
+  .dia-fila .detalhe-dia { font-size: .82rem; color: var(--suave); font-weight: 400; }
+  .dia-fila.dia-atrasado { color: var(--erro); border-bottom-color: var(--erro-claro); }
+  .linha-fila { display: grid; grid-template-columns: 92px 86px minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.6fr); gap: 10px;
+                align-items: start; padding: 10px 0; border-top: 1px solid var(--borda); font-size: .86rem; }
+  .dia-fila + .linha-fila, .dia-fila + .envio { border-top: 0; }
+  .linha-prox { grid-template-columns: 104px minmax(0, 1.5fr) 150px minmax(0, 1.7fr); }
+  .linha-fila .quando { font-family: var(--fonte-mono); font-size: .74rem; color: #6b7686; }
+  .hora-grande { font-size: 1.05rem; font-weight: 700; color: var(--texto); }
+  .cab-fila { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: #6b7686; border-top: 0; padding-top: 0; }
+  .motivo { color: #4b5a6b; }
+  .situacao-fila .motivo { margin-top: 3px; }
+  .atrasado, .atrasado .hora-grande { color: var(--erro); font-weight: 600; }
+  .canais-toque { display: flex; flex-wrap: wrap; gap: 4px; align-items: flex-start; }
+  .canais-toque .pequeno { width: 100%; }
+  .selo-botao { cursor: pointer; border: 1px solid transparent; font: inherit; font-size: .75rem; }
+  .selo-botao:hover { border-color: var(--azul); }
+  .popup-msg { width: min(640px, 94vw); border: 0; border-radius: 14px; padding: 20px; box-shadow: 0 20px 60px rgba(16, 42, 67, .3); }
+  .popup-msg::backdrop { background: rgba(16, 42, 67, .45); }
+  .popup-msg h3 { margin: 0 0 4px; }
+  .popup-msg textarea { width: 100%; font: inherit; line-height: 1.45; }
+  @media (max-width: 760px) {
+    .linha-fila, .linha-prox { grid-template-columns: 1fr 1fr; } .cab-fila { display: none; }
+    .rotulo-chips { width: 100%; } .filtros-prox input[type=search] { width: 100%; }
+  }
+</style>
+{% endmacro %}
+
+{# Uma fileira de filtros em botões. opcoes = [(chave, nome, quantidade, classe do ponto)]; o link de cada botão é
+   url(param=chave), mantendo os outros filtros. "todas" = o botão que tira este filtro. #}
+{% macro filtros_chips(rotulo, opcoes, escolhida, url, param, todas="") %}
+<div class="chips-filtro"><span class="rotulo-chips">{{ rotulo }}</span>
+  {% if todas %}<a class="chip-f {{ 'ativo' if not escolhida }}" href="{{ url(**{param: ''}) }}">{{ todas }}</a>{% endif %}
+  {% for chave, nome, n, ponto in opcoes %}<a class="chip-f {{ 'ativo' if escolhida == chave }} {{ 'chip-zero' if not n and escolhida != chave }}"
+     href="{{ url(**{param: chave}) }}">{% if ponto %}<span class="ponto {{ ponto }}"></span>{% endif %}{{ nome }} <span class="n">{{ n }}</span></a>{% endfor %}
+</div>
+{% endmacro %}
+
+{# Um toque que ainda vai sair: hora, empresa, canais (ver e editar a mensagem), situação e o botão certo. #}
+{% macro linha_proximo(p, voltar) %}{% set t = p.t %}{% set canais_t = canais_do_toque(t) %}
+<div class="linha-fila linha-prox">
+  <div class="quando {{ 'atrasado' if p.atrasado }}"><span class="hora-grande">{{ t.hora or '09:00' }}</span><br>{{ t.data.strftime('%d/%m/%Y') }}
+    {% if p.atrasado %}<br>atrasado há {{ p.dias }} dia{{ 's' if p.dias > 1 }}{% endif %}</div>
+  <div>{% if t.lead %}<a href="/leads/{{ t.lead.id }}"><b>{{ t.lead.empresa }}</b></a>{% else %}—{% endif %}
+    <div class="pequeno suave"><a href="/campanhas/{{ t.campanha_id }}">{{ nomes_camp.get(t.campanha_id, '') }}</a> · {{ config.ANGULOS.get(t.angulo, t.acao) }}</div></div>
+  <div class="canais-toque">{% for c in canais_t %}{% set at = texto_do_canal(t, c) %}
+    <button type="button" class="selo selo-botao {{ 'selo-azul' if c == t.canal else '' }}" onclick="document.getElementById('msg-{{ t.id }}-{{ c }}').showModal()"
+            title="Ver e editar a mensagem de {{ CANAIS.get(c) }}">{{ '✉️ E-mail' if c == 'email' else '💬 WhatsApp' }}</button>
+    <dialog class="popup-msg" id="msg-{{ t.id }}-{{ c }}">
+      <form method="post" action="/fila/mensagem/{{ t.id }}">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="canal" value="{{ c }}">
+        <input type="hidden" name="voltar_para" value="{{ voltar }}">
+        <h3>{{ '✉️ E-mail' if c == 'email' else '💬 WhatsApp' }} · {{ t.lead.empresa if t.lead else '' }}</h3>
+        <p class="pequeno suave">{{ config.ANGULOS.get(t.angulo, t.acao) }} · {{ t.data.strftime('%d/%m/%Y') }} às {{ t.hora or '09:00' }}{{ ' · canal marcado' if c == t.canal else ' · versão reserva' }}</p>
+        {% if c == 'email' %}<label>Assunto</label><input type="text" name="assunto" value="{{ at[0] }}" maxlength="200">{% endif %}
+        <label>Mensagem</label>
+        <textarea name="texto" rows="12" required>{{ at[1] }}</textarea>
+        <div class="grupo-btn" style="margin-top:10px;justify-content:flex-end">
+          <button type="button" class="btn" onclick="this.closest('dialog').close()">Fechar</button>
+          <button class="btn btn-primario">Salvar alteração</button>
+        </div>
+      </form>
+    </dialog>{% endfor %}
+    {% if canais_t|length > 1 %}<div class="pequeno suave">marcado: {{ CANAIS.get(t.canal) }}</div>{% endif %}</div>
+  <div class="situacao-fila"><span class="selo {{ p.classe }}">{{ p.rotulo }}</span>
+    <div class="motivo pequeno">{{ p.motivo }}</div>
+    <div class="grupo-btn" style="margin-top:6px">{% for c in canais_t %}
+      {% set sem_contato = t.lead and ((c == 'whatsapp' and not (t.lead.whatsapp or '').strip()) or (c == 'email' and not t.lead.email)) %}
+      {% if sem_contato and c != t.canal %}{# versão reserva sem contato: o botão não teria efeito #}
+      {% elif sem_contato %}
+      <a class="btn btn-pequeno" href="/leads/{{ t.lead.id }}" title="O {{ 'WhatsApp' if c == 'whatsapp' else 'e-mail' }} desta empresa está em branco">Cadastrar {{ 'WhatsApp' if c == 'whatsapp' else 'e-mail' }}</a>
+      {% else %}
+      <form class="inline" method="post" action="/fila/enviar/{{ t.id }}"
+            data-confirmar="Enviar agora esta mensagem para {{ t.lead.empresa if t.lead else 'a empresa' }} por {{ CANAIS.get(c) }}?">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="canal" value="{{ c }}">
+        <input type="hidden" name="voltar_para" value="{{ voltar }}">
+        <button class="btn btn-pequeno {{ 'btn-verde' if c == 'whatsapp' else 'btn-primario' }}">{{ 'Enviar por WhatsApp' if c == 'whatsapp' else 'Enviar por e-mail' }}</button></form>
+      {% endif %}{% endfor %}</div></div>
+</div>
+{% endmacro %}

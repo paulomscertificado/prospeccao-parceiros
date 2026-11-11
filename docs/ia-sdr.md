@@ -400,3 +400,10 @@ empresas, com as MESMAS colunas da `base_receita`, para reaproveitar `base_recei
 - Desempenho: o lead vem junto com o toque (`selectinload`) e quem já conversou pelo WhatsApp é conferido numa
   consulta só (`campanhas.leads_que_conversaram`, a mesma regra de `whatsapp_liberado`). Limite: 600 toques.
 - Testes: `testes/test_fila_filtros.py`.
+- **Tela Envios** (`rotas/envios.py`, mesmo padrão): abas Enviados / Próximos envios / Como funcionam. Enviados lê os
+  envios dos 90 dias uma vez e filtra aqui (período, situação, canal, campanha, busca sem acento), agrupados por dia
+  (`_grupos_do_passado`), e mostra os testes da campanha (registro `testou_campanha`, `_teste`): o teste vai só para
+  quem testou e, nas Conversas, aparece no contato dessa pessoa. Próximos envios usa `fila._situacao` e a linha de
+  `templates/_proximo_envio.html` (a mesma da Minha fila). Caso que motivou (11/11/2026): "Hoje 10:28" em Próximos
+  envios parecia já enviado, mas era a hora programada de um WhatsApp frio esperando o clique.
+  Testes: `testes/test_envios_tela.py`.
