@@ -783,7 +783,7 @@ def test_minha_fila_mostra_hora_e_envia_agora(cliente, monkeypatch):
 def test_minha_fila_filtro_whatsapp_mostra_toque_de_email_com_versao_whatsapp(cliente):
     with sessao() as db:
         admin = _admin(db)
-        lead = _novo_lead(db, "Versao Reserva Ltda", email="r@versaoreserva.com.br")
+        lead = _novo_lead(db, "Versao Reserva Ltda", email="r@versaoreserva.com.br", whatsapp="81999990011")
         camp = Campanha(nome="Reserva", categorias="contabil", cidade="Recife", estado="PE", status="ativa",
                         aprovado_em=agora(), usuario_id=admin.id)
         db.add(camp)

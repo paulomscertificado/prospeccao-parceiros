@@ -387,3 +387,16 @@ empresas, com as MESMAS colunas da `base_receita`, para reaproveitar `base_recei
   não consegue falar com o WhatsApp ao ligar (ver `whatsapp-leads/docs/api.md`, seção 8).
 - Testes: `testes/test_nuvem.py::test_conversa_de_celular_antigo_fica_com_o_9` e
   `testes/test_revisao_filas.py::test_disparo_explica_por_que_nao_saiu`.
+
+## Minha fila em abas e com filtros (nov/2026)
+
+- `rotas/fila.py`: a aba **Próximos envios** agrupa os toques por dia (`_agrupar_por_dia`: Atrasados, Hoje, Amanhã,
+  depois o dia da semana) e filtra por período (`PERIODOS`), situação (`SITUACOES`, calculada em `_situacao`),
+  campanha e busca no nome da empresa (sem acento). Cada opção mostra quantos há, com os outros filtros aplicados.
+  `url_fila(...)` monta os links mantendo os filtros. As outras abas (fila do WhatsApp, histórico, registro) vêm na
+  mesma página, escondidas (`?aba=`).
+- A situação "WhatsApp em branco" / "Sem e-mail" aparece também nos toques dos próximos dias, para dar tempo de
+  cadastrar o contato; no lugar do botão que não funcionaria, a tela mostra **Cadastrar WhatsApp/e-mail**.
+- Desempenho: o lead vem junto com o toque (`selectinload`) e quem já conversou pelo WhatsApp é conferido numa
+  consulta só (`campanhas.leads_que_conversaram`, a mesma regra de `whatsapp_liberado`). Limite: 600 toques.
+- Testes: `testes/test_fila_filtros.py`.

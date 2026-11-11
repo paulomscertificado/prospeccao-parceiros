@@ -110,13 +110,19 @@ momento", menu "digite 1", aviso de ausência), a IA SDR **não responde**, **n�
 continua normalmente. Além disso, a SDR responde no máximo 1 vez por dia para o mesmo contato, para nunca entrar
 numa conversa sem fim. Se o mesmo lead mandar várias mensagens, tudo fica na mesma oportunidade.
 
-**Minha fila (menu):** mostra os seus disparos num lugar só:
-- o que está na fila do WhatsApp agora;
-- o que ainda vai sair, com o motivo (ex.: "Aguardando seu clique", "Aguardando o horário de envio", "Sem WhatsApp");
-- o histórico dos últimos 7 dias, com o erro de quem não saiu;
-- o registro dos disparos e testes.
+**Minha fila (menu):** mostra os seus disparos num lugar só, em 4 abas:
+- **Próximos envios:** o que ainda vai sair, separado por dia (Atrasados, Hoje, Amanhã, os próximos dias) e na ordem
+  em que vai sair. Cada envio mostra a situação em destaque (ex.: "Aguardando seu clique", "WhatsApp em branco",
+  "Programado") e o botão certo: **Enviar** ou **Cadastrar WhatsApp**/**Cadastrar e-mail**, quando falta o contato.
+  Para achar um envio, use os filtros: **Quando** (todos, hoje e atrasados, atrasados, hoje, amanhã, próximos dias),
+  **Situação**, a **campanha** e a **busca pelo nome da empresa**. Cada filtro mostra quantos envios há nele;
+  **Limpar filtros** volta a mostrar tudo.
+- **Na fila do WhatsApp:** o que está saindo agora, um por vez;
+- **Histórico (7 dias):** o que saiu ou falhou, com o erro de quem não saiu;
+- **Registro dos disparos:** disparos e testes.
 
-Admin e gestor podem ver a fila de outra pessoa ou da equipe toda.
+Os números do topo também são atalhos: clique em **Atrasados** para ver só os atrasados, em **Para sair hoje** para
+ver os de hoje e os atrasados. Admin e gestor podem ver a fila de outra pessoa ou da equipe toda.
 
 **Disparar campanha (qualquer pessoa da equipe):** na página da campanha ativa, **🚀 Disparar campanha** tem os
 botões **Disparar campanha WhatsApp** e **Disparar campanha e-mail**. Eles mandam na hora o toque de hoje de cada

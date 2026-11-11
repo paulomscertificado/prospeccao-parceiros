@@ -1017,12 +1017,19 @@ def whatsapp_liberado(db, lead: Lead) -> bool:
     """A IA SDR só manda WhatsApp SOZINHA para quem já conversou com a MS: autorizou receber (consentimento)
     ou já mandou mensagem pelo WhatsApp. O primeiro contato frio continua com 1 clique de uma pessoa
     (conexão por QR code + política do WhatsApp: mensagem automática para quem não conhece o número = bloqueio)."""
-    if lead.consentimento:
-        return True
+    return bool(lead.consentimento) or lead.id in leads_que_conversaram(db, [lead.id])
+
+
+def leads_que_conversaram(db, ids) -> set[int]:
+    """Dos leads informados, os que já mandaram mensagem pelo WhatsApp (a regra de whatsapp_liberado, numa consulta
+    só: a tela Minha fila confere centenas de toques de uma vez)."""
     from .modelos import Mensagem
 
-    return db.execute(select(Mensagem.id).where(Mensagem.lead_id == lead.id, Mensagem.canal == "whatsapp",
-                                                Mensagem.status == "recebida").limit(1)).first() is not None
+    ids = [i for i in set(ids or []) if i]
+    if not ids:
+        return set()
+    return set(db.execute(select(Mensagem.lead_id).where(Mensagem.lead_id.in_(ids), Mensagem.canal == "whatsapp",
+                                                         Mensagem.status == "recebida").distinct()).scalars())
 
 
 def processar_fila_whatsapp(db, maximo: int = 3) -> dict:

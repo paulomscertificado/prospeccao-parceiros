@@ -3,10 +3,11 @@
 gestor podem ver a fila de outra pessoa ou da equipe toda."""
 
 from datetime import date, timedelta
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from .. import autorizacao, campanhas, config, mensagens, sdr, util
 from ..banco import agora, ler_config, obter_db
@@ -26,36 +27,98 @@ def _numero_da_pessoa(db, usuario: Usuario) -> str:
     return proprio.id if proprio else conexoes.PRINCIPAL
 
 
-def _motivo_pendente(db, t: Tarefa, hoje: date, no_horario: bool, liberados: dict[int, bool]) -> str:
-    """Por que o toque ainda não saiu, em linguagem simples."""
+ABAS = ("proximos", "fila", "historico", "registro")
+PERIODOS = [("todos", "Todos"), ("ate_hoje", "Hoje e atrasados"), ("atrasados", "Atrasados"), ("hoje", "Hoje"),
+            ("amanha", "Amanhã"), ("proximos", "Próximos dias")]
+# Situação de cada toque que ainda não saiu: (rótulo curto do filtro, cor do selo). Nesta ordem na tela.
+SITUACOES = {
+    "clique": ("Aguardando seu clique", "selo-alerta"),
+    "sem_whatsapp": ("WhatsApp em branco", "selo-erro"),
+    "sem_email": ("Sem e-mail", "selo-erro"),
+    "email_manual": ("E-mail só pelo Disparar", "selo-alerta"),
+    "horario": ("Fora do horário", "selo-baixo"),
+    "programado": ("Programado", "selo-azul"),
+    "rodada": ("Sai na próxima rodada", "selo-ok"),
+    "sozinho": ("Sai sozinho", "selo-ok"),
+    "parado": ("Automação parada", "selo-baixo"),
+}
+DIAS_SEMANA = ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado", "domingo"]
+LIMITE_PENDENTES = 600  # toques olhados por vez (atrasados primeiro)
+
+
+def _situacao(t: Tarefa, hoje: date, no_horario: bool, conversaram: set[int], email_auto: bool,
+              whats_auto: bool) -> tuple[str, str]:
+    """(situação, explicação) de por que o toque ainda não saiu, em linguagem simples. O que pede uma ação da pessoa
+    (WhatsApp ou e-mail em branco) aparece também nos toques dos próximos dias, para dar tempo de corrigir."""
     lead = t.lead
-    if t.data > hoje:
-        return f"Programado para {t.data:%d/%m} às {t.hora or '09:00'}"
     if not lead or not sdr.automacao_ativa(lead):
-        return "Automação parada para este lead (respondeu, opt-out ou está com alguém)"
+        return "parado", "Automação parada para este lead (respondeu, opt-out ou está com alguém)"
+    if t.canal == "email" and not lead.email:
+        return "sem_email", "Sem e-mail cadastrado"
+    if t.canal == "whatsapp" and not (lead.whatsapp or "").strip():
+        return "sem_whatsapp", "WhatsApp em branco: cadastre o número na ficha da empresa para a mensagem sair"
+    if t.data > hoje:
+        return "programado", f"Programado para {t.data:%d/%m} às {t.hora or '09:00'}"
     if t.canal == "email":
-        if not lead.email:
-            return "Sem e-mail cadastrado"
-        if ler_config(db, "enviar_email_automatico") != "1":
-            return "Envio automático de e-mail desligado: use Disparar campanha e-mail"
+        if not email_auto:
+            return "email_manual", "Envio automático de e-mail desligado: use Disparar campanha e-mail"
         if not no_horario:
-            return "Aguardando o horário de envio"
+            return "horario", "Aguardando o horário de envio"
         if t.data == hoje and (t.hora or "00:00") > agora().strftime("%H:%M"):
-            return f"Programado para hoje às {t.hora}"
-        return "Sai na próxima rodada da fila (a cada minuto)"
-    if not (lead.whatsapp or "").strip():
-        return "WhatsApp em branco: cadastre o número na ficha da empresa para a mensagem sair"
-    if lead.id not in liberados:
-        liberados[lead.id] = campanhas.whatsapp_liberado(db, lead)
-    if liberados[lead.id] and ler_config(db, "enviar_whatsapp_automatico") == "1":
-        return "Sai sozinho (contato já conversou com a MS)" if no_horario else "Aguardando o horário de envio"
-    return "Aguardando seu clique (WhatsApp de hoje ou Disparar campanha WhatsApp)"
+            return "programado", f"Programado para hoje às {t.hora}"
+        return "rodada", "Sai na próxima rodada da fila (a cada minuto)"
+    if whats_auto and (lead.consentimento or lead.id in conversaram):
+        if no_horario:
+            return "sozinho", "Sai sozinho (contato já conversou com a MS)"
+        return "horario", "Aguardando o horário de envio"
+    return "clique", "Aguardando seu clique (WhatsApp de hoje ou Disparar campanha WhatsApp)"
+
+
+def _no_periodo(p: dict, periodo: str, hoje: date) -> bool:
+    d = p["t"].data
+    if periodo == "ate_hoje":
+        return d <= hoje
+    if periodo == "atrasados":
+        return d < hoje
+    if periodo == "hoje":
+        return d == hoje
+    if periodo == "amanha":
+        return d == hoje + timedelta(days=1)
+    if periodo == "proximos":
+        return d > hoje
+    return True
+
+
+def _agrupar_por_dia(itens: list[dict], hoje: date) -> list[dict]:
+    """Atrasados num grupo só; depois um grupo por dia (Hoje, Amanhã, Quinta-feira...), na ordem do envio."""
+    grupos = []
+    atrasados = [p for p in itens if p["atrasado"]]
+    if atrasados:
+        grupos.append({"titulo": "Atrasados", "detalhe": "de dias anteriores", "atrasado": True, "itens": atrasados})
+    por_dia: dict[date, list] = {}
+    for p in itens:
+        if not p["atrasado"]:
+            por_dia.setdefault(p["t"].data, []).append(p)
+    for d in sorted(por_dia):
+        semana = DIAS_SEMANA[d.weekday()]
+        if d == hoje:
+            titulo, detalhe = "Hoje", f"{semana}, {d:%d/%m}"
+        elif d == hoje + timedelta(days=1):
+            titulo, detalhe = "Amanhã", f"{semana}, {d:%d/%m}"
+        else:
+            titulo, detalhe = semana.capitalize(), f"{d:%d/%m}"
+        grupos.append({"titulo": titulo, "detalhe": detalhe, "atrasado": False, "itens": por_dia[d]})
+    return grupos
 
 
 @rotas.get("/fila")
-def minha_fila(request: Request, de: str = "", canal: str = "", usuario: Usuario = Depends(exige("fila.ver")),
-               db: Session = Depends(obter_db)):
+def minha_fila(request: Request, de: str = "", canal: str = "", aba: str = "proximos", periodo: str = "todos",
+               situacao: str = "", campanha: str = "", busca: str = "",
+               usuario: Usuario = Depends(exige("fila.ver")), db: Session = Depends(obter_db)):
     hoje = date.today()
+    aba = aba if aba in ABAS else "proximos"
+    periodo = periodo if periodo in dict(PERIODOS) else "todos"
+    situacao = situacao if situacao in SITUACOES else ""
     alvo_id = usuario.id
     if ve_tudo(usuario, "fila.ver") and de:
         alvo_id = None if de == "todos" else (util.para_int(de) or usuario.id)
@@ -81,11 +144,44 @@ def minha_fila(request: Request, de: str = "", canal: str = "", usuario: Usuario
                          *([Tarefa.mensagem_email != ""] if "email" in canais else [])),
                      Tarefa.canal.in_(["email", "whatsapp"]),
                      Tarefa.data <= hoje + timedelta(days=7)))
-    pendentes = db.execute(do_alvo_tarefa(pend_q).order_by(Tarefa.data, Tarefa.hora, Tarefa.id).limit(300)).scalars().all()
+    tarefas = db.execute(do_alvo_tarefa(pend_q).options(selectinload(Tarefa.lead))  # o lead junto: sem 1 consulta por toque
+                         .order_by(Tarefa.data, Tarefa.hora, Tarefa.id).limit(LIMITE_PENDENTES)).scalars().all()
     no_horario = mensagens.dentro_do_horario(db)
-    liberados: dict[int, bool] = {}
-    pendentes = [{"t": t, "motivo": _motivo_pendente(db, t, hoje, no_horario, liberados),
-                  "atrasado": t.data < hoje} for t in pendentes]
+    conversaram = campanhas.leads_que_conversaram(db, [t.lead_id for t in tarefas if t.canal == "whatsapp"])
+    email_auto = ler_config(db, "enviar_email_automatico") == "1"
+    whats_auto = ler_config(db, "enviar_whatsapp_automatico") == "1"
+    pendentes = []
+    for t in tarefas:
+        chave, motivo = _situacao(t, hoje, no_horario, conversaram, email_auto, whats_auto)
+        rotulo, classe = SITUACOES[chave]
+        pendentes.append({"t": t, "situacao": chave, "rotulo": rotulo, "classe": classe, "motivo": motivo,
+                          "atrasado": t.data < hoje, "dias": (hoje - t.data).days})
+
+    # Filtros da aba Próximos envios: campanha e busca valem para tudo; o período e a situação mostram quantos há
+    # em cada opção, já com os outros filtros aplicados
+    nomes_camp = {c.id: c.nome for c in db.execute(select(Campanha)).scalars()}
+    camp_id = util.para_int(campanha) or 0
+    termo = util.chave_texto(busca)
+    base = [p for p in pendentes if (not camp_id or p["t"].campanha_id == camp_id)
+            and (not termo or termo in util.chave_texto(p["t"].lead.empresa if p["t"].lead else ""))]
+    na_situacao = [p for p in base if not situacao or p["situacao"] == situacao]
+    contagem_periodo = {chave: sum(1 for p in na_situacao if _no_periodo(p, chave, hoje)) for chave, _ in PERIODOS}
+    no_periodo = [p for p in base if _no_periodo(p, periodo, hoje)]
+    contagem_situacao = {chave: sum(1 for p in no_periodo if p["situacao"] == chave) for chave in SITUACOES}
+    filtrados = [p for p in no_periodo if not situacao or p["situacao"] == situacao]
+    por_campanha: dict[int, int] = {}
+    for p in pendentes:
+        por_campanha[p["t"].campanha_id] = por_campanha.get(p["t"].campanha_id, 0) + 1
+    opcoes_campanha = sorted(((cid, nomes_camp.get(cid, f"Campanha {cid}"), n) for cid, n in por_campanha.items()),
+                             key=lambda o: o[1].lower())
+    atuais = {"de": de, "canal": canal, "aba": aba, "periodo": periodo, "situacao": situacao,
+              "campanha": str(camp_id or ""), "busca": busca.strip()}
+
+    def url_fila(**mudancas) -> str:
+        """Endereço desta tela com os filtros atuais e as mudanças pedidas (valor padrão fica fora do endereço)."""
+        params = {k: v for k, v in {**atuais, **mudancas}.items()
+                  if v and not (k == "aba" and v == "proximos") and not (k == "periodo" and v == "todos")}
+        return "/fila" + ("?" + urlencode(params) if params else "")
 
     # 2) Na fila do WhatsApp agora e 3) histórico (últimos 7 dias): saiu, falhou, foi lida...
     desde = agora().replace(hour=0, minute=0, second=0) - timedelta(days=7)
@@ -120,7 +216,6 @@ def minha_fila(request: Request, de: str = "", canal: str = "", usuario: Usuario
     tarefas_por_id = {t.id: t for t in db.execute(select(Tarefa).where(Tarefa.id.in_(ids_t))).scalars()} if ids_t else {}
     ids = {m.lead_id for m in envios if m.lead_id}
     leads_por_id = {l.id: l for l in db.execute(select(Lead).where(Lead.id.in_(ids))).scalars()} if ids else {}
-    nomes_camp = {c.id: c.nome for c in db.execute(select(Campanha)).scalars()}
     pessoas = db.execute(select(Usuario).where(Usuario.ativo.is_(True)).order_by(Usuario.nome)).scalars().all() \
         if ve_tudo(usuario, "fila.ver") else []
     return tela(request, "fila.html", {
@@ -130,6 +225,12 @@ def minha_fila(request: Request, de: str = "", canal: str = "", usuario: Usuario
         "filtro_canal": canal, "horario": (ler_config(db, "horario_envio_inicio"), ler_config(db, "horario_envio_fim")),
         "CANAIS": config.CANAIS, "canais_do_toque": campanhas.canais_do_toque,
         "texto_do_canal": campanhas.texto_do_canal, "tarefas_por_id": tarefas_por_id,
+        # aba Próximos envios: filtros, contagens e grupos por dia
+        "aba": aba, "periodo": periodo, "situacao": situacao, "campanha": camp_id, "busca": busca.strip(),
+        "PERIODOS": PERIODOS, "SITUACOES": SITUACOES, "contagem_periodo": contagem_periodo,
+        "contagem_situacao": contagem_situacao, "grupos": _agrupar_por_dia(filtrados, hoje),
+        "total_filtrados": len(filtrados), "opcoes_campanha": opcoes_campanha, "url_fila": url_fila,
+        "filtrando": bool(situacao or camp_id or termo or periodo != "todos"),
     })
 
 
