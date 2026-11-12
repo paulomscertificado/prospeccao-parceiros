@@ -70,6 +70,8 @@ CATALOGO = [
     Permissao("campanhas.excluir_andamento", "IA SDR", "Excluir campanha em andamento", modulo="campanhas", padrao="G"),
     Permissao("campanhas.escolher_numero", "IA SDR", "Escolher o número de WhatsApp da campanha", modulo="campanhas",
               padrao="A"),
+    Permissao("campanhas.whatsapp_sozinho", "IA SDR",
+              "Ligar o WhatsApp automático da campanha (contato frio sai sem clique)", modulo="campanhas", padrao="A"),
     Permissao("fila.ver", "IA SDR", "Ver a fila de mensagens", True, padrao="E"),
     Permissao("fila.enviar", "IA SDR", "Enviar e editar mensagens da fila", True, padrao="E"),
     Permissao("envios.ver", "IA SDR", "Ver os envios", True, padrao="E"),

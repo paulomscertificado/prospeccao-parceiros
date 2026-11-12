@@ -531,6 +531,9 @@ class Campanha(Base):
     status_ia: Mapped[str] = mapped_column(String(120), default="")
     arquivada: Mapped[bool] = mapped_column(Boolean, default=False)  # some da lista (Ver arquivadas)
     conexao_id: Mapped[str] = mapped_column(String(40), default="")  # número escolhido pelo admin (vazio = automático)
+    # WhatsApp sai sozinho depois da aprovação, também para contato frio: o admin liga por campanha (as de Empresas
+    # novas já saem sozinhas). Mesmas travas da fila automática (campanhas.campanhas_que_saem_sozinhas)
+    whatsapp_sozinho: Mapped[bool] = mapped_column(Boolean, default=False)
     # Visual (HTML no e-mail, imagem no WhatsApp) — app/visual.py. toques: "seguintes" (do 2º em diante) ou "todos"
     visual_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     visual_canais: Mapped[str] = mapped_column(String(40), default="")

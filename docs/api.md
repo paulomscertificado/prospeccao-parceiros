@@ -48,7 +48,7 @@ pessoa: veja a lista e as regras em [permissoes.md](permissoes.md). Sem a permis
 | `GET/POST /leads/{id}/agendar` | A G V | Horários livres reais e marcação de reunião |
 | `POST /leads/{id}/pesquisar` · `/abordagem-sdr` | A G V | Perfil do parceiro e mensagens SDR (4 ângulos) |
 | `GET /campanhas` · `GET/POST /campanhas/nova` · `GET /campanhas/{id}` | A G V | Campanhas da IA SDR (`?pedido=` texto livre) |
-| `POST /campanhas/{id}/{acao}` | A G (aprovar/cancelar) · A G V | `aprovar`, `cancelar`, `pausar`, `retomar`, `editar-mensagem`, `remover-lead` |
+| `POST /campanhas/{id}/{acao}` | A G (aprovar/cancelar) · A G V | `aprovar`, `cancelar`, `pausar`, `retomar`, `editar-mensagem`, `remover-lead`; `numero` e `whatsapp-sozinho` (`ligar` = 1/0) só admin |
 | `GET /inteligencia` · `POST /inteligencia/sugerir-categorias` | A G V · A G | Inteligência de Prospecção |
 | `GET /categorias` · `POST /categorias/{id}` | A G · A | Categorias de parceiros |
 | `GET /conhecimento` · `POST /conhecimento/{id}` | A G V · A G | Base de conhecimento |

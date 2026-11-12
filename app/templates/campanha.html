@@ -28,6 +28,23 @@
 </form>
 {% endif %}
 
+{% if pode_whatsapp_sozinho and c.tipo != 'empresas_novas' and c.status in ('aguardando_aprovacao', 'ativa', 'pausada') %}
+<form class="cartao" id="whatsapp-sozinho" method="post" action="/campanhas/{{ c.id }}/whatsapp-sozinho"
+      style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap"
+      {% if not c.whatsapp_sozinho %}data-confirmar="Ligar o WhatsApp automático? Depois da aprovação, as mensagens de WhatsApp desta campanha saem sozinhas, também para quem nunca conversou com a MS (uma a cada 3 minutos, com os limites do número)."{% endif %}>
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <input type="hidden" name="ligar" value="{{ '0' if c.whatsapp_sozinho else '1' }}">
+  <div style="flex:1;min-width:260px"><b>WhatsApp sai sozinho depois da aprovação</b> <span class="selo">só admin</span>
+    {% if c.whatsapp_sozinho %}<span class="selo selo-ok">ligado</span>{% else %}<span class="selo">desligado</span>{% endif %}
+    <p class="pequeno suave" style="margin:4px 0 0">{% if c.whatsapp_sozinho %}As mensagens de WhatsApp desta campanha saem sem o seu clique,
+      também para quem nunca conversou com a MS, como nas Empresas novas.{% else %}Hoje, quem nunca conversou com a MS
+      espera o seu clique. Ligado, o WhatsApp sai sozinho, como nas Empresas novas.{% endif %}
+      Travas: uma mensagem a cada 3 minutos, só no horário de envio, limites por hora e por dia, até 20 contatos frios
+      por número por dia e pausa com 3 pedidos de SAIR. Toque atrasado mais de 2 dias espera o clique.</p></div>
+  <button class="btn {{ '' if c.whatsapp_sozinho else 'btn-verde' }}">{{ 'Desligar' if c.whatsapp_sozinho else 'Ligar' }}</button>
+</form>
+{% endif %}
+
 {% if rodando %}
 <div class="aviso aviso-info"><b>Montando a campanha...</b> {{ c.etapa }} Esta página se atualiza sozinha.</div>
 {% elif c.status == 'erro' %}
@@ -109,7 +126,7 @@
 <div class="cartao" id="whatsapp-hoje">
   <h2>WhatsApp de hoje <span class="selo selo-ok">{{ whatsapp_hoje|length }} para enviar</span></h2>
   {% if sem_numero %}<div class="aviso aviso-alerta">{{ sem_numero }} <a href="/whatsapp">Conectar meu WhatsApp</a></div>
-  {% elif c.tipo == 'empresas_novas' %}<p class="pequeno suave"><b>Campanha de Empresas novas: depois de aprovada, os WhatsApps saem sozinhos</b>,
+  {% elif c.tipo == 'empresas_novas' or c.whatsapp_sozinho %}<p class="pequeno suave"><b>{{ 'Campanha de Empresas novas' if c.tipo == 'empresas_novas' else 'WhatsApp automático ligado' }}: depois de aprovada, os WhatsApps saem sozinhos</b>,
     cada um no seu horário, pelo <b>{{ numero_whatsapp }}</b>, um por vez, com as pausas e o limite do número. O botão só adianta o envio.</p>
   {% else %}<p class="pequeno suave">Sai pelo <b>{{ numero_whatsapp }}</b>, uma mensagem por clique, com as pausas e o limite do número.
     Para quem já conversou com a MS, a IA SDR envia sozinha.</p>{% endif %}
@@ -136,7 +153,7 @@
   <div class="kpi destaque"><div class="rotulo">Quantidade de leads</div><div class="valor">{{ resumo.leads }}</div></div>
   <div class="kpi"><div class="rotulo">Contatos programados</div><div class="valor">{{ resumo.contatos_estimados }}</div></div>
   {% for canal, n in resumo.por_canal.items() %}<div class="kpi"><div class="rotulo">{{ CANAIS.get(canal, canal) }}</div><div class="valor">{{ n }}</div>
-    <div class="detalhe">{{ ('envio automático pela fila' if resumo.email_automatico else 'envio assistido (SMTP não configurado)') if canal == 'email' else ('sai sozinho depois da aprovação (um por vez, com pausas)' if c.tipo == 'empresas_novas' else 'envio com 1 clique pelo WhatsApp conectado (Agenda)' if wl.conectado else 'envio com 1 clique na Agenda') }}</div></div>{% endfor %}
+    <div class="detalhe">{{ ('envio automático pela fila' if resumo.email_automatico else 'envio assistido (SMTP não configurado)') if canal == 'email' else ('sai sozinho depois da aprovação (um por vez, com pausas)' if c.tipo == 'empresas_novas' or c.whatsapp_sozinho else 'envio com 1 clique pelo WhatsApp conectado (Agenda)' if wl.conectado else 'envio com 1 clique na Agenda') }}</div></div>{% endfor %}
 </div>
 <div class="grade-2">
   <div class="cartao"><h2>Segmentos</h2><table>{% for nome, n in resumo.por_categoria.items() %}<tr><td>{{ nome }}</td><td class="num">{{ n }}</td></tr>{% endfor %}</table></div>

@@ -531,7 +531,14 @@ empresas, com as MESMAS colunas da `base_receita`, para reaproveitar `base_recei
   limite por hora (15), por dia e por número (40), horário de envio, controle de frequência e SAIR.
 - Minha fila e Envios (`fila._situacao`, parâmetro `automaticas`): "Sai sozinho: campanha de Empresas novas aprovada";
   toque futuro mostra "(sai sozinho)" ou "(vai esperar o seu clique)".
-- Campanhas de parceiros: sem mudança (contato frio = clique). Testes: `testes/test_empresas_novas_automatico.py`.
+- Campanhas de parceiros: contato frio = clique, a não ser que o admin ligue **WhatsApp sai sozinho depois da
+  aprovação** na tela da campanha (12/11/2026; ligado na Campanha 3 a pedido da Maria). `Campanha.whatsapp_sozinho`
+  (coluna nova), permissão `campanhas.whatsapp_sozinho` (padrão: só admin), `POST /campanhas/{id}/whatsapp-sozinho`
+  (`ligar` = 1/0, na rota das ações da campanha; Empresas novas não muda; registro `ligou_whatsapp_sozinho` /
+  `desligou_whatsapp_sozinho`). `campanhas_que_saem_sozinhas` devolve `{id: tipo}` e `motivo_automatico` monta o
+  texto: "Enviada sozinha (campanha aprovada com WhatsApp automático)" e "Sai sozinho: campanha aprovada com WhatsApp
+  automático". Mesmas travas da fila automática, inclusive o teto de 20 frios por número por dia.
+  Testes: `testes/test_empresas_novas_automatico.py` e `testes/test_whatsapp_sozinho.py`.
 - **Cancelar envios** (Minha fila e Envios, nov/2026): `POST /fila/cancelar/{id}` (um toque) e `POST /fila/cancelar-varios`
   (os ids mostrados na tela, no máximo `LIMITE_MOSTRAR`; o botão só aparece com algum filtro escolhido). Permissão
   `fila.enviar` + dono da campanha ou responsável pelo lead (`_toque_permitido`). `campanhas.cancelar_toques` cancela

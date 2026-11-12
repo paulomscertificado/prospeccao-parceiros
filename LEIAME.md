@@ -150,6 +150,11 @@ preço nem comissão e não fecha parceria.
 4. E-mails saem sozinhos (com limites). WhatsApp: com o celular conectado, sai **sozinho para quem já conversou com
    a MS** (respondeu pelo WhatsApp ou tem marcado na ficha "Autorizou receber mensagens da MS pelo WhatsApp"); para
    os demais, a Agenda mostra o botão para enviar com um clique. LinkedIn: sempre com um clique.
+   **WhatsApp automático (só o administrador):** na tela da campanha, o cartão **WhatsApp sai sozinho depois da
+   aprovação** tem o botão **Ligar**. Ligado, o WhatsApp da campanha sai sem clique também para quem nunca conversou
+   com a MS, como nas Empresas novas: uma mensagem a cada 3 minutos, só no horário de envio, com os limites por hora e
+   por dia, até 20 contatos frios por número por dia e pausa com 3 pedidos de SAIR. Toque atrasado mais de 2 dias
+   espera o clique. **Desligar** volta ao clique.
    Toda empresa da campanha ganha a mensagem de WhatsApp. Se o campo **WhatsApp** da empresa estiver em branco, a
    mensagem fica pronta e **não sai**: cadastre o número na ficha da empresa e ela fica liberada.
    Empresa com WhatsApp **e** e-mail recebe os dois em cada toque (nas Empresas novas, só o WhatsApp).
@@ -294,7 +299,8 @@ leads: as respostas vão para **Oportunidades** e o time conversa.
 - **Foco no WhatsApp:** empresa com celular recebe os 3 toques **por WhatsApp**, que saem sozinhos depois da
   aprovação (o botão **Enviar** da **Minha fila** ou da campanha só adianta). O **e-mail** só é usado para quem não
   tem celular, e também sai sozinho pela fila. Nas campanhas de **parceiros** o WhatsApp para quem nunca conversou
-  com a MS continua saindo com 1 clique.
+  com a MS continua saindo com 1 clique, a não ser que o administrador ligue o **WhatsApp sai sozinho depois da
+  aprovação** na tela da campanha.
 - **Buscar de novo não gasta à toa:** toda empresa que já veio entra numa lista de exclusão guardada na própria
   CNPJá. Buscando o mesmo dia de novo, a CNPJá só traz (e só cobra) as empresas que ainda não vieram.
 - **Atividade:** a busca pega empresas novas de **qualquer atividade** (toda empresa nova pode precisar do e-CNPJ).

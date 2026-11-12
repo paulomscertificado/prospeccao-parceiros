@@ -640,6 +640,7 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(exige("c
         "whatsapp_hoje": whatsapp_hoje, "numero_whatsapp": numero, "sem_numero": sem_numero,
         "disparar": {k: len(v) for k, v in campanhas.para_disparar(db, camp).items()},
         "numeros_admin": _numeros_para_admin(db, usuario), "visual_resumo": visual.resumo_da_campanha(db, camp),
+        "pode_whatsapp_sozinho": autorizacao.pode(usuario, "campanhas.whatsapp_sozinho"),
         "pode_gerenciar": autorizacao.pode(usuario, "campanhas.gerenciar", camp),
         "dono": db.get(Usuario, camp.usuario_id) if camp.usuario_id else None,
         "c": camp, "resumo": campanhas.resumo_aprovacao(db, camp), "nomes_categorias": nomes,
@@ -835,6 +836,26 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
         else:
             camp.conexao_id = _numero_escolhido(db, usuario, form)
             avisar(request, "Número da campanha atualizado.")
+    elif acao == "whatsapp-sozinho":
+        if not autorizacao.pode(usuario, "campanhas.whatsapp_sozinho"):
+            avisar(request, "Só o administrador liga ou desliga o WhatsApp automático da campanha.", "erro")
+        elif camp.tipo in campanhas.TIPOS_QUE_SAEM_SOZINHOS:
+            avisar(request, "Nas campanhas de Empresas novas o WhatsApp já sai sozinho depois da aprovação.", "alerta")
+        else:
+            ligar = form.get("ligar") == "1"
+            camp.whatsapp_sozinho = ligar
+            registrar_log(db, usuario, "ligou_whatsapp_sozinho" if ligar else "desligou_whatsapp_sozinho", "campanha",
+                          cid, "WhatsApp sai sozinho depois da aprovação, também para contato frio" if ligar
+                          else "Contato frio volta a esperar o clique", request)
+            if not ligar:
+                avisar(request, "WhatsApp automático desligado: quem nunca conversou com a MS volta a esperar o seu clique.")
+            elif camp.status == "ativa" and camp.aprovado_em:
+                avisar(request, "WhatsApp automático ligado: as mensagens desta campanha saem sozinhas, uma a cada "
+                                "3 minutos, no horário de envio e com os limites do número.")
+            else:
+                avisar(request, "WhatsApp automático ligado: começa quando a campanha for aprovada.")
+        db.commit()
+        return voltar(f"/campanhas/{cid}#whatsapp-sozinho")
     elif acao == "remover-lead":
         lead_id = util.para_int(form.get("lead_id"))
         motivo = str(form.get("motivo", ""))

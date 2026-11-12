@@ -81,7 +81,7 @@ def _situacao(t: Tarefa, hoje: date, no_horario: bool, conversaram: set[int], em
         if t.data == hoje and (t.hora or "00:00") > agora().strftime("%H:%M"):
             return "programado", f"Programado para hoje às {t.hora} (sai sozinho)"
         if da_campanha_automatica:
-            return "sozinho", "Sai sozinho: campanha de Empresas novas aprovada (um por vez, com pausas)"
+            return "sozinho", f"Sai sozinho: {campanhas.motivo_automatico(automaticas, t.campanha_id)} (um por vez, com pausas)"
         return "sozinho", "Sai sozinho (contato já conversou com a MS)"
     if t.campanha_id in automaticas:
         return "clique", (f"Aguardando seu clique: atrasado mais de {campanhas.DIAS_ATRASO_AUTOMATICO} dias, "

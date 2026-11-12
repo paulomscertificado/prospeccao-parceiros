@@ -15,7 +15,9 @@ Para: toda a equipe (Funcionários MS, vendedores, gestores)
 3. **E-mails saem sozinhos**, em horário comercial e com limites.
 4. **WhatsApp:**
    - para quem **já conversou com a MS**, sai sozinho;
-   - para os demais, **você envia com um clique**.
+   - para os demais, **você envia com um clique**;
+   - se o administrador ligou **WhatsApp sai sozinho depois da aprovação** na campanha, sai sozinho para todos
+     (uma mensagem a cada 3 minutos, com os limites do número).
 5. **Quando o lead responde**, a sequência para e ele vai para **Oportunidades** para você assumir.
 6. **Se ninguém responder**, a campanha termina sozinha depois do último toque.
 
