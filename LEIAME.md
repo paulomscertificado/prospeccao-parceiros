@@ -439,7 +439,7 @@ cópia do banco da nuvem em `dados\backups` (ficam os últimos 14 dias). Desde n
   **Guarde uma cópia dessa senha fora do computador** (gerenciador de senhas, cofre ou papel guardado): sem ela,
   nenhuma cópia abre. Não mande essa senha por e-mail nem WhatsApp.
 - **Cópia fora do computador:** instale o **Google Drive para computador** (entrando com o e-mail da MS). A partir
-  daí cada backup também vai sozinho para `Meu Drive\Backups Prospeccao MS`. Se o computador quebrar, as cópias
+  daí cada backup também vai sozinho para `Meu Drive\Backup Sistema MS\Prospeccao` (configurado em 11/2026). Se o computador quebrar, as cópias
   estão lá.
 - O sistema da nuvem fica sabendo de cada backup e manda um e-mail de aviso se ficar mais de 3 dias e meio sem.
 
