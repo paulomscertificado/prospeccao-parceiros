@@ -49,11 +49,12 @@ LIMITE_MOSTRAR = 200    # toques mostrados de uma vez (a página não pode ficar
 
 def _situacao(t: Tarefa, hoje: date, no_horario: bool, conversaram: set[int], email_auto: bool,
               whats_auto: bool, automaticas: set[int] = frozenset(),
-              com_anterior: set[int] = frozenset()) -> tuple[str, str]:
+              com_anterior: set[int] = frozenset(), recentes: set[int] = frozenset()) -> tuple[str, str]:
     """(situação, explicação) de por que o toque ainda não saiu, em linguagem simples. O que pede uma ação da pessoa
     (WhatsApp ou e-mail em branco) aparece também nos toques dos próximos dias, para dar tempo de corrigir.
     automaticas = campanhas cujo WhatsApp sai sozinho depois da aprovação (campanhas.campanhas_que_saem_sozinhas);
-    com_anterior = toques que esperam o toque anterior da mesma empresa sair (campanhas.toques_com_anterior_pendente)."""
+    com_anterior = toques que esperam o toque anterior da mesma empresa sair (campanhas.toques_com_anterior_pendente);
+    recentes = leads que receberam WhatsApp há menos de 20 h (campanhas.leads_com_whatsapp_recente)."""
     lead = t.lead
     if not lead or not sdr.automacao_ativa(lead):
         return "parado", "Automação parada para este lead (respondeu, opt-out ou está com alguém)"
@@ -86,6 +87,9 @@ def _situacao(t: Tarefa, hoje: date, no_horario: bool, conversaram: set[int], em
             return "horario", "Aguardando o horário de envio"
         if t.data == hoje and (t.hora or "00:00") > agora().strftime("%H:%M"):
             return "programado", f"Programado para hoje às {t.hora} (sai sozinho)"
+        if lead.id in recentes:
+            return "programado", ("Sai sozinho depois: a empresa recebeu WhatsApp há menos de "
+                                  f"{campanhas.HORAS_MINIMAS_FILA_AUTOMATICA} h (nunca dois no mesmo dia)")
         if da_campanha_automatica:
             return "sozinho", f"Sai sozinho: {campanhas.motivo_automatico(automaticas, t.campanha_id)} (um por vez, com pausas)"
         return "sozinho", "Sai sozinho (contato já conversou com a MS)"
@@ -173,9 +177,11 @@ def minha_fila(request: Request, de: str = "", canal: str = "", aba: str = "prox
     whats_auto = ler_config(db, "enviar_whatsapp_automatico") == "1"
     automaticas = campanhas.campanhas_que_saem_sozinhas(db)
     com_anterior = campanhas.toques_com_anterior_pendente(db, tarefas)
+    recentes = campanhas.leads_com_whatsapp_recente(db, [t.lead_id for t in tarefas if t.canal == "whatsapp"])
     pendentes = []
     for t in tarefas:
-        chave, motivo = _situacao(t, hoje, no_horario, conversaram, email_auto, whats_auto, automaticas, com_anterior)
+        chave, motivo = _situacao(t, hoje, no_horario, conversaram, email_auto, whats_auto, automaticas, com_anterior,
+                                  recentes)
         rotulo, classe = SITUACOES[chave]
         pendentes.append({"t": t, "situacao": chave, "rotulo": rotulo, "classe": classe, "motivo": motivo,
                           "atrasado": t.data < hoje, "dias": (hoje - t.data).days})

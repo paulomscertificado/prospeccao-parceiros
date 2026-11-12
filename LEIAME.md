@@ -151,8 +151,9 @@ preço nem comissão e não fecha parceria.
    nunca conversou com a MS (desde 12/11/2026). O WhatsApp sai pelo celular conectado, uma mensagem a cada 3 minutos,
    só no horário de envio, com os limites por hora e por dia, até 20 contatos frios por número por dia e pausa com 3
    pedidos de SAIR. Toque atrasado mais de 2 dias espera o clique, para não sair tudo de uma vez, e o toque seguinte
-   da mesma empresa espera o anterior sair (o "último contato" nunca chega antes da apresentação). LinkedIn: sempre
-   com um clique.
+   da mesma empresa espera o anterior sair (o "último contato" nunca chega antes da apresentação). A fila nunca manda
+   dois WhatsApps para a mesma empresa em menos de 20 horas, mesmo com o intervalo mínimo em 0 nas Configurações.
+   LinkedIn: sempre com um clique.
    **Desligar numa campanha (só o administrador):** na tela da campanha, o cartão **WhatsApp sai sozinho depois da
    aprovação** tem o botão **Desligar**. Desligado, o WhatsApp só sai sozinho para quem já conversou com a MS
    (respondeu pelo WhatsApp ou tem marcado na ficha "Autorizou receber mensagens da MS pelo WhatsApp"); para os

@@ -106,6 +106,42 @@ def test_toque_seguinte_espera_o_anterior_da_mesma_empresa(cliente, monkeypatch)
             t.status = "cancelada"
 
 
+def test_nunca_dois_whatsapps_automaticos_em_menos_de_20h(cliente, monkeypatch):
+    """Caso real de 12/11/2026: com o intervalo mínimo em 0 nas Configurações, a Britânica recebeu o 1º e o 2º toque
+    com 10 minutos. A fila automática segura o toque até completar 20 h, qualquer que seja a configuração."""
+    from app.integracoes import whatsapp_leads
+    from app.modelos import Mensagem
+
+    enviados = []
+    monkeypatch.setattr(whatsapp_leads, "configurado", lambda: True)
+    monkeypatch.setattr(whatsapp_leads, "status", lambda: {"disponivel": True})
+    monkeypatch.setattr(campanhas.mensagens, "dentro_do_horario", lambda db, momento=None: True)
+    monkeypatch.setattr(sdr, "enviar_whatsapp_conectado",
+                        lambda db, texto, u, lead=None, tarefa=None: enviados.append(lead.empresa))
+    with sessao() as db:
+        gravar_config(db, "enviar_whatsapp_automatico", "1")
+        gravar_config(db, "horas_entre_contatos_whatsapp", "0")  # controle de frequência desligado na tela
+        camp = _campanha(db, "Parceiros intervalo minimo", True)
+        recente = _toque(db, camp, "Parceiro Recebeu Agora", "(81) 98777-0001", 0)
+        antiga = _toque(db, camp, "Parceiro Recebeu Ontem", "(81) 98777-0002", 0)
+        db.add_all([Mensagem(lead_id=recente.lead_id, canal="whatsapp", direcao="saida", status="enviada",
+                             angulo="apresentacao", corpo="1º toque", criado_em=agora() - timedelta(minutes=10)),
+                    Mensagem(lead_id=antiga.lead_id, canal="whatsapp", direcao="saida", status="enviada",
+                             angulo="apresentacao", corpo="1º toque", criado_em=agora() - timedelta(hours=21))])
+        db.flush()
+        assert campanhas.leads_com_whatsapp_recente(db, [recente.lead_id, antiga.lead_id]) == {recente.lead_id}
+        campanhas.processar_fila_whatsapp(db, maximo=1000)
+        assert "Parceiro Recebeu Ontem" in enviados and "Parceiro Recebeu Agora" not in enviados
+        antiga.status = "feita"
+        db.commit()
+    pagina = cliente.get("/fila").text
+    assert "a empresa recebeu WhatsApp há menos de 20 h" in pagina.split("Parceiro Recebeu Agora", 1)[1]
+    with sessao() as db:
+        gravar_config(db, "horas_entre_contatos_whatsapp", "")
+        for t in db.execute(select(Tarefa).join(Campanha).where(Campanha.nome == "Parceiros intervalo minimo")).scalars():
+            t.status = "cancelada"
+
+
 def test_fila_mostra_que_a_campanha_sai_sozinha(cliente, monkeypatch):
     monkeypatch.setattr(campanhas.mensagens, "dentro_do_horario", lambda db, momento=None: True)
     with sessao() as db:

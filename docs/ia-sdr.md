@@ -537,6 +537,12 @@ empresas, com as MESMAS colunas da `base_receita`, para reaproveitar `base_recei
   `toques_com_anterior_pendente` (parâmetro `com_anterior` de `fila._situacao`): "Aguardando: o toque anterior desta
   empresa ainda não saiu" e, no futuro, "(espera o toque anterior sair)", só quando o primeiro toque em aberto da
   empresa está atrasado (na cadência normal o seguinte continua "sai sozinho"). O clique manual continua livre.
+- **Intervalo mínimo da fila automática (12/11/2026):** `processar_fila_whatsapp` só pega empresa que não recebeu
+  WhatsApp há `horas_minimas_automatico` = max(intervalo de Configurações, `HORAS_MINIMAS_FILA_AUTOMATICA` = 20 h)
+  (`NOT EXISTS` em `mensagens`, mesma conta de `mensagens.ultimo_envio`). Caso real: com
+  `horas_entre_contatos_whatsapp` = 0 na nuvem, a Britânica (Campanha 3) recebeu o 1º toque (atrasado) e o 2º com
+  10 minutos. Telas: `leads_com_whatsapp_recente` (parâmetro `recentes` de `fila._situacao`): "Sai sozinho depois:
+  a empresa recebeu WhatsApp há menos de 20 h". Envio por clique segue a configuração.
 - Campanhas de parceiros (12/11/2026, pedido da Maria: "a partir do momento de aprovadas, entrem na fila de
   envios"): **toda campanha nova da IA SDR já vem com o WhatsApp automático ligado** (`rotas/sdr.py`, config
   `whatsapp_sozinho_padrao` = "1" em Configurações > Geral; "0" volta ao clique nas próximas) e as campanhas em aberto

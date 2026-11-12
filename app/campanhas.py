@@ -1061,6 +1061,29 @@ def whatsapp_liberado(db, lead: Lead) -> bool:
 
 TIPOS_QUE_SAEM_SOZINHOS = ("empresas_novas",)
 DIAS_ATRASO_AUTOMATICO = 2  # toque com mais atraso que isto não sai sozinho (espera o clique): evita rajada
+# A fila automática nunca manda dois WhatsApps para a mesma empresa em menos que isto, mesmo com o intervalo mínimo
+# desligado (0) em Configurações: em 12/11/2026 a Britânica recebeu o 1º e o 2º toque com 10 minutos de diferença
+# (1º toque atrasado + 2º do dia, com horas_entre_contatos_whatsapp = 0 na nuvem).
+HORAS_MINIMAS_FILA_AUTOMATICA = 20
+
+
+def horas_minimas_automatico(db) -> int:
+    """Intervalo entre dois WhatsApps automáticos para a mesma empresa: o de Configurações, nunca menos de 20 h."""
+    return max(mensagens.horas_entre_contatos(db, "whatsapp"), HORAS_MINIMAS_FILA_AUTOMATICA)
+
+
+def leads_com_whatsapp_recente(db, ids) -> set[int]:
+    """Dos leads informados, os que receberam WhatsApp há menos de horas_minimas_automatico (o toque automático
+    deles espera). Mesma conta de mensagens.ultimo_envio: a resposta automática da IA não conta."""
+    from .modelos import Mensagem
+
+    ids = [i for i in set(ids or []) if i]
+    if not ids:
+        return set()
+    desde = agora() - timedelta(hours=horas_minimas_automatico(db))
+    return set(db.execute(select(Mensagem.lead_id).where(
+        Mensagem.lead_id.in_(ids), Mensagem.canal == "whatsapp", Mensagem.direcao == "saida",
+        Mensagem.angulo != "resposta", Mensagem.status.in_(mensagens.ENVIADAS), Mensagem.criado_em > desde)).scalars())
 
 
 def campanhas_que_saem_sozinhas(db) -> dict[int, str]:
@@ -1168,13 +1191,18 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
                                            Mensagem.status == "recebida", Mensagem.modo != "robo").exists())
     da_campanha_automatica = and_(or_(Campanha.tipo.in_(TIPOS_QUE_SAEM_SOZINHOS), Campanha.whatsapp_sozinho.is_(True)),
                                   Tarefa.data >= hoje - timedelta(days=DIAS_ATRASO_AUTOMATICO))
+    recebeu_ha_pouco = (select(Mensagem.id).where(
+        Mensagem.lead_id == Lead.id, Mensagem.canal == "whatsapp", Mensagem.direcao == "saida",
+        Mensagem.angulo != "resposta", Mensagem.status.in_(mensagens.ENVIADAS),
+        Mensagem.criado_em > agora() - timedelta(hours=horas_minimas_automatico(db))).exists())
     consulta = (select(Tarefa).join(Campanha, Tarefa.campanha_id == Campanha.id)
                 .join(Lead, Tarefa.lead_id == Lead.id)
                 .where(Tarefa.status == "pendente", Tarefa.tipo == "prospeccao", Tarefa.canal == "whatsapp",
                        _ja_na_hora(hoje, hora), Campanha.status == "ativa", Campanha.aprovado_em.is_not(None),
                        func.coalesce(Lead.whatsapp, "") != "",
                        or_(Lead.consentimento.is_(True), conversou, da_campanha_automatica),
-                       ~_toque_anterior_pendente())  # o toque anterior da empresa sai primeiro
+                       ~_toque_anterior_pendente(),  # o toque anterior da empresa sai primeiro
+                       ~recebeu_ha_pouco)  # nunca dois WhatsApps automáticos para a mesma empresa em menos de 20 h
                 .order_by(Tarefa.data, Tarefa.hora, Tarefa.id).limit(200))
     automaticas = campanhas_que_saem_sozinhas(db)
     campanhas_no_limite: set[int] = set()
