@@ -96,11 +96,21 @@ def _valores(db, lead: Lead, usuario) -> dict:
     return v
 
 
+def cta_do_lead(cta: str, lead: Lead) -> str:
+    """A pergunta final da campanha para esta empresa. "Variar": uma de cada tipo, escolhida pelo número da empresa
+    (sempre a mesma para a mesma empresa), para descobrir qual traz mais resposta."""
+    if cta == config.CTA_VARIAR:
+        return config.CTAS_VARIAR[(lead.id or 0) % len(config.CTAS_VARIAR)]
+    return cta
+
+
 def mensagens_por_regras(db, lead: Lead, usuario, cta: str = "", tom: str = "consultivo") -> dict:
     """Mensagens de cada ângulo montadas com os dados reais do lead e da categoria (sem IA), no tom escolhido
     (app/tons.py). Inclui os toques novos (pergunta rápida, dica útil, convite) usados pelas cadências novas."""
     v = _valores(db, lead, usuario)
     generico = not ramo_confirmado(lead)
+    cta = cta_do_lead(cta, lead)
+    escolhida = bool(cta)  # pergunta escolhida na campanha: vale no 1º contato em qualquer tom
     cta = cta or ("Queria entender com quem posso falar sobre possíveis parcerias comerciais na empresa."
                   if generico else config.CTAS[0])
     ola = f"Olá, {v['nome']}! Tudo bem?" if v["nome"] else "Olá! Tudo bem?"
@@ -129,18 +139,19 @@ def mensagens_por_regras(db, lead: Lead, usuario, cta: str = "", tom: str = "con
     tom = tom if tom in config.TONS else "consultivo"
     if tom == "formal":
         assinatura = f"\n\nAtenciosamente,\n{v['vendedor']}\nMS Certificação Digital · mscertificados.com.br"
-    for angulo, (texto, assunto) in tons.textos(db, lead, usuario, v, tom, cta, not generico).items():
+    for angulo, (texto, assunto) in tons.textos(db, lead, usuario, v, tom, cta, not generico, escolhida).items():
         if tom == "consultivo" and angulo in resultado:
             continue  # consultivo: os textos de sempre (e os modelos do segmento, logo abaixo)
         if texto_seguro(texto):
             resultado[angulo] = {"whatsapp": texto, "assunto": assunto, "email": texto + assinatura,
                                  "fonte": f"tom {config.TONS[tom].lower()}"}
     if not generico and lead.categoria and tom == "consultivo":
-        _usar_modelos_do_segmento(db, lead, v, resultado)
+        # com a pergunta final escolhida, o 1º contato fica com o texto que termina nela (o modelo tem a própria)
+        _usar_modelos_do_segmento(db, lead, v, resultado, manter={"apresentacao"} if escolhida else set())
     return resultado
 
 
-def _usar_modelos_do_segmento(db, lead: Lead, v: dict, resultado: dict) -> None:
+def _usar_modelos_do_segmento(db, lead: Lead, v: dict, resultado: dict, manter: set | None = None) -> None:
     """Troca os textos-base pelos modelos do segmento (Cadências > Templates), escolhendo um modelo por toque de
     acordo com a empresa: assim cada empresa da campanha recebe uma variação diferente."""
     from .modelos import Template
@@ -148,6 +159,8 @@ def _usar_modelos_do_segmento(db, lead: Lead, v: dict, resultado: dict) -> None:
     modelos = db.execute(select(Template).where(Template.ativo.is_(True), Template.categoria == lead.categoria.codigo,
                                                 Template.angulo != "").order_by(Template.id)).scalars().all()
     for angulo, msgs in resultado.items():
+        if angulo in (manter or set()):
+            continue
         for canal in ("whatsapp", "email"):
             opcoes = [m for m in modelos if m.angulo == angulo and m.canal == canal]
             if not opcoes:
@@ -191,6 +204,7 @@ def gerar_mensagens(db, lead: Lead, usuario, cta: str = "", tom: str = "consulti
     base = mensagens_por_regras(db, lead, usuario, cta, tom)
     if not ia.disponivel():
         return base
+    cta = cta_do_lead(cta, lead)
     perfil = json.loads(lead.perfil) if lead.perfil else {}
     fatos = {k: perfil.get(k) for k in ("segmento", "publico", "produtos", "servicos", "clientes_estimados",
                                         "perfil_clientes", "programa_parceiros", "integracoes", "diferenciais",

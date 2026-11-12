@@ -546,7 +546,13 @@ async def criar_campanha(request: Request, usuario: Usuario = Depends(exige("cam
         avisar(request, "Informe a região (cidade e estado) e pelo menos um segmento.", "erro")
         return voltar("/campanhas/nova?pedido=" + util.chave_texto(str(form.get("pedido", "")))[:200])
     canais = [c for c in form.getlist("canais") if c in ("whatsapp", "email", "linkedin")] or ["whatsapp", "email"]
-    cta = str(form.get("cta_livre") or form.get("cta") or "").strip()
+    escolha_cta, cta_livre = str(form.get("cta") or ""), str(form.get("cta_livre") or "").strip()
+    cta = cta_livre if escolha_cta in ("", "__minha__") and cta_livre else ("" if escolha_cta == "__minha__" else escolha_cta)
+    cta = cta.strip()
+    if cta and cta != config.CTA_VARIAR and not sdr.texto_seguro(cta):
+        avisar(request, "A pergunta final não pode ter valores, porcentagem, desconto, exclusividade, contrato nem "
+                        "frase de propaganda. Escreva de outro jeito.", "erro")
+        return voltar("/campanhas/nova?pedido=" + util.chave_texto(str(form.get("pedido", "")))[:200])
     camp = Campanha(
         nome=str(form.get("nome") or _nome_automatico(db, cats, cidade or uf)).strip()[:160],
         pedido=str(form.get("pedido", ""))[:2000], categorias=",".join(cats), cidade=cidade, estado=uf, base=base,

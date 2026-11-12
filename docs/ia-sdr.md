@@ -452,6 +452,11 @@ empresas, com as MESMAS colunas da `base_receita`, para reaproveitar `base_recei
   Relacionamento (D1, D4, D10, D18, D30) e Convite por e-mail (D1, D5, D11, canal e-mail).
 - Base da escolha: dados da auditoria (e-mail 1,8% de resposta, WhatsApp 34%, risco de bloqueio no frio) e pesquisa
   de mercado (4 a 7 toques no e-mail, 1 lembrete no WhatsApp frio, conversa de parceiro, pedido pequeno).
+- Pergunta final (CTA): `config.CTAS_GRUPOS` (14 perguntas em 5 tipos; `config.CTAS` é a lista plana e `CTAS[0]`
+  continua a padrão), `CTA_VARIAR` (`sdr.cta_do_lead`: uma de cada tipo pelo número da empresa) e "Escrever a minha"
+  (`__minha__` + `cta_livre`, recusada se não passar em `texto_seguro`). Antes a pergunta escolhida era ignorada pelos
+  modelos do segmento (consultivo) e pelos tons pergunta/formal; agora, com pergunta escolhida, o 1º contato termina
+  nela em qualquer tom (`_usar_modelos_do_segmento(manter={"apresentacao"})`, `tons.PRIMEIRA_COM_CTA`).
 - Testes: `testes/test_tons_cadencias.py`.
 
 ## Quem precisa de mim hoje e motivo obrigatório (auditoria P1.7, nov/2026)

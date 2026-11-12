@@ -87,6 +87,13 @@ PRIMEIRA = {
         "conversa?\n\n{rodape_formal}"),
 }
 
+# 1ª mensagem quando a campanha escolheu a pergunta final (os tons que já terminam numa pergunta própria)
+PRIMEIRA_COM_CTA = {
+    "pergunta": ("{oi} {cta}\n\nPergunto porque sou {vendedor}, da MS Certificação Digital, e estamos fazendo "
+                 "parcerias com {quem} em {cidade}.\n\n{rodape}"),
+    "formal": PRIMEIRA["formal"].replace("Seria possível agendarmos uma breve conversa?", "{cta}"),
+}
+
 # Os toques seguintes, por registro. Cada tom usa um registro.
 SEGUINTES = {
     "neutro": {
@@ -190,8 +197,9 @@ def convite(db, usuario) -> str:
     return "é só responder esta mensagem que eu explico em poucos minutos."
 
 
-def textos(db, lead, usuario, v: dict, tom: str, cta: str, confirmado: bool) -> dict:
-    """{angulo: (texto, assunto)} do tom. v = valores do lead (nome, empresa, vendedor, cidade...)."""
+def textos(db, lead, usuario, v: dict, tom: str, cta: str, confirmado: bool, cta_escolhida: bool = False) -> dict:
+    """{angulo: (texto, assunto)} do tom. v = valores do lead (nome, empresa, vendedor, cidade...).
+    cta_escolhida: a campanha escolheu a pergunta final; ela fecha o 1º contato em qualquer tom."""
     tom = tom if tom in REGISTRO else "consultivo"
     registro = REGISTRO[tom]
     n = v.get("nome") or ""
@@ -206,7 +214,7 @@ def textos(db, lead, usuario, v: dict, tom: str, cta: str, confirmado: bool) -> 
     saida = {}
     modelos = dict(SEGUINTES[registro])
     if tom in PRIMEIRA:
-        modelos["apresentacao"] = PRIMEIRA[tom]
+        modelos["apresentacao"] = PRIMEIRA_COM_CTA.get(tom, PRIMEIRA[tom]) if cta_escolhida else PRIMEIRA[tom]
     for angulo, modelo in modelos.items():
         assunto = (ASSUNTOS_FORMAIS.get(angulo) if registro == "formal" else None) or ASSUNTOS[angulo]
         saida[angulo] = (modelo.format(**campos).strip(), assunto.format(empresa=campos["empresa"]))

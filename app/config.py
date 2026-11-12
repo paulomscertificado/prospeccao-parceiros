@@ -199,13 +199,36 @@ ANGULOS = {
     "receita": "Foco em geração de receita recorrente",
     "encerramento": "Encerramento educado",
 }
-CTAS = [
-    "Hoje vocês já trabalham com algum parceiro de certificação digital?",
-    "Faz sentido conversarmos sobre isso?",
-    "Quem seria a pessoa responsável por parcerias aí?",
-    "Posso te explicar rapidamente como funciona?",
-    "Vocês já possuem algo parecido?",
+# Pergunta final do 1º contato (CTA), por tipo. Pedido pequeno = mais resposta (pesquisa de nov/2026).
+CTAS_GRUPOS = [
+    ("Descobrir como fazem hoje (fácil de responder)", [
+        "Hoje vocês já trabalham com algum parceiro de certificação digital?",
+        "Quando um cliente precisa de certificado digital, para quem vocês indicam hoje?",
+        "Os clientes de vocês costumam pedir ajuda com certificado digital?",
+        "Vocês já possuem algo parecido?",
+    ]),
+    ("Convidar para conversar (sem compromisso)", [
+        "Faz sentido conversarmos sobre isso?",
+        "Posso te explicar rapidamente como funciona?",
+        "Podemos falar 10 minutos esta semana?",
+        "Prefere que eu explique por aqui mesmo ou numa ligação rápida?",
+    ]),
+    ("Achar a pessoa certa", [
+        "Quem seria a pessoa responsável por parcerias aí?",
+        "Você é a melhor pessoa para falar sobre isso, ou há outra pessoa que cuida de parcerias?",
+    ]),
+    ("Mandar informação (o mínimo de esforço para eles)", [
+        "Posso te mandar um resumo de como funciona, em poucas linhas?",
+        "Quer que eu envie o passo a passo da parceria por aqui?",
+    ]),
+    ("Resposta de uma palavra", [
+        "Faz sentido para vocês? Pode responder só com sim ou não.",
+        "Tem interesse em saber mais? Um \"sim\" já basta.",
+    ]),
 ]
+CTAS = [p for _, perguntas in CTAS_GRUPOS for p in perguntas]
+CTA_VARIAR = "__variar__"  # cada empresa recebe uma pergunta diferente (a 1ª de cada tipo)
+CTAS_VARIAR = [perguntas[0] for _, perguntas in CTAS_GRUPOS]
 TONS = {"consultivo": "Consultivo e cordial", "pergunta": "Pergunta curta", "parceiro": "Conversa de parceiro",
         "cliente": "Foco nos clientes deles", "local": "Empresa da região", "direto": "Direto e objetivo",
         "informal": "Leve e informal", "formal": "Formal e institucional"}

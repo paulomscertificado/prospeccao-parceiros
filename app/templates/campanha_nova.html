@@ -24,6 +24,15 @@
   .selo-cad { align-self: flex-start; font-size: .7rem; font-weight: 700; border-radius: 999px; padding: 1px 8px; }
   .selo-cad.seguro { background: var(--verde-claro); color: #137a48; } .selo-cad.padrao { background: var(--azul-claro); color: var(--azul); }
   .subtitulo-passo { font-size: .95rem; margin: 18px 0 4px; }
+  .ctas { display: grid; gap: 10px; }
+  .ctas-principais, .ctas-opcoes { display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+  .grupo-cta .grupo-escolha-titulo { margin-bottom: 6px; }
+  .opcao-cta { display: flex; align-items: flex-start; gap: 8px; border: 1.5px solid var(--borda); border-radius: var(--raio);
+               padding: 8px 12px; background: #fff; cursor: pointer; font-weight: 400; font-size: .86rem; margin: 0; }
+  .opcao-cta input[type=radio] { width: auto; margin-top: 3px; }
+  .opcao-cta:has(input[type=radio]:checked) { border-color: var(--verde); background: var(--verde-claro); }
+  .opcao-minha { align-items: center; flex-wrap: wrap; }
+  .opcao-minha input[type=text] { flex: 1; min-width: 220px; }
   .subtitulo-passo:first-of-type { margin-top: 8px; }
 </style>
 <div class="cabecalho"><div><h1>Nova campanha</h1>
@@ -154,6 +163,27 @@
     </div>
     <p class="ajuda" id="aviso-so-email" hidden>Esta cadência é só por e-mail: o canal WhatsApp foi desmarcado. Quem clicar no convite e chamar no WhatsApp passa a poder receber WhatsApp depois.</p>
 
+    <h3 class="subtitulo-passo">Pergunta final <span class="pequeno suave">· fecha o 1º contato; pedido pequeno traz mais resposta</span></h3>
+    <div class="ctas">
+      <div class="ctas-principais">
+        <label class="opcao-cta"><input type="radio" name="cta" value="" checked>
+          <span><b>Automática</b> · a mais natural para cada empresa</span></label>
+        <label class="opcao-cta"><input type="radio" name="cta" value="{{ config.CTA_VARIAR }}">
+          <span><b>Variar</b> · cada empresa recebe uma pergunta de um tipo diferente (para descobrir qual traz mais resposta)</span></label>
+      </div>
+      {% for titulo, perguntas in config.CTAS_GRUPOS %}
+      <div class="grupo-cta"><div class="grupo-escolha-titulo">{{ titulo }}</div>
+        <div class="ctas-opcoes">{% for p in perguntas %}
+          <label class="opcao-cta"><input type="radio" name="cta" value="{{ p }}"><span>“{{ p }}”</span></label>{% endfor %}</div>
+      </div>{% endfor %}
+      <div class="grupo-cta"><div class="grupo-escolha-titulo">Do seu jeito</div>
+        <label class="opcao-cta opcao-minha"><input type="radio" name="cta" value="__minha__" id="cta-minha">
+          <span>Escrever a minha:</span>
+          <input type="text" name="cta_livre" maxlength="200" placeholder="Ex.: Vocês atendem empresas que estão abrindo agora?"
+                 aria-label="Pergunta final escrita por você"></label>
+      </div>
+    </div>
+
     <h3 class="subtitulo-passo">Detalhes</h3>
     <div class="campos" style="margin-top:4px">
       <div class="largo"><label for="nome-campanha">Nome da campanha *</label>
@@ -161,8 +191,6 @@
       <div><label>Canais *</label>
         {% for c in ['whatsapp', 'email'] %}<label class="marcar"><input type="checkbox" name="canais" value="{{ c }}" {{ 'checked' if c == 'whatsapp' }}> {{ CANAIS[c] }}</label>{% endfor %}</div>
       <div><label>Início *</label><input type="date" name="inicio" required value="{{ hoje.isoformat() }}" min="{{ hoje.isoformat() }}"></div>
-      <div class="largo"><label>Pergunta final (CTA)</label><select name="cta"><option value="">A IA escolhe a mais natural para cada empresa</option>{% for c in config.CTAS %}<option>{{ c }}</option>{% endfor %}</select>
-        <input type="text" name="cta_livre" placeholder="ou escreva a sua" style="margin-top:6px"></div>
       {% if numeros_admin %}{% set atual = '' %}
       <div class="largo"><label for="conexao_id">WhatsApp que vai disparar <span class="selo">só admin</span></label>
         <select name="conexao_id" id="conexao_id">
@@ -278,6 +306,10 @@ base.addEventListener('change', () => {
     if (cidade.value === TODAS) cidade.value = '';
   }
   carregarCidades(); atualizar();
+});
+// Pergunta escrita à mão: marca a opção "Escrever a minha" ao digitar
+document.querySelector('input[name="cta_livre"]').addEventListener('input', ev => {
+  if (ev.target.value.trim()) document.getElementById('cta-minha').checked = true;
 });
 // Cadência só de e-mail: desmarca o WhatsApp (o convite é justamente para não mandar WhatsApp frio)
 document.querySelectorAll('input[name="cadencia_id"]').forEach(r => r.addEventListener('change', () => {

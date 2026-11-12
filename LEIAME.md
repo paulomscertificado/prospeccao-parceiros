@@ -116,6 +116,12 @@ ritmo dos contatos:
 | Relacionamento – 5 toques em 30 dias | Dia 1, 4, 10 (dica útil), 18 e 30. Para quem decide devagar |
 | Convite por e-mail – 3 e-mails | Só e-mail, sem WhatsApp frio: convida para conversar. Quem chamar no WhatsApp vira conversa |
 
+**Pergunta final (vai no fim do 1º contato):** 14 perguntas prontas em 5 tipos (descobrir como fazem hoje,
+convidar para conversar, achar a pessoa certa, mandar informação, resposta de uma palavra), **Automática** (a mais
+natural para cada empresa), **Variar** (cada empresa recebe uma pergunta de um tipo diferente, para descobrir qual
+traz mais resposta) ou **Escrever a minha**. A pergunta escolhida vale em todos os tons. A pergunta escrita à mão não
+pode ter valores, porcentagem, desconto, exclusividade nem frase de propaganda.
+
 O tom muda as mensagens de verdade, mesmo sem a IA ligada: cada tom tem os próprios textos. Para o convite por e-mail
 levar o botão do WhatsApp, cadastre o número da MS em **Configurações > Geral > "WhatsApp da MS para os convites por
 e-mail"** (sem ele, o convite pede para responder o e-mail).

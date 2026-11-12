@@ -122,3 +122,46 @@ def test_cadencia_repetida_some_da_tela_e_e_removida(cliente):
         assert _remover_cadencias_repetidas(db) == 1  # a repetida sem uso sai; a usada por campanha fica
         assert db.execute(select(Cadencia.id).where(Cadencia.nome == nome)).all().__len__() == 2
         assert db.get(Cadencia, usada.id) is not None
+
+
+def test_pergunta_final_escolhida_vale_em_todos_os_tons(cliente):
+    pergunta = "Podemos falar 10 minutos esta semana?"
+    with sessao() as db:
+        lead = _lead(db, "Pergunta Final Contabil Ltda")
+        assert all(sdr.texto_seguro(p) for p in config.CTAS) and len(config.CTAS) >= 14
+        for tom in config.TONS:
+            msgs = sdr.mensagens_por_regras(db, lead, _admin(db), cta=pergunta, tom=tom)
+            assert pergunta in msgs["apresentacao"]["whatsapp"], tom  # antes o modelo do segmento ignorava a escolha
+            assert sdr.texto_seguro(msgs["apresentacao"]["whatsapp"]), tom
+        # sem escolha, o consultivo continua com os modelos do segmento (variedade)
+        assert sdr.mensagens_por_regras(db, lead, _admin(db))["apresentacao"]["fonte"] == "modelos do segmento"
+        # escolhida: os toques seguintes continuam com os modelos do segmento
+        assert sdr.mensagens_por_regras(db, lead, _admin(db), cta=pergunta)["praticidade"]["fonte"] == "modelos do segmento"
+        db.rollback()
+
+
+def test_variar_a_pergunta_entre_as_empresas(cliente):
+    with sessao() as db:
+        leads = [_lead(db, f"Variar Pergunta {i} Ltda") for i in range(len(config.CTAS_VARIAR))]
+        usadas = set()
+        for lead in leads:
+            texto = sdr.mensagens_por_regras(db, lead, _admin(db), cta=config.CTA_VARIAR)["apresentacao"]["whatsapp"]
+            achada = [p for p in config.CTAS_VARIAR if p in texto]
+            assert len(achada) == 1 and sdr.cta_do_lead(config.CTA_VARIAR, lead) == achada[0]
+            usadas.add(achada[0])
+        assert usadas == set(config.CTAS_VARIAR)  # cada empresa uma diferente, todas usadas
+        db.rollback()
+
+
+def test_tela_e_pergunta_escrita_a_mao(cliente):
+    from conftest import csrf_de
+
+    pagina = cliente.get("/campanhas/nova").text
+    for titulo, perguntas in config.CTAS_GRUPOS:
+        assert titulo in pagina
+    assert 'value="__variar__"' in pagina and 'value="__minha__"' in pagina and 'name="cta_livre"' in pagina
+    r = cliente.post("/campanhas/nova", data={
+        "csrf": csrf_de(pagina), "nome": "CTA proibido", "cidade": "Recife", "estado": "PE", "quantidade": "5",
+        "categorias": ["contabil"], "canais": ["email"], "tom": "consultivo", "objetivo": "Encontrar parceiros",
+        "cta": "__minha__", "cta_livre": "Pagamos R$ 50 por indicação, topa?"})
+    assert "A pergunta final não pode ter valores" in r.text
