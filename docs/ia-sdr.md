@@ -535,7 +535,8 @@ empresas, com as MESMAS colunas da `base_receita`, para reaproveitar `base_recei
   mesma campanha (`campanhas._toque_anterior_pendente`, `NOT EXISTS` no filtro de `processar_fila_whatsapp`). Caso
   real: campanhas com o 1º toque parado há dias esperando o clique e os seguintes chegando no dia deles. As telas usam
   `toques_com_anterior_pendente` (parâmetro `com_anterior` de `fila._situacao`): "Aguardando: o toque anterior desta
-  empresa ainda não saiu" e, no futuro, "(espera o toque anterior sair)". O clique manual continua livre.
+  empresa ainda não saiu" e, no futuro, "(espera o toque anterior sair)", só quando o primeiro toque em aberto da
+  empresa está atrasado (na cadência normal o seguinte continua "sai sozinho"). O clique manual continua livre.
 - Campanhas de parceiros (12/11/2026, pedido da Maria: "a partir do momento de aprovadas, entrem na fila de
   envios"): **toda campanha nova da IA SDR já vem com o WhatsApp automático ligado** (`rotas/sdr.py`, config
   `whatsapp_sozinho_padrao` = "1" em Configurações > Geral; "0" volta ao clique nas próximas) e as campanhas em aberto

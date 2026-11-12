@@ -1104,9 +1104,11 @@ def _toque_anterior_pendente():
         .exists())
 
 
-def toques_com_anterior_pendente(db, tarefas) -> set[int]:
-    """Dos toques de WhatsApp informados, os que esperam um toque anterior da mesma empresa (mesma campanha) sair
-    (a mesma regra de _toque_anterior_pendente, para as telas Minha fila e Envios)."""
+def toques_com_anterior_pendente(db, tarefas, hoje: date | None = None) -> set[int]:
+    """Dos toques de WhatsApp informados, os que estão parados atrás de um toque ATRASADO da mesma empresa (mesma
+    campanha), para as telas Minha fila e Envios (a fila automática segue _toque_anterior_pendente). Na cadência
+    normal (1º toque amanhã, 3º daqui a 3 dias) o seguinte não aparece como parado: ele sai depois do anterior."""
+    hoje = hoje or date.today()
     tarefas = [t for t in tarefas if t.canal == "whatsapp" and t.campanha_id and t.lead_id]
     if not tarefas:
         return set()
@@ -1118,7 +1120,9 @@ def toques_com_anterior_pendente(db, tarefas) -> set[int]:
         chave, ordem = (cid, lid), (data, hora or "", tid)
         if chave not in primeiro or ordem < primeiro[chave]:
             primeiro[chave] = ordem
-    return {t.id for t in tarefas if primeiro.get((t.campanha_id, t.lead_id), (None, None, t.id))[2] != t.id}
+    parado = {chave for chave, (data, _hora, _tid) in primeiro.items() if data < hoje}  # o primeiro em aberto atrasou
+    return {t.id for t in tarefas if (t.campanha_id, t.lead_id) in parado
+            and primeiro[(t.campanha_id, t.lead_id)][2] != t.id}
 
 
 def leads_que_conversaram(db, ids) -> set[int]:

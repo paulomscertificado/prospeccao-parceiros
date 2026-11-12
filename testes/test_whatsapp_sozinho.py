@@ -91,13 +91,16 @@ def test_toque_seguinte_espera_o_anterior_da_mesma_empresa(cliente, monkeypatch)
                         data=date.today(), hora="00:05", status="pendente", mensagem="Segundo do dia.")
         db.add_all([seguinte, hoje_2])
         db.flush()
-        assert campanhas.toques_com_anterior_pendente(db, [parado, seguinte, hoje_1, hoje_2]) == {seguinte.id, hoje_2.id}
+        # na tela: só o que está parado atrás de um toque atrasado (o 2º de hoje sai depois do 1º, normal)
+        assert campanhas.toques_com_anterior_pendente(db, [parado, seguinte, hoje_1, hoje_2]) == {seguinte.id}
         campanhas.processar_fila_whatsapp(db, maximo=1000)
         assert hoje_1.id in enviados
         assert parado.id not in enviados and seguinte.id not in enviados and hoje_2.id not in enviados
         db.commit()
     pagina = cliente.get("/fila").text
-    assert "o toque anterior desta empresa ainda não saiu" in pagina.split("Parceiro Primeiro Parado")[-1]
+    parado_em_diante = pagina.split("Parceiro Primeiro Parado", 1)[1]  # o 1º (parado) vem antes do seguinte na lista
+    assert "não sai sozinho" in parado_em_diante.split('class="linha-fila')[0]
+    assert "o toque anterior desta empresa ainda não saiu" in parado_em_diante
     with sessao() as db:
         for t in db.execute(select(Tarefa).join(Campanha).where(Campanha.nome == "Parceiros ordem dos toques")).scalars():
             t.status = "cancelada"
