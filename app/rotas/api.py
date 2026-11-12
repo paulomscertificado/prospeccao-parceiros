@@ -113,6 +113,23 @@ def ponte_teste(request: Request):
     return {"ok": True}
 
 
+@rotas.get("/ponte/midia/{mid:int}")
+def ponte_midia(request: Request, mid: int):
+    """Imagem de um visual para o computador com o WhatsApp Leads mandar junto com a mensagem (senha da ponte)."""
+    from fastapi.responses import Response
+
+    from ..modelos import VisualCampanha
+
+    if not _ponte_autorizada(request):
+        return JSONResponse({"erro": "token inválido"}, status_code=403)
+    with sessao() as db:
+        v = db.get(VisualCampanha, mid)
+        if v is None or not v.imagem:
+            return JSONResponse({"erro": "imagem não encontrada"}, status_code=404)
+        return Response(v.imagem, media_type=v.imagem_tipo or "application/octet-stream",
+                        headers={"X-Hash": v.imagem_hash})
+
+
 @rotas.post("/ponte/troca")
 async def ponte_troca(request: Request):
     """O computador com o WhatsApp Leads avisa o status e leva as mensagens que estão esperando."""
@@ -129,8 +146,15 @@ async def ponte_troca(request: Request):
         for item in db.execute(select(PonteWhatsApp).where(PonteWhatsApp.status == "aguardando")
                                .order_by(PonteWhatsApp.id).limit(50)).scalars():
             item.status = "retirada"
-            envios.append({"id": item.id, "telefone": item.telefone, "nome": item.nome, "texto": item.texto,
-                           "resposta": item.resposta, "manual": item.manual, "conexao": item.conexao or "principal"})
+            envio = {"id": item.id, "telefone": item.telefone, "nome": item.nome, "texto": item.texto,
+                     "resposta": item.resposta, "manual": item.manual, "conexao": item.conexao or "principal"}
+            if item.midia_id:  # imagem do visual: o computador baixa em /api/ponte/midia/<id> (e guarda pelo hash)
+                from ..modelos import VisualCampanha
+
+                v = db.get(VisualCampanha, item.midia_id)
+                if v is not None and v.imagem_hash:
+                    envio["midia"] = {"id": v.id, "hash": v.imagem_hash, "tipo": v.imagem_tipo}
+            envios.append(envio)
         comandos = []
         for c in db.execute(select(ComandoWhatsApp).where(ComandoWhatsApp.status == "aguardando")
                             .order_by(ComandoWhatsApp.id).limit(10)).scalars():

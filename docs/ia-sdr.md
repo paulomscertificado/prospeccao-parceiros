@@ -431,6 +431,26 @@ empresas, com as MESMAS colunas da `base_receita`, para reaproveitar `base_recei
   caminho do próprio sistema (`_destino_seguro`).
 - Testes: `testes/test_oportunidades_tela.py`.
 
+## Visual das campanhas: e-mail em HTML e imagem no WhatsApp (nov/2026)
+
+- Cadastro: `app/rotas/visuais.py` + `templates/visuais.html`/`visual.html` (permissões `templates.ver`/`templates.editar`).
+  Tabelas `visuais_campanha` (nome, `usar_em` = "sdr,empresas_novas", `html`, `imagem` bytea + tipo/hash) e
+  `visuais_arquivos` (imagens do HTML, servidas sem login em `/visual/arquivo/<id>/<nome>`, só imagens; o tipo é
+  conferido pelo conteúdo, até 1 MB). O HTML passa por `visual.limpar_html` (tira script, on*= e javascript:) e a
+  prévia é um iframe `sandbox` com `srcdoc`.
+- Escolha: `templates/_escolha_visual.html`, o mesmo bloco na Nova campanha (IA SDR) e nas Empresas novas
+  (`novas_visual_id/canais/toques` na configuração, copiados para a campanha diária em `empresas_novas.criar_campanha`).
+  `Campanha.visual_id`, `visual_canais` ("email,whatsapp") e `visual_toques` ("seguintes" ou "todos");
+  `cadencias.aplicar` marca `Tarefa.com_visual` com `visual.no_toque` (índice do passo).
+- Envio: `campanhas._enviar_email_da_tarefa` monta `visual.html_do_email` ({{mensagem}} = texto do toque, escapado;
+  {{descadastro}} ou rodapé automático) e `email_smtp.enviar(html=...)` manda multipart/alternative (texto + HTML).
+  `sdr.enviar_whatsapp_conectado` pede `visual.imagem_do_whatsapp`: só com `campanhas.whatsapp_liberado` (quem já
+  conversou); vai em `PonteWhatsApp.midia_id`, a troca da ponte manda `{"midia": {id, hash, tipo}}` e o computador baixa em
+  `GET /api/ponte/midia/<id>` (token da ponte), confere o hash, guarda em `whatsapp-leads/dados/midia/<hash>` e envia
+  com `send_image` + legenda pela mesma fila. A Mensagem registrada ganha `assunto = "[com imagem: <visual>]"`.
+  O teste da campanha (`campanhas.testar`) usa o visual e manda a imagem mesmo sem conversa (vai para quem testa).
+- Testes: `testes/test_visual.py` (e `whatsapp-leads/testes/teste_ponta_a_ponta.py`, parte 24).
+
 ## Nova campanha: tela em 4 passos, tons e cadências novos (nov/2026)
 
 - Tela (`templates/campanha_nova.html`, `_escolha_categoria.html`): "Onde?" virou o passo 1 (as quantidades por

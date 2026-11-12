@@ -1,0 +1,28 @@
+{# Escolha do visual (HTML do e-mail e imagem do WhatsApp) — o mesmo bloco na Nova campanha (IA SDR) e nas Empresas novas.
+   Usa do contexto: visuais (lista), visual_atual (id), visual_canais ("email,whatsapp"), visual_toques. #}
+<div class="bloco-visual">
+  {% if visuais %}
+  <div class="campos" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)">
+    <div><label for="visual_id">Visual</label>
+      <select name="visual_id" id="visual_id">
+        <option value="">Só texto (sem visual)</option>
+        {% for v in visuais %}<option value="{{ v.id }}" {{ 'selected' if visual_atual == v.id }}>{{ v.nome }}{{ '' if (v.html or '').strip() else ' (ainda sem HTML)' }}{{ '' if v.imagem_hash else ' (ainda sem imagem)' }}</option>{% endfor %}
+      </select></div>
+    <div><label>Em quais toques</label>
+      <select name="visual_toques">
+        <option value="seguintes" {{ 'selected' if visual_toques != 'todos' }}>Do 2º toque em diante (recomendado)</option>
+        <option value="todos" {{ 'selected' if visual_toques == 'todos' }}>Em todos os toques</option>
+      </select></div>
+  </div>
+  <div style="margin-top:6px">
+    <label class="marcar"><input type="checkbox" name="visual_email" {{ 'checked' if 'email' in (visual_canais or 'email') }}> ✉️ E-mail com o HTML do visual</label>
+    <label class="marcar"><input type="checkbox" name="visual_whatsapp" {{ 'checked' if 'whatsapp' in (visual_canais or '') }}> 💬 WhatsApp com a imagem do visual (o texto vai embaixo)</label>
+  </div>
+  <p class="ajuda">A imagem no WhatsApp só vai para quem <b>já conversou com a MS</b>; para contato frio sai só o texto (proteção do número).
+    O 1º contato frio costuma responder melhor só com texto, por isso o padrão é usar o visual do 2º toque em diante.
+    <a href="/visuais">Ver e cadastrar visuais</a>.</p>
+  {% else %}
+  <p class="ajuda" style="margin:0">Nenhum visual cadastrado ainda: as mensagens saem só com texto.
+    {% if pode('templates.editar') %}<a href="/visuais">Cadastrar um visual</a> (HTML do e-mail e imagem do WhatsApp).{% endif %}</p>
+  {% endif %}
+</div>

@@ -59,6 +59,9 @@ PADRAO = {
     "novas_ultima_busca": "",          # dia em que a busca automática rodou (AAAA-MM-DD)
     "novas_ultimo_resultado": "",
     "novas_excluir_listas": "1",       # 1 = deixa de fora quem já está em alguma lista importada (bases_importadas)
+    "novas_visual_id": "",             # visual das campanhas diárias (app/visual.py); vazio = só texto
+    "novas_visual_canais": "email",
+    "novas_visual_toques": "seguintes",
 }
 LIMITE_TESTE = 10  # consulta de teste: 10 empresas = 1 crédito
 ATRASO_DIAS = 2    # a busca diária pega as empresas abertas até 2 dias atrás (a Receita publica com atraso)
@@ -473,6 +476,13 @@ def criar_campanha(db, dados: list[dict], usuario: Usuario, rotulo: str) -> Camp
                     estado=",".join(_ufs(db))[:2], cidade="", quantidade=util.para_int(cfg(db, "novas_maximo_dia")) or 60,
                     canais=canais, status="gerando", usuario_id=usuario.id, inicio=date.today(),
                     cadencia_id=garantir_cadencia(db).id, pedido=f"Empresas abertas {rotulo} (API CNPJá)")
+    from . import visual
+
+    vid = util.para_int(cfg(db, "novas_visual_id"))
+    escolhido = db.get(visual.VisualCampanha, vid) if vid else None
+    if escolhido is not None and escolhido.ativo and "empresas_novas" in (escolhido.usar_em or "").split(","):
+        camp.visual_id = escolhido.id
+        camp.visual_canais, camp.visual_toques = cfg(db, "novas_visual_canais"), cfg(db, "novas_visual_toques")
     db.add(camp)
     db.commit()
     trabalhos.iniciar("campanha", camp.id, usuario.id, {"fase": "novas", "registros": dados})

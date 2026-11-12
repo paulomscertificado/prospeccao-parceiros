@@ -184,6 +184,10 @@
       </div>
     </div>
 
+    <h3 class="subtitulo-passo">Visual <span class="pequeno suave">· opcional: e-mail em HTML e imagem no WhatsApp</span></h3>
+    {% set visual_atual, visual_canais, visual_toques = None, 'email', 'seguintes' %}
+    {% include "_escolha_visual.html" %}
+
     <h3 class="subtitulo-passo">Detalhes</h3>
     <div class="campos" style="margin-top:4px">
       <div class="largo"><label for="nome-campanha">Nome da campanha *</label>

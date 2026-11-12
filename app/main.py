@@ -103,8 +103,8 @@ async def _nao_encontrado(request: Request, erro):
 
 
 from .rotas import (admin, agenda, api, auth, comercial, conversas, email_contas, empresas_novas, envios, fila,  # noqa: E402
-                    leads, painel, permissoes, portal, sdr, whatsapp)
+                    leads, painel, permissoes, portal, sdr, visuais, whatsapp)
 
 for modulo in (auth, painel, sdr, leads, agenda, comercial, admin, permissoes, conversas, envios, fila, whatsapp,
-               email_contas, empresas_novas, portal, api):
+               email_contas, empresas_novas, visuais, portal, api):
     app.include_router(modulo.rotas)

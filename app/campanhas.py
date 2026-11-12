@@ -626,15 +626,20 @@ def enviar_teste(db, camp: Campanha, usuario: Usuario, canal: str, destino: str,
         rotulo = f"[TESTE · {empresa} · {config.ANGULOS.get(t.angulo, t.acao)}]"
         assunto, texto = _texto_do_canal(t, canal)
         try:
+            from . import visual
+
             if canal == "email":
                 from . import marca
 
                 assunto, texto = marca.aplicar(assunto, usuario), marca.aplicar(texto, usuario)
                 email_smtp.enviar(destino, f"[TESTE] {assunto or marca.da_pessoa(usuario)['nome']}",
-                                  f"{rotulo}\n\n{texto}", lead_id=None, conta=conta)
+                                  f"{rotulo}\n\n{texto}", lead_id=None, conta=conta,
+                                  html=visual.html_do_email(db, t, t.lead, usuario, f"{rotulo}\n\n{texto}"))
             else:
+                # no teste a imagem vai mesmo para contato frio: quem recebe é a própria pessoa que testa
+                imagem = visual.imagem_do_whatsapp(db, t, t.lead, so_para_quem_conversou=False)
                 whatsapp_leads.enviar(destino, "Teste", f"{rotulo}\n\n{texto}", db=db, manual=True,
-                                      usuario_id=usuario.id, conexao=numero)
+                                      usuario_id=usuario.id, conexao=numero, midia_id=imagem.id if imagem else None)
             feito["enviadas"] += 1
         except (email_smtp.ErroEmail, whatsapp_leads.ErroWhatsAppLeads) as erro:
             feito["erros"].append(f"{'E-mail' if canal == 'email' else 'WhatsApp'}: {erro}")
@@ -832,11 +837,14 @@ def _enviar_email_da_tarefa(db, t: Tarefa, usuario: Usuario | None, resultado: s
             return str(erro)
     from . import conexoes, marca
 
+    from . import visual
+
     quem = conexoes.responsavel(db, lead, usuario, t)
     t.assunto, t.mensagem = marca.aplicar(t.assunto, quem), marca.aplicar(t.mensagem, quem)
+    html = visual.html_do_email(db, t, lead, quem, t.mensagem, email_smtp.link_descadastro(lead.id))
     try:
         id_externo = email_smtp.enviar(lead.email, t.assunto or marca.da_pessoa(quem)["nome"], t.mensagem,
-                                       lead_id=lead.id, conta=conta)
+                                       lead_id=lead.id, conta=conta, html=html)
     except email_smtp.ErroEmail as erro:
         do_lead = isinstance(erro, email_smtp.ErroDestinatario)
         if not do_lead and not registrar_erro_da_caixa:

@@ -99,6 +99,15 @@
     </div>
   </div>
 
+  <div class="cartao">
+    <h2 class="passo-titulo"><span class="numero-passo">5</span> Visual (opcional)</h2>
+    <p class="ajuda" style="margin-top:0">E-mail em HTML e imagem no WhatsApp nas campanhas diárias. Nas Empresas novas quase todo contato é
+      frio: a imagem no WhatsApp só vai para quem já respondeu; o HTML vale para quem recebe por e-mail.</p>
+    {% set visual_atual = (cfg.novas_visual_id|int) if cfg.novas_visual_id else None %}
+    {% set visual_canais, visual_toques = cfg.novas_visual_canais, cfg.novas_visual_toques %}
+    {% include "_escolha_visual.html" %}
+  </div>
+
   <div style="margin:0 0 20px"><button class="btn btn-verde btn-grande">Salvar configuração</button></div>
 </form>
 

@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from .. import agenda_horarios, autorizacao, campanhas, config, hoje as fila_hoje, ia, metricas, sdr, util
+from .. import agenda_horarios, autorizacao, campanhas, config, hoje as fila_hoje, ia, metricas, sdr, util, visual
 from ..banco import agora, obter_db
 from ..leads_servico import historico, limpar_campos
 from ..modelos import (Cadencia, Campanha, Categoria, Conhecimento, Lead, Mensagem, Notificacao, Oportunidade, Tarefa,
@@ -516,6 +516,7 @@ def nova_campanha(request: Request, pedido: str = "", base: str = "", usuario: U
         "ultima_cidade": ultima.cidade if ultima else "", "ultima_uf": ultima.estado if ultima else "",
         "categorias": db.execute(select(Categoria).where(Categoria.ativa.is_(True)).order_by(Categoria.prioridade)).scalars().all(),
         "cadencias": _cadencias_da_ia(db), "cadencia_sdr": campanhas.cadencia_sdr(db), "ia_ligada": ia.disponivel(),
+        "visuais": visual.disponiveis(db, "sdr"),
     })
 
 
@@ -563,6 +564,7 @@ async def criar_campanha(request: Request, usuario: Usuario = Depends(exige("cam
         conexao_id=_numero_escolhido(db, usuario, form),
         inicio=util.para_data(form.get("inicio")) or date.today(), status="gerando", personalizar_ia=ia.disponivel(),
     )
+    camp.visual_id, camp.visual_canais, camp.visual_toques = visual.escolha_do_formulario(db, form, "sdr")
     db.add(camp)
     db.flush()
     registrar_log(db, usuario, "criou_campanha", "campanha", camp.id,
@@ -637,7 +639,7 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(exige("c
         "andamento": campanhas.andamento(db, camp) if camp.status not in ("gerando", "erro") else [],
         "whatsapp_hoje": whatsapp_hoje, "numero_whatsapp": numero, "sem_numero": sem_numero,
         "disparar": {k: len(v) for k, v in campanhas.para_disparar(db, camp).items()},
-        "numeros_admin": _numeros_para_admin(db, usuario),
+        "numeros_admin": _numeros_para_admin(db, usuario), "visual_resumo": visual.resumo_da_campanha(db, camp),
         "pode_gerenciar": autorizacao.pode(usuario, "campanhas.gerenciar", camp),
         "dono": db.get(Usuario, camp.usuario_id) if camp.usuario_id else None,
         "c": camp, "resumo": campanhas.resumo_aprovacao(db, camp), "nomes_categorias": nomes,

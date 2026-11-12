@@ -2,7 +2,7 @@
 
 from datetime import date, datetime
 
-from sqlalchemy import (Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, func,
+from sqlalchemy import (Boolean, Date, DateTime, Float, ForeignKey, Integer, LargeBinary, String, Text, func,
                         select)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -52,7 +52,45 @@ class PonteWhatsApp(Base):
     status: Mapped[str] = mapped_column(String(20), default="aguardando", index=True)  # aguardando, retirada, na_fila, erro
     id_wl: Mapped[str] = mapped_column(String(40), default="")  # id da mensagem no WhatsApp Leads
     erro: Mapped[str] = mapped_column(Text, default="")
+    midia_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # imagem do visual (app/visual.py)
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
+
+
+class VisualCampanha(Base):
+    """Visual das campanhas (nov/2026): o HTML do e-mail e a imagem do WhatsApp, cadastrados em Campanhas > Visuais
+    e escolhidos na campanha da IA SDR e nas Empresas novas. Ver app/visual.py."""
+    __tablename__ = "visuais_campanha"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nome: Mapped[str] = mapped_column(String(120))
+    descricao: Mapped[str] = mapped_column(Text, default="")
+    usar_em: Mapped[str] = mapped_column(String(60), default="sdr,empresas_novas")  # onde pode ser escolhido
+    html: Mapped[str] = mapped_column(Text, default="")              # e-mail ({{mensagem}} = texto do toque)
+    imagem: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True, deferred=True)  # WhatsApp
+    imagem_tipo: Mapped[str] = mapped_column(String(40), default="")
+    imagem_nome: Mapped[str] = mapped_column(String(160), default="")
+    imagem_hash: Mapped[str] = mapped_column(String(64), default="")  # sha256: o WhatsApp Leads guarda uma cópia
+    ativo: Mapped[bool] = mapped_column(Boolean, default=True)
+    usuario_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
+    atualizado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, onupdate=agora)
+
+    arquivos: Mapped[list["ArquivoVisual"]] = relationship(
+        back_populates="visual", cascade="all, delete-orphan", order_by="ArquivoVisual.id")
+
+
+class ArquivoVisual(Base):
+    """Imagem usada dentro do HTML do e-mail. Fica pública em /visual/arquivo/<id>/<nome> (o programa de e-mail do
+    lead precisa conseguir abrir)."""
+    __tablename__ = "visuais_arquivos"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    visual_id: Mapped[int] = mapped_column(ForeignKey("visuais_campanha.id", ondelete="CASCADE"), index=True)
+    nome: Mapped[str] = mapped_column(String(160))
+    tipo: Mapped[str] = mapped_column(String(40), default="")
+    tamanho: Mapped[int] = mapped_column(Integer, default=0)
+    dados: Mapped[bytes] = mapped_column(LargeBinary, deferred=True)
+    criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
+
+    visual: Mapped[VisualCampanha] = relationship(back_populates="arquivos")
 
 
 class MensagemWhatsApp(Base):
@@ -493,6 +531,10 @@ class Campanha(Base):
     status_ia: Mapped[str] = mapped_column(String(120), default="")
     arquivada: Mapped[bool] = mapped_column(Boolean, default=False)  # some da lista (Ver arquivadas)
     conexao_id: Mapped[str] = mapped_column(String(40), default="")  # número escolhido pelo admin (vazio = automático)
+    # Visual (HTML no e-mail, imagem no WhatsApp) — app/visual.py. toques: "seguintes" (do 2º em diante) ou "todos"
+    visual_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    visual_canais: Mapped[str] = mapped_column(String(40), default="")
+    visual_toques: Mapped[str] = mapped_column(String(20), default="seguintes")
     so_fixo: Mapped[str] = mapped_column(Text, default="")  # ids dos leads só com telefone fixo (o usuário liga)
     tipo: Mapped[str] = mapped_column(String(30), default="parceiros", index=True)  # parceiros | empresas_novas
     # De onde vêm as empresas: "receita" ou "lista:<id>" (lista importada, ver app/bases_importadas.py)
@@ -524,6 +566,7 @@ class Tarefa(Base):
     mensagem_whatsapp: Mapped[str] = mapped_column(Text, default="")
     mensagem_email: Mapped[str] = mapped_column(Text, default="")
     assunto_email: Mapped[str] = mapped_column(String(200), default="")
+    com_visual: Mapped[bool] = mapped_column(Boolean, default=False)  # este toque usa o visual da campanha
     angulo: Mapped[str] = mapped_column(String(20), default="")
     # rascunho (campanha aguardando aprovação), pendente, feita, pulada, cancelada
     status: Mapped[str] = mapped_column(String(20), default="pendente", index=True)

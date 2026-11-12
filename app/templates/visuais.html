@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block titulo %}Visuais das campanhas{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <div><h1>Visuais das campanhas</h1>
+    <div class="suave">O HTML do e-mail e a imagem do WhatsApp que as campanhas podem usar (IA SDR e Empresas novas).</div></div>
+  <div class="acoes"><a class="btn" href="/campanhas">Campanhas</a><a class="btn" href="/empresas-novas">Empresas novas</a></div>
+</div>
+
+<div class="cartao">
+  <h2>Como funciona</h2>
+  <ul style="margin:6px 0 0;padding-left:18px">
+    <li><b>E-mail:</b> sai com duas versões, o texto de sempre e o HTML do visual. No HTML, escreva <code>{{ '{{mensagem}}' }}</code>
+      onde deve entrar o texto do toque (já personalizado para cada empresa). Também dá para usar <code>{{ '{{nome}}' }}</code>,
+      <code>{{ '{{empresa}}' }}</code>, <code>{{ '{{cidade}}' }}</code>, <code>{{ '{{vendedor}}' }}</code> e <code>{{ '{{descadastro}}' }}</code>
+      (o link para sair da lista; se não usar, ele entra sozinho no fim).</li>
+    <li><b>WhatsApp:</b> sai a imagem do visual com o texto do toque embaixo. Para proteger o número, a imagem só vai para
+      <b>quem já conversou com a MS</b>; para contato frio sai só o texto.</li>
+    <li><b>Na campanha</b> você escolhe o visual, os canais e se ele vale do 2º toque em diante (recomendado) ou em todos.</li>
+  </ul>
+</div>
+
+<div class="cartao">
+  <h2>Visuais cadastrados</h2>
+  {% for v in visuais %}
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--borda)">
+    <div><a href="/visuais/{{ v.id }}"><b>{{ v.nome }}</b></a>
+      {% if not v.ativo %}<span class="selo">desativado</span>{% endif %}
+      <div class="pequeno suave">
+        {{ '✉️ HTML do e-mail' if (v.html or '').strip() else '✉️ sem HTML' }} ·
+        {{ '💬 imagem do WhatsApp' if v.imagem_hash else '💬 sem imagem' }} ·
+        usar em: {{ (v.usar_em or '').split(',')|map('replace', 'empresas_novas', 'Empresas novas')|map('replace', 'sdr', 'IA SDR')|join(', ') or '—' }}
+        {% if uso.get(v.id) %} · em {{ uso[v.id] }} campanha(s){% endif %}</div></div>
+    <a class="btn btn-pequeno" href="/visuais/{{ v.id }}">Abrir</a>
+  </div>
+  {% else %}<p class="suave">Nenhum visual ainda. Crie o primeiro abaixo.</p>{% endfor %}
+</div>
+
+{% if pode('templates.editar') %}
+<form class="cartao" method="post" action="/visuais/novo" enctype="multipart/form-data" style="max-width:860px">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>Novo visual</h2>
+  <div class="campos">
+    <div class="largo"><label>Nome *</label><input type="text" name="nome" required maxlength="120" placeholder="Ex.: Folheto da parceria"></div>
+    <div class="largo"><label>Para que serve (opcional)</label><input type="text" name="descricao" maxlength="1000"></div>
+    <div class="largo"><label>Pode ser usado em</label>
+      {% for codigo, nome in SECOES.items() %}<label class="marcar"><input type="checkbox" name="usar_{{ codigo }}" checked> {{ nome }}</label>{% endfor %}</div>
+    <div class="largo"><label>HTML do e-mail (pode colar depois)</label>
+      <textarea name="html" rows="8" placeholder="<html>... {{ '{{mensagem}}' }} ...</html>" style="font-family:var(--fonte-mono);font-size:.8rem"></textarea></div>
+    <div class="largo"><label>Imagem do WhatsApp (PNG, JPG, GIF ou WebP, até 1 MB; pode mandar depois)</label>
+      <input type="file" name="imagem" accept="image/png,image/jpeg,image/gif,image/webp"></div>
+  </div>
+  <button class="btn btn-primario" style="margin-top:10px">Criar visual</button>
+</form>
+{% endif %}
+{% endblock %}

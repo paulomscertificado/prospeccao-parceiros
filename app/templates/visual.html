@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block titulo %}Visual: {{ v.nome }}{% endblock %}
+{% block conteudo %}
+<style>
+  .previa-email { width: 100%; height: 560px; border: 1px solid var(--borda); border-radius: var(--raio); background: #fff; }
+  .previa-zap { max-width: 320px; background: #e5ddd5; border-radius: 12px; padding: 12px; }
+  .previa-zap .balao { background: #dcf8c6; border-radius: 8px; padding: 6px; font-size: .85rem; white-space: pre-wrap; }
+  .previa-zap img { width: 100%; border-radius: 6px; display: block; margin-bottom: 6px; }
+  .url-arquivo { font-family: var(--fonte-mono); font-size: .75rem; width: 100%; }
+  .grade-2 > * { min-width: 0; }  /* no celular a prévia e o HTML longo não alargam a página */
+  .grade-2 code { word-break: break-all; }
+</style>
+<div class="cabecalho">
+  <div><h1>{{ v.nome }} {% if not v.ativo %}<span class="selo">desativado</span>{% endif %}</h1>
+    <div class="suave">{% if campanhas %}Usado em {{ campanhas }} campanha(s): mudanças valem para os próximos envios.{% else %}Ainda não usado em campanhas.{% endif %}</div></div>
+  <div class="acoes"><a class="btn" href="/visuais">Todos os visuais</a></div>
+</div>
+
+<div class="grade-2">
+  <form class="cartao" method="post" action="/visuais/{{ v.id }}" enctype="multipart/form-data">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <h2>Dados</h2>
+    <div class="campos">
+      <div class="largo"><label>Nome *</label><input type="text" name="nome" required maxlength="120" value="{{ v.nome }}"></div>
+      <div class="largo"><label>Para que serve</label><input type="text" name="descricao" maxlength="1000" value="{{ v.descricao }}"></div>
+      <div class="largo"><label>Pode ser usado em</label>
+        {% for codigo, nome in SECOES.items() %}<label class="marcar"><input type="checkbox" name="usar_{{ codigo }}" {{ 'checked' if codigo in (v.usar_em or '').split(',') }}> {{ nome }}</label>{% endfor %}
+        <label class="marcar"><input type="checkbox" name="ativo" {{ 'checked' if v.ativo }}> Ativo (aparece para escolher nas campanhas)</label></div>
+      <div class="largo"><label>HTML do e-mail</label>
+        <textarea name="html" rows="16" style="font-family:var(--fonte-mono);font-size:.78rem">{{ v.html }}</textarea>
+        <p class="ajuda">Use <code>{{ '{{mensagem}}' }}</code> onde entra o texto do toque. Variáveis: <code>{{ '{{nome}}' }}</code>, <code>{{ '{{empresa}}' }}</code>,
+          <code>{{ '{{cidade}}' }}</code>, <code>{{ '{{vendedor}}' }}</code>, <code>{{ '{{descadastro}}' }}</code>. Scripts são tirados (e-mail não roda script).</p></div>
+      <div class="largo"><label>Imagem do WhatsApp {% if v.imagem_hash %}(trocar){% endif %}</label>
+        <input type="file" name="imagem" accept="image/png,image/jpeg,image/gif,image/webp">
+        <p class="ajuda">PNG, JPG, GIF ou WebP, até {{ LIMITE_KB }} KB. Vai com o texto do toque embaixo, só para quem já conversou com a MS.</p>
+        {% if v.imagem_hash %}<label class="marcar"><input type="checkbox" name="tirar_imagem"> Tirar a imagem do WhatsApp</label>{% endif %}</div>
+    </div>
+    {% if pode('templates.editar') %}<button class="btn btn-primario" style="margin-top:10px">Salvar</button>{% endif %}
+  </form>
+
+  <div>
+    <div class="cartao">
+      <h2>Prévia do e-mail</h2>
+      {% if previa %}
+      <iframe class="previa-email" sandbox="" srcdoc="{{ previa }}" title="Prévia do e-mail"></iframe>
+      <p class="ajuda">Com um texto e dados de exemplo. Cada empresa recebe o texto do próprio toque.</p>
+      <form method="post" action="/visuais/{{ v.id }}/teste-email" style="margin-top:6px"><input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn btn-pequeno" title="Vai para {{ usuario.email }}">Mandar e-mail de teste para mim</button>
+        <span class="pequeno suave" style="word-break:break-all">({{ usuario.email }})</span></form>
+      {% else %}<p class="suave">Ainda sem HTML. Cole o HTML ao lado e salve.</p>{% endif %}
+    </div>
+    <div class="cartao">
+      <h2>Prévia no WhatsApp</h2>
+      {% if v.imagem_hash %}
+      <div class="previa-zap"><div class="balao"><img src="/visuais/{{ v.id }}/imagem?h={{ v.imagem_hash[:8] }}" alt="Imagem do WhatsApp">Olá, Ana! Tudo bem? (o texto do toque vai aqui, embaixo da imagem)</div></div>
+      {% else %}<p class="suave">Ainda sem imagem do WhatsApp. Envie a imagem ao lado e salve.</p>{% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="cartao" id="arquivos">
+  <h2>Imagens usadas no HTML do e-mail</h2>
+  <p class="ajuda" style="margin-top:0">Envie aqui as imagens do e-mail (logo, banner...). Cada uma ganha um endereço público: copie e use no HTML,
+    por exemplo <code>&lt;img src="ENDEREÇO" width="600"&gt;</code>.</p>
+  {% for a, url in arquivos %}
+  <div style="display:grid;grid-template-columns:70px 1fr auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--borda)">
+    <img src="{{ url }}" alt="" style="max-width:70px;max-height:50px;object-fit:contain">
+    <div><b>{{ a.nome }}</b> <span class="pequeno suave">{{ (a.tamanho / 1000)|round|int }} KB</span>
+      <input class="url-arquivo" type="text" readonly value="{{ url }}" onclick="this.select()" aria-label="Endereço da imagem"></div>
+    {% if pode('templates.editar') %}<form method="post" action="/visuais/{{ v.id }}/arquivos/{{ a.id }}/apagar" data-confirmar="Apagar esta imagem? Se o HTML usa ela, ela some do e-mail.">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-pequeno btn-perigo">Apagar</button></form>{% endif %}
+  </div>
+  {% else %}<p class="suave">Nenhuma imagem enviada para o HTML.</p>{% endfor %}
+  {% if pode('templates.editar') %}
+  <form method="post" action="/visuais/{{ v.id }}/arquivos" enctype="multipart/form-data" class="filtros" style="margin-top:10px">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="file" name="arquivos" multiple accept="image/png,image/jpeg,image/gif,image/webp" aria-label="Imagens do e-mail">
+    <button class="btn">Enviar imagens</button></form>
+  {% endif %}
+</div>
+
+{% if pode('templates.editar') %}
+<form method="post" action="/visuais/{{ v.id }}/apagar" data-confirmar="{{ 'Este visual está em campanhas: ele será só desativado. Continuar?' if campanhas else 'Apagar este visual?' }}">
+  <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-perigo">{{ 'Desativar visual' if campanhas else 'Apagar visual' }}</button></form>
+{% endif %}
+{% endblock %}

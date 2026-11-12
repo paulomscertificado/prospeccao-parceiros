@@ -82,7 +82,10 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
     deixa tudo esperando a aprovação da campanha."""
     # Campanha da IA SDR: só e-mail e WhatsApp (ligação é o usuário quem faz, por conta própria)
     da_ia = bool(campanha_id) and mensagens_sdr is not None
-    from . import sdr
+    from . import sdr, visual
+    from .modelos import Campanha
+
+    campanha = db.get(Campanha, campanha_id) if campanha_id else None
 
     mensagens_sdr = mensagens_sdr or {}
     inicio = inicio or date.today()
@@ -106,7 +109,8 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
             continue
         responsavel = db.get(Usuario, lead.vendedor_id) if lead.vendedor_id else usuario
         dia_anterior = None
-        for passo in cadencia.passos:
+        for indice, passo in enumerate(cadencia.passos):
+            com_visual = visual.no_toque(campanha, indice)  # e-mail em HTML / imagem no WhatsApp (app/visual.py)
             data = inicio + timedelta(days=passo.dia - 1)
             if pular_fds:
                 while data.weekday() >= 5 or (dia_anterior and data <= dia_anterior):
@@ -170,14 +174,15 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
                     tipo="prospeccao", lead_id=lead.id, passo_id=passo.id, campanha_id=campanha_id,
                     usuario_id=responsavel.id if responsavel else None, canal=canal_extra, data=data,
                     hora=hora, acao=f"Contato por {canal_extra}", angulo=passo.angulo or "", status=status_tarefa,
-                    **extra,
+                    com_visual=com_visual, **extra,
                 ))
                 resultado["tarefas"] += 1
             db.add(Tarefa(
                 tipo="prospeccao", lead_id=lead.id, passo_id=passo.id, campanha_id=campanha_id,
                 usuario_id=responsavel.id if responsavel else None, canal=canal, data=data,
                 hora=hora, acao=passo.acao or f"Contato por {canal}",
-                assunto=assunto, mensagem=corpo, angulo=passo.angulo or "", status=status_tarefa, **modelos,
+                assunto=assunto, mensagem=corpo, angulo=passo.angulo or "", status=status_tarefa,
+                com_visual=com_visual, **modelos,
             ))
             resultado["tarefas"] += 1
         if lead.vendedor_id is None and usuario.perfil != "parceiro" and not autorizacao.ve_tudo(usuario, "leads.ver"):

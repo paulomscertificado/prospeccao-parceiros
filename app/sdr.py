@@ -775,14 +775,19 @@ def enviar_whatsapp_conectado(db, texto: str, usuario: Usuario | None, lead: Lea
         bloqueio = mensagens.limite_de_frios(db, conexao)  # teto de contatos frios do número e pausa por SAIR
     if bloqueio:
         raise EnvioRecusado(bloqueio)
+    from . import visual
+
+    imagem = visual.imagem_do_whatsapp(db, tarefa, lead)  # só para quem já conversou (proteção do número)
     try:
-        id_externo = whatsapp_leads.enviar(telefone, nome, texto, db=db, conexao=conexao)
+        id_externo = whatsapp_leads.enviar(telefone, nome, texto, db=db, conexao=conexao,
+                                           midia_id=imagem.id if imagem else None)
     except whatsapp_leads.ErroWhatsAppLeads as erro:
         raise EnvioRecusado(str(erro)) from None
     msg = mensagens.registrar(db, lead.id if lead else None, "whatsapp", texto, usuario, modo="whatsapp-leads",
                               status="na_fila", tarefa_id=tarefa.id if tarefa else None, id_externo=str(id_externo),
                               campanha_id=tarefa.campanha_id if tarefa else None, angulo=tarefa.angulo if tarefa else "",
-                              categoria_id=lead.categoria_id if lead else None)
+                              categoria_id=lead.categoria_id if lead else None,
+                              assunto=f"[com imagem: {imagem.nome}]"[:200] if imagem else "")
     msg.conexao = conexao
     if tarefa is not None:
         tarefa.status, tarefa.concluida_em, tarefa.resultado = "feita", agora(), "Enviada pelo WhatsApp conectado"

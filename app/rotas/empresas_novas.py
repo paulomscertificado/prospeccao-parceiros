@@ -19,6 +19,8 @@ rotas = APIRouter()
 @rotas.get("/empresas-novas")
 def tela_empresas_novas(request: Request, usuario: Usuario = Depends(exige("campanhas.ver")),
                         db: Session = Depends(obter_db)):
+    from .. import visual
+
     campanhas = empresas_novas.campanhas_recentes(db)
     contagem = dict(db.execute(select(Tarefa.campanha_id, func.count(func.distinct(Tarefa.lead_id)))
                                .where(Tarefa.campanha_id.in_([c.id for c in campanhas]))
@@ -32,6 +34,7 @@ def tela_empresas_novas(request: Request, usuario: Usuario = Depends(exige("camp
         "usuarios": usuarios, "dono": empresas_novas.dono(db), "hoje": date.today(),
         "ontem": date.today() - timedelta(days=1), "buscas": empresas_novas.buscas_recentes(db),
         "limite_teste": empresas_novas.LIMITE_TESTE,
+        "visuais": visual.disponiveis(db, "empresas_novas"),
     })
 
 
@@ -119,6 +122,12 @@ async def configurar(request: Request, usuario: Usuario = Depends(exige("campanh
                              ("novas_dono_id", str(dono_id or "")),
                              ("novas_excluir_listas", "1" if form.get("excluir_listas") else "0")]:
         gravar_config(db, chave_cfg, valor)
+    from .. import visual
+
+    vid, canais_visual, toques = visual.escolha_do_formulario(db, form, "empresas_novas")
+    gravar_config(db, "novas_visual_id", str(vid or ""))
+    gravar_config(db, "novas_visual_canais", canais_visual)
+    gravar_config(db, "novas_visual_toques", toques)
     registrar_log(db, usuario, "configurou_empresas_novas", "configuracao", None, request=request)
     db.commit()
     if form.get("ativo") and not empresas_novas.chave_api():

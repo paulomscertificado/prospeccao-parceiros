@@ -28,6 +28,9 @@ pessoa: veja a lista e as regras em [permissoes.md](permissoes.md). Sem a permis
 | `POST /leads/{id}/enviar` | A G V | Envia 1 mensagem pela API oficial (WhatsApp/SMTP) |
 | `GET/POST /leads/importar` | A G V | Importação CSV/Excel |
 | `GET /cadencias` · `/cadencias/{id}` · `/templates/{id}` | A G V (edição A G) | Cadências, templates, campanhas |
+| `GET /visuais` · `POST /visuais/novo` · `GET/POST /visuais/{id}` · `/visuais/{id}/arquivos` · `/teste-email` · `/apagar` | templates.ver / templates.editar | Visual das campanhas (HTML do e-mail e imagem do WhatsApp) |
+| `GET /visual/arquivo/{id}/{nome}` | aberto | Imagem usada no HTML do e-mail (o programa de e-mail do lead abre sem login) |
+| `GET /api/ponte/midia/{id}` | token da ponte | Imagem do visual para o WhatsApp Leads mandar com a mensagem |
 | `GET /agenda` | A G V | Agenda (`?ver=hoje|semana|proximas|feitas&canal=&tipo=`) |
 | `POST /agenda/{id}/{acao}` | A G V | `feita`, `respondeu`, `pular`, `remarcar`, `invalido`, `opt-out` |
 | `GET/POST /parceiros/{id}` | A G V | Ficha do parceiro (0 = novo) |

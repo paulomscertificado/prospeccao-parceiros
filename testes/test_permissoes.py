@@ -115,7 +115,9 @@ def test_toda_rota_da_equipe_confere_permissao():
     """Nenhuma tela fica sem porteiro: só login, descadastro, webhooks e a ponte (com senha própria) são abertos."""
     abertas = {"/login", "/login/ativar-codigo", "/login/codigo", "/primeiro-acesso", "/sair",
                "/descadastrar/{lead_id:int}/{assinatura}", "/api/saude", "/api/webhooks/whatsapp", "/api/cron",
-               "/api/ponte/teste", "/api/ponte/troca", "/api/ponte/retorno", "/static"}
+               "/api/ponte/teste", "/api/ponte/troca", "/api/ponte/retorno", "/static",
+               "/api/ponte/midia/{mid:int}",  # imagem do visual para o WhatsApp Leads (senha da ponte)
+               "/visual/arquivo/{aid:int}/{nome}"}  # imagem do e-mail: o programa de e-mail do lead precisa abrir
     sem_porteiro = []
     for rota in app.routes:
         caminho = getattr(rota, "path", "")

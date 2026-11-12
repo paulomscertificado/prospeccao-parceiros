@@ -116,6 +116,19 @@ ritmo dos contatos:
 | Relacionamento – 5 toques em 30 dias | Dia 1, 4, 10 (dica útil), 18 e 30. Para quem decide devagar |
 | Convite por e-mail – 3 e-mails | Só e-mail, sem WhatsApp frio: convida para conversar. Quem chamar no WhatsApp vira conversa |
 
+**Visual das campanhas (e-mail em HTML e imagem no WhatsApp):** em **Campanhas > 🎨 Visuais** você cadastra cada
+visual: o **HTML do e-mail** (cole o código; escreva `{{mensagem}}` onde entra o texto do toque, e use `{{nome}}`,
+`{{empresa}}`, `{{cidade}}`, `{{vendedor}}` e `{{descadastro}}` se quiser), a **imagem do WhatsApp** (PNG ou JPG, até
+1 MB) e as **imagens que o HTML usa** (cada uma ganha um endereço para colar no HTML). A tela mostra a prévia do e-mail
+e do WhatsApp e manda um e-mail de teste para você.
+- Na **Nova campanha (IA SDR)** e na configuração das **Empresas novas** (passo 5) escolha o visual, os canais (e-mail,
+  WhatsApp) e os toques: **do 2º toque em diante** (recomendado: o 1º contato frio responde melhor só com texto) ou
+  **em todos**.
+- O **e-mail** sai com o HTML e também com a versão em texto (exigência dos filtros de spam).
+- No **WhatsApp** vai a imagem com o texto do toque embaixo, **só para quem já conversou com a MS**. Para contato frio
+  sai só o texto, para proteger o número contra bloqueio.
+- O botão **Testar** da campanha manda o e-mail com o visual e o WhatsApp com a imagem para você mesmo.
+
 **Pergunta final (vai no fim do 1º contato):** 14 perguntas prontas em 5 tipos (descobrir como fazem hoje,
 convidar para conversar, achar a pessoa certa, mandar informação, resposta de uma palavra), **Automática** (a mais
 natural para cada empresa), **Variar** (cada empresa recebe uma pergunta de um tipo diferente, para descobrir qual
