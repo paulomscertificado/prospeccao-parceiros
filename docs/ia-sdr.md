@@ -431,6 +431,29 @@ empresas, com as MESMAS colunas da `base_receita`, para reaproveitar `base_recei
   caminho do próprio sistema (`_destino_seguro`).
 - Testes: `testes/test_oportunidades_tela.py`.
 
+## Nova campanha: tela em 4 passos, tons e cadências novos (nov/2026)
+
+- Tela (`templates/campanha_nova.html`, `_escolha_categoria.html`): "Onde?" virou o passo 1 (as quantidades por
+  segmento dependem da cidade); os segmentos sem empresas na cidade ficam escondidos (`.so-com-empresas`, botão
+  Mostrar), o quadro do topo soma as empresas escolhidas, cada cartão mostra `Categoria.motivo` e "⭐ Mais indicado"
+  (`aderencia >= 20`). Tom e cadência viraram cartões (`config.TONS_INFO` com quando usar e exemplo). A rota mostra só
+  as cadências da IA (`_cadencias_da_ia`: todo passo com ângulo); a da Agenda (ligação/LinkedIn) fica de fora.
+  Cadência só de e-mail desmarca o WhatsApp na tela.
+- Tons (`app/tons.py`): antes o tom só valia com a IA ligada. Agora `sdr.mensagens_por_regras(..., tom)` usa a 1ª
+  mensagem de cada tom (`PRIMEIRA`) e o registro dos toques seguintes (`SEGUINTES`: neutro, informal, curto, formal),
+  com o vocabulário do segmento (`modelos_segmento.SEGMENTOS`) ou genérico quando o ramo não está confirmado. O tom
+  "consultivo" mantém os textos de sempre e os modelos do segmento. Tudo passa por `texto_seguro`.
+- Toques novos: `pergunta` (pergunta rápida), `conteudo` (dica útil) e `convite` (e-mail com `wa.me` do número em
+  `whatsapp_convite`; o link vai sem texto pronto porque o "%" da URL esbarra na trava de percentuais). Ficam fora de
+  `config.ANGULOS` (a IA continua escrevendo os 4 de sempre); `gerar_mensagens` completa com as regras e
+  `cadencias.aplicar` gera na hora o toque que faltar.
+- Cadências novas (`modelos.CADENCIAS_SDR_EXTRAS`, criadas por `dados_iniciais`; o nome entra em `_versao_do_esquema`
+  para a nuvem criar na publicação): Curta e segura (D1, D6), Leve (D1, D5, D12), Pergunta primeiro (D1, D4, D10),
+  Relacionamento (D1, D4, D10, D18, D30) e Convite por e-mail (D1, D5, D11, canal e-mail).
+- Base da escolha: dados da auditoria (e-mail 1,8% de resposta, WhatsApp 34%, risco de bloqueio no frio) e pesquisa
+  de mercado (4 a 7 toques no e-mail, 1 lembrete no WhatsApp frio, conversa de parceiro, pedido pequeno).
+- Testes: `testes/test_tons_cadencias.py`.
+
 ## Quem precisa de mim hoje e motivo obrigatório (auditoria P1.7, nov/2026)
 
 - `app/hoje.py`, quadro no topo do Dashboard (`rotas/painel.py`, `templates/dashboard.html`): respostas quentes

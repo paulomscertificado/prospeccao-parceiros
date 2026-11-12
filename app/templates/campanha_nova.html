@@ -5,14 +5,66 @@
 {% set cidade_inicial = e.cidade or ultima_cidade or 'Recife' %}
 {% set uf_inicial = e.estado or ultima_uf or 'PE' %}
 {% set marcadas = e.categorias or ['contabil'] %}
-<div class="cabecalho"><div><h1>Nova campanha</h1><div class="suave">Escolha 3 coisas e clique em Pesquisar. A IA faz o resto e só envia depois da sua aprovação.</div></div>
+<style>
+  .campanha-nova .cartao { margin-bottom: 14px; }
+  .resumo-segmentos { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; background: #f6f9fc;
+                      border: 1px solid var(--borda); border-radius: var(--raio); padding: 10px 14px; margin: 4px 0 14px; font-size: .88rem; }
+  .resumo-segmentos .total { font-weight: 700; color: var(--verde); }
+  .resumo-segmentos .acoes-seg { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+  .selo-indicado { align-self: flex-start; font-size: .7rem; font-weight: 700; color: #8a5a00; background: #fff4d6;
+                   border-radius: 999px; padding: 1px 8px; }
+  .escolha-motivo { font-size: .76rem; color: var(--suave); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2;
+                    -webkit-box-orient: vertical; overflow: hidden; }
+  .so-com-empresas .escolha.vazia:not(:has(input:checked)) { display: none; }
+  .grupo-escolha.sem-nada { display: none; }
+  .cartoes-escolha.cartoes-largos { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); grid-auto-rows: auto; }
+  .escolha-tom .exemplo { font-size: .76rem; color: #4b5a6b; font-style: italic; background: #f6f9fc; border-radius: 8px; padding: 6px 8px; }
+  .passos-cad { display: flex; flex-wrap: wrap; gap: 4px; }
+  .passos-cad span { font-size: .7rem; background: #eef3f8; color: var(--azul); border-radius: 999px; padding: 1px 7px; }
+  .selo-cad { align-self: flex-start; font-size: .7rem; font-weight: 700; border-radius: 999px; padding: 1px 8px; }
+  .selo-cad.seguro { background: var(--verde-claro); color: #137a48; } .selo-cad.padrao { background: var(--azul-claro); color: var(--azul); }
+  .subtitulo-passo { font-size: .95rem; margin: 18px 0 4px; }
+  .subtitulo-passo:first-of-type { margin-top: 8px; }
+</style>
+<div class="cabecalho"><div><h1>Nova campanha</h1>
+  <div class="suave">Siga os 4 passos. A IA pesquisa as empresas, escreve as mensagens e só envia depois da sua aprovação.</div></div>
   <a class="btn" href="/campanhas">Voltar</a></div>
 
-<form method="post" action="/campanhas/nova" id="assistente">
+<form method="post" action="/campanhas/nova" id="assistente" class="campanha-nova">
   <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="pedido" value="{{ pedido }}">
 
+  {# ------------------------------------------------ 1. Onde (vem primeiro: as quantidades dependem da cidade) #}
   <div class="cartao">
-    <h2 class="passo-titulo"><span class="numero-passo">1</span> O que você procura?</h2>
+    <h2 class="passo-titulo"><span class="numero-passo">1</span> Onde?</h2>
+    {% if bases|length > 1 or (bases and bases[0].id != 'receita') %}
+    <div class="campos" style="max-width:640px;margin-bottom:10px">
+      <div class="largo"><label for="base">Base de dados</label>
+        <select id="base" name="base">{% for b in bases %}<option value="{{ b.id }}" {{ 'selected' if b.id == base }}>{{ b.nome }} ({{ '{:,}'.format(b.total).replace(',', '.') }} empresas)</option>{% endfor %}</select>
+        <p class="ajuda">De onde vêm as empresas desta campanha.</p></div>
+    </div>
+    {% else %}<input type="hidden" id="base" name="base" value="{{ base }}">{% endif %}
+    <div class="campos" style="max-width:640px;grid-template-columns:120px 1fr">
+      <div><label for="estado">Estado</label><select id="estado" name="estado" required>{% for u in config.UFS %}<option {{ 'selected' if uf_inicial == u }}>{{ u }}</option>{% endfor %}</select></div>
+      <div><label for="lista-cidades">Cidade</label>
+        <select id="lista-cidades" hidden><option value="">Carregando cidades…</option></select>
+        <input id="cidade" type="text" name="cidade" value="{{ cidade_inicial }}" required placeholder="Digite o nome da cidade"
+               style="margin-top:6px">
+        <a href="#" id="voltar-lista" class="pequeno" hidden></a></div>
+    </div>
+    <p class="ajuda" id="total-cidade"></p>
+  </div>
+
+  {# ------------------------------------------------ 2. O que procura #}
+  <div class="cartao">
+    <h2 class="passo-titulo"><span class="numero-passo">2</span> Que tipo de empresa?</h2>
+    <div class="resumo-segmentos" aria-live="polite">
+      <span id="resumo-escolha">Escolha um ou mais tipos de empresa.</span>
+      <span class="acoes-seg">
+        <button type="button" class="btn btn-pequeno" id="mostrar-vazias" hidden></button>
+        <button type="button" class="btn btn-pequeno" id="limpar-escolha">Desmarcar todos</button>
+      </span>
+    </div>
+    <div id="segmentos" class="so-com-empresas">
     {% set grupos = [
       ('Contabilidade e finanças', ['contabil', 'bpo', 'rh', 'despachante', 'consultoria']),
       ('Software e tecnologia', ['nf', 'software_contabil', 'erp', 'tecnologia', 'internet']),
@@ -23,7 +75,7 @@
     <div class="grupo-escolha">
       <div class="grupo-escolha-titulo">{{ titulo }}</div>
       <div class="cartoes-escolha">
-        {% for c in categorias if c.codigo in codigos %}{% set _ = usados.append(c.codigo) %}
+        {% for c in categorias|sort(attribute='aderencia', reverse=True) if c.codigo in codigos %}{% set _ = usados.append(c.codigo) %}
         {% include "_escolha_categoria.html" %}
         {% endfor %}
       </div>
@@ -47,28 +99,11 @@
       </div>
     </div>
     {% endif %}
+    </div>
+    <p class="ajuda" style="margin-top:10px">Passe o mouse sobre um tipo para ver por que ele pode ser um bom parceiro. "⭐ Mais indicado" = quem mais precisa de certificado digital para os próprios clientes.</p>
   </div>
 
-  <div class="cartao">
-    <h2 class="passo-titulo"><span class="numero-passo">2</span> Onde?</h2>
-    {% if bases|length > 1 or (bases and bases[0].id != 'receita') %}
-    <div class="campos" style="max-width:640px;margin-bottom:10px">
-      <div class="largo"><label for="base">Base de dados</label>
-        <select id="base" name="base">{% for b in bases %}<option value="{{ b.id }}" {{ 'selected' if b.id == base }}>{{ b.nome }} ({{ '{:,}'.format(b.total).replace(',', '.') }} empresas)</option>{% endfor %}</select>
-        <p class="ajuda">De onde vêm as empresas desta campanha.</p></div>
-    </div>
-    {% else %}<input type="hidden" id="base" name="base" value="{{ base }}">{% endif %}
-    <div class="campos" style="max-width:640px;grid-template-columns:120px 1fr">
-      <div><label for="estado">Estado</label><select id="estado" name="estado" required>{% for u in config.UFS %}<option {{ 'selected' if uf_inicial == u }}>{{ u }}</option>{% endfor %}</select></div>
-      <div><label for="lista-cidades">Cidade</label>
-        <select id="lista-cidades" hidden><option value="">Carregando cidades…</option></select>
-        <input id="cidade" type="text" name="cidade" value="{{ cidade_inicial }}" required placeholder="Digite o nome da cidade"
-               style="margin-top:6px">
-        <a href="#" id="voltar-lista" class="pequeno" hidden></a></div>
-    </div>
-    <p class="ajuda" id="total-cidade"></p>
-  </div>
-
+  {# ------------------------------------------------ 3. Quantas #}
   <div class="cartao">
     <h2 class="passo-titulo"><span class="numero-passo">3</span> Quantas empresas?</h2>
     <div class="grupo-btn">
@@ -81,16 +116,50 @@
     <p class="ajuda">A IA pesquisa o dobro e fica com as melhores.</p>
   </div>
 
+  {# ------------------------------------------------ 4. Como abordar #}
   <div class="cartao">
     <h2 class="passo-titulo"><span class="numero-passo">4</span> Como a IA vai abordar?</h2>
-    <p class="ajuda" style="margin-top:0">Confira e ajuste cada item. A campanha só é criada depois que você revisar esta parte.</p>
-    <div class="campos" style="margin-top:12px">
+    <p class="ajuda" style="margin-top:0">Escolha o jeito de falar e o ritmo dos contatos. A campanha só é criada depois que você revisar esta parte.</p>
+
+    <h3 class="subtitulo-passo">Tom das mensagens</h3>
+    <div class="cartoes-escolha cartoes-largos" role="radiogroup" aria-label="Tom das mensagens">
+      {% for k, nome in config.TONS.items() %}{% set info = config.TONS_INFO.get(k, ('', '')) %}
+      <label class="escolha escolha-tom">
+        <input type="radio" name="tom" value="{{ k }}" {{ 'checked' if k == 'consultivo' }} required>
+        <span class="escolha-corpo">
+          <span class="escolha-marca" aria-hidden="true">✓</span>
+          <b>{{ nome }}</b>
+          <span class="escolha-motivo" style="-webkit-line-clamp:3">{{ info[0] }}</span>
+          {% if info[1] %}<span class="exemplo">“{{ info[1] }}”</span>{% endif %}
+        </span>
+      </label>{% endfor %}
+    </div>
+
+    <h3 class="subtitulo-passo">Ritmo dos contatos (cadência)</h3>
+    <div class="cartoes-escolha cartoes-largos" role="radiogroup" aria-label="Cadência">
+      {% for c in cadencias %}{% set so_email = c.passos and c.passos|selectattr('canal', 'equalto', 'email')|list|length == c.passos|length %}
+      <label class="escolha escolha-cadencia">
+        <input type="radio" name="cadencia_id" value="{{ c.id }}" data-so-email="{{ '1' if so_email else '' }}" required
+               {{ 'checked' if (cadencia_sdr and c.id == cadencia_sdr.id) or (not cadencia_sdr and loop.first) }}>
+        <span class="escolha-corpo">
+          <span class="escolha-marca" aria-hidden="true">✓</span>
+          <b>{{ c.nome.split(' (')[0] }}</b>
+          {% if cadencia_sdr and c.id == cadencia_sdr.id %}<span class="selo-cad padrao">Padrão</span>
+          {% elif c.passos|length <= 2 %}<span class="selo-cad seguro">Mais segura para WhatsApp</span>
+          {% elif so_email %}<span class="selo-cad seguro">Sem WhatsApp frio</span>{% endif %}
+          {% if c.descricao %}<span class="escolha-motivo" style="-webkit-line-clamp:3">{{ c.descricao }}</span>{% endif %}
+          <span class="passos-cad">{% for p in c.passos %}<span title="{{ p.acao }}">D{{ p.dia }} · {{ (p.acao or p.angulo)|replace('Último contato (encerramento educado)', 'Encerramento')|replace('Primeiro contato (apresentação da parceria)', 'Apresentação') }}</span>{% endfor %}</span>
+        </span>
+      </label>{% endfor %}
+    </div>
+    <p class="ajuda" id="aviso-so-email" hidden>Esta cadência é só por e-mail: o canal WhatsApp foi desmarcado. Quem clicar no convite e chamar no WhatsApp passa a poder receber WhatsApp depois.</p>
+
+    <h3 class="subtitulo-passo">Detalhes</h3>
+    <div class="campos" style="margin-top:4px">
       <div class="largo"><label for="nome-campanha">Nome da campanha *</label>
         <input id="nome-campanha" type="text" name="nome" required placeholder="Ex.: Escritórios contábeis – Belo Horizonte"></div>
       <div><label>Canais *</label>
         {% for c in ['whatsapp', 'email'] %}<label class="marcar"><input type="checkbox" name="canais" value="{{ c }}" {{ 'checked' if c == 'whatsapp' }}> {{ CANAIS[c] }}</label>{% endfor %}</div>
-      <div><label>Tom *</label><select name="tom" required>{% for k, v in config.TONS.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
-      <div><label>Cadência *</label><select name="cadencia_id" required>{% for c in cadencias %}<option value="{{ c.id }}" {{ 'selected' if cadencia_sdr and c.id == cadencia_sdr.id }}>{{ c.nome }}</option>{% endfor %}</select></div>
       <div><label>Início *</label><input type="date" name="inicio" required value="{{ hoje.isoformat() }}" min="{{ hoje.isoformat() }}"></div>
       <div class="largo"><label>Pergunta final (CTA)</label><select name="cta"><option value="">A IA escolhe a mais natural para cada empresa</option>{% for c in config.CTAS %}<option>{{ c }}</option>{% endfor %}</select>
         <input type="text" name="cta_livre" placeholder="ou escreva a sua" style="margin-top:6px"></div>
@@ -105,7 +174,7 @@
       <div class="largo"><label>Objetivo *</label><input type="text" name="objetivo" required value="Encontrar parceiros"></div>
     </div>
     <label class="marcar" style="margin-top:12px"><input type="checkbox" id="revisei" required>
-      <b>Revisei o nome, os canais, o tom, a cadência e o objetivo desta campanha.</b></label>
+      <b>Revisei o tom, o ritmo, o nome, os canais e o objetivo desta campanha.</b></label>
   </div>
 
   <button class="btn btn-verde btn-grande">Pesquisar empresas</button>
@@ -116,10 +185,31 @@
 // Atualiza a quantidade de empresas de cada tipo conforme a cidade
 const cidade = document.getElementById('cidade'), estado = document.getElementById('estado');
 const base = document.getElementById('base');
+const segmentos = document.getElementById('segmentos');
 const TODAS = '__todas__';
 const eLista = () => base.value.startsWith('lista:');
 const nomeBase = () => base.tagName === 'SELECT' ? base.options[base.selectedIndex].text.replace(/ \([\d.]+ empresas\)$/, '') : 'base da Receita';
-let espera;
+let espera, contagem = {};
+function resumir() {
+  // Resumo do que foi escolhido, os grupos que ficaram vazios e o botão de mostrar os segmentos sem empresas
+  const marcados = [...document.querySelectorAll('input[name="categorias"]:checked')];
+  const temContagem = Object.keys(contagem).length > 0;
+  const total = marcados.reduce((s, i) => s + (contagem[i.value] || 0), 0);
+  document.getElementById('resumo-escolha').innerHTML = marcados.length
+    ? 'Escolhidos: <b>' + marcados.map(i => i.dataset.nome + (temContagem ? ' (' + (contagem[i.value] || 0).toLocaleString('pt-BR') + ')' : '')).join(', ')
+      + '</b>' + (temContagem ? ' · <span class="total">' + total.toLocaleString('pt-BR') + ' empresas</span>' : '')
+    : 'Escolha um ou mais tipos de empresa.';
+  const vazias = [...document.querySelectorAll('.escolha-segmento.vazia')].filter(l => !l.querySelector('input').checked).length;
+  const botao = document.getElementById('mostrar-vazias');
+  botao.hidden = !vazias;
+  botao.textContent = segmentos.classList.contains('so-com-empresas')
+    ? 'Mostrar ' + vazias + ' tipo' + (vazias > 1 ? 's' : '') + ' sem empresas aqui' : 'Esconder os tipos sem empresas';
+  document.querySelectorAll('#segmentos .grupo-escolha').forEach(g => {
+    const cartoes = [...g.querySelectorAll('.escolha-segmento')];
+    const visiveis = cartoes.filter(l => !segmentos.classList.contains('so-com-empresas') || !l.classList.contains('vazia') || l.querySelector('input').checked);
+    g.classList.toggle('sem-nada', cartoes.length > 0 && visiveis.length === 0);
+  });
+}
 async function atualizar() {
   const todas = cidade.value === TODAS;
   if (!cidade.value.trim() || (todas && !eLista())) return;
@@ -127,6 +217,7 @@ async function atualizar() {
     const r = await fetch('/api/contagem?cidade=' + encodeURIComponent(todas ? '' : cidade.value) + '&uf=' + estado.value
                           + '&base=' + encodeURIComponent(base.value));
     const dados = await r.json();
+    contagem = dados || {};
     let total = 0;
     document.querySelectorAll('.escolha-qtd').forEach(el => {
       const n = dados[el.dataset.categoria] || 0; total += n;
@@ -138,7 +229,13 @@ async function atualizar() {
       ? total.toLocaleString('pt-BR') + ' empresas encontradas na ' + (eLista() ? 'lista "' + nomeBase() + '"' : 'base da Receita') + ' em ' + lugar + '.'
       : 'Nenhuma empresa encontrada em ' + lugar + ' nesta base. Confira a cidade, o estado e a base escolhida.';
   } catch (e) { /* sem contagem, segue normal */ }
+  resumir();
 }
+document.querySelectorAll('input[name="categorias"]').forEach(i => i.addEventListener('change', resumir));
+document.getElementById('mostrar-vazias').addEventListener('click', () => { segmentos.classList.toggle('so-com-empresas'); resumir(); });
+document.getElementById('limpar-escolha').addEventListener('click', () => {
+  document.querySelectorAll('input[name="categorias"]').forEach(i => { i.checked = false; }); resumir();
+});
 cidade.addEventListener('input', () => { clearTimeout(espera); espera = setTimeout(atualizar, 400); });
 // Lista de cidades do estado (IBGE) + opção de digitar outra
 const lista = document.getElementById('lista-cidades'), voltar = document.getElementById('voltar-lista');
@@ -182,11 +279,19 @@ base.addEventListener('change', () => {
   }
   carregarCidades(); atualizar();
 });
+// Cadência só de e-mail: desmarca o WhatsApp (o convite é justamente para não mandar WhatsApp frio)
+document.querySelectorAll('input[name="cadencia_id"]').forEach(r => r.addEventListener('change', () => {
+  const soEmail = r.dataset.soEmail === '1';
+  const zap = document.querySelector('input[name="canais"][value="whatsapp"]'), mail = document.querySelector('input[name="canais"][value="email"]');
+  if (soEmail) { zap.checked = false; mail.checked = true; }
+  document.getElementById('aviso-so-email').hidden = !soEmail;
+}));
 carregarCidades();
 estado.addEventListener('change', atualizar);
 atualizar();
+resumir();
 document.getElementById('assistente').addEventListener('submit', ev => {
-  if (!document.querySelector('input[name="categorias"]:checked')) { ev.preventDefault(); aviso('Escolha pelo menos um tipo de empresa.'); }
+  if (!document.querySelector('input[name="categorias"]:checked')) { ev.preventDefault(); aviso('No passo 2, escolha pelo menos um tipo de empresa.'); }
   else if (!document.querySelector('input[name="canais"]:checked')) { ev.preventDefault(); aviso('No passo 4, escolha pelo menos um canal (WhatsApp ou e-mail).'); }
 });
 </script>

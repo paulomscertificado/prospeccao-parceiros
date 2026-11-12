@@ -137,7 +137,7 @@ def _mensagens(lead_id: int, usuario_id: int, cta: str, tom: str) -> tuple[int, 
             return lead_id, sdr.gerar_mensagens(db, lead, usuario, cta, tom)
         except Exception as erro:  # noqa: BLE001
             log.warning("Mensagens da empresa %s: IA falhou (%s), usando os modelos", lead_id, erro)
-            return lead_id, sdr.mensagens_por_regras(db, lead, usuario, cta)
+            return lead_id, sdr.mensagens_por_regras(db, lead, usuario, cta, tom)
 
 
 def _leads_em_outras_campanhas(db, campanha_id: int) -> set[int]:

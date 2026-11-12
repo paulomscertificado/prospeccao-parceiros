@@ -218,6 +218,9 @@ def _versao_do_esquema() -> str:
 
     partes += [f"{p.codigo}:{p.padrao}" for p in CATALOGO]  # permissão nova: a nuvem dá o padrão aos papéis
     partes += ["dados:conversas-com-nono"]  # ajuste de dados novo (migrar_conversas_com_nono): roda uma vez na nuvem
+    from .modelos import CADENCIAS_SDR_EXTRAS
+
+    partes += [f"cadencia:{nome}" for nome, _, _ in CADENCIAS_SDR_EXTRAS]  # cadência nova: a nuvem cria na publicação
     return hashlib.sha256("|".join(partes).encode()).hexdigest()[:16]
 
 

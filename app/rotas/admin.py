@@ -50,6 +50,8 @@ CAMPOS_GERAIS = [
     ("enviar_whatsapp_automatico", "IA SDR · com o celular conectado, manda sozinha o WhatsApp para quem já conversou "
      "ou autorizou (1 = sim, 0 = não). Primeiro contato frio: sempre 1 clique", "numero"),
     ("aprovacao_obrigatoria", "IA SDR · campanha só começa com aprovação (1 = sim, 0 = não)", "numero"),
+    ("whatsapp_convite", "IA SDR · WhatsApp da MS para os convites por e-mail (com DDD, ex.: 81999998888). Quem "
+     "clicar abre a conversa com este número; vazio = o convite pede para responder o e-mail", "texto"),
     ("notificar_por_email", "IA SDR · avisar o responsável por e-mail quando surgir oportunidade (1 = sim)", "numero"),
     ("alertas_emails", "Avisos de problema · e-mails que recebem (separados por vírgula; vazio = os administradores)",
      "texto"),

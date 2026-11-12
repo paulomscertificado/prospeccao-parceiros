@@ -206,7 +206,28 @@ CTAS = [
     "Posso te explicar rapidamente como funciona?",
     "Vocês já possuem algo parecido?",
 ]
-TONS = {"consultivo": "Consultivo e cordial", "direto": "Direto e objetivo", "informal": "Leve e informal"}
+TONS = {"consultivo": "Consultivo e cordial", "pergunta": "Pergunta curta", "parceiro": "Conversa de parceiro",
+        "cliente": "Foco nos clientes deles", "local": "Empresa da região", "direto": "Direto e objetivo",
+        "informal": "Leve e informal", "formal": "Formal e institucional"}
+# Para a tela Nova campanha: quando usar cada tom e como começa a 1ª mensagem (app/tons.py tem os textos)
+TONS_INFO = {
+    "consultivo": ("O padrão: apresenta a MS, explica a parceria e faz uma pergunta.",
+                   "Olá, Ana! Tudo bem? Conheci o escritório... Sou Paulo, da MS Certificação Digital, e..."),
+    "pergunta": ("Começa só com uma pergunta fácil de responder. É o que mais abre conversa no WhatsApp.",
+                 "Oi, Ana! Uma pergunta rápida: quando os clientes precisam de certificado, vocês indicam alguém?"),
+    "parceiro": ("Fala como colega de mercado: os dois lados ganham. Bom para contadores e consultorias.",
+                 "Olá, Ana! Trabalhamos lado a lado com escritórios contábeis: vocês... e nós cuidamos do certificado."),
+    "cliente": ("Começa pelo problema do cliente deles (certificado vencido travando tudo).",
+                "Olá, Ana! Uma situação que vemos muito: um certificado vencido travando uma entrega do cliente."),
+    "local": ("Mostra que a MS é Autoridade de Registro, com validação presencial ou por vídeo.",
+              "Olá, Ana! Aqui é Paulo, da MS Certificação Digital, Autoridade de Registro ICP-Brasil..."),
+    "direto": ("Mensagens curtas, a proposta em uma frase. Para quem não gosta de texto longo.",
+               "Olá, Ana! Em uma frase: vocês indicam, a MS faz todo o atendimento e vocês são remunerados."),
+    "informal": ("Próximo e descontraído. Bom para coworkings, restaurantes e negócios menores.",
+                 "Oi, Ana! Tudo certo? Vi o escritório e pensei numa parceria..."),
+    "formal": ("Linguagem de carta. Para associações, franqueadoras e administradoras grandes.",
+               "Prezado(a) Ana, meu nome é Paulo e represento a MS Certificação Digital..."),
+}
 
 STATUS_PARCEIRO = ["ATIVO", "INATIVO", "EM ATIVAÇÃO", "BLOQUEADO"]
 STATUS_CLIENTE = ["Indicado", "Em contato", "Emitido", "Perdido"]
@@ -260,6 +281,7 @@ CONFIG_PADRAO = {
     "limite_frios_whatsapp": "20",         # contatos frios (quem nunca conversou) por número por dia
     "pausa_frios_sair": "3",               # pedidos de SAIR no dia que pausam os frios do número até amanhã
     "limite_banco_mb": "500",              # tamanho do banco contratado (aviso por e-mail em 80%)
+    "whatsapp_convite": "",                # número da MS que recebe quem clica no convite por e-mail (wa.me)
     "alertas_emails": "",                  # quem recebe os avisos de problema (vazio = os administradores)
     "limite_diario_campanha": "60",
     "limite_diario_dominio": "3",

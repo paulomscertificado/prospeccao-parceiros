@@ -99,8 +99,8 @@ def test_mensagens_por_angulo_sem_spam(cliente):
         generica = sdr.mensagens_por_regras(db, imob, _admin(db))["apresentacao"]["whatsapp"]
     assert "condomínio" not in generica and "trabalham diretamente com empresas" in generica
     assert "com quem posso falar sobre possíveis parcerias" in generica
-    assert set(msgs) == set(config.ANGULOS)
-    assert len({m["whatsapp"] for m in msgs.values()}) == 4  # cada toque é diferente
+    assert set(config.ANGULOS) <= set(msgs) and {"pergunta", "conteudo", "convite"} <= set(msgs)  # toques novos (nov/2026)
+    assert len({m["whatsapp"] for m in msgs.values()}) == len(msgs)  # cada toque é diferente
     # a variação do modelo é escolhida pelo número do lead; todas cumprimentam pelo primeiro nome
     assert msgs["apresentacao"]["whatsapp"].split("!")[0] in ("Olá, Maria", "Oi, Maria")
     assert "condomínio" in msgs["apresentacao"]["whatsapp"] and msgs["apresentacao"]["fonte"] == "modelos do segmento"
@@ -123,7 +123,8 @@ def test_ia_que_sai_das_regras_e_trocada_pela_versao_segura(cliente, monkeypatch
     with sessao() as db:
         lead = _novo_lead(db, "Contábil Segura")
         msgs = sdr.gerar_mensagens(db, lead, _admin(db))
-    assert all(m["fonte"] == "regras" and "R$" not in m["whatsapp"] for m in msgs.values())
+    assert all(msgs[a]["fonte"] == "regras" for a in config.ANGULOS)
+    assert all("R$" not in m["whatsapp"] for m in msgs.values())
 
 
 def test_trava_contra_invencao_no_perfil():
@@ -230,7 +231,7 @@ def test_campanha_completa_com_aprovacao_e_fila(cliente, tmp_path, monkeypatch):
     monkeypatch.setattr(campanhas, "gerar_em_segundo_plano", campanhas.gerar)  # roda na hora no teste
     r = cliente.get("/campanhas/nova?pedido=Quero+parceiros+entre+administradoras+de+condom%C3%ADnio+em+Recife")
     assert r.status_code == 200 and 'value="condominio" checked' in r.text and 'value="Recife"' in r.text
-    assert "Software e tecnologia" in r.text and r.text.count('<label class="escolha">') == 16  # agrupado, sem repetir
+    assert "Software e tecnologia" in r.text and r.text.count('class="escolha escolha-segmento"') == 16  # agrupado, sem repetir
     csrf = r.text.split('name="csrf" content="')[1].split('"')[0]
     r = cliente.post("/campanhas/nova", data={"csrf": csrf, "nome": "Admins Recife", "cidade": "Recife", "estado": "PE",
                                               "quantidade": "5", "categorias": ["condominio"], "canais": ["email"],

@@ -130,8 +130,10 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
                         continue  # campanha só de e-mail e empresa sem e-mail: não entra
                     canal = "whatsapp"  # só fixo: WhatsApp a pesquisar (o time acha o número e cadastra na campanha)
                 if lead.id not in mensagens_sdr:
-                    mensagens_sdr[lead.id] = sdr.mensagens_por_regras(db, lead, responsavel, cta)
+                    mensagens_sdr[lead.id] = sdr.mensagens_por_regras(db, lead, responsavel, cta, tom)
                 msg = mensagens_sdr[lead.id].get(passo.angulo or "apresentacao") or {}
+                if not msg:  # toque que a IA não escreveu (ex.: pergunta rápida): sai das regras do tom
+                    msg = sdr.mensagens_por_regras(db, lead, responsavel, cta, tom).get(passo.angulo) or {}
                 assunto = msg.get("assunto", "") if canal == "email" else ""
                 corpo = msg.get("email", "") if canal == "email" else msg.get("whatsapp", "")
                 modelos = {"mensagem_whatsapp": msg.get("whatsapp", ""), "mensagem_email": msg.get("email", ""),

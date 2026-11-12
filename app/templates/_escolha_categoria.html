@@ -1,8 +1,10 @@
-<label class="escolha">
-  <input type="checkbox" name="categorias" value="{{ c.codigo }}" {{ 'checked' if c.codigo in marcadas }}>
+<label class="escolha escolha-segmento" title="{{ c.motivo }}">
+  <input type="checkbox" name="categorias" data-nome="{{ c.nome }}" value="{{ c.codigo }}" {{ 'checked' if c.codigo in marcadas }}>
   <span class="escolha-corpo">
     <span class="escolha-marca" aria-hidden="true">✓</span>
     <b>{{ c.nome }}</b>
+    {% if c.aderencia >= 20 %}<span class="selo-indicado">⭐ Mais indicado</span>{% endif %}
+    {% if c.motivo %}<span class="escolha-motivo">{{ c.motivo }}</span>{% endif %}
     <span class="escolha-qtd" data-categoria="{{ c.codigo }}">{{ contagem.get(c.codigo, '') if contagem else '' }}</span>
   </span>
 </label>

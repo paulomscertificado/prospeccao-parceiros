@@ -792,6 +792,33 @@ CADENCIA_SDR = [
 ]
 
 
+# Cadências da IA SDR além da padrão (nov/2026): (nome, descrição, [(dia, canal, ângulo, ação)]).
+# canal "auto" = WhatsApp ou e-mail conforme a campanha e a empresa; "email" = só e-mail.
+CADENCIAS_SDR_EXTRAS = [
+    ("Curta e segura – 2 toques (D1, D6)",
+     "Primeiro contato e um último lembrete. A mais segura para WhatsApp frio: menos chance de bloqueio do número.",
+     [(1, "auto", "apresentacao", "Primeiro contato"), (6, "auto", "encerramento", "Último contato (encerramento educado)")]),
+    ("Leve – 3 toques em 12 dias (D1, D5, D12)",
+     "Primeiro contato, um lembrete mostrando a praticidade e o encerramento. Bom equilíbrio entre insistir e respeitar.",
+     [(1, "auto", "apresentacao", "Primeiro contato"), (5, "auto", "praticidade", "Lembrete com foco em praticidade"),
+      (12, "auto", "encerramento", "Último contato (encerramento educado)")]),
+    ("Pergunta primeiro – 3 toques (D1, D4, D10)",
+     "Começa só com uma pergunta curta; explica a parceria no 2º toque e encerra no 3º.",
+     [(1, "auto", "pergunta", "Pergunta rápida"), (4, "auto", "apresentacao", "Explicação da parceria"),
+      (10, "auto", "encerramento", "Último contato (encerramento educado)")]),
+    ("Relacionamento – 5 toques em 30 dias (D1, D4, D10, D18, D30)",
+     "Mais espaçada, com uma dica útil no meio. Para quem decide devagar: administradoras, associações, franqueadoras.",
+     [(1, "auto", "apresentacao", "Primeiro contato"), (4, "auto", "praticidade", "Foco em praticidade"),
+      (10, "auto", "conteudo", "Dica útil para os clientes deles"), (18, "auto", "receita", "Foco em receita recorrente"),
+      (30, "auto", "encerramento", "Último contato (encerramento educado)")]),
+    ("Convite por e-mail – 3 e-mails (D1, D5, D11)",
+     "Só e-mail, sem WhatsApp frio: convida para conversar (responder ou chamar no WhatsApp da MS). Quem chamar vira "
+     "conversa e pode receber WhatsApp depois.",
+     [(1, "email", "convite", "Convite para conversar"), (5, "email", "pergunta", "Pergunta rápida"),
+      (11, "email", "encerramento", "Último contato (encerramento educado)")]),
+]
+
+
 def _categorias_novas(db) -> None:
     """Cria as categorias padrão que ainda não existem. Os CNAEs da nova passam a ser dela: saem da categoria
     antiga e as empresas da base da Receita com esses CNAEs são reclassificadas (ex.: 6319400 saiu de Tecnologia)."""
@@ -849,6 +876,14 @@ def dados_iniciais(db) -> None:
                                  "o lead vira 'Sem resposta'.")
         for dia, angulo, acao in CADENCIA_SDR:
             cad.passos.append(PassoCadencia(dia=dia, canal="auto", acao=acao, angulo=angulo))
+        db.add(cad)
+    existentes = {n for (n,) in db.execute(select(Cadencia.nome))}
+    for nome, descricao, passos in CADENCIAS_SDR_EXTRAS:  # cadências novas da IA SDR (só cria as que faltam)
+        if nome in existentes:
+            continue
+        cad = Cadencia(nome=nome, descricao=descricao)
+        for dia, canal, angulo, acao in passos:
+            cad.passos.append(PassoCadencia(dia=dia, canal=canal, acao=acao, angulo=angulo))
         db.add(cad)
     from . import modelos_segmento
 

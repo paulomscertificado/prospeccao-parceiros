@@ -96,8 +96,9 @@ def _valores(db, lead: Lead, usuario) -> dict:
     return v
 
 
-def mensagens_por_regras(db, lead: Lead, usuario, cta: str = "") -> dict:
-    """Mensagens de cada ângulo montadas com os dados reais do lead e da categoria (sem IA)."""
+def mensagens_por_regras(db, lead: Lead, usuario, cta: str = "", tom: str = "consultivo") -> dict:
+    """Mensagens de cada ângulo montadas com os dados reais do lead e da categoria (sem IA), no tom escolhido
+    (app/tons.py). Inclui os toques novos (pergunta rápida, dica útil, convite) usados pelas cadências novas."""
     v = _valores(db, lead, usuario)
     generico = not ramo_confirmado(lead)
     cta = cta or ("Queria entender com quem posso falar sobre possíveis parcerias comerciais na empresa."
@@ -123,7 +124,18 @@ def mensagens_por_regras(db, lead: Lead, usuario, cta: str = "") -> dict:
     assinatura = f"\n\n{v['vendedor']}\nMS Certificação Digital · mscertificados.com.br"
     resultado = {a: {"whatsapp": t, "assunto": ASSUNTOS[a].format(empresa=v["empresa"]), "email": t + assinatura,
                      "fonte": "regras"} for a, t in textos.items()}
-    if not generico and lead.categoria:
+    from . import tons
+
+    tom = tom if tom in config.TONS else "consultivo"
+    if tom == "formal":
+        assinatura = f"\n\nAtenciosamente,\n{v['vendedor']}\nMS Certificação Digital · mscertificados.com.br"
+    for angulo, (texto, assunto) in tons.textos(db, lead, usuario, v, tom, cta, not generico).items():
+        if tom == "consultivo" and angulo in resultado:
+            continue  # consultivo: os textos de sempre (e os modelos do segmento, logo abaixo)
+        if texto_seguro(texto):
+            resultado[angulo] = {"whatsapp": texto, "assunto": assunto, "email": texto + assinatura,
+                                 "fonte": f"tom {config.TONS[tom].lower()}"}
+    if not generico and lead.categoria and tom == "consultivo":
         _usar_modelos_do_segmento(db, lead, v, resultado)
     return resultado
 
@@ -175,8 +187,8 @@ def texto_seguro(texto: str) -> bool:
 
 
 def gerar_mensagens(db, lead: Lead, usuario, cta: str = "", tom: str = "consultivo") -> dict:
-    """Mensagens únicas da empresa para os 4 toques. IA quando houver chave; senão, regras."""
-    base = mensagens_por_regras(db, lead, usuario, cta)
+    """Mensagens únicas da empresa para os 4 toques. IA quando houver chave; senão, regras (no tom escolhido)."""
+    base = mensagens_por_regras(db, lead, usuario, cta, tom)
     if not ia.disponivel():
         return base
     perfil = json.loads(lead.perfil) if lead.perfil else {}
@@ -219,6 +231,8 @@ def gerar_mensagens(db, lead: Lead, usuario, cta: str = "", tom: str = "consulti
                                  or base[angulo]["assunto"], "email": m["email"].strip(), "fonte": "ia"}
         else:
             resultado[angulo] = base[angulo]  # a IA saiu das regras: usa a versão segura
+    for angulo, m in base.items():
+        resultado.setdefault(angulo, m)  # toques novos (pergunta, dica, convite) saem das regras do tom
     return resultado
 
 

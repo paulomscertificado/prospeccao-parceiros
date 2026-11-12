@@ -90,13 +90,43 @@ Geral > "Mostrar Vendas, Vencimentos e Comissões" = 1 > Salvar.
 
 ## 4. IA SDR (prospecção de parceiros)
 
+**Tela Nova campanha (4 passos):** 1) **Onde?** (base, estado e cidade); 2) **Que tipo de empresa?** Cada tipo mostra
+quantas empresas há na cidade e por que pode ser um bom parceiro ("⭐ Mais indicado" = quem mais precisa de certificado
+para os próprios clientes). Os tipos sem nenhuma empresa na cidade ficam escondidos (botão **Mostrar**), e o quadro do
+topo soma as empresas dos tipos escolhidos. 3) **Quantas empresas?** 4) **Como a IA vai abordar?**, com o tom e o
+ritmo dos contatos:
+
+| Tom | Quando usar |
+|---|---|
+| Consultivo e cordial | O padrão: apresenta a MS, explica a parceria e faz uma pergunta |
+| Pergunta curta | Começa só com uma pergunta fácil de responder (o que mais abre conversa no WhatsApp) |
+| Conversa de parceiro | Fala como colega de mercado, os dois lados ganham (contadores, consultorias) |
+| Foco nos clientes deles | Começa pelo problema do cliente deles (certificado vencido travando tudo) |
+| Empresa da região | Mostra que a MS é Autoridade de Registro, com validação presencial ou por vídeo |
+| Direto e objetivo | Mensagens curtas, a proposta em uma frase |
+| Leve e informal | Próximo e descontraído (coworkings, restaurantes, negócios menores) |
+| Formal e institucional | Linguagem de carta (associações, franqueadoras, administradoras grandes) |
+
+| Ritmo (cadência) | Toques |
+|---|---|
+| IA SDR – 4 toques (padrão) | Dia 1 apresentação, dia 3 praticidade, dia 7 receita, dia 12 encerramento |
+| Curta e segura – 2 toques | Dia 1 e dia 6. A mais segura para WhatsApp frio (menos chance de bloqueio) |
+| Leve – 3 toques | Dia 1, dia 5 (praticidade) e dia 12 (encerramento) |
+| Pergunta primeiro – 3 toques | Dia 1 só uma pergunta, dia 4 explica a parceria, dia 10 encerra |
+| Relacionamento – 5 toques em 30 dias | Dia 1, 4, 10 (dica útil), 18 e 30. Para quem decide devagar |
+| Convite por e-mail – 3 e-mails | Só e-mail, sem WhatsApp frio: convida para conversar. Quem chamar no WhatsApp vira conversa |
+
+O tom muda as mensagens de verdade, mesmo sem a IA ligada: cada tom tem os próprios textos. Para o convite por e-mail
+levar o botão do WhatsApp, cadastre o número da MS em **Configurações > Geral > "WhatsApp da MS para os convites por
+e-mail"** (sem ele, o convite pede para responder o e-mail).
+
 A IA **encontra, pesquisa, qualifica, faz o primeiro contato e entrega o interessado para você**. Ela não negocia
 preço nem comissão e não fecha parceria.
 
 1. **Campanhas > Criar campanha**: escreva o que procura (ex.: "Quero parceiros entre contadores, administradoras e
    empresas de software em São Paulo"). Se faltar a região ou o segmento, a tela pergunta.
 2. A IA monta a campanha: acha as empresas, pesquisa o site de cada uma, calcula o potencial, escolhe as melhores e
-   escreve uma mensagem **diferente para cada empresa**, em 4 toques (dia 1, 3, 7 e 12).
+   escreve uma mensagem **diferente para cada empresa**, nos toques da cadência escolhida (padrão: dia 1, 3, 7 e 12).
 3. Você confere e clica em **APROVAR CAMPANHA** (ou edita/cancela). Nada sai antes disso.
 4. E-mails saem sozinhos (com limites). WhatsApp: com o celular conectado, sai **sozinho para quem já conversou com
    a MS** (respondeu pelo WhatsApp ou tem marcado na ficha "Autorizou receber mensagens da MS pelo WhatsApp"); para

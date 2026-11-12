@@ -476,6 +476,14 @@ def lista_campanhas(request: Request, ver: str = "todas", de: str = "", usuario:
                                             "equipe_campanhas": equipe_})
 
 
+def _cadencias_da_ia(db: Session) -> list[Cadencia]:
+    """Cadências que servem para campanha da IA SDR: todo toque tem um ângulo (a mensagem certa para cada toque).
+    As da Agenda (com ligação e LinkedIn, sem ângulo) ficam de fora: a campanha não faz ligação nem LinkedIn."""
+    ativas = db.execute(select(Cadencia).where(Cadencia.ativa.is_(True)).order_by(Cadencia.id)).scalars().all()
+    da_ia = [c for c in ativas if c.passos and all(p.angulo for p in c.passos)]
+    return da_ia or list(ativas)
+
+
 @rotas.get("/campanhas/nova")
 def nova_campanha(request: Request, pedido: str = "", base: str = "", usuario: Usuario = Depends(exige("campanhas.criar")),
                   db: Session = Depends(obter_db)):
@@ -500,8 +508,7 @@ def nova_campanha(request: Request, pedido: str = "", base: str = "", usuario: U
         "numeros_admin": _numeros_para_admin(db, usuario),
         "ultima_cidade": ultima.cidade if ultima else "", "ultima_uf": ultima.estado if ultima else "",
         "categorias": db.execute(select(Categoria).where(Categoria.ativa.is_(True)).order_by(Categoria.prioridade)).scalars().all(),
-        "cadencias": db.execute(select(Cadencia).where(Cadencia.ativa.is_(True))).scalars().all(),
-        "cadencia_sdr": campanhas.cadencia_sdr(db), "ia_ligada": ia.disponivel(),
+        "cadencias": _cadencias_da_ia(db), "cadencia_sdr": campanhas.cadencia_sdr(db), "ia_ligada": ia.disponivel(),
     })
 
 
@@ -537,7 +544,8 @@ async def criar_campanha(request: Request, usuario: Usuario = Depends(exige("cam
         nome=str(form.get("nome") or _nome_automatico(db, cats, cidade or uf)).strip()[:160],
         pedido=str(form.get("pedido", ""))[:2000], categorias=",".join(cats), cidade=cidade, estado=uf, base=base,
         quantidade=max(1, min(util.para_int(form.get("quantidade")) or util.para_int(form.get("quantidade_outra")) or 20, 500)), canais=",".join(canais),
-        objetivo=str(form.get("objetivo") or "Encontrar parceiros")[:200], tom=str(form.get("tom") or "consultivo"),
+        objetivo=str(form.get("objetivo") or "Encontrar parceiros")[:200],
+        tom=str(form.get("tom")) if str(form.get("tom")) in config.TONS else "consultivo",
         cta=cta[:200], cadencia_id=util.para_int(form.get("cadencia_id")), usuario_id=usuario.id,
         conexao_id=_numero_escolhido(db, usuario, form),
         inicio=util.para_data(form.get("inicio")) or date.today(), status="gerando", personalizar_ia=ia.disponivel(),
