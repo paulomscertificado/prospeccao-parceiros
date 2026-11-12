@@ -98,3 +98,27 @@ def test_tela_nova_campanha_com_tons_e_cadencias(cliente):
         assert nome.split(" (")[0] in pagina
     assert "Prospecção de escritórios (10 dias)" not in pagina  # cadência da Agenda (ligação/LinkedIn) não serve aqui
     assert "⭐ Mais indicado" in pagina and 'id="mostrar-vazias"' in pagina and 'data-so-email="1"' in pagina
+
+
+def test_cadencia_repetida_some_da_tela_e_e_removida(cliente):
+    from app import empresas_novas
+    from app.modelos import Campanha, PassoCadencia, _remover_cadencias_repetidas
+
+    nome = CADENCIAS_SDR_EXTRAS[0][0]
+    with sessao() as db:
+        empresas_novas.garantir_cadencia(db)  # a de venda existe, mas não é para campanha de parceiros
+        for _ in range(2):  # como na nuvem: duas cópias criaram a mesma cadência
+            cad = Cadencia(nome=nome, descricao="repetida")
+            cad.passos.append(PassoCadencia(dia=1, canal="auto", acao="Primeiro contato", angulo="apresentacao"))
+            db.add(cad)
+        db.flush()
+        usada = db.execute(select(Cadencia).where(Cadencia.nome == nome).order_by(Cadencia.id.desc())).scalars().first()
+        db.add(Campanha(nome="Usa a repetida", cadencia_id=usada.id, usuario_id=_admin(db).id))
+        db.commit()
+    pagina = cliente.get("/campanhas/nova").text
+    assert pagina.count(nome.split(" (")[0] + "</b>") == 1  # na tela, uma vez só
+    assert empresas_novas.CADENCIA_NOME.split(" (")[0] not in pagina
+    with sessao() as db:
+        assert _remover_cadencias_repetidas(db) == 1  # a repetida sem uso sai; a usada por campanha fica
+        assert db.execute(select(Cadencia.id).where(Cadencia.nome == nome)).all().__len__() == 2
+        assert db.get(Cadencia, usada.id) is not None

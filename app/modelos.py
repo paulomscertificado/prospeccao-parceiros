@@ -845,6 +845,25 @@ def _categorias_novas(db) -> None:
         db.flush()
 
 
+def _remover_cadencias_repetidas(db) -> int:
+    """Duas cópias da nuvem subindo juntas criaram as cadências novas em dobro (12/11/2026). Fica a mais antiga de
+    cada nome; a repetida só sai se nenhuma campanha ou toque usa ela."""
+    vistas, removidas = set(), 0
+    for cad in db.execute(select(Cadencia).order_by(Cadencia.id)).scalars().all():
+        if cad.nome not in vistas:
+            vistas.add(cad.nome)
+            continue
+        passos = [p.id for p in cad.passos]
+        usada = db.execute(select(Campanha.id).where(Campanha.cadencia_id == cad.id).limit(1)).first() or (
+            passos and db.execute(select(Tarefa.id).where(Tarefa.passo_id.in_(passos)).limit(1)).first())
+        if not usada:
+            db.delete(cad)
+            removidas += 1
+    if removidas:
+        db.flush()
+    return removidas
+
+
 def dados_iniciais(db) -> None:
     """Cria templates, cadências, produtos, categorias e base de conhecimento na primeira vez."""
     if not db.execute(select(func.count(Categoria.id))).scalar():
@@ -877,6 +896,7 @@ def dados_iniciais(db) -> None:
         for dia, angulo, acao in CADENCIA_SDR:
             cad.passos.append(PassoCadencia(dia=dia, canal="auto", acao=acao, angulo=angulo))
         db.add(cad)
+    _remover_cadencias_repetidas(db)
     existentes = {n for (n,) in db.execute(select(Cadencia.nome))}
     for nome, descricao, passos in CADENCIAS_SDR_EXTRAS:  # cadências novas da IA SDR (só cria as que faltam)
         if nome in existentes:

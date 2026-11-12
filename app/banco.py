@@ -193,6 +193,11 @@ def criar_tabelas() -> None:
         Base.metadata.create_all(motor)
     migrar_colunas()
     with sessao() as db:
+        if motor.dialect.name == "postgresql":
+            from sqlalchemy import text
+
+            # uma cópia da nuvem por vez cria os dados iniciais (antes duas juntas criaram cadências em dobro)
+            db.execute(text("SELECT pg_advisory_xact_lock(724502)"))
         modelos.dados_iniciais(db)
         from . import autorizacao
 
@@ -218,6 +223,7 @@ def _versao_do_esquema() -> str:
 
     partes += [f"{p.codigo}:{p.padrao}" for p in CATALOGO]  # permissão nova: a nuvem dá o padrão aos papéis
     partes += ["dados:conversas-com-nono"]  # ajuste de dados novo (migrar_conversas_com_nono): roda uma vez na nuvem
+    partes += ["dados:cadencias-sem-repeticao"]  # modelos._remover_cadencias_repetidas: roda uma vez na nuvem
     from .modelos import CADENCIAS_SDR_EXTRAS
 
     partes += [f"cadencia:{nome}" for nome, _, _ in CADENCIAS_SDR_EXTRAS]  # cadência nova: a nuvem cria na publicação

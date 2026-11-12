@@ -479,9 +479,16 @@ def lista_campanhas(request: Request, ver: str = "todas", de: str = "", usuario:
 def _cadencias_da_ia(db: Session) -> list[Cadencia]:
     """Cadências que servem para campanha da IA SDR: todo toque tem um ângulo (a mensagem certa para cada toque).
     As da Agenda (com ligação e LinkedIn, sem ângulo) ficam de fora: a campanha não faz ligação nem LinkedIn."""
-    ativas = db.execute(select(Cadencia).where(Cadencia.ativa.is_(True)).order_by(Cadencia.id)).scalars().all()
-    da_ia = [c for c in ativas if c.passos and all(p.angulo for p in c.passos)]
-    return da_ia or list(ativas)
+    from .. import empresas_novas
+
+    ativas, nomes = [], set()
+    for c in db.execute(select(Cadencia).where(Cadencia.ativa.is_(True)).order_by(Cadencia.id)).scalars():
+        if c.nome not in nomes:  # uma de cada nome (a nuvem já criou cadência em dobro)
+            nomes.add(c.nome)
+            ativas.append(c)
+    da_ia = [c for c in ativas if c.passos and all(p.angulo for p in c.passos)
+             and c.nome != empresas_novas.CADENCIA_NOME]  # a de venda é só das Empresas novas
+    return da_ia or ativas
 
 
 @rotas.get("/campanhas/nova")
