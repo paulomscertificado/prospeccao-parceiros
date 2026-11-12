@@ -294,7 +294,13 @@ de 2 dias não sai sozinho (espera um clique em **Minha fila**), para não sair 
 e dia 7 (último contato). As mensagens podem ser editadas na própria tela. A IA não responde sozinha esses
 leads: as respostas vão para **Oportunidades** e o time conversa.
 
-- **Buscar agora:** escolha as datas de abertura (até 7 dias) e clique em **Buscar agora e montar campanha**.
+- **Buscar agora:** escolha as datas de abertura (até 7 dias), escolha **quantas empresas buscar** (10, 20, 30, 40,
+  50 ou 100; cada 10 gastam 1 crédito) e clique em **Buscar e montar campanha**. A campanha leva **todas** as
+  empresas que vierem e puderem entrar: nada pago fica sem uso. O **Máximo de empresas por campanha diária**
+  (passo 2) vale só para a busca automática, que pede à CNPJá o dobro desse número e usa esse número.
+- **Muitas empresas de uma vez:** o WhatsApp sai no ritmo seguro do número (no máximo 20 contatos frios por número
+  por dia, contando os lembretes). Com 50 ou 100 empresas, leva vários dias, e o toque atrasado mais de 2 dias
+  espera um clique em **Minha fila**.
 - **Custo:** cada 10 empresas encontradas gastam 1 crédito. Em PE abrem cerca de 380 empresas por dia
   (≈ 1.100 créditos por mês).
 - Os celulares que a Receita guarda sem o 9 ganham o 9 na frente (é um palpite: confira antes de enviar).

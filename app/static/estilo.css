@@ -336,4 +336,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid rgba(60, 199, 122
 .interruptor input:focus-visible + .trilho { outline: 2px solid #9cc1e6; outline-offset: 2px; }
 .ufs-escolha { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); margin-bottom: 6px; }
 .ufs-escolha .chip { justify-content: center; padding: 6px 10px; font-size: .9rem; }
+.campo-quantas { font-size: .82rem; font-weight: 600; color: #344054; }
+.quantas-empresas { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+.quantas-empresas .chip { padding: 6px 12px; font-size: .9rem; }
 .escolha-corpo .pequeno { font-weight: 400; }

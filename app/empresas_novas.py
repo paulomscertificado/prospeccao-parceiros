@@ -64,6 +64,9 @@ PADRAO = {
     "novas_visual_toques": "seguintes",
 }
 LIMITE_TESTE = 10  # consulta de teste: 10 empresas = 1 crédito
+# "Buscar agora": quantas empresas pedir à CNPJá, escolhido na tela (pedido da Maria em 12/11/2026). A campanha leva
+# todas as que vierem e puderem entrar (nada pago fica sem uso). Cada 10 empresas = 1 crédito.
+QUANTIDADES_BUSCA = (10, 20, 30, 40, 50, 100)
 ATRASO_DIAS = 2    # a busca diária pega as empresas abertas até 2 dias atrás (a Receita publica com atraso)
 
 MENSAGENS_PADRAO = {
@@ -447,23 +450,28 @@ def registrar_busca(db, registros: list[dict], desde: date, ate: date, ufs: list
     return busca
 
 
-def criar_campanha_da_busca(db, busca, usuario: Usuario) -> Campanha | None:
-    """Campanha de venda com as empresas da busca que podem entrar (sem gastar crédito: usa a lista guardada)."""
+def criar_campanha_da_busca(db, busca, usuario: Usuario, quantidade: int | None = None) -> Campanha | None:
+    """Campanha de venda com as empresas da busca que podem entrar (sem gastar crédito: usa a lista guardada).
+    quantidade: no máximo quantas entram (a busca automática passa o máximo por dia); sem ela, entram todas as da
+    lista que podem entrar (como promete o botão "Montar a campanha com estas empresas")."""
     from .modelos import EmpresaCnpja
 
     empresas = db.execute(select(EmpresaCnpja).where(EmpresaCnpja.busca_id == busca.id, EmpresaCnpja.motivo_fora == "")
                           .order_by(EmpresaCnpja.id)).scalars().all()
     periodo = f"{busca.desde:%d/%m}" if busca.desde == busca.ate else f"{busca.desde:%d/%m} a {busca.ate:%d/%m}"
-    camp = criar_campanha(db, [para_lead(e) for e in empresas], usuario, f"{periodo} – {busca.ufs.replace(',', ', ')}")
+    camp = criar_campanha(db, [para_lead(e) for e in empresas], usuario, f"{periodo} – {busca.ufs.replace(',', ', ')}",
+                          quantidade=quantidade or len(empresas))
     if camp:
         busca.campanha_id = camp.id
         db.commit()
     return camp
 
 
-def criar_campanha(db, dados: list[dict], usuario: Usuario, rotulo: str) -> Campanha | None:
-    """Cria a campanha do dia (status "gerando") com as empresas (dados de lead); o trabalho em etapas cadastra os
-    leads e monta as mensagens. Devolve None se não houver nada novo."""
+def criar_campanha(db, dados: list[dict], usuario: Usuario, rotulo: str,
+                   quantidade: int | None = None) -> Campanha | None:
+    """Cria a campanha do dia (status "gerando") com as empresas (dados de lead), no máximo `quantidade` (sem ela, o
+    máximo por dia da configuração); o trabalho em etapas cadastra os leads e monta as mensagens. Devolve None se não
+    houver nada novo."""
     from . import trabalhos
 
     dados = [d for d in dados if d["empresa"] and d["cnpj"]]
@@ -473,7 +481,8 @@ def criar_campanha(db, dados: list[dict], usuario: Usuario, rotulo: str) -> Camp
     dados.sort(key=lambda d: (not d["whatsapp"], not d["email"]))
     canais = cfg(db, "novas_canais")
     camp = Campanha(nome=f"Empresas novas {rotulo}"[:160], tipo=TIPO_CAMPANHA, objetivo="Vender certificado digital",
-                    estado=",".join(_ufs(db))[:2], cidade="", quantidade=util.para_int(cfg(db, "novas_maximo_dia")) or 60,
+                    estado=",".join(_ufs(db))[:2], cidade="",
+                    quantidade=quantidade or util.para_int(cfg(db, "novas_maximo_dia")) or 60,
                     canais=canais, status="gerando", usuario_id=usuario.id, inicio=date.today(),
                     cadencia_id=garantir_cadencia(db).id, pedido=f"Empresas abertas {rotulo} (API CNPJá)")
     from . import visual
@@ -546,24 +555,33 @@ def _ufs(db) -> list[str]:
     return [u.strip().upper() for u in re.split(r"[,; ]+", cfg(db, "novas_ufs")) if len(u.strip()) == 2] or ["PE"]
 
 
-def buscar_e_criar(db, usuario: Usuario, desde: date, ate: date, automatica: bool = False) -> dict:
-    """Busca na API, guarda a lista e cria a campanha. Devolve {"encontradas", "campanha_id", "busca_id", "fora"}
-    (lança ErroCnpja)."""
+def buscar_e_criar(db, usuario: Usuario, desde: date, ate: date, automatica: bool = False,
+                   quantidade: int | None = None) -> dict:
+    """Busca na API, guarda a lista e cria a campanha. quantidade: quantas empresas o usuário escolheu no "Buscar
+    agora" (QUANTIDADES_BUSCA); sem ela (busca automática), vale o máximo por dia. Devolve {"encontradas",
+    "campanha_id", "busca_id", "fora"} (lança ErroCnpja)."""
     ufs = _ufs(db)
-    # Pede à CNPJá só o que cabe na campanha (o dobro do máximo, para sobrar depois das exclusões): cada empresa
-    # devolvida gasta crédito, e as que não cabem na campanha do dia não seriam contatadas.
-    maximo = util.para_int(cfg(db, "novas_maximo_dia")) or 60
+    if quantidade:
+        # "Buscar agora": pede à CNPJá exatamente o que o usuário escolheu e a campanha leva todas as que vierem e
+        # puderem entrar. Antes pedia o dobro do máximo por dia e a campanha só levava o máximo: em 11/11/2026 cada
+        # busca pagou 20 empresas (máximo 10) e as outras 10 nunca foram contatadas.
+        limite, na_campanha = min(POR_PAGINA * MAXIMO_PAGINAS, quantidade), None
+    else:
+        # Busca automática: pede o dobro do máximo da campanha diária (para sobrar depois das exclusões) e a campanha
+        # leva o máximo.
+        maximo = util.para_int(cfg(db, "novas_maximo_dia")) or 60
+        limite, na_campanha = min(POR_PAGINA * MAXIMO_PAGINAS, maximo * 2), maximo
     # Lista de exclusão na CNPJá: quem já veio em qualquer busca anterior não volta (nem é cobrado) de novo. As já
-    # pagas que ainda não entraram em campanha (ex.: de um teste) entram pelo que está guardado aqui.
-    reaproveitadas = reaproveitaveis(db, desde, ate, ufs)
-    limite = min(POR_PAGINA * MAXIMO_PAGINAS, maximo * 2)
+    # pagas que ainda não entraram em campanha (ex.: de um teste) entram pelo que está guardado aqui (até o limite; as
+    # que passarem ficam para a próxima busca).
+    reaproveitadas = reaproveitaveis(db, desde, ate, ufs)[:limite]
     registros = buscar_abertas(desde, ate, ufs, limite=max(1, limite - len(reaproveitadas)),
                                lista_exclusao=lista_exclusao(db)) if len(reaproveitadas) < limite else []
     busca = registrar_busca(db, registros, desde, ate, ufs, usuario, automatica=automatica, reaproveitadas=reaproveitadas)
     db.commit()
     atualizar_lista_exclusao(db)
     db.commit()
-    camp = criar_campanha_da_busca(db, busca, usuario)
+    camp = criar_campanha_da_busca(db, busca, usuario, quantidade=na_campanha)
     return {"encontradas": busca.encontradas, "campanha_id": camp.id if camp else None, "busca_id": busca.id,
             "fora": busca.fora, "pagas": len(registros)}
 

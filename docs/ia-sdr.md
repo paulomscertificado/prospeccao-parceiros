@@ -252,7 +252,14 @@ continuam só no WhatsApp para quem tem celular.
 - `registrar_busca` deixa de fora quem não está "Ativa" (a CNPJá às vezes devolve empresa baixada no mesmo dia,
   mesmo com `status.id.in=2`).
 - `registrar_busca` marca "já veio na busca de..." quem estava apto numa busca anterior que virou campanha.
-- `buscar_e_criar` pede `limit` = 2 × `novas_maximo_dia` (só paga o que cabe na campanha).
+- `buscar_e_criar(quantidade=...)`: no **Buscar agora** o usuário escolhe quantas empresas buscar
+  (`QUANTIDADES_BUSCA` = 10/20/30/40/50/100, pedido da Maria em 12/11/2026; valor fora da lista vira 10):
+  `limit` = quantidade e a campanha leva todas as que podem entrar (`criar_campanha_da_busca(quantidade=None)` = a
+  lista toda, o mesmo do botão "Montar a campanha com estas empresas"). Busca automática (sem `quantidade`):
+  `limit` = 2 × `novas_maximo_dia` e a campanha leva `novas_maximo_dia`. Antes o Buscar agora também pedia o dobro e
+  usava só o máximo: em 11/11/2026 cada busca pagou 20 empresas (máximo 10) e 10 nunca foram contatadas (não voltam:
+  lista de exclusão; não são reaproveitadas: a busca virou campanha). Reaproveitadas entram até o limite.
+  Testes: `test_buscar_agora_com_a_quantidade_escolhida`, `test_campanha_da_lista_leva_todas_as_empresas_da_lista`.
 
 ## Horários dos toques nunca no passado (nov/2026)
 

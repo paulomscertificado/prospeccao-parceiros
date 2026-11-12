@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .. import empresas_novas, util
-from ..banco import gravar_config, obter_db
+from ..banco import gravar_config, ler_config_int, obter_db
 from ..modelos import Tarefa, Usuario
 from ..seguranca import exige, registrar_log, verificar_csrf
 from ..web import avisar, tela, voltar
@@ -33,7 +33,8 @@ def tela_empresas_novas(request: Request, usuario: Usuario = Depends(exige("camp
         "tem_chave": bool(empresas_novas.chave_api()), "campanhas": campanhas, "empresas_por_campanha": contagem,
         "usuarios": usuarios, "dono": empresas_novas.dono(db), "hoje": date.today(),
         "ontem": date.today() - timedelta(days=1), "buscas": empresas_novas.buscas_recentes(db),
-        "limite_teste": empresas_novas.LIMITE_TESTE,
+        "limite_teste": empresas_novas.LIMITE_TESTE, "quantidades": empresas_novas.QUANTIDADES_BUSCA,
+        "limite_frios": ler_config_int(db, "limite_frios_whatsapp", 0),
         "visuais": visual.disponiveis(db, "empresas_novas"),
     })
 
@@ -183,19 +184,24 @@ async def buscar_agora(request: Request, usuario: Usuario = Depends(exige("campa
     if (ate - desde).days > 7:
         avisar(request, "Busque no máximo 7 dias de uma vez (cada empresa encontrada gasta créditos da CNPJá).", "erro")
         return voltar("/empresas-novas")
+    # Quantas empresas buscar, escolhido na tela (10 a 100); valor fora da lista vira 10 (o que gasta menos)
+    quantidade = util.para_int(form.get("quantidade"))
+    if quantidade not in empresas_novas.QUANTIDADES_BUSCA:
+        quantidade = empresas_novas.QUANTIDADES_BUSCA[0]
     dono = empresas_novas.dono(db) or usuario
     try:
-        r = empresas_novas.buscar_e_criar(db, dono, desde, ate)
+        r = empresas_novas.buscar_e_criar(db, dono, desde, ate, quantidade=quantidade)
     except empresas_novas.ErroCnpja as erro:
         texto = str(erro)
         avisar(request, f"A busca não deu certo: {texto[:1].upper()}{texto[1:]}.", "erro")
         return voltar("/empresas-novas")
     registrar_log(db, usuario, "buscou_empresas_novas", "campanha", r["campanha_id"],
-                  f"{r['encontradas']} encontradas", request)
+                  f"{r['encontradas']} encontradas (pediu {quantidade})", request)
     db.commit()
     if r["campanha_id"]:
-        avisar(request, f"{r['encontradas']} empresas abertas encontradas ({r['fora']} ficaram de fora). A campanha "
-                        "está sendo montada e vai pedir aprovação (leva alguns minutos).")
+        avisar(request, f"Você pediu {quantidade} empresas: {r['encontradas']} encontradas ({r['fora']} ficaram de "
+                        "fora). A campanha está sendo montada com todas as que podem entrar e vai pedir aprovação "
+                        "(leva alguns minutos).")
     else:
         avisar(request, f"{r['encontradas']} empresas encontradas, nenhuma nova para contatar nesse período.")
     return voltar(f"/empresas-novas/busca/{r['busca_id']}")

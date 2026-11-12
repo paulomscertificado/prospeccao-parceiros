@@ -361,3 +361,85 @@ def test_buscar_de_novo_nao_paga_quem_ja_veio(cliente, monkeypatch):
         assert listas[-1][0] == "PATCH"  # a lista na CNPJá ganhou os CNPJs novos
         assert db.get(BuscaCnpja, r["busca_id"]).creditos == 1
         gravar_config(db, "novas_lista_exclusao", "")
+
+
+class _SemLinhaParalela:  # a montagem roda aqui embaixo, não numa linha de execução paralela (evita corrida no teste)
+    def __init__(self, *a, **k):
+        pass
+
+    def start(self):
+        pass
+
+
+def test_buscar_agora_com_a_quantidade_escolhida(cliente, monkeypatch):
+    """Pedido da Maria (12/11/2026): no "Buscar agora" o usuário escolhe quantas empresas buscar (10, 20, 30, 40, 50 ou
+    100). A CNPJá recebe exatamente esse número e a campanha leva todas as que vierem. Antes pedia o dobro do máximo por
+    dia e a campanha só levava o máximo (em 11/11 cada busca pagou 20 empresas e usou 10)."""
+    import json
+
+    from conftest import csrf_de
+
+    from app import trabalhos
+    from app.modelos import BuscaCnpja
+
+    pedidos = []
+
+    def falso(url, params=None, headers=None, timeout=None):
+        pedidos.append(dict(params or {}))
+        return _Resposta({"records": [_registro(f"5{i:07d}000199", f"EMPRESA ESCOLHIDA {i} LTDA")
+                                      for i in range(int(params["limit"]))], "next": None})
+
+    monkeypatch.setattr(empresas_novas.httpx, "get", falso)
+    monkeypatch.setattr(config, "CNPJA_API_KEY", "chave-de-teste")
+    monkeypatch.setattr(trabalhos.threading, "Thread", _SemLinhaParalela)
+    with sessao() as db:
+        maximo_antes = empresas_novas.cfg(db, "novas_maximo_dia")
+        gravar_config(db, "novas_maximo_dia", "10")  # o máximo por dia agora é só da busca automática
+        gravar_config(db, "novas_sem_individual", "0")
+    pagina = cliente.get("/empresas-novas")
+    for q in (10, 20, 30, 40, 50, 100):
+        assert f'name="quantidade" value="{q}"' in pagina.text
+    assert 'name="quantidade" value="10" checked' in pagina.text  # já vem marcado o que gasta menos
+    dia = date.today() - timedelta(days=40)  # longe dos dias dos outros testes (nada reaproveitado)
+    r = cliente.post("/empresas-novas/buscar", data={"csrf": csrf_de(pagina.text), "desde": dia.isoformat(),
+                                                      "ate": dia.isoformat(), "quantidade": "30"})
+    assert r.status_code == 200 and "Você pediu 30 empresas: 30 encontradas" in r.text
+    assert len(pedidos) == 1 and pedidos[0]["limit"] == 30  # exatamente 30 (3 créditos), não o dobro do máximo
+    with sessao() as db:
+        busca = db.execute(select(BuscaCnpja).order_by(BuscaCnpja.id.desc())).scalars().first()
+        assert busca.encontradas == 30 and busca.creditos == 3 and busca.fora == 0 and busca.campanha_id
+        cid = busca.campanha_id
+        assert db.get(Campanha, cid).quantidade == 30
+        t = db.execute(select(Trabalho).where(Trabalho.ref_id == cid, Trabalho.tipo == "campanha")).scalars().first()
+        estado = json.loads(t.estado)
+    while not campanhas.etapa_gerar(cid, None, estado, float("inf")):
+        pass
+    with sessao() as db:
+        leads = set(db.execute(select(Tarefa.lead_id).where(Tarefa.campanha_id == cid)).scalars())
+        assert len(leads) == 30  # todas as que vieram (e foram pagas) entraram na campanha
+    # valor fora da lista (página antiga ou mexida) vira 10, o que gasta menos
+    cliente.post("/empresas-novas/buscar", data={"csrf": csrf_de(pagina.text), "desde": dia.isoformat(),
+                                                 "ate": dia.isoformat(), "quantidade": "1000"})
+    assert pedidos[-1]["limit"] == 10
+    with sessao() as db:
+        gravar_config(db, "novas_maximo_dia", maximo_antes)
+
+
+def test_campanha_da_lista_leva_todas_as_empresas_da_lista(cliente, monkeypatch):
+    """O botão "Montar a campanha com estas empresas" (lista de um teste) leva todas as que podem entrar, mesmo com o
+    máximo por dia menor: elas já foram pagas."""
+    from app import trabalhos
+    from app.modelos import BuscaCnpja
+
+    monkeypatch.setattr(empresas_novas.httpx, "get", lambda *a, **k: _Resposta({"records": [
+        _registro(f"6{i:07d}000199", f"EMPRESA DA LISTA {i} LTDA") for i in range(10)], "next": None}))
+    monkeypatch.setattr(config, "CNPJA_API_KEY", "chave-de-teste")
+    monkeypatch.setattr(trabalhos.threading, "Thread", _SemLinhaParalela)
+    with sessao() as db:
+        maximo_antes = empresas_novas.cfg(db, "novas_maximo_dia")
+        gravar_config(db, "novas_maximo_dia", "4")
+        admin = db.get(Usuario, admin_id(db))
+        r = empresas_novas.testar(db, admin)
+        camp = empresas_novas.criar_campanha_da_busca(db, db.get(BuscaCnpja, r["busca_id"]), admin)
+        assert r["encontradas"] == 10 and camp.quantidade == 10
+        gravar_config(db, "novas_maximo_dia", maximo_antes)

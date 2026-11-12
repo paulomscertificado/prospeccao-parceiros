@@ -20,7 +20,7 @@
     <div class="valor">{% if tem_chave %}<span class="selo selo-ok">configurada</span>{% else %}<span class="selo selo-erro">falta</span>{% endif %}</div>
     <div class="detalhe"><a href="/configuracoes?aba=integracoes#cnpja">Configurações &gt; Integrações</a></div></div>
   <div class="kpi"><div class="rotulo">Onde</div><div class="valor">{{ cfg.novas_ufs }}</div>
-    <div class="detalhe">até {{ cfg.novas_maximo_dia }} empresas por dia</div></div>
+    <div class="detalhe">busca automática: até {{ cfg.novas_maximo_dia }} por dia</div></div>
   <div class="kpi"><div class="rotulo">Quem assina</div><div class="valor" style="font-size:1.1rem">{{ dono.nome if dono else '—' }}</div>
     <div class="detalhe">{{ cfg.novas_canais.replace('whatsapp', 'WhatsApp').replace('email', 'e-mail').replace(',', ' + ') }}</div></div>
 </div>
@@ -36,13 +36,16 @@
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <label class="pequeno">Abertas de<br><input type="date" name="desde" value="{{ ontem.isoformat() }}"></label>
       <label class="pequeno">até<br><input type="date" name="ate" value="{{ hoje.isoformat() }}"></label>
+      <div class="campo-quantas" role="radiogroup" aria-label="Quantas empresas buscar">Quantas empresas buscar
+        <div class="quantas-empresas">{% for q in quantidades %}<label class="chip"><input type="radio" name="quantidade" value="{{ q }}" {{ 'checked' if loop.first }}> {{ q }}</label>{% endfor %}</div></div>
       <button class="btn btn-primario" {{ 'disabled' if not tem_chave }}>Buscar e montar campanha</button></form>
     {% if tem_chave %}
     <form class="inline" method="post" action="/empresas-novas/testar" data-confirmar="Fazer uma consulta de teste com até {{ limite_teste }} empresas abertas num dia (cada teste olha um dia diferente; gasta cerca de 1 crédito)? Não cria campanha: só mostra a lista.">
       <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">Testar ({{ limite_teste }} empresas · 1 crédito)</button></form>
     <form class="inline" method="post" action="/empresas-novas/saldo"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">Ver saldo</button></form>{% endif %}
   </div>
-  <p class="pequeno suave" style="margin-bottom:0">Cada 10 empresas encontradas gastam 1 crédito da CNPJá. Em Pernambuco abrem cerca de 380 empresas por dia (≈ 1.100 créditos por mês).</p>
+  <p class="pequeno suave" style="margin-bottom:0">Escolha quantas empresas buscar: cada 10 gastam 1 crédito da CNPJá (100 empresas = 10 créditos) e a campanha leva todas as que podem entrar. Em Pernambuco abrem cerca de 380 empresas por dia (≈ 1.100 créditos por mês).{% if limite_frios %}
+    O WhatsApp sai no ritmo seguro do número (no máximo {{ limite_frios }} contatos frios por dia, contando os lembretes): com 50 ou 100 empresas leva vários dias, e o toque atrasado mais de 2 dias espera um clique em Minha fila.{% endif %}</p>
 </div>
 
 <form method="post" action="/empresas-novas/configurar" id="configurar">
@@ -66,8 +69,8 @@
       {% for u in config.UFS %}<label class="chip"><input type="checkbox" name="ufs" value="{{ u }}" {{ 'checked' if u in ufs_marcadas }}> {{ u }}</label>{% endfor %}
     </div>
     <p class="ajuda">Empresas de <b>qualquer atividade</b>, só as <b>ativas</b>. Mais estados = mais créditos por dia.</p>
-    <label style="max-width:320px">Máximo de empresas por campanha diária<br><input type="number" name="maximo_dia" min="1" max="500" value="{{ cfg.novas_maximo_dia }}"></label>
-    <p class="ajuda">Quem tem celular e e-mail entra primeiro. A busca pede à CNPJá no máximo o dobro desse número (só paga o que pode usar). Os limites de envio continuam valendo (padrão: 80 e-mails por dia).</p>
+    <label style="max-width:360px">Máximo de empresas por campanha diária (busca automática)<br><input type="number" name="maximo_dia" min="1" max="500" value="{{ cfg.novas_maximo_dia }}"></label>
+    <p class="ajuda">Vale só para a busca automática: ela pede à CNPJá o dobro desse número (para sobrar se alguma ficar de fora) e a campanha leva esse número, quem tem celular e e-mail primeiro. No "Buscar agora" você escolhe a quantidade na hora. Os limites de envio continuam valendo (padrão: 80 e-mails por dia).</p>
   </div>
 
   <div class="cartao">
