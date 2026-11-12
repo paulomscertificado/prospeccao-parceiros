@@ -70,6 +70,30 @@ def dia_e_hora_futuros(db: Session, dia: date, pular_fds: bool | None = None) ->
     return dia, hora_natural(db) or "09:07"
 
 
+INTERVALO_DEPOIS_DO_WHATSAPP = 120  # minutos: Empresas novas, o e-mail do toque fica para umas 2 h depois do WhatsApp
+
+
+def depois_de(db: Session, dia: date, hora: str, minutos: int = INTERVALO_DEPOIS_DO_WHATSAPP,
+              pular_fds: bool | None = None) -> tuple[date, str]:
+    """Dia e horário natural pelo menos `minutos` depois de dia/hora: no mesmo dia, se couber no horário de envio
+    (fora do almoço); senão no próximo dia de envio. Empresas novas (pedido da Maria em 12/11/2026): o e-mail de cada
+    toque fica para depois do WhatsApp do mesmo toque, que tem prioridade."""
+    from .banco import agora
+
+    fim = _minutos(ler_config(db, "horario_envio_fim") or "18:00", 18 * 60) - 20
+    minuto = _minutos(hora or "09:00", 9 * 60) + minutos + random.randint(0, 40)
+    if 12 * 60 <= minuto < 13 * 60 + 30:
+        minuto = 13 * 60 + 30 + random.randint(1, 25)  # nada no horário de almoço
+    if minuto % 5 == 0:
+        minuto += random.randint(1, 4)  # nada de 14:30, 15:15...
+    if minuto > fim + 4:
+        return dia_e_hora_futuros(db, dia + timedelta(days=1), pular_fds)  # não cabe hoje: próximo dia de envio
+    hhmm = f"{minuto // 60:02d}:{minuto % 60:02d}"
+    if f"{dia:%Y-%m-%d} {hhmm}" <= agora().strftime("%Y-%m-%d %H:%M"):
+        return dia_e_hora_futuros(db, dia, pular_fds)  # o WhatsApp já passou da hora: o e-mail fica para daqui a pouco
+    return dia, hhmm
+
+
 def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario, inicio: date | None = None,
             campanha_id: int | None = None, mensagens_sdr: dict | None = None, canais: list[str] | None = None,
             status_tarefa: str = "pendente", cta: str = "", tom: str = "consultivo",
@@ -128,7 +152,7 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
             if passo.canal == "auto" or passo.angulo:
                 canal = sdr.escolher_canal(db, lead, canais) if passo.canal == "auto" else passo.canal
                 if foco_whatsapp and passo.canal == "auto" and lead.whatsapp and "whatsapp" in (canais or []):
-                    canal = "whatsapp"  # Empresas novas: o foco é sempre o WhatsApp; e-mail só para quem não tem
+                    canal = "whatsapp"  # Empresas novas: o WhatsApp é sempre o principal (o e-mail vem depois dele)
                 if da_ia and canal not in ("email", "whatsapp"):
                     if "whatsapp" not in (canais or ["whatsapp"]):
                         continue  # campanha só de e-mail e empresa sem e-mail: não entra
@@ -147,8 +171,9 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
                 if (da_ia and canal != "whatsapp" and "whatsapp" in (canais or [])
                         and not (lead.whatsapp or "").strip() and (msg.get("whatsapp") or "").strip()):
                     canal_extra = "whatsapp"
-                # pedido da Maria: quem tem WhatsApp e e-mail recebe os dois em cada toque (Empresas novas: só WhatsApp)
-                elif (da_ia and canal == "whatsapp" and not foco_whatsapp and "email" in (canais or [])
+                # pedido da Maria: quem tem WhatsApp e e-mail recebe os dois em cada toque. Empresas novas também
+                # (12/11/2026), mas com o WhatsApp primeiro: o e-mail fica para depois dele (ver data_extra abaixo)
+                elif (da_ia and canal == "whatsapp" and "email" in (canais or [])
                         and lead.email and not lead.email_invalido and (msg.get("email") or "").strip()):
                     canal_extra = "email"
             elif da_ia and canal not in ("email", "whatsapp"):
@@ -170,10 +195,15 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
                     extra = {"assunto": modelos["assunto_email"], "mensagem": modelos["mensagem_email"],
                              "mensagem_email": modelos["mensagem_email"], "assunto_email": modelos["assunto_email"]}
                     modelos["mensagem_email"] = modelos["assunto_email"] = ""
+                data_extra, hora_extra = data, hora
+                if foco_whatsapp and canal_extra == "email":
+                    # Empresas novas: o WhatsApp tem prioridade. O e-mail do toque fica para umas 2 h depois dele (e a
+                    # fila de e-mail ainda espera o WhatsApp da empresa sair: campanhas.TIPOS_WHATSAPP_PRIMEIRO)
+                    data_extra, hora_extra = depois_de(db, data, hora, pular_fds=pular_fds)
                 db.add(Tarefa(
                     tipo="prospeccao", lead_id=lead.id, passo_id=passo.id, campanha_id=campanha_id,
-                    usuario_id=responsavel.id if responsavel else None, canal=canal_extra, data=data,
-                    hora=hora, acao=f"Contato por {canal_extra}", angulo=passo.angulo or "", status=status_tarefa,
+                    usuario_id=responsavel.id if responsavel else None, canal=canal_extra, data=data_extra,
+                    hora=hora_extra, acao=f"Contato por {canal_extra}", angulo=passo.angulo or "", status=status_tarefa,
                     com_visual=com_visual, **extra,
                 ))
                 resultado["tarefas"] += 1

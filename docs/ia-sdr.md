@@ -218,10 +218,23 @@ permissão `campanhas.ver`; configurar/buscar com `campanhas.gerenciar`).
 
 ## Empresas novas: foco no WhatsApp (nov/2026)
 
-`cadencias.aplicar(..., foco_whatsapp=True)` (usado por `_montar` quando `Campanha.tipo == "empresas_novas"`): empresa
-com celular recebe todos os toques por WhatsApp (sem e-mail); e-mail só para quem não tem celular. WhatsApp para quem
-nunca conversou sai com 1 clique do time (Minha fila / campanha). Pedido da Maria em 10/11/2026 (antes era e-mail E
-WhatsApp).
+`cadencias.aplicar(..., foco_whatsapp=True)` (usado por `_montar` quando `Campanha.tipo == "empresas_novas"`): o
+WhatsApp é sempre o canal principal de quem tem celular. Pedido da Maria em 10/11/2026: só WhatsApp para quem tem
+celular (antes era e-mail E WhatsApp, e o e-mail chegava primeiro porque o WhatsApp esperava o clique).
+
+**12/11/2026 — e-mail de volta, com o WhatsApp primeiro** (pedido da Maria: "coloque também os disparos de e-mails mas
+que continue priorizando os disparos de WhatsApp"): quem tem WhatsApp **e** e-mail válido ganha o e-mail em cada toque
+(`canal_extra = "email"`, o mesmo das campanhas de parceiros), marcado para depois do WhatsApp com
+`cadencias.depois_de` (~2 h depois, `INTERVALO_DEPOIS_DO_WHATSAPP`; não cabendo no horário, o próximo dia de envio).
+A fila de e-mail (`campanhas.processar_fila`) não solta o e-mail de campanha em `TIPOS_WHATSAPP_PRIMEIRO` enquanto a
+mesma empresa tem, na mesma campanha, WhatsApp pendente marcado para antes ou para a mesma hora
+(`_whatsapp_da_empresa_pendente`). Não seguram: WhatsApp atrasado mais de `DIAS_ATRASO_AUTOMATICO` (espera clique) e
+campo WhatsApp em branco. Resposta no WhatsApp cancela os toques seguintes, inclusive o e-mail. Telas:
+`emails_que_esperam_whatsapp` (parâmetro `espera_whatsapp` de `fila._situacao`): "Sai sozinho depois do WhatsApp
+desta empresa". Campanhas montadas antes: `empresas_novas.incluir_emails(db, camp)` cria os e-mails dos toques de
+WhatsApp que ainda não saíram (texto de e-mail guardado no toque; toque que já teve e-mail, mesmo cancelado, não ganha
+outro). Testes: `test_busca_monta_campanha_de_venda`, `test_fila_de_email_espera_o_whatsapp_das_empresas_novas`,
+`test_incluir_emails_em_campanha_montada_antes`.
 
 ## WhatsApp primeiro e campo WhatsApp em branco (nov/2026)
 
@@ -233,8 +246,8 @@ Toque de campanha **nunca** sai com o campo WhatsApp em branco (nem pelo telefon
 recusa com `sdr.SEM_WHATSAPP`, e `para_disparar`, `enviar_toque_agora` e `processar_fila_whatsapp` pulam esse toque.
 Minha fila mostra "WhatsApp em branco: cadastre o número…". Teste: `testes/test_whatsapp_em_branco.py`.
 Quem tem WhatsApp **e** e-mail válido recebe os dois em cada toque (duas tarefas, cada uma num canal, sem reserva do
-outro). O controle de frequência é por canal, então um não segura o outro. Exceção: Empresas novas (`foco_whatsapp`)
-continuam só no WhatsApp para quem tem celular.
+outro). O controle de frequência é por canal, então um não segura o outro. Empresas novas (`foco_whatsapp`): também
+os dois desde 12/11/2026, mas o e-mail fica para depois do WhatsApp (ver "Empresas novas: foco no WhatsApp").
 
 ## Empresas novas sem repetição (nov/2026)
 

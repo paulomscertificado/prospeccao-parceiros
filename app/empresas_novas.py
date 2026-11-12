@@ -450,6 +450,39 @@ def registrar_busca(db, registros: list[dict], desde: date, ate: date, ufs: list
     return busca
 
 
+def incluir_emails(db, camp: Campanha) -> int:
+    """Campanha de Empresas novas montada antes de 12/11/2026 (só WhatsApp para quem tem celular): cria o e-mail de
+    cada toque de WhatsApp que ainda não saiu, para as empresas com e-mail válido, como a montagem faz agora
+    (cadencias.aplicar com foco_whatsapp): texto de e-mail guardado no próprio toque, marcado para depois do WhatsApp
+    (e a fila de e-mail ainda espera o WhatsApp da empresa sair). Toque que já teve e-mail (mesmo cancelado) não ganha
+    outro. Devolve quantos e-mails criou."""
+    from . import cadencias
+    from .modelos import Tarefa
+
+    if camp.tipo != TIPO_CAMPANHA or "email" not in (camp.canais or "").split(","):
+        return 0
+    ja_tem = {(lid, pid, ang) for lid, pid, ang in db.execute(
+        select(Tarefa.lead_id, Tarefa.passo_id, Tarefa.angulo).where(Tarefa.campanha_id == camp.id,
+                                                                     Tarefa.canal == "email"))}
+    criados = 0
+    for t in db.execute(select(Tarefa).where(Tarefa.campanha_id == camp.id, Tarefa.canal == "whatsapp",
+                                             Tarefa.tipo == "prospeccao", Tarefa.status.in_(("rascunho", "pendente")))
+                        .order_by(Tarefa.data, Tarefa.hora, Tarefa.id)).scalars().all():
+        lead = t.lead
+        if ((t.lead_id, t.passo_id, t.angulo) in ja_tem or not lead or not lead.email or lead.email_invalido
+                or not (lead.whatsapp or "").strip() or not (t.mensagem_email or "").strip()):
+            continue
+        data, hora = cadencias.depois_de(db, t.data, t.hora or "09:00")
+        db.add(Tarefa(tipo="prospeccao", lead_id=t.lead_id, passo_id=t.passo_id, campanha_id=t.campanha_id,
+                      usuario_id=t.usuario_id, canal="email", data=data, hora=hora, acao="Contato por email",
+                      assunto=t.assunto_email or "", mensagem=t.mensagem_email, mensagem_email=t.mensagem_email,
+                      assunto_email=t.assunto_email or "", angulo=t.angulo, status=t.status, com_visual=t.com_visual))
+        t.mensagem_email = t.assunto_email = ""  # cada mensagem num canal só: o mesmo toque nunca sai duas vezes
+        ja_tem.add((t.lead_id, t.passo_id, t.angulo))
+        criados += 1
+    return criados
+
+
 def criar_campanha_da_busca(db, busca, usuario: Usuario, quantidade: int | None = None) -> Campanha | None:
     """Campanha de venda com as empresas da busca que podem entrar (sem gastar crédito: usa a lista guardada).
     quantidade: no máximo quantas entram (a busca automática passa o máximo por dia); sem ela, entram todas as da

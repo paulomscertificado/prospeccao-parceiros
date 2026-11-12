@@ -89,12 +89,20 @@ def test_busca_monta_campanha_de_venda(cliente, monkeypatch):
             {e.upper() for e in empresas} == {"NOVA CONSTRUTORA LTDA", "QUARTA EMPRESA LTDA", "SEM CONTATO LTDA"}
         lead = db.execute(select(Lead).where(Lead.cnpj.like("11.111.111%"))).scalars().first()
         assert lead.origem == empresas_novas.ORIGEM and lead.whatsapp == "(81) 99136-3335"
-        primeira = [t for t in tarefas if t.lead_id == lead.id and t.angulo == "venda_boas_vindas"][0]
+        primeira = [t for t in tarefas if t.lead_id == lead.id and t.angulo == "venda_boas_vindas"
+                    and t.canal == "whatsapp"][0]
         assert "R$" not in primeira.mensagem_whatsapp and "acabou de abrir" in primeira.mensagem_whatsapp
         dela = [t for t in tarefas if t.lead_id == lead.id]
-        # foco no WhatsApp: a empresa tem celular, então os 3 toques (dia 1, 3 e 7) são por WhatsApp, sem e-mail
-        assert sorted(t.canal for t in dela) == ['whatsapp'] * 3
-        zap = [t for t in dela if t.angulo == 'venda_boas_vindas'][0]
+        # a empresa tem celular e e-mail: os 3 toques (dia 1, 3 e 7) saem pelo WhatsApp E pelo e-mail (pedido da Maria
+        # em 12/11/2026), com o WhatsApp primeiro: o e-mail de cada toque fica para depois do WhatsApp do mesmo toque
+        assert sorted(t.canal for t in dela) == ['email'] * 3 + ['whatsapp'] * 3
+        for angulo in ("venda_boas_vindas", "venda_lembrete", "venda_ultimo"):
+            zap = [t for t in dela if t.angulo == angulo and t.canal == "whatsapp"][0]
+            mail = [t for t in dela if t.angulo == angulo and t.canal == "email"][0]
+            assert (mail.data, mail.hora) > (zap.data, zap.hora), angulo
+            assert mail.assunto and mail.mensagem and "R$" not in mail.mensagem
+            assert zap.mensagem_email == "" and not mail.mensagem_whatsapp  # cada mensagem num canal só
+        zap = [t for t in dela if t.angulo == 'venda_boas_vindas' and t.canal == 'whatsapp'][0]
         assert 'acabou de abrir' in zap.mensagem and zap.assunto == ''
         sem_zap = [t for t in tarefas if 'Sem Contato' in t.lead.empresa or 'SEM CONTATO' in t.lead.empresa]
         assert {t.canal for t in sem_zap} == {'whatsapp'}  # sem e-mail nem celular: só o toque a pesquisar
@@ -443,3 +451,123 @@ def test_campanha_da_lista_leva_todas_as_empresas_da_lista(cliente, monkeypatch)
         camp = empresas_novas.criar_campanha_da_busca(db, db.get(BuscaCnpja, r["busca_id"]), admin)
         assert r["encontradas"] == 10 and camp.quantidade == 10
         gravar_config(db, "novas_maximo_dia", maximo_antes)
+
+
+def _lead_teste(db, nome, email, whatsapp):
+    from app.leads_servico import criar_lead
+
+    admin = db.get(Usuario, admin_id(db))
+    lead, _ = criar_lead(db, {"empresa": nome, "cidade": "Recife", "estado": "PE", "email": email,
+                              "whatsapp": whatsapp}, admin, checar_duplicado=False)
+    db.flush()
+    return lead
+
+
+def test_fila_de_email_espera_o_whatsapp_das_empresas_novas(cliente, monkeypatch):
+    """Pedido da Maria (12/11/2026): nas Empresas novas o e-mail também sai, mas o WhatsApp tem prioridade. A fila de
+    e-mail só solta o e-mail do toque depois que o WhatsApp da empresa saiu. WhatsApp travado (atrasado mais de 2
+    dias, esperando clique) ou com o campo em branco não segura o e-mail."""
+    from app import mensagens
+    from app.banco import agora, ler_config
+    from app.integracoes import email_smtp
+    from app.rotas import fila
+
+    enviados = []
+    monkeypatch.setattr(email_smtp, "configurado", lambda: True)
+    monkeypatch.setattr(email_smtp, "enviar", lambda para, assunto, corpo, **k: enviados.append(para) or "id-teste")
+    monkeypatch.setattr(mensagens, "dentro_do_horario", lambda db, momento=None: True)
+    hoje = date.today()
+    chaves = ("limite_hora_email", "limite_diario_email", "horas_entre_contatos", "horas_entre_contatos_email")
+    with sessao() as db:
+        antes = {c: ler_config(db, c) for c in chaves}
+        gravar_config(db, "limite_hora_email", str(mensagens.enviadas_na_hora(db, "email") + 100))
+        gravar_config(db, "limite_diario_email", "100000")
+        gravar_config(db, "horas_entre_contatos", "0")
+        gravar_config(db, "horas_entre_contatos_email", "0")
+        admin = db.get(Usuario, admin_id(db))
+        camp = Campanha(nome="Empresas novas prioridade do WhatsApp", tipo="empresas_novas", canais="whatsapp,email",
+                        status="ativa", usuario_id=admin.id, aprovado_em=agora())
+        db.add(camp)
+        db.flush()
+        com_zap = _lead_teste(db, "Prioridade Zap Ltda", "contato@prioridade-zap-teste.com.br", "81991112222")
+        em_branco = _lead_teste(db, "Zap Em Branco Ltda", "contato@zap-em-branco-teste.com.br", "")
+        travado = _lead_teste(db, "Zap Travado Ltda", "contato@zap-travado-teste.com.br", "81993334444")
+
+        def toque(lead, canal, data, hora):
+            t = Tarefa(tipo="prospeccao", lead_id=lead.id, campanha_id=camp.id, usuario_id=admin.id, canal=canal,
+                       data=data, hora=hora, status="pendente", angulo="venda_boas_vindas",
+                       assunto="Certificado digital" if canal == "email" else "", mensagem="Olá! Teste de prioridade.",
+                       mensagem_email="Olá! Teste de prioridade." if canal == "email" else "",
+                       assunto_email="Certificado digital" if canal == "email" else "",
+                       mensagem_whatsapp="Olá! Teste de prioridade." if canal == "whatsapp" else "")
+            db.add(t)
+            db.flush()
+            return t.id
+
+        zap = toque(com_zap, "whatsapp", hoje, "00:01")
+        mail = toque(com_zap, "email", hoje, "00:02")
+        toque(em_branco, "whatsapp", hoje, "00:01")  # campo WhatsApp em branco: não segura o e-mail
+        mail_em_branco = toque(em_branco, "email", hoje, "00:02")
+        toque(travado, "whatsapp", hoje - timedelta(days=3), "09:07")  # travado esperando clique: não segura
+        mail_travado = toque(travado, "email", hoje - timedelta(days=3), "11:11")
+        cid = camp.id
+    with sessao() as db:
+        tarefas = [db.get(Tarefa, i) for i in (zap, mail, mail_em_branco, mail_travado)]
+        assert campanhas.emails_que_esperam_whatsapp(db, tarefas) == {mail}
+        _, motivo = fila._situacao(db.get(Tarefa, mail), hoje, True, set(), True, True, espera_whatsapp={mail})
+        assert "depois do WhatsApp" in motivo
+        campanhas.processar_fila(db, maximo=500)
+    with sessao() as db:
+        assert db.get(Tarefa, mail).status == "pendente"  # o WhatsApp da empresa ainda não saiu: o e-mail espera
+        assert db.get(Tarefa, mail_em_branco).status == "feita" and db.get(Tarefa, mail_travado).status == "feita"
+        db.get(Tarefa, zap).status = "feita"  # o WhatsApp saiu
+    with sessao() as db:
+        campanhas.processar_fila(db, maximo=500)
+    with sessao() as db:
+        assert db.get(Tarefa, mail).status == "feita"  # agora o e-mail sai
+        assert "contato@prioridade-zap-teste.com.br" in enviados
+        camp = db.get(Campanha, cid)
+        camp.status = "cancelada"  # nada desta campanha fica para os outros testes
+        for t in db.execute(select(Tarefa).where(Tarefa.campanha_id == cid, Tarefa.status == "pendente")).scalars():
+            t.status = "cancelada"
+        for c, v in antes.items():
+            gravar_config(db, c, v)
+
+
+def test_incluir_emails_em_campanha_montada_antes(cliente):
+    """Campanha de Empresas novas montada antes de 12/11/2026 (só WhatsApp para quem tem celular): incluir_emails cria
+    o e-mail de cada toque que ainda não saiu, depois do WhatsApp e com o texto de e-mail guardado no toque. Rodar de
+    novo não duplica; empresa sem e-mail e toque que já saiu ficam como estão."""
+    with sessao() as db:
+        admin = db.get(Usuario, admin_id(db))
+        camp = Campanha(nome="Empresas novas montada antes", tipo="empresas_novas", canais="whatsapp,email",
+                        status="aguardando_aprovacao", usuario_id=admin.id)
+        db.add(camp)
+        db.flush()
+        com_email = _lead_teste(db, "Antiga Com Email Ltda", "contato@antiga-com-email-teste.com.br", "81995556666")
+        sem_email = _lead_teste(db, "Antiga Sem Email Ltda", "", "81997778888")
+        amanha = date.today() + timedelta(days=1)
+
+        def toque(lead, status, angulo):
+            t = Tarefa(tipo="prospeccao", lead_id=lead.id, campanha_id=camp.id, usuario_id=admin.id, canal="whatsapp",
+                       data=amanha, hora="10:07", status=status, angulo=angulo, mensagem="Olá pelo WhatsApp",
+                       mensagem_whatsapp="Olá pelo WhatsApp", mensagem_email="Olá pelo e-mail",
+                       assunto_email="Certificado digital")
+            db.add(t)
+            db.flush()
+            return t
+
+        zap = toque(com_email, "rascunho", "venda_boas_vindas")
+        ja_saiu = toque(com_email, "feita", "venda_lembrete")
+        toque(sem_email, "rascunho", "venda_boas_vindas")
+        assert empresas_novas.incluir_emails(db, camp) == 1
+        mail = db.execute(select(Tarefa).where(Tarefa.campanha_id == camp.id, Tarefa.canal == "email")).scalars().one()
+        assert mail.lead_id == com_email.id and mail.status == "rascunho" and mail.angulo == "venda_boas_vindas"
+        assert (mail.data, mail.hora) > (zap.data, zap.hora)  # depois do WhatsApp do mesmo toque
+        assert mail.mensagem == "Olá pelo e-mail" and mail.assunto == "Certificado digital"
+        assert zap.mensagem_email == "" and ja_saiu.mensagem_email == "Olá pelo e-mail"
+        assert empresas_novas.incluir_emails(db, camp) == 0  # rodar de novo não duplica
+        camp.status = "cancelada"
+        for t in db.execute(select(Tarefa).where(Tarefa.campanha_id == camp.id,
+                                                 Tarefa.status.in_(("rascunho", "pendente")))).scalars():
+            t.status = "cancelada"

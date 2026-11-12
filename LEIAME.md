@@ -306,10 +306,14 @@ leads: as respostas vão para **Oportunidades** e o time conversa.
 - Os celulares que a Receita guarda sem o 9 ganham o 9 na frente (é um palpite: confira antes de enviar).
 - Empresas com o mesmo telefone/e-mail (do contador) **não** são juntadas: só o CNPJ conta como repetido.
 - Opção para deixar de fora **empresário individual** (inclui os MEIs, que muitas vezes não precisam de e-CNPJ).
-- **Foco no WhatsApp:** empresa com celular recebe os 3 toques **por WhatsApp**, que saem sozinhos depois da
-  aprovação (o botão **Enviar** da **Minha fila** ou da campanha só adianta). O **e-mail** só é usado para quem não
-  tem celular, e também sai sozinho pela fila. As campanhas de **parceiros** da IA SDR seguem a mesma regra desde
-  12/11/2026 (o administrador pode desligar em cada campanha).
+- **WhatsApp primeiro, e-mail depois:** empresa com celular recebe os 3 toques **por WhatsApp**, que saem sozinhos
+  depois da aprovação (o botão **Enviar** da **Minha fila** ou da campanha só adianta). Se ela também tem e-mail,
+  cada toque ganha a versão por **e-mail**, marcada para umas 2 horas depois do WhatsApp (ou o dia seguinte, se não
+  couber no horário). O e-mail só sai **depois** que o WhatsApp da empresa saiu; se ela responder no WhatsApp antes,
+  o e-mail não sai. Se o WhatsApp travar (atrasado mais de 2 dias, esperando clique, ou sem número), o e-mail sai
+  assim mesmo. Quem não tem celular recebe só por e-mail. Para não mandar e-mail nenhum, desmarque o canal
+  **E-mail** no passo 4. As campanhas de **parceiros** da IA SDR também saem sozinhas desde 12/11/2026 (o
+  administrador pode desligar em cada campanha).
 - **Buscar de novo não gasta à toa:** toda empresa que já veio entra numa lista de exclusão guardada na própria
   CNPJá. Buscando o mesmo dia de novo, a CNPJá só traz (e só cobra) as empresas que ainda não vieram.
 - **Atividade:** a busca pega empresas novas de **qualquer atividade** (toda empresa nova pode precisar do e-CNPJ).
@@ -490,6 +494,7 @@ permissão, a conta para de enviar na hora.
 | "Este número já fez 20 contatos frios hoje" | Proteção contra bloqueio: o resto sai amanhã (ou por outro número). O teto fica em Configurações > Geral |
 | "Este número está com os contatos frios pausados até amanhã" | 3 pessoas pediram para sair hoje: revise o texto e a lista da campanha. Amanhã volta sozinho |
 | "Aguardando: o toque anterior desta empresa ainda não saiu" | O toque anterior da empresa está parado (atrasado mais de 2 dias ou sem WhatsApp). Envie o anterior na Minha fila ou cancele-o: os próximos voltam a sair sozinhos |
+| "Sai sozinho depois do WhatsApp desta empresa" | Empresas novas: o e-mail espera o WhatsApp da mesma empresa sair primeiro (o WhatsApp tem prioridade). Não precisa fazer nada |
 | E-mail "[Prospecção MS] ⚠️ ..." | Aviso automático de problema: o próprio e-mail diz o que fazer. Quando resolver, chega o "✅ Resolvido" |
 | (site na internet) "O computador com o WhatsApp Leads está desligado" | Ligue o computador e abra o `iniciar.bat` do WhatsApp Leads; em até 1 minuto volta |
 | (site na internet) Campanha ou busca parada em "Na fila" | Espere 1 minuto. Se continuar, avise o suporte: o agendador da Vercel (Cron Jobs) pode estar desligado |

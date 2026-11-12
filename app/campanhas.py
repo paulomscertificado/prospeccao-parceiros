@@ -708,7 +708,9 @@ def processar_fila(db, maximo: int = 25) -> dict:
     consulta = (select(Tarefa).join(Campanha, Tarefa.campanha_id == Campanha.id)
                 .where(Tarefa.status == "pendente", Tarefa.tipo == "prospeccao", Tarefa.canal == "email",
                        _ja_na_hora(date.today(), hora), Campanha.status == "ativa",
-                       Campanha.aprovado_em.is_not(None))  # só campanhas aprovadas na IA SDR
+                       Campanha.aprovado_em.is_not(None),  # só campanhas aprovadas na IA SDR
+                       # Empresas novas: o WhatsApp tem prioridade, o e-mail do toque só sai depois dele
+                       ~and_(Campanha.tipo.in_(TIPOS_WHATSAPP_PRIMEIRO), _whatsapp_da_empresa_pendente(date.today())))
                 .order_by(Tarefa.data, Tarefa.hora, Tarefa.id).limit(max(maximo * 3, 400)))
     campanhas_no_limite: set[int] = set()
     for t in db.execute(consulta).scalars():
@@ -1060,6 +1062,10 @@ def whatsapp_liberado(db, lead: Lead) -> bool:
 
 
 TIPOS_QUE_SAEM_SOZINHOS = ("empresas_novas",)
+# Empresas novas (pedido da Maria em 12/11/2026): quem tem WhatsApp e e-mail recebe os dois em cada toque, mas o WhatsApp
+# tem prioridade: o e-mail do toque é marcado para umas 2 h depois dele (cadencias.depois_de) e a fila de e-mail só o
+# solta depois que o WhatsApp da empresa saiu (_whatsapp_da_empresa_pendente).
+TIPOS_WHATSAPP_PRIMEIRO = ("empresas_novas",)
 DIAS_ATRASO_AUTOMATICO = 2  # toque com mais atraso que isto não sai sozinho (espera o clique): evita rajada
 # A fila automática nunca manda dois WhatsApps para a mesma empresa em menos que isto, mesmo com o intervalo mínimo
 # desligado (0) em Configurações: em 12/11/2026 a Britânica recebeu o 1º e o 2º toque com 10 minutos de diferença
@@ -1125,6 +1131,45 @@ def _toque_anterior_pendente():
         or_(anterior.data < Tarefa.data,
             and_(anterior.data == Tarefa.data, or_(hora_ant < hora, and_(hora_ant == hora, anterior.id < Tarefa.id)))))
         .exists())
+
+
+def _whatsapp_da_empresa_pendente(hoje: date):
+    """Condição do banco (fila de e-mail): a mesma empresa tem, na mesma campanha, um WhatsApp marcado para antes (ou
+    para a mesma hora) que ainda não saiu e ainda pode sair sozinho (até DIAS_ATRASO_AUTOMATICO de atraso, com o
+    campo WhatsApp preenchido). Assim o e-mail das Empresas novas sai depois do WhatsApp; WhatsApp travado (esperando
+    clique) ou sem número não segura o e-mail."""
+    zap = aliased(Tarefa)
+    dono = aliased(Lead)
+    hora_zap, hora = func.coalesce(zap.hora, ""), func.coalesce(Tarefa.hora, "")
+    return (select(zap.id).join(dono, dono.id == zap.lead_id).where(
+        zap.campanha_id == Tarefa.campanha_id, zap.lead_id == Tarefa.lead_id, zap.canal == "whatsapp",
+        zap.status == "pendente", zap.id != Tarefa.id, zap.data >= hoje - timedelta(days=DIAS_ATRASO_AUTOMATICO),
+        func.trim(func.coalesce(dono.whatsapp, "")) != "",
+        or_(zap.data < Tarefa.data, and_(zap.data == Tarefa.data, hora_zap <= hora))).exists())
+
+
+def emails_que_esperam_whatsapp(db, tarefas, hoje: date | None = None) -> set[int]:
+    """Dos e-mails informados, os de Empresas novas que esperam o WhatsApp da mesma empresa sair primeiro (a mesma
+    regra da fila de e-mail, _whatsapp_da_empresa_pendente), para as telas Minha fila e Envios."""
+    hoje = hoje or date.today()
+    emails = [t for t in tarefas if t.canal == "email" and t.campanha_id and t.lead_id]
+    if not emails:
+        return set()
+    tipos = dict(db.execute(select(Campanha.id, Campanha.tipo).where(
+        Campanha.id.in_({t.campanha_id for t in emails}))).all())
+    emails = [t for t in emails if tipos.get(t.campanha_id) in TIPOS_WHATSAPP_PRIMEIRO]
+    if not emails:
+        return set()
+    zaps: dict[tuple[int, int], list[tuple]] = {}
+    for cid, lid, data, hora in db.execute(
+            select(Tarefa.campanha_id, Tarefa.lead_id, Tarefa.data, Tarefa.hora).join(Lead, Lead.id == Tarefa.lead_id)
+            .where(Tarefa.status == "pendente", Tarefa.canal == "whatsapp",
+                   Tarefa.data >= hoje - timedelta(days=DIAS_ATRASO_AUTOMATICO),
+                   func.trim(func.coalesce(Lead.whatsapp, "")) != "",
+                   Tarefa.lead_id.in_({t.lead_id for t in emails}),
+                   Tarefa.campanha_id.in_({t.campanha_id for t in emails}))):
+        zaps.setdefault((cid, lid), []).append((data, hora or ""))
+    return {t.id for t in emails if any(z <= (t.data, t.hora or "") for z in zaps.get((t.campanha_id, t.lead_id), []))}
 
 
 def toques_com_anterior_pendente(db, tarefas, hoje: date | None = None) -> set[int]:

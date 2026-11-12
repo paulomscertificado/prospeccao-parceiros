@@ -56,8 +56,9 @@ def test_com_whatsapp_e_email_cria_os_dois(cliente):
         db.rollback()
 
 
-def test_empresas_novas_com_whatsapp_so_zap(cliente):
-    """Empresas novas: foco no WhatsApp, sem e-mail para quem tem celular."""
+def test_empresas_novas_whatsapp_primeiro_e_email_depois(cliente):
+    """Empresas novas: o WhatsApp é o principal; quem também tem e-mail ganha o e-mail do toque, sempre depois do
+    WhatsApp (pedido da Maria em 12/11/2026; de 10/11 a 12/11 era só WhatsApp para quem tem celular)."""
     with sessao() as db:
         admin = db.execute(select(Usuario).where(Usuario.perfil == "admin")).scalars().first()
         cad = Cadencia(nome="Teste foco")
@@ -70,5 +71,9 @@ def test_empresas_novas_com_whatsapp_so_zap(cliente):
         cadencias.aplicar(db, cad, [lead], admin, campanha_id=camp.id, mensagens_sdr=msgs,
                           canais=["whatsapp", "email"], foco_whatsapp=True)
         db.flush()
-        assert [t.canal for t in db.execute(select(Tarefa).where(Tarefa.campanha_id == camp.id)).scalars()] == ["whatsapp"]
+        toques = {t.canal: t for t in db.execute(select(Tarefa).where(Tarefa.campanha_id == camp.id)).scalars()}
+        assert set(toques) == {"whatsapp", "email"}
+        zap, mail = toques["whatsapp"], toques["email"]
+        assert (mail.data, mail.hora) > (zap.data, zap.hora)  # o e-mail fica para depois do WhatsApp
+        assert zap.mensagem == "Z" and mail.mensagem == "E" and zap.mensagem_email == ""
         db.rollback()
