@@ -147,14 +147,17 @@ preço nem comissão e não fecha parceria.
 2. A IA monta a campanha: acha as empresas, pesquisa o site de cada uma, calcula o potencial, escolhe as melhores e
    escreve uma mensagem **diferente para cada empresa**, nos toques da cadência escolhida (padrão: dia 1, 3, 7 e 12).
 3. Você confere e clica em **APROVAR CAMPANHA** (ou edita/cancela). Nada sai antes disso.
-4. E-mails saem sozinhos (com limites). WhatsApp: com o celular conectado, sai **sozinho para quem já conversou com
-   a MS** (respondeu pelo WhatsApp ou tem marcado na ficha "Autorizou receber mensagens da MS pelo WhatsApp"); para
-   os demais, a Agenda mostra o botão para enviar com um clique. LinkedIn: sempre com um clique.
-   **WhatsApp automático (só o administrador):** na tela da campanha, o cartão **WhatsApp sai sozinho depois da
-   aprovação** tem o botão **Ligar**. Ligado, o WhatsApp da campanha sai sem clique também para quem nunca conversou
-   com a MS, como nas Empresas novas: uma mensagem a cada 3 minutos, só no horário de envio, com os limites por hora e
-   por dia, até 20 contatos frios por número por dia e pausa com 3 pedidos de SAIR. Toque atrasado mais de 2 dias
-   espera o clique. **Desligar** volta ao clique.
+4. **Aprovou, entrou na fila.** Os e-mails e os WhatsApps saem sozinhos, cada um no seu horário, também para quem
+   nunca conversou com a MS (desde 12/11/2026). O WhatsApp sai pelo celular conectado, uma mensagem a cada 3 minutos,
+   só no horário de envio, com os limites por hora e por dia, até 20 contatos frios por número por dia e pausa com 3
+   pedidos de SAIR. Toque atrasado mais de 2 dias espera o clique, para não sair tudo de uma vez, e o toque seguinte
+   da mesma empresa espera o anterior sair (o "último contato" nunca chega antes da apresentação). LinkedIn: sempre
+   com um clique.
+   **Desligar numa campanha (só o administrador):** na tela da campanha, o cartão **WhatsApp sai sozinho depois da
+   aprovação** tem o botão **Desligar**. Desligado, o WhatsApp só sai sozinho para quem já conversou com a MS
+   (respondeu pelo WhatsApp ou tem marcado na ficha "Autorizou receber mensagens da MS pelo WhatsApp"); para os
+   demais, a campanha e a Minha fila mostram o botão para enviar com um clique. Para as campanhas novas voltarem ao
+   clique, mude em **Configurações > Geral** "campanha nova já vem com o WhatsApp automático ligado" para 0.
    Toda empresa da campanha ganha a mensagem de WhatsApp. Se o campo **WhatsApp** da empresa estiver em branco, a
    mensagem fica pronta e **não sai**: cadastre o número na ficha da empresa e ela fica liberada.
    Empresa com WhatsApp **e** e-mail recebe os dois em cada toque (nas Empresas novas, só o WhatsApp).
@@ -298,9 +301,8 @@ leads: as respostas vão para **Oportunidades** e o time conversa.
 - Opção para deixar de fora **empresário individual** (inclui os MEIs, que muitas vezes não precisam de e-CNPJ).
 - **Foco no WhatsApp:** empresa com celular recebe os 3 toques **por WhatsApp**, que saem sozinhos depois da
   aprovação (o botão **Enviar** da **Minha fila** ou da campanha só adianta). O **e-mail** só é usado para quem não
-  tem celular, e também sai sozinho pela fila. Nas campanhas de **parceiros** o WhatsApp para quem nunca conversou
-  com a MS continua saindo com 1 clique, a não ser que o administrador ligue o **WhatsApp sai sozinho depois da
-  aprovação** na tela da campanha.
+  tem celular, e também sai sozinho pela fila. As campanhas de **parceiros** da IA SDR seguem a mesma regra desde
+  12/11/2026 (o administrador pode desligar em cada campanha).
 - **Buscar de novo não gasta à toa:** toda empresa que já veio entra numa lista de exclusão guardada na própria
   CNPJá. Buscando o mesmo dia de novo, a CNPJá só traz (e só cobra) as empresas que ainda não vieram.
 - **Atividade:** a busca pega empresas novas de **qualquer atividade** (toda empresa nova pode precisar do e-CNPJ).
@@ -480,6 +482,7 @@ permissão, a conta para de enviar na hora.
 | "Já houve uma mensagem para este lead há menos de 20 horas" | Controle de frequência: contate amanhã |
 | "Este número já fez 20 contatos frios hoje" | Proteção contra bloqueio: o resto sai amanhã (ou por outro número). O teto fica em Configurações > Geral |
 | "Este número está com os contatos frios pausados até amanhã" | 3 pessoas pediram para sair hoje: revise o texto e a lista da campanha. Amanhã volta sozinho |
+| "Aguardando: o toque anterior desta empresa ainda não saiu" | O toque anterior da empresa está parado (atrasado mais de 2 dias ou sem WhatsApp). Envie o anterior na Minha fila ou cancele-o: os próximos voltam a sair sozinhos |
 | E-mail "[Prospecção MS] ⚠️ ..." | Aviso automático de problema: o próprio e-mail diz o que fazer. Quando resolver, chega o "✅ Resolvido" |
 | (site na internet) "O computador com o WhatsApp Leads está desligado" | Ligue o computador e abra o `iniciar.bat` do WhatsApp Leads; em até 1 minuto volta |
 | (site na internet) Campanha ou busca parada em "Na fila" | Espere 1 minuto. Se continuar, avise o suporte: o agendador da Vercel (Cron Jobs) pode estar desligado |

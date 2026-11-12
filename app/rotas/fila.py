@@ -48,10 +48,12 @@ LIMITE_MOSTRAR = 200    # toques mostrados de uma vez (a página não pode ficar
 
 
 def _situacao(t: Tarefa, hoje: date, no_horario: bool, conversaram: set[int], email_auto: bool,
-              whats_auto: bool, automaticas: set[int] = frozenset()) -> tuple[str, str]:
+              whats_auto: bool, automaticas: set[int] = frozenset(),
+              com_anterior: set[int] = frozenset()) -> tuple[str, str]:
     """(situação, explicação) de por que o toque ainda não saiu, em linguagem simples. O que pede uma ação da pessoa
     (WhatsApp ou e-mail em branco) aparece também nos toques dos próximos dias, para dar tempo de corrigir.
-    automaticas = campanhas cujo WhatsApp sai sozinho depois da aprovação (campanhas.campanhas_que_saem_sozinhas)."""
+    automaticas = campanhas cujo WhatsApp sai sozinho depois da aprovação (campanhas.campanhas_que_saem_sozinhas);
+    com_anterior = toques que esperam o toque anterior da mesma empresa sair (campanhas.toques_com_anterior_pendente)."""
     lead = t.lead
     if not lead or not sdr.automacao_ativa(lead):
         return "parado", "Automação parada para este lead (respondeu, opt-out ou está com alguém)"
@@ -62,10 +64,12 @@ def _situacao(t: Tarefa, hoje: date, no_horario: bool, conversaram: set[int], em
     da_campanha_automatica = campanhas.toque_sai_sozinho(t, automaticas, hoje)
     sozinho = t.canal == "whatsapp" and whats_auto and (
         da_campanha_automatica or bool(lead.consentimento) or lead.id in conversaram)
+    espera_anterior = t.canal == "whatsapp" and t.id in com_anterior
     if t.data > hoje:
         quando = f"Programado para {t.data:%d/%m} às {t.hora or '09:00'}"
         if t.canal == "whatsapp":
-            quando += " (sai sozinho)" if sozinho else " (vai esperar o seu clique)"
+            quando += (" (espera o toque anterior sair)" if espera_anterior
+                       else " (sai sozinho)" if sozinho else " (vai esperar o seu clique)")
         return "programado", quando
     if t.canal == "email":
         if not email_auto:
@@ -75,6 +79,8 @@ def _situacao(t: Tarefa, hoje: date, no_horario: bool, conversaram: set[int], em
         if t.data == hoje and (t.hora or "00:00") > agora().strftime("%H:%M"):
             return "programado", f"Programado para hoje às {t.hora}"
         return "rodada", "Sai na próxima rodada da fila (a cada minuto)"
+    if espera_anterior:
+        return "clique", "Aguardando: o toque anterior desta empresa ainda não saiu (envie o anterior primeiro)"
     if sozinho:
         if not no_horario:
             return "horario", "Aguardando o horário de envio"
@@ -166,9 +172,10 @@ def minha_fila(request: Request, de: str = "", canal: str = "", aba: str = "prox
     email_auto = ler_config(db, "enviar_email_automatico") == "1"
     whats_auto = ler_config(db, "enviar_whatsapp_automatico") == "1"
     automaticas = campanhas.campanhas_que_saem_sozinhas(db)
+    com_anterior = campanhas.toques_com_anterior_pendente(db, tarefas)
     pendentes = []
     for t in tarefas:
-        chave, motivo = _situacao(t, hoje, no_horario, conversaram, email_auto, whats_auto, automaticas)
+        chave, motivo = _situacao(t, hoje, no_horario, conversaram, email_auto, whats_auto, automaticas, com_anterior)
         rotulo, classe = SITUACOES[chave]
         pendentes.append({"t": t, "situacao": chave, "rotulo": rotulo, "classe": classe, "motivo": motivo,
                           "atrasado": t.data < hoje, "dias": (hoje - t.data).days})

@@ -8,7 +8,7 @@ Todo dia (a partir do horário configurado), o sistema:
    esperando APROVAÇÃO, como as outras campanhas.
 
 Depois de aprovada, vale tudo o que já existe nas campanhas: e-mail sai sozinho pela fila (horário e limites),
-WhatsApp aparece para o time enviar com 1 clique (contato frio), respostas viram Oportunidades, opt-out, e-mails
+WhatsApp sai sozinho pela fila (campanhas.campanhas_que_saem_sozinhas), respostas viram Oportunidades, opt-out, e-mails
 inexistentes saem da campanha e as empresas ficam reservadas para o dono da campanha por 60 dias.
 
 Diferença das campanhas de parceria: aqui a mensagem é de VENDA e pode ter preço (as regras da IA SDR de "nunca

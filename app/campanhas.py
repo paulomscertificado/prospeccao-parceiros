@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
 
 from sqlalchemy import and_, func, or_, select
+from sqlalchemy.orm import aliased
 
 from . import base_receita, bases_importadas, cadencias, config, contas_email, email_validacao, reservas, ia, mensagens, prospeccao, sdr, trabalhos, util
 from .banco import agora, gravar_config, ler_config, ler_config_int, sessao
@@ -1052,7 +1053,8 @@ def resumo_dos_motivos(motivos) -> str:
 
 def whatsapp_liberado(db, lead: Lead) -> bool:
     """A IA SDR só manda WhatsApp SOZINHA para quem já conversou com a MS: autorizou receber (consentimento)
-    ou já mandou mensagem pelo WhatsApp. O primeiro contato frio continua com 1 clique de uma pessoa
+    ou já mandou mensagem pelo WhatsApp. Nas campanhas que não saem sozinhas (campanhas_que_saem_sozinhas), o
+    primeiro contato frio continua com 1 clique de uma pessoa
     (conexão por QR code + política do WhatsApp: mensagem automática para quem não conhece o número = bloqueio)."""
     return bool(lead.consentimento) or lead.id in leads_que_conversaram(db, [lead.id])
 
@@ -1086,6 +1088,37 @@ def toque_sai_sozinho(t: Tarefa, automaticas, hoje: date | None = None) -> bool:
     """O toque é de uma campanha que sai sozinha e não está atrasado demais?"""
     hoje = hoje or date.today()
     return t.campanha_id in automaticas and t.data >= hoje - timedelta(days=DIAS_ATRASO_AUTOMATICO)
+
+
+def _toque_anterior_pendente():
+    """Condição do banco: a mesma empresa tem, na mesma campanha, um WhatsApp anterior que ainda não saiu. Assim o
+    "último contato" nunca sai antes da apresentação (ex.: 1º toque parado há dias esperando o clique e os
+    seguintes chegando no dia deles)."""
+    anterior = aliased(Tarefa)
+    hora_ant, hora = func.coalesce(anterior.hora, ""), func.coalesce(Tarefa.hora, "")
+    return (select(anterior.id).where(
+        anterior.campanha_id == Tarefa.campanha_id, anterior.lead_id == Tarefa.lead_id, anterior.canal == "whatsapp",
+        anterior.status == "pendente", anterior.id != Tarefa.id,
+        or_(anterior.data < Tarefa.data,
+            and_(anterior.data == Tarefa.data, or_(hora_ant < hora, and_(hora_ant == hora, anterior.id < Tarefa.id)))))
+        .exists())
+
+
+def toques_com_anterior_pendente(db, tarefas) -> set[int]:
+    """Dos toques de WhatsApp informados, os que esperam um toque anterior da mesma empresa (mesma campanha) sair
+    (a mesma regra de _toque_anterior_pendente, para as telas Minha fila e Envios)."""
+    tarefas = [t for t in tarefas if t.canal == "whatsapp" and t.campanha_id and t.lead_id]
+    if not tarefas:
+        return set()
+    linhas = db.execute(select(Tarefa.id, Tarefa.campanha_id, Tarefa.lead_id, Tarefa.data, Tarefa.hora).where(
+        Tarefa.status == "pendente", Tarefa.canal == "whatsapp",
+        Tarefa.lead_id.in_({t.lead_id for t in tarefas}), Tarefa.campanha_id.in_({t.campanha_id for t in tarefas}))).all()
+    primeiro: dict[tuple[int, int], tuple] = {}
+    for tid, cid, lid, data, hora in linhas:
+        chave, ordem = (cid, lid), (data, hora or "", tid)
+        if chave not in primeiro or ordem < primeiro[chave]:
+            primeiro[chave] = ordem
+    return {t.id for t in tarefas if primeiro.get((t.campanha_id, t.lead_id), (None, None, t.id))[2] != t.id}
 
 
 def leads_que_conversaram(db, ids) -> set[int]:
@@ -1136,7 +1169,8 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
                 .where(Tarefa.status == "pendente", Tarefa.tipo == "prospeccao", Tarefa.canal == "whatsapp",
                        _ja_na_hora(hoje, hora), Campanha.status == "ativa", Campanha.aprovado_em.is_not(None),
                        func.coalesce(Lead.whatsapp, "") != "",
-                       or_(Lead.consentimento.is_(True), conversou, da_campanha_automatica))
+                       or_(Lead.consentimento.is_(True), conversou, da_campanha_automatica),
+                       ~_toque_anterior_pendente())  # o toque anterior da empresa sai primeiro
                 .order_by(Tarefa.data, Tarefa.hora, Tarefa.id).limit(200))
     automaticas = campanhas_que_saem_sozinhas(db)
     campanhas_no_limite: set[int] = set()

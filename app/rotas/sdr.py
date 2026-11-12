@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from .. import agenda_horarios, autorizacao, campanhas, config, hoje as fila_hoje, ia, metricas, sdr, util, visual
-from ..banco import agora, obter_db
+from ..banco import agora, ler_config, obter_db
 from ..leads_servico import historico, limpar_campos
 from ..modelos import (Cadencia, Campanha, Categoria, Conhecimento, Lead, Mensagem, Notificacao, Oportunidade, Tarefa,
                        Usuario)
@@ -517,6 +517,7 @@ def nova_campanha(request: Request, pedido: str = "", base: str = "", usuario: U
         "categorias": db.execute(select(Categoria).where(Categoria.ativa.is_(True)).order_by(Categoria.prioridade)).scalars().all(),
         "cadencias": _cadencias_da_ia(db), "cadencia_sdr": campanhas.cadencia_sdr(db), "ia_ligada": ia.disponivel(),
         "visuais": visual.disponiveis(db, "sdr"),
+        "whatsapp_sozinho_padrao": ler_config(db, "whatsapp_sozinho_padrao") != "0",
     })
 
 
@@ -562,6 +563,7 @@ async def criar_campanha(request: Request, usuario: Usuario = Depends(exige("cam
         tom=str(form.get("tom")) if str(form.get("tom")) in config.TONS else "consultivo",
         cta=cta[:200], cadencia_id=util.para_int(form.get("cadencia_id")), usuario_id=usuario.id,
         conexao_id=_numero_escolhido(db, usuario, form),
+        whatsapp_sozinho=ler_config(db, "whatsapp_sozinho_padrao") != "0",  # regra desde 12/11/2026 (pedido da Maria)
         inicio=util.para_data(form.get("inicio")) or date.today(), status="gerando", personalizar_ia=ia.disponivel(),
     )
     camp.visual_id, camp.visual_canais, camp.visual_toques = visual.escolha_do_formulario(db, form, "sdr")
@@ -701,9 +703,13 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
     if acao == "aprovar" and camp.status == "aguardando_aprovacao":
         n = campanhas.aprovar(db, camp, usuario)
         registrar_log(db, usuario, "aprovou_campanha", "campanha", cid, f"{n} tarefas", request)
-        avisar(request, f"Campanha aprovada: {n} contatos programados. Os WhatsApps de cada dia aparecem aqui na "
-                        "campanha para enviar com um clique (para quem já conversou com a MS, saem sozinhos); "
-                        "e-mails saem pela fila.")
+        if camp.whatsapp_sozinho:
+            avisar(request, f"Campanha aprovada: {n} contatos programados. Os e-mails e os WhatsApps entram na fila e "
+                            "saem sozinhos, cada um no seu horário (WhatsApp: um a cada 3 minutos, com os limites do número).")
+        else:
+            avisar(request, f"Campanha aprovada: {n} contatos programados. Os WhatsApps de cada dia aparecem aqui na "
+                            "campanha para enviar com um clique (para quem já conversou com a MS, saem sozinhos); "
+                            "e-mails saem pela fila.")
     elif acao == "cancelar" and camp.status in ("aguardando_aprovacao", "ativa", "gerando", "erro"):
         n = campanhas.cancelar(db, camp, usuario)
         registrar_log(db, usuario, "cancelou_campanha", "campanha", cid, f"{n} tarefas", request)

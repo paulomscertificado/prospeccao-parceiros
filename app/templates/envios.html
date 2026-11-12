@@ -130,7 +130,7 @@
   {% endif %}{% endfor %}{% endfor %}
   {% if not grupos_enviados %}
   <p class="vazio" style="padding:30px 10px">{% if filtrando_enviados %}Nenhum envio com esses filtros.
-    {% if filtros.campanha %} Se a campanha acabou de ser aprovada, veja a aba <a href="{{ url_envios(aba='proximos') }}">Próximos envios</a>: os WhatsApps frios esperam um clique para sair.{% endif %}
+    {% if filtros.campanha %} Se a campanha acabou de ser aprovada, veja a aba <a href="{{ url_envios(aba='proximos') }}">Próximos envios</a>: nas campanhas com o WhatsApp automático desligado, os WhatsApps frios esperam um clique para sair.{% endif %}
     {% else %}Nenhum envio neste período. Quando uma campanha for aprovada, os e-mails e WhatsApps aparecem aqui, com a situação de cada um.{% endif %}</p>
   {% endif %}
 </div>
@@ -163,8 +163,7 @@
     <li><b>4 toques por empresa</b>, cada um com um assunto diferente: dia 1 (apresentação), dia 3, dia 7 e dia 12. Se a empresa responder, os próximos toques são cancelados e o lead vai para Oportunidades. Sem resposta {{ regras.dias_sem_resposta }} dias depois do último, vira "Sem resposta".</li>
     <li><b>E-mail sai sozinho</b>{% if regras.enviar_email_automatico != '1' %} (desligado agora em Configurações){% endif %}: a cada minuto o sistema olha a fila e manda o que estiver na hora, em <b>dias úteis das {{ regras.horario_envio_inicio }} às {{ regras.horario_envio_fim }}</b>.</li>
     <li><b>Limites de e-mail:</b> até <b>{{ regras.limite_hora_email }} por hora</b> e <b>{{ regras.limite_diario_email }} por dia</b>; no máximo {{ regras.limite_diario_dominio }} por dia para a mesma empresa (domínio) e {{ regras.limite_diario_campanha }} por dia por campanha.</li>
-    <li><b>WhatsApp:</b> o primeiro contato com quem nunca conversou com a MS é com <b>1 clique</b> ("Disparar campanha WhatsApp" na campanha ou "Enviar por WhatsApp" na Minha fila). Até o clique, ele fica em Próximos envios como "Aguardando seu clique", mesmo depois da hora programada.
-      <b>Nas campanhas de Empresas novas, a aprovação basta:</b> o WhatsApp sai sozinho no horário de cada toque. Para quem já conversou com a MS, sai sozinho{% if regras.enviar_whatsapp_automatico != '1' %} (desligado agora){% endif %}. Até {{ regras.limite_hora_whatsapp }} por hora e {{ regras.limite_diario_whatsapp }} por dia, com pausas entre uma mensagem e outra.</li>
+    <li><b>WhatsApp: a aprovação basta.</b> Nas campanhas da IA SDR (com o <b>WhatsApp automático</b> ligado, o padrão) e nas de Empresas novas, o WhatsApp sai sozinho no horário de cada toque, também para quem nunca conversou com a MS, um a cada 3 minutos e até {{ regras.limite_frios_whatsapp }} contatos frios por número por dia. Toque atrasado mais de 2 dias e campanha com o WhatsApp automático desligado esperam <b>1 clique</b> ("Disparar campanha WhatsApp" na campanha ou "Enviar por WhatsApp" na Minha fila) e aparecem como "Aguardando seu clique". Para quem já conversou com a MS, sai sozinho{% if regras.enviar_whatsapp_automatico != '1' %} (desligado agora){% endif %}. Até {{ regras.limite_hora_whatsapp }} por hora e {{ regras.limite_diario_whatsapp }} por dia, com pausas entre uma mensagem e outra.</li>
     <li><b>Teste da campanha:</b> vai só para o número ou e-mail de quem testou, com "[TESTE · nome da empresa]" no começo. Nas Conversas ele aparece no contato de quem testou, não no da empresa.</li>
     <li><b>Nunca insiste:</b> no máximo 1 WhatsApp a cada {{ regras.horas_whatsapp }} h e 1 e-mail a cada {{ regras.horas_email }} h para a mesma empresa (cada canal com o seu controle); quem pede SAIR não recebe mais nada.</li>
   </ul>

@@ -47,8 +47,11 @@ CAMPOS_GERAIS = [
     ("enviar_email_automatico", "IA SDR · fila envia e-mails sozinha depois da aprovação (1 = sim, 0 = não)", "numero"),
     ("sdr_resposta_automatica", "IA SDR · responde \"vou passar para o time\" quando o canal permite (1 = sim, 0 = não)", "numero"),
     ("dias_sem_resposta", "IA SDR · dias depois do último toque para marcar SEM RESPOSTA", "numero"),
-    ("enviar_whatsapp_automatico", "IA SDR · com o celular conectado, manda sozinha o WhatsApp para quem já conversou "
-     "ou autorizou (1 = sim, 0 = não). Primeiro contato frio: sempre 1 clique", "numero"),
+    ("enviar_whatsapp_automatico", "IA SDR · com o celular conectado, a fila manda o WhatsApp sozinha (1 = sim, 0 = não): "
+     "para quem já conversou ou autorizou e, nas campanhas com o WhatsApp automático ligado, também para contato frio",
+     "numero"),
+    ("whatsapp_sozinho_padrao", "IA SDR · campanha nova já vem com o WhatsApp automático ligado: depois da aprovação, "
+     "sai sozinho também para contato frio (1 = sim, 0 = não; o administrador desliga em cada campanha)", "numero"),
     ("aprovacao_obrigatoria", "IA SDR · campanha só começa com aprovação (1 = sim, 0 = não)", "numero"),
     ("whatsapp_convite", "IA SDR · WhatsApp da MS para os convites por e-mail (com DDD, ex.: 81999998888). Quem "
      "clicar abre a conversa com este número; vazio = o convite pede para responder o e-mail", "texto"),

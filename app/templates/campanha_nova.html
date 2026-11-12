@@ -193,7 +193,8 @@
       <div class="largo"><label for="nome-campanha">Nome da campanha *</label>
         <input id="nome-campanha" type="text" name="nome" required placeholder="Ex.: Escritórios contábeis – Belo Horizonte"></div>
       <div><label>Canais *</label>
-        {% for c in ['whatsapp', 'email'] %}<label class="marcar"><input type="checkbox" name="canais" value="{{ c }}" {{ 'checked' if c == 'whatsapp' }}> {{ CANAIS[c] }}</label>{% endfor %}</div>
+        {% for c in ['whatsapp', 'email'] %}<label class="marcar"><input type="checkbox" name="canais" value="{{ c }}" {{ 'checked' if c == 'whatsapp' }}> {{ CANAIS[c] }}</label>{% endfor %}
+        {% if whatsapp_sozinho_padrao %}<p class="ajuda">Depois da aprovação, os dois saem sozinhos pela fila. WhatsApp: um a cada 3 minutos, com os limites do número.</p>{% endif %}</div>
       <div><label>Início *</label><input type="date" name="inicio" required value="{{ hoje.isoformat() }}" min="{{ hoje.isoformat() }}"></div>
       {% if numeros_admin %}{% set atual = '' %}
       <div class="largo"><label for="conexao_id">WhatsApp que vai disparar <span class="selo">só admin</span></label>

@@ -275,7 +275,10 @@ NOMES_UF = {
 
 # Configurações que o administrador altera na tela (guardadas no banco).
 CONFIG_PADRAO = {
-    "enviar_whatsapp_automatico": "1",  # só para quem já conversou/autorizou (campanhas.whatsapp_liberado)
+    "enviar_whatsapp_automatico": "1",  # fila automática: quem já conversou/autorizou e campanhas com WhatsApp automático
+    # Campanha nova da IA SDR já vem com o WhatsApp automático ligado (Campanha.whatsapp_sozinho): depois da aprovação
+    # sai sozinho também para contato frio, com as travas da fila (pedido da Maria em 12/11/2026)
+    "whatsapp_sozinho_padrao": "1",
     "mostrar_vendas": "0",
     "mostrar_agenda": "0",  # Agenda (follow-ups) oculta no menu e no Dashboard (pedido da MS)  # Vendas, Vencimentos e Comissões ocultos no menu e no Dashboard (pedido da MS)
     "empresa_nome": "MS Certificação Digital",

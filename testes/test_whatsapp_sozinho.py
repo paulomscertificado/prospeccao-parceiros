@@ -70,6 +70,39 @@ def test_parceiros_com_whatsapp_sozinho_sai_sem_clique(cliente, monkeypatch):
         db.rollback()
 
 
+def test_toque_seguinte_espera_o_anterior_da_mesma_empresa(cliente, monkeypatch):
+    """1º toque parado (atrasado demais, esperando o clique): o 2º da mesma empresa não pode sair antes dele."""
+    from app.integracoes import whatsapp_leads
+
+    enviados = []
+    monkeypatch.setattr(whatsapp_leads, "configurado", lambda: True)
+    monkeypatch.setattr(whatsapp_leads, "status", lambda: {"disponivel": True})
+    monkeypatch.setattr(campanhas.mensagens, "dentro_do_horario", lambda db, momento=None: True)
+    monkeypatch.setattr(sdr, "enviar_whatsapp_conectado",
+                        lambda db, texto, u, lead=None, tarefa=None: enviados.append(tarefa.id))
+    with sessao() as db:
+        gravar_config(db, "enviar_whatsapp_automatico", "1")
+        camp = _campanha(db, "Parceiros ordem dos toques", True)
+        parado = _toque(db, camp, "Parceiro Primeiro Parado", "(81) 98666-0001", -4)
+        seguinte = Tarefa(tipo="prospeccao", lead_id=parado.lead_id, campanha_id=camp.id, canal="whatsapp",
+                          data=date.today(), hora="00:02", status="pendente", mensagem="Último contato.")
+        hoje_1 = _toque(db, camp, "Parceiro Dois Hoje", "(81) 98666-0002", 0)
+        hoje_2 = Tarefa(tipo="prospeccao", lead_id=hoje_1.lead_id, campanha_id=camp.id, canal="whatsapp",
+                        data=date.today(), hora="00:05", status="pendente", mensagem="Segundo do dia.")
+        db.add_all([seguinte, hoje_2])
+        db.flush()
+        assert campanhas.toques_com_anterior_pendente(db, [parado, seguinte, hoje_1, hoje_2]) == {seguinte.id, hoje_2.id}
+        campanhas.processar_fila_whatsapp(db, maximo=1000)
+        assert hoje_1.id in enviados
+        assert parado.id not in enviados and seguinte.id not in enviados and hoje_2.id not in enviados
+        db.commit()
+    pagina = cliente.get("/fila").text
+    assert "o toque anterior desta empresa ainda não saiu" in pagina.split("Parceiro Primeiro Parado")[-1]
+    with sessao() as db:
+        for t in db.execute(select(Tarefa).join(Campanha).where(Campanha.nome == "Parceiros ordem dos toques")).scalars():
+            t.status = "cancelada"
+
+
 def test_fila_mostra_que_a_campanha_sai_sozinha(cliente, monkeypatch):
     monkeypatch.setattr(campanhas.mensagens, "dentro_do_horario", lambda db, momento=None: True)
     with sessao() as db:
@@ -87,6 +120,40 @@ def test_fila_mostra_que_a_campanha_sai_sozinha(cliente, monkeypatch):
     assert "(sai sozinho)" in linha("Parceiro Fila Amanha Sozinho")
     with sessao() as db:  # não deixa os toques na fila dos outros testes
         for t in db.execute(select(Tarefa).join(Campanha).where(Campanha.nome == "Parceiros automatico na fila")).scalars():
+            t.status = "cancelada"
+
+
+def test_campanha_nova_da_ia_sdr_ja_vem_com_whatsapp_automatico(cliente, monkeypatch):
+    """Regra desde 12/11/2026 (pedido da Maria): aprovada, a campanha da IA SDR entra na fila e sai sozinha.
+    Configurações > Geral (whatsapp_sozinho_padrao = 0) volta ao clique nas campanhas novas."""
+    monkeypatch.setattr(campanhas, "gerar_em_segundo_plano", lambda *a, **k: None)
+    nova = cliente.get("/campanhas/nova").text
+    assert "Depois da aprovação, os dois saem sozinhos pela fila" in nova
+    dados = {"csrf": csrf_de(nova), "cidade": "Recife", "estado": "PE", "quantidade": "5", "categorias": ["contabil"],
+             "canais": ["whatsapp"], "tom": "consultivo", "objetivo": "Encontrar parceiros"}
+    cliente.post("/campanhas/nova", data={**dados, "nome": "Campanha Nova Automatica"})
+    with sessao() as db:
+        gravar_config(db, "whatsapp_sozinho_padrao", "0")
+    assert "Depois da aprovação, os dois saem sozinhos pela fila" not in cliente.get("/campanhas/nova").text
+    cliente.post("/campanhas/nova", data={**dados, "nome": "Campanha Nova Com Clique"})
+    with sessao() as db:
+        gravar_config(db, "whatsapp_sozinho_padrao", "1")
+        ligada = db.execute(select(Campanha).where(Campanha.nome == "Campanha Nova Automatica")).scalars().one()
+        clique = db.execute(select(Campanha).where(Campanha.nome == "Campanha Nova Com Clique")).scalars().one()
+        assert ligada.whatsapp_sozinho is True and clique.whatsapp_sozinho is False
+        # aprovada: o aviso diz que tudo entra na fila e sai sozinho
+        ligada.status = "aguardando_aprovacao"
+        _toque(db, ligada, "Parceiro Rascunho Aprovacao", "(81) 98555-0001", 0).status = "rascunho"
+        ids = (ligada.id, clique.id)
+    pagina = cliente.get(f"/campanhas/{ids[0]}").text
+    r = cliente.post(f"/campanhas/{ids[0]}/aprovar", data={"csrf": csrf_de(pagina)})
+    assert "Os e-mails e os WhatsApps entram na fila e saem sozinhos" in r.text
+    with sessao() as db:
+        assert ids[0] in campanhas.campanhas_que_saem_sozinhas(db)
+        assert ids[1] not in campanhas.campanhas_que_saem_sozinhas(db)
+        for cid in ids:
+            db.get(Campanha, cid).status = "cancelada"
+        for t in db.execute(select(Tarefa).where(Tarefa.campanha_id.in_(ids))).scalars():
             t.status = "cancelada"
 
 

@@ -13,11 +13,11 @@ Para: toda a equipe (Funcionários MS, vendedores, gestores)
 1. A IA **monta a campanha**: encontra as empresas e escreve uma mensagem diferente para cada uma.
 2. Você **confere, testa e aprova**. Nada sai antes da aprovação.
 3. **E-mails saem sozinhos**, em horário comercial e com limites.
-4. **WhatsApp:**
+4. **WhatsApp: aprovou, entrou na fila.** Sai sozinho para todos, também para quem nunca conversou com a MS
+   (uma mensagem a cada 3 minutos, com os limites do número). Se o administrador **desligar** o "WhatsApp sai
+   sozinho depois da aprovação" na campanha:
    - para quem **já conversou com a MS**, sai sozinho;
-   - para os demais, **você envia com um clique**;
-   - se o administrador ligou **WhatsApp sai sozinho depois da aprovação** na campanha, sai sozinho para todos
-     (uma mensagem a cada 3 minutos, com os limites do número).
+   - para os demais, **você envia com um clique**.
 5. **Quando o lead responde**, a sequência para e ele vai para **Oportunidades** para você assumir.
 6. **Se ninguém responder**, a campanha termina sozinha depois do último toque.
 

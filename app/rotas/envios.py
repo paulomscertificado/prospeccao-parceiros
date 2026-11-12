@@ -173,9 +173,11 @@ def tela_envios(request: Request, canal: str = "", status: str = "", campanha: s
     email_auto = ler_config(db, "enviar_email_automatico") == "1"
     whats_auto = ler_config(db, "enviar_whatsapp_automatico") == "1"
     automaticas = campanhas.campanhas_que_saem_sozinhas(db)
+    com_anterior = campanhas.toques_com_anterior_pendente(db, tarefas)
     proximos = []
     for t in tarefas:
-        chave, motivo = fila._situacao(t, hoje, no_horario, conversaram, email_auto, whats_auto, automaticas)
+        chave, motivo = fila._situacao(t, hoje, no_horario, conversaram, email_auto, whats_auto, automaticas,
+                                       com_anterior)
         rotulo, classe = fila.SITUACOES[chave]
         proximos.append({"t": t, "situacao": chave, "rotulo": rotulo, "classe": classe, "motivo": motivo,
                          "atrasado": t.data < hoje, "dias": (hoje - t.data).days})
@@ -200,7 +202,8 @@ def tela_envios(request: Request, canal: str = "", status: str = "", campanha: s
     regras = {chave: ler_config(db, chave) for chave in (
         "limite_diario_email", "limite_hora_email", "limite_diario_whatsapp", "limite_hora_whatsapp",
         "limite_diario_campanha", "limite_diario_dominio", "horas_entre_contatos", "horario_envio_inicio",
-        "horario_envio_fim", "enviar_email_automatico", "enviar_whatsapp_automatico", "dias_sem_resposta")}
+        "horario_envio_fim", "enviar_email_automatico", "enviar_whatsapp_automatico", "dias_sem_resposta",
+        "limite_frios_whatsapp")}
     regras["horas_whatsapp"] = mensagens.horas_entre_contatos(db, "whatsapp")
     regras["horas_email"] = mensagens.horas_entre_contatos(db, "email")
     camp_q = select(Campanha).where(Campanha.arquivada.is_(False)).order_by(Campanha.criado_em.desc()).limit(100)

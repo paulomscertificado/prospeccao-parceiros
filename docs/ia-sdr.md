@@ -531,8 +531,16 @@ empresas, com as MESMAS colunas da `base_receita`, para reaproveitar `base_recei
   limite por hora (15), por dia e por número (40), horário de envio, controle de frequência e SAIR.
 - Minha fila e Envios (`fila._situacao`, parâmetro `automaticas`): "Sai sozinho: campanha de Empresas novas aprovada";
   toque futuro mostra "(sai sozinho)" ou "(vai esperar o seu clique)".
-- Campanhas de parceiros: contato frio = clique, a não ser que o admin ligue **WhatsApp sai sozinho depois da
-  aprovação** na tela da campanha (12/11/2026; ligado na Campanha 3 a pedido da Maria). `Campanha.whatsapp_sozinho`
+- **Ordem dos toques (12/11/2026):** a fila automática nunca manda um WhatsApp antes do anterior da mesma empresa na
+  mesma campanha (`campanhas._toque_anterior_pendente`, `NOT EXISTS` no filtro de `processar_fila_whatsapp`). Caso
+  real: campanhas com o 1º toque parado há dias esperando o clique e os seguintes chegando no dia deles. As telas usam
+  `toques_com_anterior_pendente` (parâmetro `com_anterior` de `fila._situacao`): "Aguardando: o toque anterior desta
+  empresa ainda não saiu" e, no futuro, "(espera o toque anterior sair)". O clique manual continua livre.
+- Campanhas de parceiros (12/11/2026, pedido da Maria: "a partir do momento de aprovadas, entrem na fila de
+  envios"): **toda campanha nova da IA SDR já vem com o WhatsApp automático ligado** (`rotas/sdr.py`, config
+  `whatsapp_sozinho_padrao` = "1" em Configurações > Geral; "0" volta ao clique nas próximas) e as campanhas em aberto
+  daquele dia foram ligadas por script. O admin desliga em cada campanha no cartão **WhatsApp sai sozinho depois da
+  aprovação**; desligado, contato frio = clique. Começou com a Campanha 3 (só ela, a pedido). `Campanha.whatsapp_sozinho`
   (coluna nova), permissão `campanhas.whatsapp_sozinho` (padrão: só admin), `POST /campanhas/{id}/whatsapp-sozinho`
   (`ligar` = 1/0, na rota das ações da campanha; Empresas novas não muda; registro `ligou_whatsapp_sozinho` /
   `desligou_whatsapp_sozinho`). `campanhas_que_saem_sozinhas` devolve `{id: tipo}` e `motivo_automatico` monta o
