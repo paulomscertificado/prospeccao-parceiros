@@ -1188,6 +1188,31 @@ def encerrar_toques(db, hoje: date | None = None) -> int:
     return len(tarefas)
 
 
+def emails_no_prazo(db, camp: Campanha) -> int:
+    """O e-mail de cada aviso sai umas 2 horas depois do WhatsApp; numa sexta à tarde isso caía na segunda, depois de um
+    vencimento no fim de semana, e o aviso por e-mail acabava cancelado (pedido da Maria em 13/11/2026: "os de sábados e
+    domingos avisar na sexta"). O e-mail que passaria do vencimento sai no mesmo dia e horário do WhatsApp (a fila de
+    e-mail espera o WhatsApp da empresa sair). Devolve quantos mudaram."""
+    tarefas = db.execute(select(Tarefa).where(Tarefa.campanha_id == camp.id, Tarefa.tipo == "prospeccao",
+                                              Tarefa.status.in_(("rascunho", "pendente")))).scalars().all()
+    ids = {t.certificado_id for t in tarefas if t.certificado_id}
+    if not ids:
+        return 0
+    vencimentos = dict(db.execute(select(Certificado.id, Certificado.data_vencimento)
+                                  .where(Certificado.id.in_(ids))).all())
+    zaps = {(t.lead_id, t.certificado_id, t.angulo): t for t in tarefas if t.canal == "whatsapp"}
+    mudou = 0
+    for t in tarefas:
+        venc = vencimentos.get(t.certificado_id)
+        if t.canal != "email" or venc is None or t.data <= venc:
+            continue
+        zap = zaps.get((t.lead_id, t.certificado_id, t.angulo))
+        if zap is not None and zap.data <= venc:
+            t.data, t.hora = zap.data, zap.hora
+            mudou += 1
+    return mudou
+
+
 def _dia_que_cabe(dia: date, vencimento: date, antes: date | None, depois: date | None, inicio: date,
                   sem_envio: frozenset, carga: Counter | None = None, teto: int = 0) -> date | None:
     """O dia útil mais perto de `dia` (primeiro para trás, depois para frente) em que um aviso cabe: a partir de

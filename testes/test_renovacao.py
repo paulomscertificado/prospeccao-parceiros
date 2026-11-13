@@ -1148,3 +1148,36 @@ def test_tela_salva_os_outros_feriados(cliente, csrf):
         assert renovacao.cfg(db, "renov_feriados") == "08/12, 24/06/2027"  # nada mudou
         gravar_config(db, "renov_feriados", "")
         db.commit()
+
+
+
+def test_email_do_aviso_nao_passa_do_vencimento(cliente):
+    """Pedido da Maria (13/11/2026): "os de sábados e domingos avisar na sexta". O e-mail fica para umas 2 horas depois
+    do WhatsApp; numa sexta à tarde isso caía na segunda, depois do vencimento no sábado, e o e-mail era cancelado. Agora
+    ele sai no mesmo dia do WhatsApp (a fila de e-mail espera o WhatsApp sair)."""
+    sexta = date.today() + timedelta(days=(4 - date.today().weekday()) % 7 + 7)
+    with sessao() as db:
+        _limpar(db)
+        admin = _admin(db)
+        camp = Campanha(nome="Renovação e-mail no prazo", tipo="renovacao", status="aguardando_aprovacao",
+                        usuario_id=admin.id, canais="whatsapp,email")
+        lead = Lead(empresa="CLIENTE PRAZO LTDA", whatsapp="(81) 98777-0001", email="prazo@prazo-teste.com.br",
+                    status="Abordagem criada", vendedor_id=admin.id, origem=renovacao.ORIGEM_LEAD)
+        db.add_all([camp, lead])
+        db.flush()
+        cert = Certificado(origem="planilha", protocolo="9500001", cliente_nome=lead.empresa, status="Ativo",
+                           data_vencimento=sexta + timedelta(days=1), campanha_id=camp.id, lead_id=lead.id)
+        db.add(cert)
+        db.flush()
+        zap = Tarefa(tipo="prospeccao", lead_id=lead.id, campanha_id=camp.id, certificado_id=cert.id,
+                     canal="whatsapp", data=sexta, hora="16:41", status="rascunho", angulo="renov_ultimo",
+                     mensagem="Olá! Último aviso.")
+        email = Tarefa(tipo="prospeccao", lead_id=lead.id, campanha_id=camp.id, certificado_id=cert.id,
+                       canal="email", data=sexta + timedelta(days=3), hora="10:12", status="rascunho",
+                       angulo="renov_ultimo", mensagem="Olá! Último aviso.")
+        db.add_all([zap, email])
+        db.flush()
+        assert renovacao.emails_no_prazo(db, camp) == 1
+        assert (email.data, email.hora) == (sexta, "16:41")
+        assert renovacao.emails_no_prazo(db, camp) == 0
+        db.rollback()

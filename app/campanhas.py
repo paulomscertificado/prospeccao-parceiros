@@ -341,6 +341,8 @@ def _montar(campanha_id: int, escolhidos: list[int], textos: dict[int, dict], so
             renovacao.depois_de_montar(db, camp)
             if ondas:  # certificado do mesmo contato vencendo bem depois: os próprios avisos, na mesma campanha
                 r["tarefas"] += renovacao.montar_ondas(db, camp, cad, usuario, ondas)
+            db.flush()
+            renovacao.emails_no_prazo(db, camp)  # e-mail nunca depois do vencimento (sexta à tarde, vence no sábado)
         camp.etapa = (f"Pronta: {r['leads']} {'contatos' if camp.tipo == 'renovacao' else 'empresas'}, "
                       f"{r['tarefas']} mensagens"
                       + (f" ({len(r['pulados'])} puladas)" if r["pulados"] else "") + ".")
@@ -505,6 +507,11 @@ def aprovar(db, camp: Campanha, usuario: Usuario) -> int:
                 t.hora = cadencias.hora_natural(db, minimo=minimo, maximo=maximo)  # (escolhido à mão, como 10:20, fica)
             t.data = util.proximo_dia_util(t.data + timedelta(days=atraso)) if atraso else t.data
         _sem_horario_no_passado(db, rascunhos, minimo, maximo, _feriados(db, camp))
+        if camp.tipo == "renovacao":
+            from . import renovacao
+
+            db.flush()
+            renovacao.emails_no_prazo(db, camp)  # aprovada depois: o e-mail também não passa do vencimento
     camp.status = "ativa"
     camp.aprovado_por_id = usuario.id if usuario else None
     camp.aprovado_em = agora()
