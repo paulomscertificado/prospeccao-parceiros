@@ -49,7 +49,23 @@ def configurado() -> bool:
     return bool(token())
 
 
-SEGUNDOS_SEM_SINAL = 180  # o computador avisa a cada 30 s; 3 min sem aviso = desligado
+SEGUNDOS_SEM_SINAL = 180  # mínimo sem sinal para dizer "desligado"
+FOLGA_DO_SINAL = 120      # além do intervalo que o computador usa entre um sinal e outro (atraso de rede, Vercel)
+
+
+def espera_do_computador(dados: dict, momento: datetime | None = None) -> int:
+    """De quanto em quanto tempo o computador do WhatsApp Leads dá sinal: o que ele mesmo informa ("espera", em
+    segundos) ou, de computador antigo que não informa, a regra dele (ponte_nuvem.espera_parado): 1 min em horário
+    comercial (dias úteis, 07:30 às 19:00) e 5 min à noite e no fim de semana."""
+    try:
+        espera = int(dados.get("espera") or 0)
+    except (TypeError, ValueError):
+        espera = 0
+    if espera > 0:
+        return min(espera, 3600)
+    momento = momento or datetime.now()
+    minutos = momento.hour * 60 + momento.minute
+    return 60 if momento.weekday() < 5 and 7 * 60 + 30 <= minutos < 19 * 60 else 300
 
 
 def _status_da_ponte(db=None) -> dict:
@@ -66,7 +82,10 @@ def _status_da_ponte(db=None) -> dict:
     except (ValueError, KeyError, TypeError):
         return {"disponivel": False, "conectado": False,
                 "erro": "O computador com o WhatsApp Leads ainda não se conectou ao sistema na nuvem."}
-    if (datetime.now() - visto).total_seconds() > SEGUNDOS_SEM_SINAL:
+    # o computador dá sinal de 1 em 1 min de dia e de 5 em 5 min à noite: antes, com 3 min fixos, toda noite a tela
+    # dizia "desligado" entre o 3º e o 5º minuto (e o envio manual era recusado nesse intervalo)
+    limite = max(SEGUNDOS_SEM_SINAL, espera_do_computador(dados, visto) + FOLGA_DO_SINAL)
+    if (datetime.now() - visto).total_seconds() > limite:
         return {"disponivel": False, "conectado": False,
                 "erro": f"O computador com o WhatsApp Leads está desligado ou sem internet (último sinal: {visto:%d/%m %H:%M})."}
     return {"disponivel": True, **dados, "erro": ""}

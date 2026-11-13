@@ -202,7 +202,8 @@ async def ponte_troca(request: Request):
 
 
 CAMPOS_STATUS = ("conectado", "tipo", "estado", "numero", "enviadas_hoje", "limite_diario", "dentro_do_horario",
-                 "horario", "estado_codigo", "erro", "qr", "regras", "conexoes")
+                 "horario", "estado_codigo", "erro", "qr", "regras", "conexoes",
+                 "espera")  # de quantos em quantos segundos o computador dá sinal (1 min de dia, 5 min à noite)
 
 
 def _gravar_status(db, recebido: dict) -> None:

@@ -581,3 +581,29 @@ def test_teste_de_email_leva_a_arte_que_voltou_do_whatsapp(cliente, monkeypatch)
         r = renovacao.enviar_teste(db, admin, 0, "email", "eu@teste.com.br", "renov_aviso", com_arte=False)
         assert not r["arte"] and "imagens" not in enviados[-1][2]
         db.rollback()
+
+
+def test_computador_do_whatsapp_a_noite_nao_aparece_como_desligado():
+    """O computador dá sinal de 1 em 1 min de dia e de 5 em 5 min à noite: a nuvem espera esse tempo (com folga) antes
+    de dizer "desligado" (em 12/11/2026 a tela dizia desligado às 23:41 com o último sinal às 23:38)."""
+    from datetime import datetime as _dt
+
+    from app.integracoes import whatsapp_leads as wl
+
+    noite, dia = _dt(2026, 11, 12, 23, 38), _dt(2026, 11, 12, 10, 0)
+    assert wl.espera_do_computador({}, noite) == 300 and wl.espera_do_computador({}, dia) == 60
+    assert wl.espera_do_computador({}, _dt(2026, 11, 14, 10, 0)) == 300  # sábado
+    assert wl.espera_do_computador({"espera": 60}, noite) == 60  # o que o computador informa vale mais
+    with sessao() as db:
+        for segundos, espera, disponivel in ((250, 300, True), (400, 300, True), (500, 300, False),
+                                             (150, 60, True), (200, 60, False), (250, None, None)):
+            visto = agora() - timedelta(seconds=segundos)
+            dados = {"conectado": True, "visto_em": visto.isoformat()}
+            if espera:
+                dados["espera"] = espera
+            gravar_config(db, "wl_status", dados)
+            s = wl._status_da_ponte(db)
+            if disponivel is None:  # computador antigo, sem "espera": vale a regra do horário (5 min à noite)
+                disponivel = 250 <= wl.espera_do_computador({}, visto) + wl.FOLGA_DO_SINAL
+            assert s["disponivel"] is disponivel, (segundos, espera, s)
+        gravar_config(db, "wl_status", "")

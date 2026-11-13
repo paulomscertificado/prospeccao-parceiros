@@ -13,7 +13,7 @@ Planos: Vercel **Hobby** e Supabase **Free** (escolha da MS); ver "Plano grátis
 | Relógio interno a cada 60 s | **Agendador do Windows** (computador da MS) chama `/api/cron` a cada minuto, com `CRON_SECRET`; Vercel Cron 1 vez por dia de reserva | `vercel.json`, `rotas/api.py`, `rotinas.rodada(None)` |
 | Linhas de execução em segundo plano | **Trabalhos em etapas** retomáveis (campanha, busca, personalização) | `trabalhos.py` |
 | Tela de e-mail grava no `.env` | Grava no banco, **criptografado**; todas as cópias releem a cada 30 s | `arquivo_env.py` |
-| Prospecção chama o WhatsApp Leads | **Ponte invertida**: o WhatsApp Leads chama a nuvem a cada 30 s | `integracoes/whatsapp_leads.py`, `rotas/api.py`, `whatsapp-leads/app/ponte_nuvem.py` |
+| Prospecção chama o WhatsApp Leads | **Ponte invertida**: o WhatsApp Leads chama a nuvem (1 min de dia, 5 min à noite) | `integracoes/whatsapp_leads.py`, `rotas/api.py`, `whatsapp-leads/app/ponte_nuvem.py` |
 | Importar base pela tela | Base copiada do computador por `enviar_para_nuvem.bat` | `enviar_para_nuvem.py` |
 | Log em `dados/sistema.log` | Logs da Vercel (Project > Logs) | `api/index.py` |
 | Fuso do Windows | Horário de Brasília fixo (UTC-3) | `config.py` (`FUSO_HORARIO`) |
@@ -80,7 +80,9 @@ uma trava vence sozinha se a Vercel cortar a chamada. Neste computador, o trabal
 execução e, se o sistema for fechado no meio, continua ao abrir de novo.
 
 ### Ponte com o WhatsApp Leads
-1. A cada 30 s o WhatsApp Leads faz `POST /api/ponte/troca` (cabeçalho `x-token`) com o status do WhatsApp e
+1. A cada 1 min em horário comercial (dias úteis, 07:30 às 19:00) e a cada 5 min fora dele (`ponte_nuvem.espera_parado`)
+   o WhatsApp Leads faz `POST /api/ponte/troca` (cabeçalho `x-token`) com o status do WhatsApp (e `espera`, esse
+   intervalo em segundos) e
    recebe as mensagens esperando (`ponte_whatsapp`), que ficam marcadas "retirada" **antes** da resposta: se a
    conexão cair, a mensagem não sai duas vezes.
 2. Coloca cada uma na fila de lá (mesmas pausas, horário, limite diário e lista de quem saiu).
@@ -90,7 +92,7 @@ execução e, se o sistema for fechado no meio, continua ao abrir de novo.
 modo teste, pausar, desligar, regras de envio). Cada botão vira um pedido na tabela `comandos_whatsapp`; a troca
 entrega os pedidos (`comandos`, marcados "retirado") e o retorno devolve o resultado e o status atualizado
 (com o QR code em imagem). Enquanto a tela está aberta (`wl_tela_vista_em` < 20 s), a troca responde
-`intervalo: 3` e o WhatsApp Leads passa a trocar a cada 3 s; fora disso, a cada 30 s. Só o administrador age.
+`intervalo: 3` e o WhatsApp Leads passa a trocar a cada 3 s; fora disso, no ritmo de cima. Só o administrador age.
 
 **Vários números** (`app/conexoes.py`, tabela `conexoes_whatsapp`): cada usuário conecta o próprio número (id
 `u<id do usuário>`; o da MS é `principal`). No WhatsApp Leads cada número é um conector (`whatsapp.Conexoes`,
@@ -113,8 +115,10 @@ faz a nuvem rodar uma vez). A busca por número acha com ou sem o 9. Enquanto h�
 O que se escreve na tela vira `ponte_whatsapp.manual = 1` → `integracao.enviar_manual` → fila "manual" (sai na
 hora). Opt-out da Prospecção bloqueia; quando o número é de um lead, entra no histórico dele.
 
-Sem sinal do computador por 3 minutos, a tela mostra "WhatsApp desligado" e o botão de envio avisa em vez de
-deixar a mensagem esperando sem prazo. Senha: `WHATSAPP_PONTE_TOKEN` (Vercel) = token do `ligar_nuvem.bat`.
+Sem sinal do computador por mais que o intervalo dele + 2 minutos (pelo menos 3 min: de dia, 3 min; à noite, 7 min;
+`whatsapp_leads.espera_do_computador` usa a `espera` que ele informa, ou a regra do horário se ele não informar), a
+tela mostra "WhatsApp desligado" e o botão de envio avisa em vez de deixar a mensagem esperando sem prazo. Até
+12/11/2026 eram 3 min fixos e, à noite (sinal de 5 em 5 min), a tela dizia "desligado" entre o 3º e o 5º minuto. Senha: `WHATSAPP_PONTE_TOKEN` (Vercel) = token do `ligar_nuvem.bat`.
 
 ## Passo a passo
 

@@ -32,7 +32,8 @@ conectado, a Prospecção usa esse número **sem configurar nada** (o token é l
 - **SAIR** no WhatsApp bloqueia o contato nos dois sistemas.
 - Em outro servidor: `WHATSAPP_LEADS_URL` e `WHATSAPP_LEADS_TOKEN` no `.env`.
 - **Sistema na nuvem (Vercel):** a nuvem não alcança este computador, então a ligação é invertida: o WhatsApp
-  Leads busca as mensagens no site a cada 30 s (`ligar_nuvem.bat` + `WHATSAPP_PONTE_TOKEN`). Ver `deploy-vercel.md`.
+  Leads busca as mensagens no site a cada 1 min de dia e 5 min à noite (`ligar_nuvem.bat` + `WHATSAPP_PONTE_TOKEN`).
+  Ver `deploy-vercel.md`.
 
 Por que o primeiro contato não é disparado sozinho pelo WhatsApp: a conexão por QR code não é oficial, e
 mensagens automáticas para quem não conhece o número violam as regras do WhatsApp e podem bloquear o número.
