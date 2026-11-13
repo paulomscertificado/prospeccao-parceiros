@@ -23,13 +23,15 @@ def _minutos(hhmm: str, padrao: int) -> int:
 FOLGA_MINUTOS = 15  # toque marcado para hoje: pelo menos 15 minutos depois de agora
 
 
-def hora_natural(db: Session, dia: date | None = None) -> str | None:
+def hora_natural(db: Session, dia: date | None = None, minimo: str = "") -> str | None:
     """Horário "quebrado" e diferente para cada mensagem de campanha (ex.: 09:47, 14:13), dentro do horário de envio
     e fora do almoço (12:00–13:30): mensagens em horário redondo, todas juntas, parecem disparo automático.
     dia = hoje: só horários que ainda não passaram; None se o horário de envio de hoje já acabou."""
     from .banco import agora
 
     inicio = _minutos(ler_config(db, "horario_envio_inicio") or "08:30", 8 * 60 + 30)
+    if minimo:  # ex.: Renovação "a partir das 10:00" (pedido da Maria em 13/11/2026)
+        inicio = max(inicio, _minutos(minimo, inicio))
     fim = _minutos(ler_config(db, "horario_envio_fim") or "18:00", 18 * 60) - 20  # folga para sair antes do fim
     if fim <= inicio:
         fim = inicio + 60
@@ -52,7 +54,7 @@ def hora_natural(db: Session, dia: date | None = None) -> str | None:
     return f"{minuto // 60:02d}:{minuto % 60:02d}"
 
 
-def dia_e_hora_futuros(db: Session, dia: date, pular_fds: bool | None = None) -> tuple[date, str]:
+def dia_e_hora_futuros(db: Session, dia: date, pular_fds: bool | None = None, minimo: str = "") -> tuple[date, str]:
     """O dia pedido (ou o próximo, se o horário de envio dele já passou) e um horário natural que ainda não passou."""
     from .banco import agora
 
@@ -63,18 +65,18 @@ def dia_e_hora_futuros(db: Session, dia: date, pular_fds: bool | None = None) ->
         if pular_fds and dia.weekday() >= 5:
             dia += timedelta(days=1)
             continue
-        hora = hora_natural(db, dia)
+        hora = hora_natural(db, dia, minimo)
         if hora:
             return dia, hora
         dia += timedelta(days=1)
-    return dia, hora_natural(db) or "09:07"
+    return dia, hora_natural(db, minimo=minimo) or "09:07"
 
 
 INTERVALO_DEPOIS_DO_WHATSAPP = 120  # minutos: Empresas novas, o e-mail do toque fica para umas 2 h depois do WhatsApp
 
 
 def depois_de(db: Session, dia: date, hora: str, minutos: int = INTERVALO_DEPOIS_DO_WHATSAPP,
-              pular_fds: bool | None = None) -> tuple[date, str]:
+              pular_fds: bool | None = None, minimo: str = "") -> tuple[date, str]:
     """Dia e horário natural pelo menos `minutos` depois de dia/hora: no mesmo dia, se couber no horário de envio
     (fora do almoço); senão no próximo dia de envio. Empresas novas (pedido da Maria em 12/11/2026): o e-mail de cada
     toque fica para depois do WhatsApp do mesmo toque, que tem prioridade."""
@@ -87,17 +89,18 @@ def depois_de(db: Session, dia: date, hora: str, minutos: int = INTERVALO_DEPOIS
     if minuto % 5 == 0:
         minuto += random.randint(1, 4)  # nada de 14:30, 15:15...
     if minuto > fim + 4:
-        return dia_e_hora_futuros(db, dia + timedelta(days=1), pular_fds)  # não cabe hoje: próximo dia de envio
+        return dia_e_hora_futuros(db, dia + timedelta(days=1), pular_fds, minimo)  # não cabe hoje: próximo dia
     hhmm = f"{minuto // 60:02d}:{minuto % 60:02d}"
     if f"{dia:%Y-%m-%d} {hhmm}" <= agora().strftime("%Y-%m-%d %H:%M"):
-        return dia_e_hora_futuros(db, dia, pular_fds)  # o WhatsApp já passou da hora: o e-mail fica para daqui a pouco
+        return dia_e_hora_futuros(db, dia, pular_fds, minimo)  # o WhatsApp já passou da hora: o e-mail fica para já
     return dia, hhmm
 
 
 def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario, inicio: date | None = None,
             campanha_id: int | None = None, mensagens_sdr: dict | None = None, canais: list[str] | None = None,
             status_tarefa: str = "pendente", cta: str = "", tom: str = "consultivo",
-            foco_whatsapp: bool = False, datas_por_lead: dict | None = None) -> dict:
+            foco_whatsapp: bool = False, datas_por_lead: dict | None = None, permitir_em_andamento: bool = False,
+            hora_minima: str = "") -> dict:
     """Cria as tarefas da cadência para cada lead. Pula quem tem opt-out, está encerrado, foi assumido
     por um humano ou já tem uma cadência em andamento.
 
@@ -128,7 +131,7 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
         em_andamento = db.execute(select(Tarefa.id).where(
             Tarefa.lead_id == lead.id, Tarefa.tipo == "prospeccao",
             Tarefa.status.in_(["pendente", "rascunho"])).limit(1)).first()
-        if em_andamento:
+        if em_andamento and not permitir_em_andamento:  # (Renovação: 2ª onda de avisos do mesmo contato)
             resultado["pulados"].append(f"{lead.empresa}: já está em uma cadência")
             continue
         responsavel = db.get(Usuario, lead.vendedor_id) if lead.vendedor_id else usuario
@@ -152,7 +155,7 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
             hora = passo.hora or "09:00"
             if campanha_id:
                 # nunca num horário que já passou: hoje, só daqui a 15 min em diante; sem tempo hoje, amanhã
-                data, hora = dia_e_hora_futuros(db, data, pular_fds)
+                data, hora = dia_e_hora_futuros(db, data, pular_fds, hora_minima)
             dia_anterior = data
             canal = passo.canal
             modelos = {}
@@ -209,7 +212,7 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
                 if foco_whatsapp and canal_extra == "email":
                     # Empresas novas: o WhatsApp tem prioridade. O e-mail do toque fica para umas 2 h depois dele (e a
                     # fila de e-mail ainda espera o WhatsApp da empresa sair: campanhas.TIPOS_WHATSAPP_PRIMEIRO)
-                    data_extra, hora_extra = depois_de(db, data, hora, pular_fds=pular_fds)
+                    data_extra, hora_extra = depois_de(db, data, hora, pular_fds=pular_fds, minimo=hora_minima)
                 db.add(Tarefa(
                     tipo="prospeccao", lead_id=lead.id, passo_id=passo.id, campanha_id=campanha_id,
                     usuario_id=responsavel.id if responsavel else None, canal=canal_extra, data=data_extra,

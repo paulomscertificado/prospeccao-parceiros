@@ -79,7 +79,17 @@ base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renova
     compartilhado, preferindo SEMPRE um conectado por QR a um em modo teste. No teste, o número escolhido no quadro
     (`conexao_teste`) vale como foi escolhido e a tela avisa quando ele está em modo teste (`numero_em_modo_teste`).
     `numeros_para_escolher` lista todos com conectado/modo teste. A área de teste é o 1º quadro da tela.
-12. **Respostas**: o fluxo normal (cancela os próximos toques, Oportunidade). A IA SDR não responde
+12. **Dias, horário e início configuráveis** (piloto da Maria de 13/11/2026 a 01/01/2027): `renov_dias` (4 dias,
+    `dias_aviso`, padrão 30,15,5,1; piloto 12,6,3,1) — `janela` = o 1º dia (quem entra na campanha), `nomes_dos_avisos`
+    nas telas; `renov_hora_inicio` (`hora_inicio`, ex.: 10:00) vai como `hora_minima` para `cadencias.aplicar` →
+    `dia_e_hora_futuros`/`hora_natural`/`depois_de(minimo=)` e na aprovação (`campanhas._hora_minima`,
+    `_sem_horario_no_passado(minimo)`); `renov_ativo_desde` faz a `rodada_diaria` esperar a data. `criar_campanha(ate=,
+    nome=)` monta com todos até uma data (o piloto, até 31/12) e divide o contato em **ondas** (`ondas`: certificados a
+    mais de `janela` dias do primeiro da onda): a 1ª onda vai pelo `cadencias.aplicar` normal; as seguintes, em
+    `montar_ondas` (aplicar com `permitir_em_andamento`), cada aviso com o `certificado_id` da onda (arte e "Renovado"
+    por onda: `arte_do_toque` e `mudar_situacao` olham só a onda do aviso). Os textos terminam com "Se você já renovou,
+    pode desconsiderar esta mensagem."
+13. **Respostas**: o fluxo normal (cancela os próximos toques, Oportunidade). A IA SDR não responde
    (`empresas_novas.e_lead_de_venda` inclui a origem "Renovação"). No WhatsApp Leads o contato ganha a etiqueta da IA
    SDR (a Atendente IA de lá não responde).
 

@@ -346,8 +346,22 @@ certificadora.
    todo dia, no horário escolhido, o sistema monta a campanha com quem chegou a 30 dias do vencimento (ela também
    espera a aprovação). Clique em **Salvar configuração**.
 
+**Dias, horário e início (quadro 4):** em **Avisar quantos dias antes de vencer** você escreve os 4 dias dos avisos
+(padrão 30, 15, 5, 1; no piloto de 13/11/2026: **12, 6, 3, 1**). **Avisos a partir das** limita o horário (ex.: 10:00).
+**Começar em** é o dia em que a campanha automática começa a montar sozinha (no piloto: 01/01/2027). Valem para as
+campanhas montadas depois de salvar.
+
+**Piloto de 13/11/2026 a 01/01/2027:** a campanha **"Renovação – piloto"** leva todos os clientes da planilha que vencem
+até 31/12, com os avisos já marcados (12, 6, 3 e 1 dia antes, a partir das 10h, WhatsApp com a arte pelo número do
+Paulo Lucas, e-mail ~2 h depois). A partir de 01/01/2027 a campanha automática do dia assume (importe o relatório de
+renovação novo antes, para entrarem os clientes de janeiro).
+
 **Como funciona:**
-- Entra quem vence nos **próximos 30 dias**. Quem já venceu **não recebe aviso**.
+- Entra quem vence até o dia do 1º aviso (ex.: **próximos 12 dias**). Quem já venceu **não recebe aviso**.
+- **Dois vencimentos distantes no mesmo contato** (ex.: um certificado vence em 20/11 e outro em 18/12): cada um ganha
+  os próprios avisos, na mesma campanha.
+- Todas as mensagens terminam com **"Se você já renovou, pode desconsiderar esta mensagem."** (a equipe também avisa
+  e o sistema só sabe quem renovou se alguém marcar **Renovado** na lista).
 - **Uma mensagem por contato:** se o mesmo WhatsApp aparece em vários certificados (ex.: um grupo de empresas com o
   mesmo telefone), ele recebe **uma** mensagem em cada aviso, com a lista dos certificados (até 5; com mais, um
   resumo: "57 certificados digitais que você acompanha vencem entre..."). Nunca uma mensagem por certificado.

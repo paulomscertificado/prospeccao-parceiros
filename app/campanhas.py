@@ -306,12 +306,12 @@ def etapa_gerar(campanha_id: int, _usuario_id, estado: dict, prazo: float) -> bo
     from . import renovacao
 
     _montar(campanha_id, estado["escolhidos"], {int(k): v for k, v in estado["textos"].items()}, estado.get("so_fixo", []),
-            datas=renovacao.datas_do_estado(estado))
+            datas=renovacao.datas_do_estado(estado), ondas=renovacao.ondas_do_estado(estado))
     return True
 
 
 def _montar(campanha_id: int, escolhidos: list[int], textos: dict[int, dict], so_fixo: list[int] | None = None,
-            datas: dict | None = None) -> None:
+            datas: dict | None = None, ondas: dict | None = None) -> None:
     with sessao() as db:
         camp = db.get(Campanha, campanha_id)
         usuario = db.get(Usuario, camp.usuario_id)
@@ -331,12 +331,15 @@ def _montar(campanha_id: int, escolhidos: list[int], textos: dict[int, dict], so
         r = cadencias.aplicar(db, cad, leads, usuario, camp.inicio or date.today(), camp.id, textos,
                               [c for c in camp.canais.split(",") if c], "rascunho", camp.cta, camp.tom,
                               foco_whatsapp=camp.tipo in TIPOS_WHATSAPP_PRIMEIRO,  # venda/renovação: WhatsApp primeiro
-                              datas_por_lead=datas)  # renovação: datas contadas do vencimento
+                              datas_por_lead=datas,  # renovação: datas contadas do vencimento
+                              hora_minima=_hora_minima(db, camp))  # renovação: "a partir das 10:00"
         if camp.tipo == "renovacao":
             from . import renovacao
 
             db.flush()
             renovacao.depois_de_montar(db, camp)
+            if ondas:  # certificado do mesmo contato vencendo bem depois: os próprios avisos, na mesma campanha
+                r["tarefas"] += renovacao.montar_ondas(db, camp, cad, usuario, ondas)
         camp.etapa = (f"Pronta: {r['leads']} {'contatos' if camp.tipo == 'renovacao' else 'empresas'}, "
                       f"{r['tarefas']} mensagens"
                       + (f" ({len(r['pulados'])} puladas)" if r["pulados"] else "") + ".")
@@ -353,6 +356,15 @@ def _montar(campanha_id: int, escolhidos: list[int], textos: dict[int, dict], so
         else:
             camp.status = "aguardando_aprovacao"
             sdr_notificar_aprovacao(db, camp)
+
+
+def _hora_minima(db, camp: Campanha) -> str:
+    """A partir de que horário saem os toques desta campanha ("" = o horário de envio geral)."""
+    if camp.tipo != "renovacao":
+        return ""
+    from . import renovacao
+
+    return renovacao.hora_inicio(db)
 
 
 def gerar(campanha_id: int) -> None:
@@ -467,19 +479,20 @@ def aprovar(db, camp: Campanha, usuario: Usuario) -> int:
     if rascunhos:
         primeiro = min(t.data for t in rascunhos)
         atraso = 0 if camp.tipo == "renovacao" else max(0, (date.today() - primeiro).days)
+        minimo = _hora_minima(db, camp)
         for t in rascunhos:
             t.status = "pendente"
             if (t.hora or "09:00").endswith(":00"):  # campanha montada antes (09:00 do passo): vira horário natural
-                t.hora = cadencias.hora_natural(db)  # (horário escolhido à mão, como 10:20, fica como está)
+                t.hora = cadencias.hora_natural(db, minimo=minimo)  # (horário escolhido à mão, como 10:20, fica)
             t.data = util.proximo_dia_util(t.data + timedelta(days=atraso)) if atraso else t.data
-        _sem_horario_no_passado(db, rascunhos)
+        _sem_horario_no_passado(db, rascunhos, minimo)
     camp.status = "ativa"
     camp.aprovado_por_id = usuario.id if usuario else None
     camp.aprovado_em = agora()
     return len(rascunhos)
 
 
-def _sem_horario_no_passado(db, tarefas: list[Tarefa]) -> int:
+def _sem_horario_no_passado(db, tarefas: list[Tarefa], minimo: str = "") -> int:
     """Aprovada depois do horário marcado (ex.: montada de manhã e aprovada à tarde): o toque de hoje que já passou ganha
     um horário novo daqui a pouco (ou vai para o próximo dia, se o horário de envio de hoje acabou). Os toques seguintes
     da mesma empresa nunca ficam antes dele. Devolve quantos mudaram."""
@@ -493,12 +506,12 @@ def _sem_horario_no_passado(db, tarefas: list[Tarefa]) -> int:
         anterior = None
         for t in lista:
             if f"{t.data:%Y-%m-%d} {t.hora or '00:00'}" <= agora_txt:
-                t.data, t.hora = cadencias.dia_e_hora_futuros(db, t.data)
+                t.data, t.hora = cadencias.dia_e_hora_futuros(db, t.data, minimo=minimo)
                 mudou += 1
             if anterior and (t.data, t.hora or "") < (anterior.data, anterior.hora or ""):
-                t.data, t.hora = cadencias.dia_e_hora_futuros(db, anterior.data)
+                t.data, t.hora = cadencias.dia_e_hora_futuros(db, anterior.data, minimo=minimo)
                 if (t.data, t.hora) <= (anterior.data, anterior.hora or ""):
-                    t.data, t.hora = cadencias.dia_e_hora_futuros(db, anterior.data + timedelta(days=1))
+                    t.data, t.hora = cadencias.dia_e_hora_futuros(db, anterior.data + timedelta(days=1), minimo=minimo)
                 mudou += 1
             anterior = t
     return mudou

@@ -70,6 +70,9 @@ PADRAO = {
     "renov_ultima_importacao": "",
     "renov_arte": "1",                # a arte do aviso (a do site) vai junto no WhatsApp e no e-mail
     "renov_conexao": "",              # número de WhatsApp dos disparos ("" = automático, sempre um número de verdade)
+    "renov_dias": "30,15,5,1",        # dias antes do vencimento dos 4 avisos (piloto de 13/11/2026: 12, 6, 3 e 1)
+    "renov_hora_inicio": "",          # os avisos saem a partir deste horário ("" = o horário de envio geral)
+    "renov_ativo_desde": "",          # a campanha automática só começa nesta data (AAAA-MM-DD; "" = já)
 }
 URL_DA_ARTE = "https://mscertificados.com.br/interno/aviso-vencimento"  # quem desenha: whatsapp-leads/app/arte_aviso.py
 DIAS_GUARDANDO_ARTE = 10  # a cópia da arte que voltou do computador (para o e-mail) fica só uns dias
@@ -90,31 +93,32 @@ MENSAGENS_PADRAO = {
         "assunto": "Vencimento do certificado digital ({data})",
         "whatsapp": ("Olá, {responsavel}! Tudo bem? Aqui é {vendedor}, da {minha_empresa}.\n\n{vencimentos}\n\n"
                      "Quer que eu já deixe tudo encaminhado para a renovação, para você não ficar sem certificado?\n\n"
-                     "(Se não quiser receber estes avisos, é só responder SAIR.)"),
+                     "Se você já renovou, pode desconsiderar esta mensagem.\n\n(Se não quiser receber estes avisos, é só responder SAIR.)"),
         "email": ("Olá, {responsavel}! Tudo bem?\n\nAqui é {vendedor}, da {minha_empresa}.\n\n{vencimentos}\n\n"
                   "Quer que eu já deixe tudo encaminhado para a renovação, para você não ficar sem certificado? "
-                  "É só responder este e-mail."),
+                  "É só responder este e-mail.\n\nSe você já renovou, pode desconsiderar esta mensagem."),
     },
     "renov_lembrete": {
         "assunto": "Lembrete: certificado digital vence em {data}",
-        "whatsapp": "Olá, {responsavel}! Passando para lembrar:\n\n{vencimentos}\n\nPosso te ajudar com a renovação?",
+        "whatsapp": ("Olá, {responsavel}! Passando para lembrar:\n\n{vencimentos}\n\nPosso te ajudar com a renovação?"
+                     "\n\nSe você já renovou, pode desconsiderar esta mensagem."),
         "email": ("Olá, {responsavel}!\n\nPassando para lembrar:\n\n{vencimentos}\n\n"
-                  "Posso te ajudar com a renovação? É só responder este e-mail."),
+                  "Posso te ajudar com a renovação? É só responder este e-mail.\n\nSe você já renovou, pode desconsiderar esta mensagem."),
     },
     "renov_reforco": {
         "assunto": "Faltam poucos dias: certificado digital vence em {data}",
         "whatsapp": ("Olá, {responsavel}! Faltam poucos dias:\n\n{vencimentos}\n\n"
-                     "Renovando antes do vencimento, você não fica sem certificado. Vamos agendar?"),
+                     "Renovando antes do vencimento, você não fica sem certificado. Vamos agendar?\n\nSe você já renovou, pode desconsiderar esta mensagem."),
         "email": ("Olá, {responsavel}!\n\nFaltam poucos dias:\n\n{vencimentos}\n\n"
                   "Renovando antes do vencimento, você não fica sem certificado. Quer agendar a renovação? "
-                  "É só responder este e-mail."),
+                  "É só responder este e-mail.\n\nSe você já renovou, pode desconsiderar esta mensagem."),
     },
     "renov_ultimo": {
         "assunto": "Último aviso: certificado digital vence em {data}",
         "whatsapp": ("Olá, {responsavel}! Último aviso:\n\n{vencimentos}\n\n"
-                     "Se precisar renovar, é só responder aqui que eu te atendo."),
+                     "Se precisar renovar, é só responder aqui que eu te atendo.\n\nSe você já renovou, pode desconsiderar esta mensagem."),
         "email": ("Olá, {responsavel}!\n\nÚltimo aviso:\n\n{vencimentos}\n\n"
-                  "Se precisar renovar, é só responder este e-mail que eu te atendo."),
+                  "Se precisar renovar, é só responder este e-mail que eu te atendo.\n\nSe você já renovou, pode desconsiderar esta mensagem."),
     },
 }
 CAMPOS_DA_MENSAGEM = ("responsavel", "vencimentos", "data", "vendedor", "minha_empresa")
@@ -138,6 +142,37 @@ def mensagens(db) -> dict:
 def dono(db) -> Usuario | None:
     uid = util.para_int(cfg(db, "renov_dono_id"))
     return db.get(Usuario, uid) if uid else None
+
+
+def dias_aviso(db) -> tuple[int, ...]:
+    """Os dias antes do vencimento dos 4 avisos (tela Renovação; padrão 30, 15, 5 e 1). Inválido: o padrão."""
+    try:
+        dias = tuple(sorted({int(x) for x in re.split(r"[,; ]+", cfg(db, "renov_dias")) if x.strip()}, reverse=True))
+    except ValueError:
+        return DIAS_AVISO
+    if len(dias) != len(DIAS_AVISO) or dias[-1] < 1 or dias[0] > 90:
+        return DIAS_AVISO
+    return dias
+
+
+def janela(db) -> int:
+    """Entra na campanha quem vence até o dia do 1º aviso (ex.: 30 ou 12 dias)."""
+    return dias_aviso(db)[0]
+
+
+def nomes_dos_avisos(dias: tuple[int, ...] = DIAS_AVISO) -> dict:
+    """Nome de cada aviso com os dias da configuração (ex.: "1º aviso (12 dias antes)")."""
+    def antes(n):
+        return "1 dia antes" if n == 1 else f"{n} dias antes"
+
+    return {"renov_aviso": f"1º aviso ({antes(dias[0])})", "renov_lembrete": f"Lembrete ({antes(dias[1])})",
+            "renov_reforco": f"Faltam poucos dias ({antes(dias[2])})", "renov_ultimo": f"Último aviso ({antes(dias[3])})"}
+
+
+def hora_inicio(db) -> str:
+    """Os avisos saem a partir deste horário (tela; "" = o horário de envio geral)."""
+    valor = cfg(db, "renov_hora_inicio").strip()
+    return valor if re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", valor) else ""
 
 
 def garantir_cadencia(db):
@@ -352,7 +387,7 @@ def importar(db, registros: list[dict], usuario: Usuario | None, arquivo: str = 
     indice = {_chave_do_certificado(c): c for c in db.execute(
         select(Certificado).where(Certificado.origem == ORIGEM)).scalars()}
     resumo = {"linhas": len(registros), "novos": 0, "atualizados": 0, "iguais": 0, "repetidos": 0, "vencidos": 0,
-              "sem_contato": 0, "a_vencer_30": 0}
+              "sem_contato": 0, "na_janela": 0, "janela": janela(db)}
     vistos = set()
     for r in registros:
         d = dados_do_registro(r)
@@ -378,8 +413,8 @@ def importar(db, registros: list[dict], usuario: Usuario | None, arquivo: str = 
         cert.importado_em = agora()
         if d["data_vencimento"] < hoje:
             resumo["vencidos"] += 1
-        elif d["data_vencimento"] <= hoje + timedelta(days=JANELA_DIAS):
-            resumo["a_vencer_30"] += 1
+        elif d["data_vencimento"] <= hoje + timedelta(days=resumo["janela"]):
+            resumo["na_janela"] += 1
         if not (d["whatsapp"] or d["email"]):
             resumo["sem_contato"] += 1
     db.flush()
@@ -442,14 +477,16 @@ def agrupar(certificados) -> tuple[list[Contato], list[Certificado]]:
     return sorted((Contato(k, v) for k, v in grupos.items()), key=lambda c: (c.vencimento, c.chave)), sem_contato
 
 
-def a_avisar(db, hoje: date | None = None) -> list[Certificado]:
-    """Certificados que podem entrar numa campanha: da planilha, ativos, fora de campanha e vencendo nos próximos 30
-    dias (de amanhã em diante: o que vence hoje já não dá tempo de avisar)."""
+def a_avisar(db, hoje: date | None = None, ate: date | None = None) -> list[Certificado]:
+    """Certificados que podem entrar numa campanha: da planilha, ativos, fora de campanha e vencendo até o dia do 1º
+    aviso (ex.: 30 ou 12 dias) ou até `ate` (campanha do piloto: até 31/12), de amanhã em diante (o que vence hoje já
+    não dá tempo de avisar)."""
     hoje = hoje or date.today()
+    ate = ate or hoje + timedelta(days=janela(db))
     return db.execute(select(Certificado).where(
         Certificado.origem == ORIGEM, Certificado.status == "Ativo", Certificado.campanha_id.is_(None),
         func.coalesce(Certificado.fora_motivo, "") == "", Certificado.data_vencimento > hoje,
-        Certificado.data_vencimento <= hoje + timedelta(days=JANELA_DIAS))).scalars().all()
+        Certificado.data_vencimento <= ate)).scalars().all()
 
 
 def _formas_do_celular(numero: str) -> set[str]:
@@ -512,10 +549,11 @@ def motivo_de_fora(db, lead: Lead) -> str:
     return ""
 
 
-def contatos_para_campanha(db, hoje: date | None = None, marcar_saida: bool = False) -> tuple[list[Contato], dict]:
+def contatos_para_campanha(db, hoje: date | None = None, marcar_saida: bool = False,
+                           ate: date | None = None) -> tuple[list[Contato], dict]:
     """Contatos que podem entrar numa campanha agora (do que vence primeiro ao último) e quantos certificados ficam de
     fora por motivo. marcar_saida=True grava nos certificados de quem pediu SAIR (vale até alguém reabrir)."""
-    contatos, sem_contato = agrupar(a_avisar(db, hoje))
+    contatos, sem_contato = agrupar(a_avisar(db, hoje, ate))
     fora: dict[str, int] = {}
     if sem_contato:
         fora["sem WhatsApp e sem e-mail na planilha"] = len(sem_contato)
@@ -542,14 +580,15 @@ def _dia_util_antes(d: date) -> date:
     return d
 
 
-def datas_dos_avisos(vencimento: date, hoje: date | None = None, pular_fds: bool = True) -> list[date | None]:
+def datas_dos_avisos(vencimento: date, hoje: date | None = None, pular_fds: bool = True,
+                     dias_antes: tuple[int, ...] = DIAS_AVISO) -> list[date | None]:
     """Datas dos 4 avisos (30, 15, 5 e 1 dia antes do vencimento). None = aviso que não cabe (já passou, ou ficaria a
     menos de 2 dias do anterior). Quem entra tarde recebe o 1º aviso hoje (ou no próximo dia útil). Aviso no fim de
     semana vem para a sexta antes, nunca para depois do vencimento. Tudo None = não dá mais tempo de avisar."""
     hoje = hoje or date.today()
     datas: list[date | None] = []
     anterior = None
-    for indice, dias in enumerate(DIAS_AVISO):
+    for indice, dias in enumerate(dias_antes):
         alvo = vencimento - timedelta(days=dias)
         if pular_fds:
             alvo = _dia_util_antes(alvo)
@@ -558,7 +597,7 @@ def datas_dos_avisos(vencimento: date, hoje: date | None = None, pular_fds: bool
             if pular_fds:
                 alvo = util.proximo_dia_util(alvo)
             if alvo > vencimento:
-                return [None] * len(DIAS_AVISO)
+                return [None] * len(dias_antes)
         elif alvo < hoje or alvo > vencimento or (alvo - anterior).days < INTERVALO_MINIMO_DIAS:
             datas.append(None)
             continue
@@ -604,7 +643,7 @@ def carga_marcada(db, desde: date, ignorar_campanha: int | None = None) -> Count
 
 
 def agenda(vencimentos: list[date], hoje: date, pular_fds: bool = True, carga: Counter | None = None,
-           teto: int = 0) -> list[list[date | None]]:
+           teto: int = 0, dias_antes: tuple[int, ...] = DIAS_AVISO) -> list[list[date | None]]:
     """As datas dos avisos de vários contatos com WhatsApp (do que vence primeiro ao último) sem passar de `teto`
     WhatsApps por dia: com 100 clientes vencendo no mês, os 100 primeiros avisos cairiam no mesmo dia e o número só
     faz 20 contatos frios por dia (o resto atrasaria e ficaria esperando clique). Primeiro, o 1º aviso de todos, no
@@ -612,12 +651,12 @@ def agenda(vencimentos: list[date], hoje: date, pular_fds: bool = True, carga: C
     Depois, os lembretes nas vagas que sobraram, no dia certo ou alguns dias antes (sem vaga, aquele lembrete não vai).
     teto 0 = sem teto (só as regras de datas_dos_avisos)."""
     if not teto:
-        return [datas_dos_avisos(v, hoje, pular_fds) for v in vencimentos]
+        return [datas_dos_avisos(v, hoje, pular_fds, dias_antes) for v in vencimentos]
     carga = carga if carga is not None else Counter()
     resultado: list[list[date | None]] = []
     for vencimento in vencimentos:
-        datas: list[date | None] = [None] * len(DIAS_AVISO)
-        primeiro = datas_dos_avisos(vencimento, hoje, pular_fds)[0]
+        datas: list[date | None] = [None] * len(dias_antes)
+        primeiro = datas_dos_avisos(vencimento, hoje, pular_fds, dias_antes)[0]
         if primeiro is not None:
             dia = primeiro
             while carga[dia] >= teto and _util_seguinte(dia, pular_fds) <= vencimento:
@@ -635,7 +674,7 @@ def agenda(vencimentos: list[date], hoje: date, pular_fds: bool = True, carga: C
         anterior = datas[0]
         if anterior is None:
             continue
-        for i, dias in enumerate(DIAS_AVISO[1:], start=1):
+        for i, dias in enumerate(dias_antes[1:], start=1):
             dia = vencimento - timedelta(days=dias)
             dia = _dia_util_antes(dia) if pular_fds else dia
             while dia >= hoje and (dia - anterior).days >= INTERVALO_MINIMO_DIAS:
@@ -728,27 +767,48 @@ def textos_do_contato(db, contato: Contato, usuario: Usuario | None) -> dict:
 
 # ---------------------------------------------------------------- Campanha
 
-def criar_campanha(db, usuario: Usuario, quantidade: int | None = None) -> Campanha | None:
+def ondas(contato: Contato, dias_da_janela: int) -> list[Contato]:
+    """Os certificados do contato em "ondas": cada onda junta os que vencem até `dias_da_janela` dias depois do
+    primeiro dela e recebe os próprios avisos (ex.: um vence em 20/11 e outro em 18/12: dois conjuntos de avisos)."""
+    lista: list[Contato] = []
+    atual: list = []
+    for c in contato.certificados:
+        if atual and (c.data_vencimento - atual[0].data_vencimento).days > dias_da_janela:
+            lista.append(Contato(contato.chave, atual))
+            atual = []
+        atual.append(c)
+    if atual:
+        lista.append(Contato(contato.chave, atual))
+    return lista
+
+
+def criar_campanha(db, usuario: Usuario, quantidade: int | None = None, ate: date | None = None,
+                   nome: str = "") -> Campanha | None:
     """Campanha de renovação com os contatos que vencem primeiro (no máximo `quantidade`; sem ela, o máximo por dia
-    da configuração). Fica "gerando": o trabalho em etapas cadastra os contatos e monta os avisos, e ela vai para a
-    aprovação. None = ninguém para avisar agora."""
+    da configuração). `ate`: todos os que vencem até essa data, com os avisos marcados desde já (campanha do piloto de
+    13/11/2026, até 31/12); o contato com certificados vencendo em datas distantes recebe uma "onda" de avisos para
+    cada uma. Fica "gerando": o trabalho em etapas cadastra os contatos e monta os avisos, e ela vai para a aprovação.
+    None = ninguém para avisar agora."""
     from . import trabalhos
 
     hoje = date.today()
-    contatos, _ = contatos_para_campanha(db, hoje, marcar_saida=True)
-    escolhidos = contatos[:quantidade or util.para_int(cfg(db, "renov_maximo_dia")) or 40]
+    contatos, _ = contatos_para_campanha(db, hoje, marcar_saida=True, ate=ate)
+    limite = quantidade or (None if ate else util.para_int(cfg(db, "renov_maximo_dia")) or 40)
+    escolhidos = contatos[:limite] if limite else contatos
     if not escolhidos:
         db.commit()  # guarda quem pediu SAIR (fora_motivo)
         return None
-    ultimo = max(c.vencimento for c in escolhidos)
-    datas = datas_da_campanha(db, escolhidos)
+    dias_da_janela = janela(db)
+    grupos = [(onda, n) for c in escolhidos for n, onda in enumerate(ondas(c, dias_da_janela))]
+    ultimo = max(c.data_vencimento for g, _ in grupos for c in g.certificados)
+    datas = datas_da_campanha(db, [g for g, _ in grupos])
     from . import conexoes
 
     try:  # o número dos disparos fica gravado na campanha (dá para trocar na página dela): nunca um de modo teste
         numero = numero_do_envio(db, usuario)
     except conexoes.SemNumero:  # computador desligado agora: vale o escolhido na tela (ou o automático no envio)
         numero = cfg(db, "renov_conexao")
-    camp = Campanha(nome=f"Renovação {hoje:%d/%m} – vencem até {ultimo:%d/%m}"[:160], tipo=TIPO_CAMPANHA,
+    camp = Campanha(nome=(nome or f"Renovação {hoje:%d/%m} – vencem até {ultimo:%d/%m}")[:160], tipo=TIPO_CAMPANHA,
                     objetivo="Renovar o certificado digital dos clientes", quantidade=len(escolhidos),
                     canais=cfg(db, "renov_canais"), status="gerando", usuario_id=usuario.id, inicio=hoje,
                     cadencia_id=garantir_cadencia(db).id, conexao_id=numero or "",
@@ -756,8 +816,8 @@ def criar_campanha(db, usuario: Usuario, quantidade: int | None = None) -> Campa
     db.add(camp)
     db.commit()
     trabalhos.iniciar("campanha", camp.id, usuario.id, {"fase": "renovacao", "grupos": [
-        {"ids": [c.id for c in g.certificados], "datas": [d.isoformat() if d else None for d in ds]}
-        for g, ds in zip(escolhidos, datas)]})
+        {"ids": [c.id for c in g.certificados], "datas": [d.isoformat() if d else None for d in ds], "onda": n}
+        for (g, n), ds in zip(grupos, datas)]})
     return camp
 
 
@@ -767,11 +827,12 @@ def datas_da_campanha(db, contatos: list[Contato], ignorar_campanha: int | None 
     pular_fds = ler_config(db, "pular_fim_de_semana") == "1"
     inicio = primeiro_dia(db)
     canais = cfg(db, "renov_canais")
+    dias = dias_aviso(db)
     com_zap = ["whatsapp" in canais and bool(c.whatsapp) for c in contatos]
     carga = carga_marcada(db, inicio, ignorar_campanha)
     agendadas = iter(agenda([c.vencimento for c, z in zip(contatos, com_zap) if z], inicio, pular_fds, carga,
-                            teto_por_dia(db)))
-    return [next(agendadas) if z else datas_dos_avisos(c.vencimento, inicio, pular_fds)
+                            teto_por_dia(db), dias))
+    return [next(agendadas) if z else datas_dos_avisos(c.vencimento, inicio, pular_fds, dias)
             for c, z in zip(contatos, com_zap)]
 
 
@@ -836,6 +897,7 @@ def etapa_preparar(campanha_id: int, estado: dict, prazo: float) -> bool:
             pular_fds = ler_config(db, "pular_fim_de_semana") == "1"
             for grupo in lote:
                 ids = grupo["ids"] if isinstance(grupo, dict) else grupo
+                onda = grupo.get("onda", 0) if isinstance(grupo, dict) else 0
                 certs = [c for c in (db.get(Certificado, i) for i in ids)
                          if c is not None and c.status == "Ativo" and c.campanha_id in (None, campanha_id)
                          and c.data_vencimento > hoje]
@@ -846,8 +908,18 @@ def etapa_preparar(campanha_id: int, estado: dict, prazo: float) -> bool:
                 # as datas vêm prontas da criação (agenda com o teto por dia); sem elas, as regras simples
                 datas = ([date.fromisoformat(d) if d else None for d in grupo["datas"]]
                          if isinstance(grupo, dict) and grupo.get("datas") and len(certs) == len(ids)
-                         else datas_dos_avisos(contato.vencimento, primeiro_dia(db), pular_fds))
+                         else datas_dos_avisos(contato.vencimento, primeiro_dia(db), pular_fds, dias_aviso(db)))
                 if not any(datas):
+                    continue
+                if onda:  # 2ª onda do mesmo contato: o lead é o da 1ª (se ela entrou), com avisos próprios
+                    lead = lead_do_contato(db, contato.chave)
+                    if lead is None or lead.id not in estado["escolhidos"]:
+                        continue
+                    for c in certs:
+                        c.campanha_id, c.lead_id = campanha_id, lead.id
+                    estado.setdefault("ondas", {}).setdefault(str(lead.id), []).append(
+                        {"textos": textos_do_contato(db, contato, usuario), "cert": certs[0].id,
+                         "datas": [d.isoformat() if d else None for d in datas]})
                     continue
                 lead, motivo = _lead_para_o_contato(db, contato, usuario)
                 if lead is None or lead.id in estado["escolhidos"]:
@@ -873,6 +945,36 @@ def datas_do_estado(estado: dict) -> dict[int, list[date | None]] | None:
     return {int(k): [date.fromisoformat(x) if x else None for x in v] for k, v in datas.items()}
 
 
+def ondas_do_estado(estado: dict) -> dict | None:
+    """As ondas seguintes guardadas no trabalho → {lead_id: [{"textos", "cert", "datas": [data ou None]}]}."""
+    if not estado.get("ondas"):
+        return None
+    return {int(k): [{**o, "datas": [date.fromisoformat(x) if x else None for x in o["datas"]]} for o in v]
+            for k, v in estado["ondas"].items()}
+
+
+def montar_ondas(db, camp: Campanha, cadencia, usuario: Usuario, ondas_por_lead: dict) -> int:
+    """Os avisos das ondas seguintes (certificado do mesmo contato vencendo bem depois): os mesmos passos, com as
+    datas e os textos da onda, na mesma campanha. Cada aviso guarda o certificado da onda. Devolve quantos criou."""
+    from . import cadencias
+
+    criadas = 0
+    for i in range(max((len(v) for v in ondas_por_lead.values()), default=0)):
+        da_vez = {lid: v[i] for lid, v in ondas_por_lead.items() if i < len(v)}
+        leads = [lead for lead in (db.get(Lead, lid) for lid in da_vez) if lead is not None]
+        antes = db.scalar(select(func.max(Tarefa.id))) or 0
+        r = cadencias.aplicar(db, cadencia, leads, usuario, camp.inicio or date.today(), camp.id,
+                              {lid: o["textos"] for lid, o in da_vez.items()},
+                              [c for c in camp.canais.split(",") if c], "rascunho", camp.cta, camp.tom,
+                              foco_whatsapp=True, datas_por_lead={lid: o["datas"] for lid, o in da_vez.items()},
+                              permitir_em_andamento=True, hora_minima=hora_inicio(db))
+        db.flush()
+        for t in db.execute(select(Tarefa).where(Tarefa.campanha_id == camp.id, Tarefa.id > antes)).scalars():
+            t.certificado_id = da_vez[t.lead_id]["cert"]
+        criadas += r["tarefas"]
+    return criadas
+
+
 def depois_de_montar(db, camp: Campanha) -> None:
     """Cada aviso guarda o certificado que define as datas (o primeiro a vencer do contato), para parar sozinho quando
     ele vencer ou for renovado. Contato que cadencias.aplicar pulou volta para a próxima campanha."""
@@ -883,7 +985,8 @@ def depois_de_montar(db, camp: Campanha) -> None:
         primeiro.setdefault(c.lead_id, c.id)
     com_aviso = set()
     for t in db.execute(select(Tarefa).where(Tarefa.campanha_id == camp.id)).scalars():
-        t.certificado_id = primeiro.get(t.lead_id)
+        if t.certificado_id is None:
+            t.certificado_id = primeiro.get(t.lead_id)
         com_aviso.add(t.lead_id)
     for c in certs:
         if c.lead_id not in com_aviso:
@@ -904,9 +1007,11 @@ def reajustar_na_aprovacao(db, camp: Campanha, rascunhos: list[Tarefa]) -> list[
     vencimentos = dict(db.execute(select(Certificado.id, Certificado.data_vencimento)
                                   .where(Certificado.campanha_id == camp.id)).all())
     ordem = {a: i for i, a in enumerate(ANGULOS)}
-    por_lead: dict[int, list[Tarefa]] = {}
-    for t in rascunhos:
-        por_lead.setdefault(t.lead_id, []).append(t)
+    por_lead: dict[tuple, list[Tarefa]] = {}
+    for t in rascunhos:  # cada onda (lead + certificado que guia os avisos) é contada separada
+        por_lead.setdefault((t.lead_id, t.certificado_id), []).append(t)
+    dias = dias_aviso(db)
+    minimo = hora_inicio(db)
 
     def vencimento_de(tarefas):
         return next((vencimentos.get(t.certificado_id) for t in tarefas if t.certificado_id), None)
@@ -915,14 +1020,14 @@ def reajustar_na_aprovacao(db, camp: Campanha, rascunhos: list[Tarefa]) -> list[
     grupos = sorted(por_lead.values(), key=lambda ts: (vencimento_de(ts) or date.max, ts[0].lead_id))
     com_zap = [vencimento_de(ts) is not None and any(t.canal == "whatsapp" for t in ts) for ts in grupos]
     agendadas = iter(agenda([vencimento_de(ts) for ts, z in zip(grupos, com_zap) if z], inicio, pular_fds,
-                            carga_marcada(db, inicio, ignorar_campanha=camp.id), teto_por_dia(db)))
+                            carga_marcada(db, inicio, ignorar_campanha=camp.id), teto_por_dia(db), dias))
     continuam = []
     for tarefas, zap_no_grupo in zip(grupos, com_zap):
         vencimento = vencimento_de(tarefas)
         if zap_no_grupo:
             datas = next(agendadas)
         else:
-            datas = datas_dos_avisos(vencimento, inicio, pular_fds) if vencimento else [None] * len(DIAS_AVISO)
+            datas = datas_dos_avisos(vencimento, inicio, pular_fds, dias) if vencimento else [None] * len(dias)
         zaps = {}
         for t in sorted(tarefas, key=lambda t: t.canal != "whatsapp"):  # o WhatsApp primeiro: o e-mail vem depois dele
             i = ordem.get(t.angulo)
@@ -936,7 +1041,8 @@ def reajustar_na_aprovacao(db, camp: Campanha, rascunhos: list[Tarefa]) -> list[
             if t.data != nova:
                 zap = zaps.get(t.angulo) if t.canal == "email" else None
                 if zap is not None:
-                    t.data, t.hora = cadencias.depois_de(db, zap.data, zap.hora or "09:00", pular_fds=pular_fds)
+                    t.data, t.hora = cadencias.depois_de(db, zap.data, zap.hora or "09:00", pular_fds=pular_fds,
+                                                         minimo=minimo)
                 else:
                     t.data = nova
             continuam.append(t)
@@ -996,13 +1102,18 @@ def mudar_situacao(db, cert: Certificado, situacao: str, usuario: Usuario | None
         tarefas = db.execute(select(Tarefa).where(Tarefa.campanha_id == cert.campanha_id, Tarefa.lead_id == cert.lead_id,
                                                   Tarefa.status.in_(("pendente", "rascunho")))).scalars().all()
     if situacao in ("Renovado", "Não renovará") and tarefas:
+        # os avisos guiados por este certificado (a onda dele) continuam por outro certificado ativo da mesma onda; sem
+        # outro, param. Os avisos das outras ondas do contato não mudam.
         outro = db.execute(select(Certificado).where(
             Certificado.campanha_id == cert.campanha_id, Certificado.lead_id == cert.lead_id, Certificado.id != cert.id,
-            Certificado.status == "Ativo").order_by(Certificado.data_vencimento)).scalars().first()
+            Certificado.status == "Ativo", Certificado.data_vencimento >= cert.data_vencimento,
+            Certificado.data_vencimento <= cert.data_vencimento + timedelta(days=janela(db)))
+            .order_by(Certificado.data_vencimento)).scalars().first()
         for t in tarefas:
+            if t.certificado_id != cert.id:
+                continue
             if outro is not None:
-                if t.certificado_id == cert.id:
-                    t.certificado_id = outro.id
+                t.certificado_id = outro.id
                 continue
             t.status, t.concluida_em = "cancelada", agora()
             t.resultado = (f"Certificado marcado como {SITUACOES[situacao].lower()}"
@@ -1022,6 +1133,8 @@ def rodada_diaria() -> str:
         if cfg(db, "renov_ativo") != "1":
             return ""
         hoje = date.today()
+        if cfg(db, "renov_ativo_desde") and hoje.isoformat() < cfg(db, "renov_ativo_desde")[:10]:
+            return ""  # piloto de 13/11/2026: o sistema assume sozinho a partir de 01/01/2027
         if cfg(db, "renov_ultima_rodada") == hoje.isoformat() or agora().strftime("%H:%M") < cfg(db, "renov_hora"):
             return ""
         gravar_config(db, "renov_ultima_rodada", hoje.isoformat())
@@ -1051,6 +1164,10 @@ def arte_do_toque(db, tarefa: Tarefa | None) -> dict | None:
         return None
     certs = db.execute(select(Certificado).where(Certificado.campanha_id == camp.id, Certificado.lead_id == tarefa.lead_id,
                                                  Certificado.status == "Ativo")).scalars().all()
+    guia = db.get(Certificado, tarefa.certificado_id)
+    if guia is not None:  # só os certificados da onda deste aviso
+        limite = guia.data_vencimento + timedelta(days=janela(db))
+        certs = [c for c in certs if guia.data_vencimento <= c.data_vencimento <= limite]
     if len(certs) != 1:
         return None
     dados = _arte_do_certificado(certs[0])
@@ -1168,8 +1285,10 @@ def numero_em_modo_teste(id_conexao: str) -> bool:
 # ---------------------------------------------------------------- Área de teste (como a da IA SDR)
 
 EXEMPLO_TESTE = {"cliente_nome": "EMPRESA EXEMPLO LTDA", "cnpj": "11.222.333/0001-81", "tipo": "e-CNPJ A1 12 meses"}
-AVISOS_TESTE = {"renov_aviso": "Só o 1º aviso", **{a: f"Só: {n}" for a, n in list(ANGULOS.items())[1:]},
-                "todos": "Os 4 avisos"}
+def avisos_teste(db) -> dict:
+    nomes = nomes_dos_avisos(dias_aviso(db))
+    return {"renov_aviso": "Só o 1º aviso", **{a: f"Só: {n}" for a, n in list(nomes.items())[1:]},
+            "todos": "Os 4 avisos"}
 
 
 def exemplos_para_teste(db, limite: int = 40) -> list[tuple[Certificado, int]]:
@@ -1179,7 +1298,7 @@ def exemplos_para_teste(db, limite: int = 40) -> list[tuple[Certificado, int]]:
     certs = db.execute(select(Certificado).where(
         Certificado.origem == ORIGEM, Certificado.status == "Ativo", Certificado.data_vencimento > hoje)
         .order_by(Certificado.data_vencimento, Certificado.id).limit(600)).scalars().all()
-    no_mes = Counter(chave_do_contato(c) for c in certs if c.data_vencimento <= hoje + timedelta(days=JANELA_DIAS))
+    no_mes = Counter(chave_do_contato(c) for c in certs if c.data_vencimento <= hoje + timedelta(days=janela(db)))
     return [(c, no_mes.get(chave_do_contato(c), 1) if chave_do_contato(c) else 1) for c in certs[:limite]]
 
 
@@ -1188,7 +1307,7 @@ def contato_do_teste(db, cert_id: int, remetente: Usuario | None) -> Contato:
     campanha) ou um cliente fictício (cert_id 0) que vence daqui a 30 dias, com o nome de quem assina."""
     hoje = date.today()
     if not cert_id:
-        exemplo = Certificado(origem=ORIGEM, protocolo="", status="Ativo", data_vencimento=hoje + timedelta(days=JANELA_DIAS),
+        exemplo = Certificado(origem=ORIGEM, protocolo="", status="Ativo", data_vencimento=hoje + timedelta(days=janela(db)),
                               responsavel=(remetente.nome if remetente else ""), **EXEMPLO_TESTE)
         return Contato("teste:exemplo", [exemplo])
     cert = db.get(Certificado, cert_id)
@@ -1197,7 +1316,7 @@ def contato_do_teste(db, cert_id: int, remetente: Usuario | None) -> Contato:
     chave = chave_do_contato(cert)
     certs = [cert]
     if chave:
-        limite = max(hoje + timedelta(days=JANELA_DIAS), cert.data_vencimento)
+        limite = max(hoje + timedelta(days=janela(db)), cert.data_vencimento)
         certs = [c for c in db.execute(select(Certificado).where(
             Certificado.origem == ORIGEM, Certificado.status == "Ativo", Certificado.data_vencimento > hoje,
             Certificado.data_vencimento <= limite)).scalars() if chave_do_contato(c) == chave]
@@ -1259,9 +1378,10 @@ def enviar_teste(db, usuario: Usuario, cert_id: int, canal: str, destino: str, a
         return feito
     if canal == "email" and dados_arte:
         imagem_email = arte_do_teste_no_email(db, cert_id, dados_arte)
+    nomes = nomes_dos_avisos(dias_aviso(db))
     for angulo in angulos:
         t = textos[angulo]
-        rotulo = f"[TESTE · {cert.cliente_nome[:60]} · {ANGULOS[angulo]}]"
+        rotulo = f"[TESTE · {cert.cliente_nome[:60]} · {nomes[angulo]}]"
         try:
             if canal == "whatsapp":
                 arte = {"teste": cert_id, **dados_arte} if dados_arte and config.WHATSAPP_PONTE else None
@@ -1292,7 +1412,7 @@ def e_lead_de_renovacao(lead: Lead) -> bool:
     return (lead.origem or "") == ORIGEM_LEAD
 
 
-def situacao_na_tela(cert: Certificado, hoje: date | None = None) -> tuple[str, str]:
+def situacao_na_tela(cert: Certificado, hoje: date | None = None, dias_da_janela: int = JANELA_DIAS) -> tuple[str, str]:
     """(classe do selo, texto) para a lista da tela Renovação."""
     hoje = hoje or date.today()
     if cert.status in ("Renovado", "Não renovará"):
@@ -1307,6 +1427,6 @@ def situacao_na_tela(cert: Certificado, hoje: date | None = None) -> tuple[str, 
         return ("selo-erro", "Sem WhatsApp e sem e-mail")
     if cert.data_vencimento <= hoje:
         return ("", "Vence hoje")
-    if cert.data_vencimento <= hoje + timedelta(days=JANELA_DIAS):
+    if cert.data_vencimento <= hoje + timedelta(days=dias_da_janela):
         return ("selo-alerta", "Pronto para avisar")
-    return ("", f"Aviso a partir de {cert.data_vencimento - timedelta(days=JANELA_DIAS):%d/%m}")
+    return ("", f"Aviso a partir de {cert.data_vencimento - timedelta(days=dias_da_janela):%d/%m}")

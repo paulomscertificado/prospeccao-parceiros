@@ -101,7 +101,7 @@ def test_importar_de_novo_nao_duplica(cliente):
     with sessao() as db:
         _limpar(db)
         r = renovacao.importar(db, renovacao.ler_planilha("r.xlsx", _planilha(linhas))[0], _admin(db))
-        assert r["novos"] == 1 and r["a_vencer_30"] == 1
+        assert r["novos"] == 1 and r["na_janela"] == 1 and r["janela"] == renovacao.janela(db)
         r = renovacao.importar(db, renovacao.ler_planilha("r.xlsx", _planilha(linhas))[0], _admin(db))
         assert r["novos"] == 0 and r["iguais"] == 1
         linhas[0][11] = "81988880002"  # o relatório novo traz outro celular
@@ -501,11 +501,11 @@ def test_ponte_leva_a_arte_e_a_copia_volta_para_o_email(cliente, monkeypatch):
 
 # ---------------------------------------------------------------- Área de teste (pedido de 12/11/2026)
 
-# situação dos números como o WhatsApp Leads informa: o principal em MODO TESTE (só simula) e o u3 por QR code
+# situação dos números como o WhatsApp Leads informa: o principal em MODO TESTE (só simula) e o u903 por QR code
 _NUMEROS = {"disponivel": True, "conectado": True, "tipo": "teste",
             "conexoes": {"principal": {"conectado": True, "tipo": "teste", "estado": "Conectado"},
-                         "u3": {"conectado": True, "tipo": "qr", "estado": "Conectado", "numero": "5581999990003"},
-                         "u9": {"conectado": False, "tipo": "qr", "estado": "Desconectado"}}}
+                         "u903": {"conectado": True, "tipo": "qr", "estado": "Conectado", "numero": "5581999990003"},
+                         "u909": {"conectado": False, "tipo": "qr", "estado": "Desconectado"}}}
 
 
 def _numeros_cadastrados(db):
@@ -513,7 +513,7 @@ def _numeros_cadastrados(db):
     from app.modelos import ConexaoWhatsApp
 
     conexoes.garantir_principal(db)
-    for cid, nome in (("u3", "WhatsApp de verdade"), ("u9", "WhatsApp desconectado")):
+    for cid, nome in (("u903", "WhatsApp de verdade"), ("u909", "WhatsApp desconectado")):
         if db.get(ConexaoWhatsApp, cid) is None:
             db.add(ConexaoWhatsApp(id=cid, nome=nome, compartilhada_todos=True))
     db.flush()
@@ -639,13 +639,13 @@ def test_numero_automatico_nunca_e_o_de_modo_teste_se_houver_um_de_verdade(clien
         admin = _admin(db)
         numeros = {n["id"]: n for n in renovacao.numeros_para_escolher(db)}
         assert numeros["principal"]["teste"] and numeros["principal"]["conectado"]
-        assert not numeros["u3"]["teste"] and numeros["u3"]["numero"] == "(81) 99999-0003"
-        assert not numeros["u9"]["conectado"]
-        assert renovacao.numero_automatico(db, admin) == "u3"  # nunca o principal em modo teste
+        assert not numeros["u903"]["teste"] and numeros["u903"]["numero"] == "(81) 99999-0003"
+        assert not numeros["u909"]["conectado"]
+        assert renovacao.numero_automatico(db, admin) == "u903"  # nunca o principal em modo teste
         assert renovacao.numero_do_envio(db, admin, "principal") == "principal"  # escolhido: vale (a tela avisa)
-        assert renovacao.numero_em_modo_teste("principal") and not renovacao.numero_em_modo_teste("u3")
+        assert renovacao.numero_em_modo_teste("principal") and not renovacao.numero_em_modo_teste("u903")
         try:
-            renovacao.numero_do_envio(db, admin, "u9")
+            renovacao.numero_do_envio(db, admin, "u909")
             assert False, "número desconectado não pode ser usado"
         except conexoes.SemNumero as erro:
             assert "desconectado" in str(erro)
@@ -675,22 +675,156 @@ def test_escolher_o_numero_do_teste_e_dos_disparos(cliente, csrf, monkeypatch):
     assert filas[-1]["conexao"] == "principal" and "está em MODO TESTE" in r.text
     r = cliente.post("/renovacao/testar", data={"csrf": csrf, "certificado": "0", "canal": "whatsapp",
                                                 "whatsapp_teste": "81999990000", "avisos": "renov_aviso",
-                                                "conexao_teste": "u3"})
-    assert filas[-1]["conexao"] == "u3" and "pelo número " in r.text and "está em MODO TESTE" not in r.text
+                                                "conexao_teste": "u903"})
+    assert filas[-1]["conexao"] == "u903" and "pelo número " in r.text and "está em MODO TESTE" not in r.text
     r = cliente.post("/renovacao/testar", data={"csrf": csrf, "certificado": "0", "canal": "whatsapp",
                                                 "whatsapp_teste": "81999990000", "avisos": "renov_aviso"})
-    assert filas[-1]["conexao"] == "u3"  # automático: o de verdade, nunca o de modo teste
+    assert filas[-1]["conexao"] == "u903"  # automático: o de verdade, nunca o de modo teste
     # número dos disparos: fica gravado e cada campanha nova já nasce com ele
     cliente.post("/renovacao/configurar", data={"csrf": csrf, "canal_whatsapp": "on", "canal_email": "on",
-                                                "maximo_dia": "40", "hora": "07:45", "conexao": "u3", "arte": "on"})
+                                                "maximo_dia": "40", "hora": "07:45", "conexao": "u903", "arte": "on"})
     with sessao() as db:
-        assert renovacao.cfg(db, "renov_conexao") == "u3"
+        assert renovacao.cfg(db, "renov_conexao") == "u903"
         renovacao.importar(db, renovacao.ler_planilha("r.xlsx", _planilha([
             _linha(12, "9800001", "e-CNPJ A1 12 meses", "NUMERO ESCOLHIDO LTDA", "11222333000181", "ANA NUMERO",
                    "12345678901", "ana@numeroescolhido.com.br", "81987653333")]))[0], _admin(db))
         camp = renovacao.criar_campanha(db, _admin(db), 10)
-        assert camp.conexao_id == "u3"
+        assert camp.conexao_id == "u903"
         _limpar(db)
         from app.banco import gravar_config
 
         gravar_config(db, "renov_conexao", "")
+
+
+
+# ---------------------------------------------------------------- Piloto de 13/11/2026 a 01/01/2027
+
+def _configurar_piloto(db, **extra):
+    from app.banco import gravar_config
+
+    valores = {"renov_dias": "12,6,3,1", "renov_hora_inicio": "10:00", "renov_canais": "whatsapp,email",
+               "renov_arte": "1", **extra}
+    antes = {k: renovacao.cfg(db, k) for k in valores}
+    for k, v in valores.items():
+        gravar_config(db, k, v)
+    return antes
+
+
+def _desfazer(db, antes):
+    from app.banco import gravar_config
+
+    for k, v in antes.items():
+        gravar_config(db, k, v if v != renovacao.PADRAO.get(k) else "")
+
+
+def test_dias_dos_avisos_e_horario_vem_da_tela(cliente):
+    """Pedido da Maria (13/11/2026): avisar 12, 6, 3 e 1 dia antes, a partir das 10h."""
+    hoje = date(2026, 11, 16)  # segunda-feira
+    dias = (12, 6, 3, 1)
+    # vence numa quarta, 02/12: 20/11 (sex), 26/11 (qui), 27/11 (sex, 3 dias antes de 30/11 = sábado → sexta)...
+    datas = renovacao.datas_dos_avisos(date(2026, 12, 2), hoje, True, dias)
+    assert datas[0] == date(2026, 11, 20) and datas[1] == date(2026, 11, 26) and datas[3] == date(2026, 12, 1)
+    with sessao() as db:
+        antes = _configurar_piloto(db)
+        assert renovacao.dias_aviso(db) == (12, 6, 3, 1) and renovacao.janela(db) == 12
+        assert renovacao.hora_inicio(db) == "10:00"
+        assert renovacao.nomes_dos_avisos(renovacao.dias_aviso(db))["renov_ultimo"] == "Último aviso (1 dia antes)"
+        from app import cadencias
+
+        for _ in range(30):  # horário natural sempre a partir das 10h
+            assert cadencias.hora_natural(db, date(2026, 12, 7), minimo="10:00") >= "10:00"
+        from app.banco import gravar_config
+
+        gravar_config(db, "renov_dias", "40,abc")  # inválido: volta ao padrão
+        assert renovacao.dias_aviso(db) == renovacao.DIAS_AVISO
+        _desfazer(db, antes)
+
+
+def test_campanha_do_piloto_com_ondas_e_a_partir_das_10h(cliente, monkeypatch):
+    """Campanha até uma data (piloto: até 31/12) com os avisos marcados desde já: o contato com um certificado que vence
+    bem depois do primeiro ganha uma 2ª onda de avisos, com o certificado dela e a arte (um certificado na onda)."""
+    from app import trabalhos
+
+    monkeypatch.setattr(trabalhos.threading, "Thread", _SemLinha)
+    linhas = [
+        # contato com dois vencimentos distantes (20 e 40 dias): duas ondas
+        _linha(20, "9900001", "e-CNPJ A1 12 meses", "ONDA UM LTDA", "19131243000197", "OTAVIO ONDA",
+               "12345678901", "otavio@onda-teste.com.br", "81987654441"),
+        _linha(40, "9900002", "e-CNPJ A3 36 meses", "ONDA DOIS LTDA", "34028316000103", "OTAVIO ONDA",
+               "12345678901", "otavio@onda-teste.com.br", "81987654441"),
+        # outro contato, um certificado em 35 dias (fora dos 12 dias, mas dentro do piloto)
+        _linha(35, "9900003", "e-CPF A1 12 meses", "", "", "PATRICIA PILOTO", "98765432100",
+               "patricia@piloto-teste.com.br", "81987654442"),
+    ]
+    with sessao() as db:
+        _limpar(db)
+        antes = _configurar_piloto(db)
+        renovacao.importar(db, renovacao.ler_planilha("r.xlsx", _planilha(linhas))[0], _admin(db))
+        assert renovacao.contatos_para_campanha(db)[0] == []  # ninguém nos próximos 12 dias
+        camp = renovacao.criar_campanha(db, _admin(db), ate=date.today() + timedelta(days=50),
+                                        nome="Renovação – piloto de teste")
+        cid = camp.id
+    _montar(cid)
+    with sessao() as db:
+        camp = db.get(Campanha, cid)
+        assert camp.status == "aguardando_aprovacao" and camp.nome == "Renovação – piloto de teste", camp.erro
+        tarefas = db.execute(select(Tarefa).where(Tarefa.campanha_id == cid)).scalars().all()
+        assert all((t.hora or "") >= "10:00" for t in tarefas)  # a partir das 10h, WhatsApp e e-mail
+        um = db.execute(select(Certificado).where(Certificado.protocolo == "9900001")).scalars().one()
+        dois = db.execute(select(Certificado).where(Certificado.protocolo == "9900002")).scalars().one()
+        do_otavio = [t for t in tarefas if t.lead_id == um.lead_id]
+        assert {t.certificado_id for t in do_otavio} == {um.id, dois.id}  # duas ondas, cada uma com o seu
+        onda1 = [t for t in do_otavio if t.certificado_id == um.id and t.canal == "whatsapp"]
+        onda2 = [t for t in do_otavio if t.certificado_id == dois.id and t.canal == "whatsapp"]
+        assert onda1 and onda2 and max(t.data for t in onda1) < min(t.data for t in onda2)
+        assert all(t.data <= um.data_vencimento for t in onda1) and all(t.data <= dois.data_vencimento for t in onda2)
+        assert "ONDA UM LTDA" in onda1[0].mensagem and "ONDA DOIS LTDA" not in onda1[0].mensagem
+        assert "ONDA DOIS LTDA" in onda2[0].mensagem and "desconsiderar" in onda2[0].mensagem
+        primeira2 = min(onda2, key=lambda t: (t.data, t.hora))
+        assert (dois.data_vencimento - primeira2.data).days <= 12  # a 2ª onda começa 12 dias antes do vencimento dela
+        assert renovacao.arte_do_toque(db, onda2[0])["nome"] == "ONDA DOIS LTDA"  # um certificado na onda: com arte
+        # renovou o da 1ª onda: só os avisos dela param
+        renovacao.mudar_situacao(db, um, "Renovado", _admin(db))
+        assert all(t.status == "cancelada" for t in onda1) and all(t.status == "rascunho" for t in onda2)
+        _desfazer(db, antes)
+        _limpar(db)
+
+
+def test_campanha_automatica_so_comeca_na_data_escolhida(cliente, monkeypatch):
+    from app import trabalhos
+    from app.banco import gravar_config
+
+    monkeypatch.setattr(trabalhos.threading, "Thread", _SemLinha)
+    with sessao() as db:
+        antes = _configurar_piloto(db, renov_ativo="1", renov_hora="00:00", renov_dono_id=str(_admin(db).id),
+                                   renov_ativo_desde=(date.today() + timedelta(days=1)).isoformat(),
+                                   renov_ultima_rodada="")
+        assert renovacao.rodada_diaria() == ""  # antes da data: nada
+        gravar_config(db, "renov_ativo_desde", date.today().isoformat())
+        db.commit()
+    texto = renovacao.rodada_diaria()
+    assert texto  # na data: roda (monta a campanha do dia ou avisa que não há ninguém)
+    with sessao() as db:
+        gravar_config(db, "renov_ultima_rodada", "")
+        _desfazer(db, antes)
+        _limpar(db)
+
+
+def test_tela_salva_dias_horario_e_inicio(cliente, csrf):
+    r = cliente.post("/renovacao/configurar", data={
+        "csrf": csrf, "canal_whatsapp": "on", "canal_email": "on", "maximo_dia": "40", "hora": "07:45", "arte": "on",
+        "dias": "1, 12, 3, 6", "hora_inicio": "10:00", "ativo_desde": "2027-01-01"})
+    assert r.status_code == 200
+    with sessao() as db:
+        assert renovacao.dias_aviso(db) == (12, 6, 3, 1) and renovacao.hora_inicio(db) == "10:00"
+        assert renovacao.cfg(db, "renov_ativo_desde") == "2027-01-01"
+    pagina = cliente.get("/renovacao").text
+    assert "Vencem em 12 dias" in pagina and "1º aviso (12 dias antes)" in pagina and 'value="12, 6, 3, 1"' in pagina
+    r = cliente.post("/renovacao/configurar", data={"csrf": csrf, "canal_whatsapp": "on", "maximo_dia": "40",
+                                                    "hora": "07:45", "dias": "12, 6"})
+    assert "Escreva os 4 dias" in r.text
+    with sessao() as db:
+        from app.banco import gravar_config
+
+        for chave in ("renov_dias", "renov_hora_inicio", "renov_ativo_desde"):
+            gravar_config(db, chave, "")

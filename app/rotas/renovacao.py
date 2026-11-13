@@ -26,10 +26,10 @@ def _n(n: int, um: str, varios: str) -> str:
     return f"{n} {um if n == 1 else varios}"
 
 
-def _no_filtro(ver: str, c: Certificado, hoje: date) -> bool:
+def _no_filtro(ver: str, c: Certificado, hoje: date, janela: int = renovacao.JANELA_DIAS) -> bool:
     aberto = c.status == "Ativo" and c.data_vencimento >= hoje
     if ver == "avisar":
-        return aberto and c.data_vencimento <= hoje + timedelta(days=renovacao.JANELA_DIAS)
+        return aberto and c.data_vencimento <= hoje + timedelta(days=janela)
     if ver == "campanha":
         return aberto and bool(c.campanha_id)
     if ver == "sem_contato":
@@ -46,12 +46,15 @@ def tela_renovacao(request: Request, ver: str = "avisar", usuario: Usuario = Dep
                    db: Session = Depends(obter_db)):
     hoje = date.today()
     ver = ver if ver in FILTROS else "avisar"
+    dias = renovacao.dias_aviso(db)
+    janela = dias[0]
+    filtros = {**FILTROS, "avisar": f"Vencem em {janela} dias"}
     todos = db.execute(select(Certificado).where(Certificado.origem == renovacao.ORIGEM)).scalars().all()
     abertos = [c for c in todos if c.status == "Ativo" and c.data_vencimento >= hoje]
     contatos, fora = renovacao.contatos_para_campanha(db, hoje)
     kpis = {
         "base": len(abertos),
-        "em_30": sum(1 for c in abertos if c.data_vencimento <= hoje + timedelta(days=renovacao.JANELA_DIAS)),
+        "em_30": sum(1 for c in abertos if c.data_vencimento <= hoje + timedelta(days=janela)),
         "prontos_contatos": len(contatos), "prontos_certificados": sum(len(c.certificados) for c in contatos),
         "em_campanha": sum(1 for c in abertos if c.campanha_id),
         "sem_contato": sum(1 for c in abertos if not renovacao.chave_do_contato(c)),
@@ -76,15 +79,17 @@ def tela_renovacao(request: Request, ver: str = "avisar", usuario: Usuario = Dep
         numero_auto = "nenhum número conectado"
     return tela(request, "renovacao.html", {
         "cfg": {c: renovacao.cfg(db, c) for c in renovacao.PADRAO}, "mensagens": renovacao.mensagens(db),
-        "angulos": renovacao.ANGULOS, "dias_aviso": renovacao.DIAS_AVISO, "quantidades": renovacao.QUANTIDADES,
-        "kpis": kpis, "fora": fora, "filtros": FILTROS, "ver": ver, "lista": lista[:LIMITE_LISTA],
+        "angulos": renovacao.nomes_dos_avisos(dias), "dias_aviso": dias, "janela": janela,
+        "quantidades": renovacao.QUANTIDADES,
+        "kpis": kpis, "fora": fora, "filtros": filtros, "ver": ver, "lista": lista[:LIMITE_LISTA],
         "total_lista": len(lista), "por_contato": por_contato, "hoje": hoje, "campanhas": campanhas,
         "contatos_por_campanha": contagem, "usuarios": usuarios, "dono": renovacao.dono(db),
         "limite_frios": ler_config_int(db, "limite_frios_whatsapp", 0), "situacoes": renovacao.SITUACOES,
-        "situacao": renovacao.situacao_na_tela, "chave_do_contato": renovacao.chave_do_contato,
+        "situacao": lambda c, h: renovacao.situacao_na_tela(c, h, janela),
+        "chave_do_contato": renovacao.chave_do_contato,
         "tipo_curto": renovacao.tipo_curto, "url_da_arte": renovacao.URL_DA_ARTE,
         "artes": renovacao.situacao_das_artes(db),
-        "exemplos": renovacao.exemplos_para_teste(db), "avisos_teste": renovacao.AVISOS_TESTE,
+        "exemplos": renovacao.exemplos_para_teste(db), "avisos_teste": renovacao.avisos_teste(db),
         "remetente": renovacao.dono(db) or usuario, "numeros": numeros,
         "numero_auto": numero_auto, "pode_escolher_numero": autorizacao.pode(usuario, "campanhas.escolher_numero"),
     })
@@ -115,7 +120,7 @@ async def importar(request: Request, arquivo: UploadFile = File(...), usuario: U
     db.commit()
     texto = (f"Planilha importada: {_n(r['novos'], 'certificado novo', 'certificados novos')} e "
              f"{_n(r['atualizados'], 'atualizado', 'atualizados')} ({r['iguais']} já estavam iguais). "
-             f"{_n(r['a_vencer_30'], 'vence', 'vencem')} nos próximos 30 dias.")
+             f"{_n(r['na_janela'], 'vence', 'vencem')} nos próximos {r['janela']} dias.")
     if r["sem_contato"]:
         texto += f" {r['sem_contato']} estão sem WhatsApp e sem e-mail na planilha (não recebem aviso)."
     if r["vencidos"]:
@@ -155,6 +160,22 @@ async def configurar(request: Request, usuario: Usuario = Depends(exige("campanh
         avisar(request, "Escolha pelo menos um canal (WhatsApp ou e-mail).", "erro")
         return voltar("/renovacao#configurar")
     maximo = max(1, min(300, util.para_int(form.get("maximo_dia")) or 40))
+    # dias dos 4 avisos (ex.: "12, 6, 3, 1"), horário mínimo e o dia em que a campanha automática começa
+    import re
+
+    dias_txt = sorted({util.para_int(x) or 0 for x in re.split(r"[,; ]+", str(form.get("dias", ""))) if x.strip()},
+                      reverse=True)
+    if form.get("dias") is not None:
+        if len(dias_txt) != 4 or dias_txt[-1] < 1 or dias_txt[0] > 90:
+            avisar(request, "Escreva os 4 dias dos avisos, diferentes, de 1 a 90 (ex.: 12, 6, 3, 1).", "erro")
+            return voltar("/renovacao#configurar")
+        gravar_config(db, "renov_dias", ",".join(str(d) for d in dias_txt))
+    hora_inicio = str(form.get("hora_inicio", "") or "")[:5]
+    if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", hora_inicio):
+        hora_inicio = ""
+    desde = util.para_data(form.get("ativo_desde"))
+    gravar_config(db, "renov_hora_inicio", hora_inicio)
+    gravar_config(db, "renov_ativo_desde", desde.isoformat() if desde else "")
     hora = str(form.get("hora", "07:45"))[:5] or "07:45"
     dono_id = util.para_int(form.get("dono_id"))
     if dono_id and not db.get(Usuario, dono_id):
@@ -173,8 +194,9 @@ async def configurar(request: Request, usuario: Usuario = Depends(exige("campanh
     if form.get("ativo") and not dono_id:
         avisar(request, "Configuração salva, mas escolha quem é o dono das campanhas de renovação.", "erro")
     else:
-        avisar(request, "Configuração salva." + (f" A campanha automática roda todo dia a partir das {hora}."
-                                                 if form.get("ativo") else ""))
+        avisar(request, "Configuração salva." + (
+            f" A campanha automática roda todo dia às {hora}" + (f", a partir de {desde:%d/%m/%Y}" if desde else "") + "."
+            if form.get("ativo") else ""))
     return voltar("/renovacao#configurar")
 
 

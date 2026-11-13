@@ -13,7 +13,7 @@
   <span>3. Monta a campanha (um aviso por contato)</span><span>4. Você aprova</span><span>5. Avisos saem sozinhos (WhatsApp primeiro)</span></div>
 
 <div class="grade">
-  <div class="kpi destaque"><div class="rotulo">Vencem em 30 dias</div><div class="valor">{{ kpis.em_30 }}</div>
+  <div class="kpi destaque"><div class="rotulo">Vencem em {{ janela }} dias</div><div class="valor">{{ kpis.em_30 }}</div>
     <div class="detalhe">{{ kpis.base }} certificados a vencer na base</div></div>
   <div class="kpi"><div class="rotulo">Prontos para avisar</div><div class="valor">{{ kpis.prontos_contatos }}</div>
     <div class="detalhe">contatos ({{ kpis.prontos_certificados }} certificados) fora de campanha</div></div>
@@ -35,7 +35,7 @@
     <div class="campos">
       <div><label>1. Com os dados de qual cliente</label>
         <select name="certificado">
-          <option value="0">Cliente fictício (EMPRESA EXEMPLO LTDA · e-CNPJ A1 · vence em 30 dias)</option>
+          <option value="0">Cliente fictício (EMPRESA EXEMPLO LTDA · e-CNPJ A1 · vence em {{ janela }} dias)</option>
           {% for c, n in exemplos %}<option value="{{ c.id }}">{{ c.data_vencimento.strftime('%d/%m') }} – {{ c.cliente_nome[:60] }} · {{ tipo_curto(c.tipo) or c.tipo[:20] }}{{ ' · ' ~ n ~ ' certificados no mesmo contato (sem arte)' if n > 1 }}</option>{% endfor %}
         </select></div>
       <div><label>2. Testar qual canal</label>
@@ -89,7 +89,7 @@
     <div class="campo-quantas" role="radiogroup" aria-label="Quantos contatos">Quantos contatos (os que vencem primeiro)
       <div class="quantas-empresas">{% for q in quantidades %}<label class="chip"><input type="radio" name="quantidade" value="{{ q }}" {{ 'checked' if loop.first }}> {{ q }}</label>{% endfor %}</div></div>
     <div class="grupo-btn"><button class="btn btn-primario" {{ 'disabled' if not kpis.prontos_contatos }}>Montar campanha</button></div>
-    <p class="ajuda" style="margin-bottom:0">Entra quem vence nos próximos 30 dias e ainda não está em campanha. Cada contato
+    <p class="ajuda" style="margin-bottom:0">Entra quem vence nos próximos {{ janela }} dias e ainda não está em campanha. Cada contato
       (mesmo WhatsApp) recebe <b>uma</b> mensagem por aviso, com a lista dos certificados dele. A campanha só sai depois
       que alguém aprovar.{% if limite_frios %} O WhatsApp segue o ritmo seguro do número (no máximo {{ limite_frios }} contatos
       frios por dia, junto com as Empresas novas; a renovação do dia sai primeiro).{% endif %}</p>
@@ -102,9 +102,14 @@
   <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap">
     <label class="interruptor"><input type="checkbox" name="ativo" {{ 'checked' if cfg.renov_ativo == '1' }}>
       <span class="trilho" aria-hidden="true"></span>
-      <span><b>Montar a campanha do dia sozinho</b><br><span class="pequeno suave">com quem chegou a 30 dias do vencimento (você aprova antes de sair)</span></span></label>
+      <span><b>Montar a campanha do dia sozinho</b><br><span class="pequeno suave">com quem chegou a {{ janela }} dias do vencimento (você aprova antes de sair)</span></span></label>
     <label style="margin:0">Horário<br><input type="time" name="hora" value="{{ cfg.renov_hora }}" style="width:130px"></label>
+    <label style="margin:0">Começar em<br><input type="date" name="ativo_desde" value="{{ cfg.renov_ativo_desde }}" style="width:170px"></label>
     <label style="margin:0;max-width:260px">Máximo de contatos por campanha<br><input type="number" name="maximo_dia" min="1" max="300" value="{{ cfg.renov_maximo_dia }}"></label>
+  </div>
+  <div style="display:flex;gap:24px;align-items:end;flex-wrap:wrap;margin-top:10px">
+    <label style="margin:0;max-width:300px">Avisar quantos dias antes de vencer (4 avisos)<br><input type="text" name="dias" value="{{ dias_aviso|join(', ') }}" placeholder="12, 6, 3, 1"></label>
+    <label style="margin:0">Avisos a partir das<br><input type="time" name="hora_inicio" value="{{ cfg.renov_hora_inicio }}" style="width:130px"></label>
   </div>
   <label style="max-width:420px;margin-top:10px">Dono das campanhas de renovação<br>
     <select name="dono_id"><option value="">Escolha...</option>
