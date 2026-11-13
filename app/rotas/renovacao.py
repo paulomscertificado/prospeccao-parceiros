@@ -17,7 +17,8 @@ from ..web import avisar, tela, voltar
 rotas = APIRouter()
 
 FILTROS = {"avisar": "Vencem em 30 dias", "campanha": "Em campanha", "sem_contato": "Sem WhatsApp e e-mail",
-           "proximos": "Todos a vencer", "encerrados": "Renovados e não vão renovar", "vencidos": "Vencidos"}
+           "proximos": "Todos a vencer", "encerrados": "Renovados e não vão renovar",
+           "cancelados": "Avisos cancelados", "vencidos": "Vencidos"}
 LIMITE_LISTA = 500
 TAMANHO_MAXIMO = 4_000_000  # bytes (a nuvem recebe até 4,5 MB por envio)
 
@@ -38,6 +39,8 @@ def _no_filtro(ver: str, c: Certificado, hoje: date, janela: int = renovacao.JAN
         return aberto
     if ver == "encerrados":
         return c.status in ("Renovado", "Não renovará")
+    if ver == "cancelados":
+        return c.status == "Avisos cancelados"
     return c.status == "Vencido" or (c.status == "Ativo" and c.data_vencimento < hoje)
 
 

@@ -44,8 +44,10 @@ JANELA_DIAS = DIAS_AVISO[0]           # entra na campanha quem vence nos próxim
 INTERVALO_MINIMO_DIAS = 2             # entre dois avisos para o mesmo contato (nunca em dias seguidos)
 QUANTIDADES = (10, 20, 30, 40, 50, 100)  # "Montar campanha agora": quantos contatos
 MAXIMO_NA_LISTA = 5                   # a mensagem lista até 5 certificados; com mais, vai um resumo
-ENCERRADOS = ("Renovado", "Não renovará", "Vencido")
-SITUACOES = {"Renovado": "Renovado", "Não renovará": "Não vai renovar", "Ativo": "Reabrir"}
+ENCERRADOS = ("Renovado", "Não renovará", "Vencido", "Avisos cancelados")
+# "Avisos cancelados": botão "Cancelar avisos" da tela (pedido da Maria em 13/11/2026), sem dizer se renovou ou não
+SITUACOES = {"Renovado": "Renovado", "Não renovará": "Não vai renovar", "Avisos cancelados": "Avisos cancelados",
+             "Ativo": "Reabrir"}
 
 ANGULOS = {
     "renov_aviso": "1º aviso (30 dias antes)",
@@ -1183,6 +1185,7 @@ def encerrar_toques(db, hoje: date | None = None) -> int:
         venceu = cert is not None and cert.data_vencimento < hoje
         t.status, t.concluida_em = "cancelada", agora()
         t.resultado = ("Não saiu antes do vencimento (quem já venceu não recebe aviso)" if venceu
+                       else "Avisos cancelados na tela Renovação" if cert is not None and cert.status == "Avisos cancelados"
                        else f"Certificado marcado como {SITUACOES.get(cert.status, cert.status).lower()}"
                        if cert is not None else "Certificado não existe mais")
     return len(tarefas)
@@ -1420,16 +1423,16 @@ def antes_de_excluir(db, camp: Campanha) -> None:
 
 
 def mudar_situacao(db, cert: Certificado, situacao: str, usuario: Usuario | None) -> int:
-    """Renovado / Não renovará: os avisos que ainda não saíram param (se o contato tiver outro certificado na mesma
-    campanha, os avisos continuam por ele). Ativo (Reabrir): volta para a fila se a campanha dele já acabou.
-    Devolve quantos avisos foram cancelados."""
+    """Renovado / Não renovará / Avisos cancelados: os avisos que ainda não saíram param, WhatsApp e e-mail (se o contato
+    tiver outro certificado na mesma onda, os avisos continuam por ele). Ativo (Reabrir): volta para a fila se a
+    campanha dele já acabou. Devolve quantos avisos foram cancelados."""
     cert.status = situacao
     cancelados = 0
     tarefas = []
     if cert.campanha_id and cert.lead_id:
         tarefas = db.execute(select(Tarefa).where(Tarefa.campanha_id == cert.campanha_id, Tarefa.lead_id == cert.lead_id,
                                                   Tarefa.status.in_(("pendente", "rascunho")))).scalars().all()
-    if situacao in ("Renovado", "Não renovará") and tarefas:
+    if situacao in ("Renovado", "Não renovará", "Avisos cancelados") and tarefas:
         # os avisos guiados por este certificado (a onda dele) continuam por outro certificado ativo da mesma onda; sem
         # outro, param. Os avisos das outras ondas do contato não mudam.
         outro = db.execute(select(Certificado).where(
@@ -1444,7 +1447,8 @@ def mudar_situacao(db, cert: Certificado, situacao: str, usuario: Usuario | None
                 t.certificado_id = outro.id
                 continue
             t.status, t.concluida_em = "cancelada", agora()
-            t.resultado = (f"Certificado marcado como {SITUACOES[situacao].lower()}"
+            t.resultado = (("Avisos cancelados" if situacao == "Avisos cancelados"
+                            else f"Certificado marcado como {SITUACOES[situacao].lower()}")
                            + (f" por {usuario.nome}" if usuario else ""))
             cancelados += 1
     if situacao == "Ativo":
@@ -1743,7 +1747,7 @@ def e_lead_de_renovacao(lead: Lead) -> bool:
 def situacao_na_tela(cert: Certificado, hoje: date | None = None, dias_da_janela: int = JANELA_DIAS) -> tuple[str, str]:
     """(classe do selo, texto) para a lista da tela Renovação."""
     hoje = hoje or date.today()
-    if cert.status in ("Renovado", "Não renovará"):
+    if cert.status in ("Renovado", "Não renovará", "Avisos cancelados"):
         return ("selo-ok" if cert.status == "Renovado" else "", SITUACOES[cert.status])
     if cert.status == "Vencido" or cert.data_vencimento < hoje:
         return ("", "Venceu")

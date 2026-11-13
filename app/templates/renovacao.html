@@ -13,7 +13,7 @@
 <div class="aviso aviso-alerta" style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap">
   <div><b>Campanha esperando aprovação:</b> {{ c.nome }} ({{ contatos_por_campanha.get(c.id, 0) }} contatos).
     Nada sai antes de aprovar. <a href="/campanhas/{{ c.id }}">Ver os avisos</a></div>
-  {% if pode_aprovar %}<form method="post" action="/campanhas/{{ c.id }}/aprovar" data-confirmar="Aprovar a campanha &quot;{{ c.nome }}&quot;? Os avisos começam a sair sozinhos, cada um no seu dia e horário."><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar" value="/renovacao"><button class="btn btn-verde">APROVAR CAMPANHA</button></form>{% endif %}
+  {% if pode_aprovar %}<form method="post" action="/campanhas/{{ c.id }}/aprovar" data-confirmar="Aprovar a campanha &quot;{{ c.nome }}&quot;? Os avisos começam a sair sozinhos, cada um no seu dia e horário."><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar" value="/renovacao"><button class="btn btn-verde">APROVAR CAMPANHA</button></form><form method="post" action="/campanhas/{{ c.id }}/cancelar" style="margin-top:4px" data-confirmar="Cancelar a campanha &quot;{{ c.nome }}&quot; inteira? Nenhum aviso dela que ainda não saiu vai sair. (Para tirar só um cliente, use &quot;Cancelar avisos&quot; na lista de certificados.)"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar" value="/renovacao"><button class="btn btn-perigo btn-pequeno">Cancelar campanha</button></form>{% endif %}
 </div>
 {% endfor %}
 <div class="passos-ia"><span>1. Testa os avisos com você</span><span>2. Importa a planilha de renovação</span>
@@ -206,7 +206,8 @@
         {% if c.status == 'Ativo' and c.data_vencimento >= hoje %}
         <form class="inline" style="display:block;margin:0 0 4px" method="post" action="/renovacao/certificado/{{ c.id }}/situacao"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ver" value="{{ ver }}"><input type="hidden" name="situacao" value="Renovado"><button class="btn btn-pequeno">Renovado</button></form>
         <form class="inline" style="display:block;margin:0 0 4px" method="post" action="/renovacao/certificado/{{ c.id }}/situacao" data-confirmar="Marcar que {{ c.cliente_nome }} não vai renovar? Os avisos que ainda não saíram param."><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ver" value="{{ ver }}"><input type="hidden" name="situacao" value="Não renovará"><button class="btn btn-pequeno">Não vai renovar</button></form>
-        {% elif c.status in ('Renovado', 'Não renovará') or (c.status == 'Ativo' and c.fora_motivo) %}
+        <form class="inline" style="display:block;margin:0 0 4px" method="post" action="/renovacao/certificado/{{ c.id }}/situacao" data-confirmar="Cancelar os avisos de {{ c.cliente_nome }}? Os avisos deste certificado que ainda não saíram param (WhatsApp e e-mail). Dá para reabrir depois."><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ver" value="{{ ver }}"><input type="hidden" name="situacao" value="Avisos cancelados"><button class="btn btn-pequeno btn-perigo">Cancelar avisos</button></form>
+        {% elif c.status in ('Renovado', 'Não renovará', 'Avisos cancelados') or (c.status == 'Ativo' and c.fora_motivo) %}
         <form class="inline" style="display:block;margin:0 0 4px" method="post" action="/renovacao/certificado/{{ c.id }}/situacao"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ver" value="{{ ver }}"><input type="hidden" name="situacao" value="Ativo"><button class="btn btn-pequeno">Reabrir</button></form>
         {% endif %}</td>{% endif %}</tr>
     {% endfor %}
@@ -226,7 +227,8 @@
       <td>{{ contatos_por_campanha.get(c.id, 0) }}</td>
       <td>{{ (usuarios|selectattr('id', 'equalto', c.usuario_id)|map(attribute='nome')|first) or '—' }}</td>
       <td>{{ c.criado_em|datahora }}</td>
-      <td>{% if c.status == 'aguardando_aprovacao' and pode_aprovar %}<form method="post" action="/campanhas/{{ c.id }}/aprovar" data-confirmar="Aprovar a campanha &quot;{{ c.nome }}&quot;? Os avisos começam a sair sozinhos, cada um no seu dia e horário."><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar" value="/renovacao"><button class="btn btn-verde">APROVAR CAMPANHA</button></form>{% else %}<a class="btn" href="/campanhas/{{ c.id }}">Ver</a>{% endif %}</td></tr>
+      <td>{% if c.status == 'aguardando_aprovacao' and pode_aprovar %}<form method="post" action="/campanhas/{{ c.id }}/aprovar" data-confirmar="Aprovar a campanha &quot;{{ c.nome }}&quot;? Os avisos começam a sair sozinhos, cada um no seu dia e horário."><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar" value="/renovacao"><button class="btn btn-verde">APROVAR CAMPANHA</button></form>{% else %}<a class="btn" href="/campanhas/{{ c.id }}">Ver</a>{% endif %}
+        {% if c.status in ('ativa', 'gerando', 'erro') and pode_aprovar %}<form method="post" action="/campanhas/{{ c.id }}/cancelar" style="margin-top:4px" data-confirmar="Cancelar a campanha &quot;{{ c.nome }}&quot; inteira? Nenhum aviso dela que ainda não saiu vai sair. (Para tirar só um cliente, use &quot;Cancelar avisos&quot; na lista de certificados.)"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar" value="/renovacao"><button class="btn btn-perigo btn-pequeno">Cancelar campanha</button></form>{% endif %}</td></tr>
     {% endfor %}
   </table></div>
   {% else %}<p class="suave">Nenhuma campanha de renovação ainda. Importe a planilha e clique em "Montar campanha".</p>{% endif %}

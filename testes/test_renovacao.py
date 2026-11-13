@@ -1181,3 +1181,50 @@ def test_email_do_aviso_nao_passa_do_vencimento(cliente):
         assert (email.data, email.hora) == (sexta, "16:41")
         assert renovacao.emails_no_prazo(db, camp) == 0
         db.rollback()
+
+
+
+def test_botoes_de_cancelar_na_tela_renovacao(cliente, csrf):
+    """Pedido da Maria (13/11/2026): "Cancelar avisos" em cada cliente para os avisos que ainda não saíram (como o
+    Renovado e o Não vai renovar), e "Cancelar campanha" na tela Renovação para a campanha inteira."""
+    with sessao() as db:
+        _limpar(db)
+        camp, cert, zap = _cenario(db, 10, "9600001", "(81) 98888-0001")
+        email = Tarefa(tipo="prospeccao", lead_id=zap.lead_id, campanha_id=camp.id, certificado_id=cert.id,
+                       canal="email", data=date.today() + timedelta(days=1), hora="11:07", status="pendente",
+                       angulo="renov_aviso", mensagem="Olá! O certificado vence em breve.")
+        db.add(email)
+        _, cert2, zap2 = _cenario(db, 12, "9600002", "(81) 98888-0002")
+        db.commit()
+        cid, cert_id, cert2_id, ids = camp.id, cert.id, cert2.id, (zap.id, email.id)
+        zap2_id = zap2.id
+    pagina = cliente.get("/renovacao?ver=campanha").text
+    assert "Cancelar avisos" in pagina and 'value="Avisos cancelados"' in pagina
+    assert f'action="/campanhas/{cid}/cancelar"' in pagina and "Cancelar campanha" in pagina
+    # Cancelar avisos: WhatsApp e e-mail que ainda não saíram param
+    r = cliente.post(f"/renovacao/certificado/{cert_id}/situacao", data={"csrf": csrf, "situacao": "Avisos cancelados",
+                                                                        "ver": "campanha"})
+    assert "avisos cancelados" in r.text and "2 avisos que ainda não tinham saído foram cancelados" in r.text
+    with sessao() as db:
+        assert db.get(Certificado, cert_id).status == "Avisos cancelados"
+        for i in ids:
+            t = db.get(Tarefa, i)
+            assert t.status == "cancelada" and t.resultado.startswith("Avisos cancelados")
+    pagina = cliente.get("/renovacao?ver=cancelados").text
+    assert "CLIENTE 9600001 LTDA" in pagina and "Reabrir" in pagina
+    # Não vai renovar também para os disparos agendados
+    r = cliente.post(f"/renovacao/certificado/{cert2_id}/situacao", data={"csrf": csrf, "situacao": "Não renovará"})
+    assert "1 avisos que ainda não tinham saído foram cancelados" in r.text
+    with sessao() as db:
+        assert db.get(Tarefa, zap2_id).status == "cancelada"
+    # Reabrir volta ao normal
+    cliente.post(f"/renovacao/certificado/{cert_id}/situacao", data={"csrf": csrf, "situacao": "Ativo"})
+    with sessao() as db:
+        assert db.get(Certificado, cert_id).status == "Ativo"
+    # Cancelar a campanha inteira pela tela Renovação: volta para a tela
+    r = cliente.post(f"/campanhas/{cid}/cancelar", data={"csrf": csrf, "voltar": "/renovacao"})
+    assert str(r.url).endswith("/renovacao") and "Campanha cancelada" in r.text
+    with sessao() as db:
+        assert db.get(Campanha, cid).status == "cancelada"
+        _limpar(db)
+        db.commit()

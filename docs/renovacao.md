@@ -48,8 +48,9 @@ base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renova
 7. **Aprovação atrasada** (`reajustar_na_aprovacao`): as datas são contadas de novo do vencimento, com o mesmo teto
    por dia; o que não cabe é cancelado (as outras campanhas empurram tudo para frente).
 8. **Parar** (`encerrar_toques`, chamado pelas filas e pela rotina de hora em hora): aviso de certificado que venceu
-   ou foi marcado Renovado / Não renovará é cancelado. `mudar_situacao` (botões da tela): Renovado/Não renovará
-   cancela os avisos pendentes do contato (se ele tiver outro certificado ativo na mesma campanha, os avisos passam a
+   ou foi marcado Renovado / Não renovará / Avisos cancelados é cancelado. `mudar_situacao` (botões da tela):
+   Renovado/Não renovará/"Cancelar avisos" (status `Avisos cancelados`, em `ENCERRADOS`, aba "Avisos cancelados";
+   pedido da Maria em 13/11/2026) cancela os avisos pendentes do contato (se ele tiver outro certificado ativo na mesma campanha, os avisos passam a
    seguir esse outro); Reabrir volta para a fila se a campanha acabou. Cancelar a campanha devolve à fila quem não
    recebeu nenhum aviso (`liberar_da_campanha`); excluir marca `fora_motivo` em quem já recebeu (`antes_de_excluir`).
 9. **Arte do aviso** (pedido da Maria em 12/11/2026: "pegue o HTML e vá atualizando para cada cliente"): a arte

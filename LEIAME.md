@@ -409,7 +409,11 @@ renovação novo antes, para entrarem os clientes de janeiro).
   cliente recebe nada e nenhuma campanha muda. A arte do teste de e-mail vem da arte que o computador desenhou no teste
   de WhatsApp do mesmo cliente: mande primeiro o teste no WhatsApp e, 1 minuto depois, o de e-mail.
 - **Renovou?** Na lista de certificados, clique em **Renovado** (ou **Não vai renovar**): os avisos que ainda não
-  saíram param. **Reabrir** desfaz.
+  saíram param (WhatsApp e e-mail). **Reabrir** desfaz.
+- **Parar os avisos de um cliente** sem dizer se renovou: botão vermelho **Cancelar avisos** na linha dele. Os avisos
+  que ainda não saíram param e ele vai para a aba **Avisos cancelados** (**Reabrir** desfaz).
+- **Cancelar a campanha inteira:** botão **Cancelar campanha**, no aviso do topo (campanha esperando aprovação) ou no
+  quadro **Campanhas de renovação**. Nenhum aviso dela que ainda não saiu vai sair.
 - A data de nascimento que vem no relatório **não é guardada**.
 
 ### Intervalo entre os envios automáticos
