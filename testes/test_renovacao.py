@@ -828,3 +828,29 @@ def test_tela_salva_dias_horario_e_inicio(cliente, csrf):
 
         for chave in ("renov_dias", "renov_hora_inicio", "renov_ativo_desde"):
             gravar_config(db, chave, "")
+
+
+
+def test_campanha_de_renovacao_aparece_como_renovacao(cliente):
+    """Pedido da Maria (13/11/2026): "você criou essa campanha como IA SDR, preciso dela como renovação". A página da
+    campanha de renovação marca o menu Renovação e volta para lá; a lista da IA SDR não mostra campanhas de renovação."""
+    with sessao() as db:
+        admin = _admin(db)
+        camp = Campanha(nome="Renovação que é renovação", tipo="renovacao", status="aguardando_aprovacao",
+                        usuario_id=admin.id, canais="whatsapp,email", objetivo="Renovar o certificado digital dos clientes")
+        sdr_camp = Campanha(nome="Campanha da IA SDR comum", tipo="parceiros", status="aguardando_aprovacao",
+                            usuario_id=admin.id, canais="whatsapp")
+        db.add_all([camp, sdr_camp])
+        db.commit()
+        cid, sid = camp.id, sdr_camp.id
+    pagina = cliente.get(f"/campanhas/{cid}").text
+    assert "Campanha de Renovação" in pagina and 'href="/renovacao">Voltar para Renovação' in pagina
+    assert 'class="item ativo" href="/renovacao"' in pagina and 'class="item ativo" href="/campanhas"' not in pagina
+    assert "tom " not in pagina.split("<h1>")[1].split("</div></div>")[0]  # nada de cidade/tom da IA SDR no topo
+    lista = cliente.get("/campanhas?de=todas").text
+    assert "Renovação que é renovação" not in lista and "Campanha da IA SDR comum" in lista
+    pagina_sdr = cliente.get(f"/campanhas/{sid}").text
+    assert 'class="item ativo" href="/campanhas"' in pagina_sdr
+    with sessao() as db:
+        for i in (cid, sid):
+            db.get(Campanha, i).status = "cancelada"

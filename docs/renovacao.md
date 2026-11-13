@@ -89,7 +89,12 @@ base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renova
     `montar_ondas` (aplicar com `permitir_em_andamento`), cada aviso com o `certificado_id` da onda (arte e "Renovado"
     por onda: `arte_do_toque` e `mudar_situacao` olham só a onda do aviso). Os textos terminam com "Se você já renovou,
     pode desconsiderar esta mensagem."
-13. **Respostas**: o fluxo normal (cancela os próximos toques, Oportunidade). A IA SDR não responde
+13. **Onde aparece** (pedido da Maria em 13/11/2026: "preciso dela como renovação"): a campanha de renovação é uma
+    `Campanha` com `tipo="renovacao"`, aberta na página comum `/campanhas/<id>`, mas a página marca o menu Renovação, mostra
+    "Campanha de Renovação" no topo (sem cidade/tom da IA SDR) e o "Voltar" leva à tela Renovação
+    (`rotas/sdr.AREAS_DAS_CAMPANHAS`; Empresas novas: igual, para a tela delas). A lista da IA SDR (`/campanhas`) não
+    mostra campanhas de renovação: elas ficam no quadro "Campanhas de renovação" da tela Renovação.
+14. **Respostas**: o fluxo normal (cancela os próximos toques, Oportunidade). A IA SDR não responde
    (`empresas_novas.e_lead_de_venda` inclui a origem "Renovação"). No WhatsApp Leads o contato ganha a etiqueta da IA
    SDR (a Atendente IA de lá não responde).
 

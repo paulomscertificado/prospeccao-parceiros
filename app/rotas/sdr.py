@@ -443,6 +443,9 @@ def _campanha(db: Session, cid: int, usuario: Usuario, permissao: str = "campanh
     return camp
 
 
+AREAS_DAS_CAMPANHAS = {"renovacao": ("/renovacao", "Renovação"), "empresas_novas": ("/empresas-novas", "Empresas novas")}
+
+
 @rotas.get("/campanhas")
 def lista_campanhas(request: Request, ver: str = "todas", de: str = "", usuario: Usuario = Depends(exige("campanhas.ver")),
                     db: Session = Depends(obter_db)):
@@ -455,6 +458,8 @@ def lista_campanhas(request: Request, ver: str = "todas", de: str = "", usuario:
         elif util.para_int(de):
             consulta = consulta.where(Campanha.usuario_id == util.para_int(de))
     consulta = consulta.where(Campanha.arquivada.is_(ver == "arquivadas"))
+    # as campanhas de Renovação ficam na tela Renovação (pedido da Maria em 13/11/2026: "preciso dela como renovação")
+    consulta = consulta.where(Campanha.tipo != "renovacao")
     if ver == "aprovacao":
         consulta = consulta.where(Campanha.status == "aguardando_aprovacao")
     elif ver == "ativas":
@@ -656,6 +661,10 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(exige("c
         "c": camp, "resumo": campanhas.resumo_aprovacao(db, camp), "nomes_categorias": nomes,
         "rodando": camp.status == "gerando", "pode_aprovar": True,
         "aprovador": db.get(Usuario, camp.aprovado_por_id) if camp.aprovado_por_id else None,
+        # Renovação e Empresas novas têm área própria: o menu marca a área e o "Voltar" leva para lá
+        "caminho": AREAS_DAS_CAMPANHAS.get(camp.tipo, (request.url.path,))[0],
+        "voltar_para": AREAS_DAS_CAMPANHAS.get(camp.tipo, ("/campanhas",))[0],
+        "nome_da_area": AREAS_DAS_CAMPANHAS.get(camp.tipo, ("", "IA SDR"))[1],
     })
 
 

@@ -338,7 +338,8 @@ certificadora.
    duplicar.
 3. No quadro **3. Montar campanha agora**, escolha quantos contatos (10 a 100; vão os que vencem primeiro) e clique
    em **Montar campanha**. Em alguns minutos a campanha fica **aguardando aprovação**.
-4. Abra a campanha, confira as mensagens e **aprove**. Depois de aprovada, tudo sai sozinho.
+4. Abra a campanha (quadro **Campanhas de renovação**, no fim da tela Renovação), confira as mensagens e **aprove**.
+   Depois de aprovada, tudo sai sozinho. As campanhas de renovação não aparecem na lista da IA SDR.
 5. No quadro **4**, escolha o **dono** (ele assina e os e-mails saem pela conta dele) e o **Número de WhatsApp dos
    disparos** (só o administrador escolhe; fica gravado em cada campanha e dá para trocar na página da campanha).
    **Número em "MODO TESTE" só simula o envio: a mensagem não chega.** No automático, o sistema usa o número de quem
