@@ -105,6 +105,20 @@ base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renova
     Vence no sábado ou no domingo ("os de sábados e domingos avisar na sexta"): o último aviso fica na sexta
     (`_limites_para_a_sexta`: os avisos de antes ficam pelo menos `INTERVALO_MINIMO_DIAS` antes dela; ex.: vence no
     domingo com 12, 6, 3 e 1: o de 3 dias vai da quinta para a quarta). Nenhum aviso depois do vencimento.
+    **Feriados** ("Sim, pular feriados", mesmo dia): `util.feriados_nacionais(ano)` (fixos + Carnaval, Sexta-feira Santa
+    e Corpus Christi a partir de `util.pascoa`) + `renov_feriados` ("Outros feriados" da tela, `feriados_extras`:
+    "DD/MM" todo ano, "DD/MM/AAAA" só nele) → `feriados_da_renovacao(db, anos)` / `dias_sem_envio(db)` (este ano e o
+    próximo). Feriado conta como fim de semana em tudo: `fora_do_horario`, `datas_dos_avisos`/`agenda`/
+    `_limites_para_a_sexta` (parâmetro `feriados`; vence num feriado ou a sexta é feriado: o último aviso vai para o
+    dia útil antes), `cadencias.dia_e_hora_futuros`/`depois_de`/`aplicar(feriados=)` e `campanhas._feriados` (montagem
+    e `_sem_horario_no_passado` na aprovação). Avisos já marcados num feriado (a piloto, montada antes; ou feriado novo
+    salvo na tela): `remarcar_feriados(db, aplicar=True)` leva cada um ao dia útil mais perto (antes, se der) com 2 dias
+    dos vizinhos, até o vencimento e com vaga no teto de WhatsApps; sem vaga de WhatsApp, só o e-mail; sem dia, cancela.
+    O e-mail vai de novo para ~2 h depois do WhatsApp. A tela chama ao salvar um feriado novo.
+    **Aprovar na tela** (pedido da Maria em 13/11/2026): a tela Renovação mostra no topo a campanha
+    `aguardando_aprovacao` com o botão (e a lista de campanhas também); o formulário manda `voltar=/renovacao` e
+    `rotas/sdr.acao_campanha` volta para lá (só endereços de `AREAS_DAS_CAMPANHAS`). A página da campanha de renovação
+    tem o botão na faixa "APROVAÇÃO NECESSÁRIA".
 15. **Respostas**: o fluxo normal (cancela os próximos toques, Oportunidade). A IA SDR não responde
    (`empresas_novas.e_lead_de_venda` inclui a origem "Renovação"). No WhatsApp Leads o contato ganha a etiqueta da IA
    SDR (a Atendente IA de lá não responde).

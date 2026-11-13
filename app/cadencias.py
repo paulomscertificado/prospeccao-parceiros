@@ -58,7 +58,7 @@ def hora_natural(db: Session, dia: date | None = None, minimo: str = "", maximo:
 
 
 def dia_e_hora_futuros(db: Session, dia: date, pular_fds: bool | None = None, minimo: str = "",
-                       maximo: str = "") -> tuple[date, str]:
+                       maximo: str = "", feriados: frozenset = frozenset()) -> tuple[date, str]:
     """O dia pedido (ou o próximo, se o horário de envio dele já passou) e um horário natural que ainda não passou."""
     from .banco import agora
 
@@ -66,7 +66,7 @@ def dia_e_hora_futuros(db: Session, dia: date, pular_fds: bool | None = None, mi
         pular_fds = ler_config(db, "pular_fim_de_semana") == "1"
     dia = max(dia, agora().date())
     for _ in range(15):
-        if pular_fds and dia.weekday() >= 5:
+        if (pular_fds and dia.weekday() >= 5) or dia in feriados:  # feriados: Renovação (pedido da Maria)
             dia += timedelta(days=1)
             continue
         hora = hora_natural(db, dia, minimo, maximo)
@@ -80,7 +80,8 @@ INTERVALO_DEPOIS_DO_WHATSAPP = 120  # minutos: Empresas novas, o e-mail do toque
 
 
 def depois_de(db: Session, dia: date, hora: str, minutos: int = INTERVALO_DEPOIS_DO_WHATSAPP,
-              pular_fds: bool | None = None, minimo: str = "", maximo: str = "") -> tuple[date, str]:
+              pular_fds: bool | None = None, minimo: str = "", maximo: str = "",
+              feriados: frozenset = frozenset()) -> tuple[date, str]:
     """Dia e horário natural pelo menos `minutos` depois de dia/hora: no mesmo dia, se couber no horário de envio
     (fora do almoço); senão no próximo dia de envio. Empresas novas (pedido da Maria em 12/11/2026): o e-mail de cada
     toque fica para depois do WhatsApp do mesmo toque, que tem prioridade."""
@@ -96,10 +97,10 @@ def depois_de(db: Session, dia: date, hora: str, minutos: int = INTERVALO_DEPOIS
     if minuto % 5 == 0:
         minuto += random.randint(1, 4)  # nada de 14:30, 15:15...
     if minuto > fim + 4:
-        return dia_e_hora_futuros(db, dia + timedelta(days=1), pular_fds, minimo, maximo)  # não cabe hoje: próximo dia
+        return dia_e_hora_futuros(db, dia + timedelta(days=1), pular_fds, minimo, maximo, feriados)  # próximo dia
     hhmm = f"{minuto // 60:02d}:{minuto % 60:02d}"
     if f"{dia:%Y-%m-%d} {hhmm}" <= agora().strftime("%Y-%m-%d %H:%M"):
-        return dia_e_hora_futuros(db, dia, pular_fds, minimo, maximo)  # o WhatsApp já passou: o e-mail fica para já
+        return dia_e_hora_futuros(db, dia, pular_fds, minimo, maximo, feriados)  # o WhatsApp já passou: fica para já
     return dia, hhmm
 
 
@@ -107,7 +108,7 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
             campanha_id: int | None = None, mensagens_sdr: dict | None = None, canais: list[str] | None = None,
             status_tarefa: str = "pendente", cta: str = "", tom: str = "consultivo",
             foco_whatsapp: bool = False, datas_por_lead: dict | None = None, permitir_em_andamento: bool = False,
-            hora_minima: str = "", hora_maxima: str = "") -> dict:
+            hora_minima: str = "", hora_maxima: str = "", feriados: frozenset = frozenset()) -> dict:
     """Cria as tarefas da cadência para cada lead. Pula quem tem opt-out, está encerrado, foi assumido
     por um humano ou já tem uma cadência em andamento.
 
@@ -162,7 +163,7 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
             hora = passo.hora or "09:00"
             if campanha_id:
                 # nunca num horário que já passou: hoje, só daqui a 15 min em diante; sem tempo hoje, amanhã
-                data, hora = dia_e_hora_futuros(db, data, pular_fds, hora_minima, hora_maxima)
+                data, hora = dia_e_hora_futuros(db, data, pular_fds, hora_minima, hora_maxima, feriados)
             dia_anterior = data
             canal = passo.canal
             modelos = {}
@@ -220,7 +221,7 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
                     # Empresas novas: o WhatsApp tem prioridade. O e-mail do toque fica para umas 2 h depois dele (e a
                     # fila de e-mail ainda espera o WhatsApp da empresa sair: campanhas.TIPOS_WHATSAPP_PRIMEIRO)
                     data_extra, hora_extra = depois_de(db, data, hora, pular_fds=pular_fds, minimo=hora_minima,
-                                                       maximo=hora_maxima)
+                                                       maximo=hora_maxima, feriados=feriados)
                 db.add(Tarefa(
                     tipo="prospeccao", lead_id=lead.id, passo_id=passo.id, campanha_id=campanha_id,
                     usuario_id=responsavel.id if responsavel else None, canal=canal_extra, data=data_extra,

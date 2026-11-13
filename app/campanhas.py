@@ -333,7 +333,7 @@ def _montar(campanha_id: int, escolhidos: list[int], textos: dict[int, dict], so
                               foco_whatsapp=camp.tipo in TIPOS_WHATSAPP_PRIMEIRO,  # venda/renovação: WhatsApp primeiro
                               datas_por_lead=datas,  # renovação: datas contadas do vencimento
                               hora_minima=_hora_minima(db, camp),  # renovação: "das 10:00 às 18:00"
-                              hora_maxima=_hora_maxima(db, camp))
+                              hora_maxima=_hora_maxima(db, camp), feriados=_feriados(db, camp))
         if camp.tipo == "renovacao":
             from . import renovacao
 
@@ -375,6 +375,15 @@ def _hora_maxima(db, camp: Campanha) -> str:
     from . import renovacao
 
     return renovacao.hora_fim(db)
+
+
+def _feriados(db, camp: Campanha) -> frozenset:
+    """Dias em que os toques desta campanha não saem, além do fim de semana (Renovação: os feriados)."""
+    if camp.tipo != "renovacao":
+        return frozenset()
+    from . import renovacao
+
+    return renovacao.dias_sem_envio(db)
 
 
 def gerar(campanha_id: int) -> None:
@@ -495,14 +504,15 @@ def aprovar(db, camp: Campanha, usuario: Usuario) -> int:
             if (t.hora or "09:00").endswith(":00"):  # campanha montada antes (09:00 do passo): vira horário natural
                 t.hora = cadencias.hora_natural(db, minimo=minimo, maximo=maximo)  # (escolhido à mão, como 10:20, fica)
             t.data = util.proximo_dia_util(t.data + timedelta(days=atraso)) if atraso else t.data
-        _sem_horario_no_passado(db, rascunhos, minimo, maximo)
+        _sem_horario_no_passado(db, rascunhos, minimo, maximo, _feriados(db, camp))
     camp.status = "ativa"
     camp.aprovado_por_id = usuario.id if usuario else None
     camp.aprovado_em = agora()
     return len(rascunhos)
 
 
-def _sem_horario_no_passado(db, tarefas: list[Tarefa], minimo: str = "", maximo: str = "") -> int:
+def _sem_horario_no_passado(db, tarefas: list[Tarefa], minimo: str = "", maximo: str = "",
+                            feriados: frozenset = frozenset()) -> int:
     """Aprovada depois do horário marcado (ex.: montada de manhã e aprovada à tarde): o toque de hoje que já passou ganha
     um horário novo daqui a pouco (ou vai para o próximo dia, se o horário de envio de hoje acabou). Os toques seguintes
     da mesma empresa nunca ficam antes dele. Devolve quantos mudaram."""
@@ -516,13 +526,15 @@ def _sem_horario_no_passado(db, tarefas: list[Tarefa], minimo: str = "", maximo:
         anterior = None
         for t in lista:
             if f"{t.data:%Y-%m-%d} {t.hora or '00:00'}" <= agora_txt:
-                t.data, t.hora = cadencias.dia_e_hora_futuros(db, t.data, minimo=minimo, maximo=maximo)
+                t.data, t.hora = cadencias.dia_e_hora_futuros(db, t.data, minimo=minimo, maximo=maximo,
+                                                              feriados=feriados)
                 mudou += 1
             if anterior and (t.data, t.hora or "") < (anterior.data, anterior.hora or ""):
-                t.data, t.hora = cadencias.dia_e_hora_futuros(db, anterior.data, minimo=minimo, maximo=maximo)
+                t.data, t.hora = cadencias.dia_e_hora_futuros(db, anterior.data, minimo=minimo, maximo=maximo,
+                                                              feriados=feriados)
                 if (t.data, t.hora) <= (anterior.data, anterior.hora or ""):
                     t.data, t.hora = cadencias.dia_e_hora_futuros(db, anterior.data + timedelta(days=1),
-                                                                  minimo=minimo, maximo=maximo)
+                                                                  minimo=minimo, maximo=maximo, feriados=feriados)
                 mudou += 1
             anterior = t
     return mudou

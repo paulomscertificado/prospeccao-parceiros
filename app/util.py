@@ -219,6 +219,36 @@ def proximo_dia_util(d: date) -> date:
     return d
 
 
+def pascoa(ano: int) -> date:
+    """Domingo de Páscoa do ano (cálculo do calendário gregoriano, de Meeus/Jones/Butcher)."""
+    a = ano % 19
+    b, c = divmod(ano, 100)
+    d, e = divmod(b, 4)
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = divmod(c, 4)
+    semana = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * semana) // 451
+    mes, dia = divmod(h + semana - 7 * m + 114, 31)
+    return date(ano, mes, dia + 1)
+
+
+FERIADOS_FIXOS = ((1, 1, "Confraternização Universal"), (4, 21, "Tiradentes"), (5, 1, "Dia do Trabalho"),
+                  (9, 7, "Independência do Brasil"), (10, 12, "Nossa Senhora Aparecida"), (11, 2, "Finados"),
+                  (11, 15, "Proclamação da República"), (11, 20, "Consciência Negra"), (12, 25, "Natal"))
+
+
+def feriados_nacionais(ano: int) -> dict[date, str]:
+    """Feriados nacionais do ano, com os de data móvel em que o comércio para (Carnaval, Sexta-feira Santa e Corpus
+    Christi)."""
+    p = pascoa(ano)
+    dias = {date(ano, mes, dia): nome for mes, dia, nome in FERIADOS_FIXOS}
+    dias.update({p - timedelta(days=48): "Carnaval", p - timedelta(days=47): "Carnaval",
+                 p - timedelta(days=2): "Sexta-feira Santa", p + timedelta(days=60): "Corpus Christi"})
+    return dias
+
+
 def moeda(valor) -> str:
     valor = float(valor or 0)
     texto = f"{valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")

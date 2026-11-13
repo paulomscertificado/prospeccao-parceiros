@@ -338,7 +338,9 @@ certificadora.
    duplicar.
 3. No quadro **3. Montar campanha agora**, escolha quantos contatos (10 a 100; vão os que vencem primeiro) e clique
    em **Montar campanha**. Em alguns minutos a campanha fica **aguardando aprovação**.
-4. Abra a campanha (quadro **Campanhas de renovação**, no fim da tela Renovação), confira as mensagens e **aprove**.
+4. A campanha que espera aprovação aparece no **topo da tela Renovação**, com o botão verde **APROVAR CAMPANHA**
+   (também no quadro **Campanhas de renovação** e na página da campanha). Para conferir as mensagens antes, clique em
+   **Ver os avisos**. Depois de aprovar, você volta para a tela Renovação.
    Depois de aprovada, tudo sai sozinho. As campanhas de renovação não aparecem na lista da IA SDR.
 5. No quadro **4**, escolha o **dono** (ele assina e os e-mails saem pela conta dele) e o **Número de WhatsApp dos
    disparos** (só o administrador escolhe; fica gravado em cada campanha e dá para trocar na página da campanha).
@@ -356,6 +358,11 @@ piloto: 01/01/2027). Valem para as campanhas montadas depois de salvar.
 4). Fora disso eles esperam e saem no próximo horário permitido; o WhatsApp para às 17:50, para chegar ao cliente antes
 das 18:00. O botão **Disparar** e o **Enviar** da Minha fila também só funcionam nesse horário. Quem vence no
 **sábado ou no domingo** recebe o **último aviso na sexta** antes (nunca no fim de semana nem depois do vencimento).
+
+**Feriados:** nos feriados também não sai aviso. Os nacionais já estão incluídos (e também Carnaval, Sexta-feira Santa
+e Corpus Christi). Os da cidade ou do estado você escreve em **Outros feriados** (quadro 4): `08/12` vale todo ano e
+`08/12/2026` só naquele ano. O aviso que cairia num feriado sai no dia útil antes. Ao salvar um feriado novo, os avisos
+já marcados para ele mudam de dia sozinhos (se não couber em outro dia antes do vencimento, aquele aviso é cancelado).
 
 **Piloto de 13/11/2026 a 01/01/2027:** a campanha **"Renovação – piloto"** leva todos os clientes da planilha que vencem
 até 31/12, com os avisos já marcados (12, 6, 3 e 1 dia antes, a partir das 10h, WhatsApp com a arte pelo número do

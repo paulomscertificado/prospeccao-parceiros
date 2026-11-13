@@ -93,6 +93,7 @@ def tela_renovacao(request: Request, ver: str = "avisar", usuario: Usuario = Dep
         "remetente": renovacao.dono(db) or usuario, "numeros": numeros,
         "numero_auto": numero_auto, "pode_escolher_numero": autorizacao.pode(usuario, "campanhas.escolher_numero"),
         "pode_aprovar": autorizacao.pode(usuario, "campanhas.gerenciar"),
+        "proximos_feriados": renovacao.proximos_feriados(db),
     })
 
 
@@ -181,6 +182,16 @@ async def configurar(request: Request, usuario: Usuario = Depends(exige("campanh
     if hora_fim and hora_fim <= (hora_inicio or "00:00"):
         avisar(request, "O horário final dos avisos precisa ser depois do inicial (ex.: das 10:00 às 18:00).", "erro")
         return voltar("/renovacao#configurar")
+    # outros feriados sem avisos, além dos nacionais (pedido da Maria em 13/11/2026: "pular feriados")
+    mudou_feriados = False
+    if form.get("feriados") is not None:
+        validos, invalidos = renovacao.feriados_extras(str(form.get("feriados")))
+        if invalidos:
+            avisar(request, "Não entendi estes feriados: " + ", ".join(invalidos[:5]) + ". Escreva como 08/12 (todo ano) "
+                            "ou 08/12/2026 (só naquele ano), separados por vírgula.", "erro")
+            return voltar("/renovacao#configurar")
+        mudou_feriados = ", ".join(validos) != renovacao.cfg(db, "renov_feriados")
+        gravar_config(db, "renov_feriados", ", ".join(validos))
     desde = util.para_data(form.get("ativo_desde"))
     gravar_config(db, "renov_hora_inicio", hora_inicio)
     gravar_config(db, "renov_hora_fim", hora_fim)
@@ -200,12 +211,20 @@ async def configurar(request: Request, usuario: Usuario = Depends(exige("campanh
         gravar_config(db, chave, valor)
     registrar_log(db, usuario, "configurou_renovacao", "configuracao", None, request=request)
     db.commit()
+    remarcados = ""
+    if mudou_feriados:  # feriado novo: os avisos já marcados para ele mudam de dia
+        r = renovacao.remarcar_feriados(db)
+        db.commit()
+        if r["remarcados"] or r["cancelados"]:
+            remarcados = (f" {r['remarcados']} aviso(s) que caíam em feriado mudaram de dia"
+                          + (f" e {r['cancelados']} não couberam em outro dia antes do vencimento" if r["cancelados"] else "")
+                          + ".")
     if form.get("ativo") and not dono_id:
-        avisar(request, "Configuração salva, mas escolha quem é o dono das campanhas de renovação.", "erro")
+        avisar(request, "Configuração salva, mas escolha quem é o dono das campanhas de renovação." + remarcados, "erro")
     else:
         avisar(request, "Configuração salva." + (
             f" A campanha automática roda todo dia às {hora}" + (f", a partir de {desde:%d/%m/%Y}" if desde else "") + "."
-            if form.get("ativo") else ""))
+            if form.get("ativo") else "") + remarcados)
     return voltar("/renovacao#configurar")
 
 

@@ -878,7 +878,7 @@ def test_renovacao_so_envia_de_segunda_a_sexta_das_10_as_18(cliente):
         assert renovacao.fora_do_horario(db, sexta.replace(hour=18))
         for dia in (14, 15):  # sábado e domingo, em qualquer horário
             motivo = renovacao.fora_do_horario(db, datetime(2026, 11, dia, 11, 0))
-            assert motivo == "A Renovação só envia de segunda a sexta, das 10:00 às 18:00"
+            assert motivo == "A Renovação só envia de segunda a sexta, fora os feriados, das 10:00 às 18:00"
         # os horários marcados nas campanhas também ficam dentro (com folga de 20 minutos no fim)
         for _ in range(40):
             hora = cadencias.hora_natural(db, date(2026, 12, 7), minimo="10:00", maximo="16:00")
@@ -1005,4 +1005,132 @@ def test_tela_renovacao_tem_o_botao_de_aprovar(cliente, csrf):
     with sessao() as db:
         assert db.get(Campanha, cid).status == "pausada"
         db.get(Campanha, cid).status = "cancelada"
+        db.commit()
+
+
+
+# ---------------------------------------------------------------- Feriados (pedido de 13/11/2026: "pular feriados")
+
+def _dias_uteis_de_verdade(d, passo):
+    """O dia útil mais perto (para frente com passo=1, para trás com passo=-1), sem fim de semana nem feriado
+    nacional."""
+    from app import util
+
+    nacionais = set(util.feriados_nacionais(d.year)) | set(util.feriados_nacionais(d.year + 1))
+    while d.weekday() >= 5 or d in nacionais:
+        d += timedelta(days=passo)
+    return d
+
+
+def test_feriados_nacionais_e_os_da_tela(cliente):
+    from app import util
+
+    assert util.pascoa(2026) == date(2026, 4, 5) and util.pascoa(2027) == date(2027, 3, 28)
+    nacionais = util.feriados_nacionais(2026)
+    for dia in (date(2026, 11, 20), date(2026, 12, 25), date(2026, 11, 15), date(2026, 2, 16), date(2026, 2, 17),
+                date(2026, 4, 3), date(2026, 6, 4), date(2026, 1, 1), date(2026, 9, 7)):
+        assert dia in nacionais, dia
+    assert date(2026, 12, 24) not in nacionais and date(2026, 12, 31) not in nacionais
+    assert renovacao.feriados_extras("8/12, 24/06/2027; 31/02 xx 06/03 08/12") == (
+        ["08/12", "24/06/2027", "06/03"], ["31/02", "xx"])
+    with sessao() as db:
+        gravar_config(db, "renov_feriados", "08/12, 24/06/2027")
+        dias = renovacao.feriados_da_renovacao(db, (2026, 2027))
+        assert date(2026, 12, 8) in dias and date(2027, 12, 8) in dias and date(2027, 6, 24) in dias
+        assert date(2026, 6, 24) not in dias
+        # a fila não envia em feriado (nacional ou da tela), nem com o horário certo
+        for feriado in (datetime(2026, 11, 20, 11, 0), datetime(2026, 12, 25, 11, 0), datetime(2026, 12, 8, 11, 0)):
+            assert "fora os feriados" in renovacao.fora_do_horario(db, feriado)
+        assert renovacao.fora_do_horario(db, datetime(2026, 11, 19, 11, 0)) == ""
+        db.rollback()
+
+
+def test_avisos_nao_sao_marcados_em_feriado():
+    from app import util
+
+    sem_envio = frozenset(util.feriados_nacionais(2026)) | frozenset(util.feriados_nacionais(2027))
+    dias = (12, 6, 3, 1)
+    # vence no sábado 21/11 e a sexta 20/11 é feriado: o último aviso vai para a quinta 19/11 (e o de 3 dias, 17/11)
+    assert renovacao.datas_dos_avisos(date(2026, 11, 21), date(2026, 11, 3), True, dias, sem_envio) == [
+        date(2026, 11, 9), date(2026, 11, 13), date(2026, 11, 17), date(2026, 11, 19)]
+    # vence na segunda 28/12: o de 3 dias antes (25/12, Natal) vem para 24/12
+    assert renovacao.datas_dos_avisos(date(2026, 12, 28), date(2026, 12, 1), True, dias, sem_envio) == [
+        date(2026, 12, 16), date(2026, 12, 22), date(2026, 12, 24), None]
+    # com o teto de WhatsApps por dia: nunca em fim de semana, feriado ou depois do vencimento
+    carga = Counter()
+    for n in range(60):
+        venc = date(2026, 11, 16) + timedelta(days=n)
+        for d in renovacao.agenda([venc], date(2026, 11, 16), True, carga, 3, dias, sem_envio)[0]:
+            assert d is None or (d.weekday() < 5 and d not in sem_envio and d <= venc), (venc, d)
+
+
+def test_remarcar_avisos_que_caem_em_feriado(cliente):
+    """A piloto foi montada antes da regra dos feriados: os avisos marcados num feriado mudam para o dia útil antes
+    (com vaga no teto de WhatsApps e 2 dias dos outros avisos do contato); o e-mail vem depois do WhatsApp. Sem dia que
+    caiba antes do vencimento, o aviso é cancelado."""
+    feriado = _dias_uteis_de_verdade(date.today() + timedelta(days=12), 1)
+    vespera = _dias_uteis_de_verdade(feriado - timedelta(days=1), -1)
+    primeiro = _dias_uteis_de_verdade(date.today() + timedelta(days=3), 1)
+    depois = _dias_uteis_de_verdade(feriado + timedelta(days=4), 1)
+    with sessao() as db:
+        _limpar(db)
+        admin = _admin(db)
+        gravar_config(db, "renov_feriados", feriado.strftime("%d/%m/%Y"))  # um dia útil que vira feriado da cidade
+        camp = Campanha(nome="Renovação com feriado", tipo="renovacao", status="aguardando_aprovacao",
+                        usuario_id=admin.id, canais="whatsapp,email")
+        x = Lead(empresa="CLIENTE FERIADO X LTDA", whatsapp="(81) 98666-0001", email="x@feriado-teste.com.br",
+                 status="Abordagem criada", vendedor_id=admin.id, origem=renovacao.ORIGEM_LEAD)
+        y = Lead(empresa="CLIENTE FERIADO Y LTDA", whatsapp="(81) 98666-0002", status="Abordagem criada",
+                 vendedor_id=admin.id, origem=renovacao.ORIGEM_LEAD)
+        db.add_all([camp, x, y])
+        db.flush()
+        cx = Certificado(origem="planilha", protocolo="9400001", cliente_nome=x.empresa, status="Ativo",
+                         data_vencimento=feriado + timedelta(days=10), campanha_id=camp.id, lead_id=x.id)
+        cy = Certificado(origem="planilha", protocolo="9400002", cliente_nome=y.empresa, status="Ativo",
+                         data_vencimento=feriado, campanha_id=camp.id, lead_id=y.id)
+        db.add_all([cx, cy])
+        db.flush()
+
+        def aviso(lead, cert, angulo, canal, dia, hora):
+            t = Tarefa(tipo="prospeccao", lead_id=lead.id, campanha_id=camp.id, certificado_id=cert.id, canal=canal,
+                       data=dia, hora=hora, status="rascunho", angulo=angulo, mensagem="Olá! Aviso.")
+            db.add(t)
+            return t
+
+        aviso(x, cx, "renov_aviso", "whatsapp", primeiro, "10:21")
+        zap = aviso(x, cx, "renov_lembrete", "whatsapp", feriado, "11:07")
+        email = aviso(x, cx, "renov_lembrete", "email", feriado, "13:41")
+        aviso(x, cx, "renov_reforco", "whatsapp", depois, "10:33")
+        aviso(y, cy, "renov_reforco", "whatsapp", vespera, "10:41")
+        ultimo = aviso(y, cy, "renov_ultimo", "whatsapp", feriado, "15:12")
+        db.flush()
+        # só calcular não muda nada
+        previa = renovacao.remarcar_feriados(db, aplicar=False)
+        assert previa["remarcados"] == 2 and previa["cancelados"] == 1 and zap.data == feriado
+        r = renovacao.remarcar_feriados(db)
+        assert r["remarcados"] == 2 and r["cancelados"] == 1
+        assert zap.data == vespera and zap.hora == "11:07"  # o dia útil antes do feriado
+        assert email.data != feriado and (email.data, email.hora) > (zap.data, zap.hora)
+        assert email.data <= cx.data_vencimento and email.data.weekday() < 5
+        assert ultimo.status == "cancelada" and "feriado" in ultimo.resultado  # vence no feriado e não cabe antes
+        assert renovacao.remarcar_feriados(db) == {"remarcados": 0, "cancelados": 0, "so_email": 0,
+                                                   "mudancas": Counter()}  # nada mais em feriado
+        db.rollback()
+
+
+def test_tela_salva_os_outros_feriados(cliente, csrf):
+    base = {"csrf": csrf, "canal_whatsapp": "on", "canal_email": "on", "maximo_dia": "40", "hora": "07:45",
+            "arte": "on"}
+    r = cliente.post("/renovacao/configurar", data={**base, "feriados": "8/12, 24/06/2027"})
+    assert r.status_code == 200 and "Configuração salva" in r.text
+    with sessao() as db:
+        assert renovacao.cfg(db, "renov_feriados") == "08/12, 24/06/2027"
+    pagina = cliente.get("/renovacao").text
+    assert 'name="feriados" value="08/12, 24/06/2027"' in pagina and "Outros feriados" in pagina
+    assert "Próximos:" in pagina and "fora os feriados" in pagina
+    r = cliente.post("/renovacao/configurar", data={**base, "feriados": "31/02, 08/12"})
+    assert "Não entendi estes feriados: 31/02" in r.text
+    with sessao() as db:
+        assert renovacao.cfg(db, "renov_feriados") == "08/12, 24/06/2027"  # nada mudou
+        gravar_config(db, "renov_feriados", "")
         db.commit()

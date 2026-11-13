@@ -119,8 +119,13 @@
     <label style="margin:0">Avisos a partir das<br><input type="time" name="hora_inicio" value="{{ cfg.renov_hora_inicio }}" style="width:130px"></label>
     <label style="margin:0">até as<br><input type="time" name="hora_fim" value="{{ cfg.renov_hora_fim }}" style="width:130px"></label>
   </div>
-  <p class="ajuda">Os avisos só saem <b>de segunda a sexta</b>, nesse horário (o WhatsApp para 10 minutos antes do fim, para
-    chegar a tempo). Quem vence no sábado ou no domingo recebe o último aviso na sexta.</p>
+  <p class="ajuda">Os avisos só saem <b>de segunda a sexta, fora os feriados</b>, nesse horário (o WhatsApp para 10 minutos
+    antes do fim, para chegar a tempo). Quem vence no sábado ou no domingo recebe o último aviso na sexta.</p>
+  <label style="max-width:560px;margin-top:10px">Outros feriados (sem avisos)<br>
+    <input type="text" name="feriados" value="{{ cfg.renov_feriados }}" placeholder="ex.: 06/03, 24/06, 08/12"></label>
+  <p class="ajuda">Os feriados nacionais já estão incluídos (e também Carnaval, Sexta-feira Santa e Corpus Christi). Escreva
+    os da cidade ou do estado: 08/12 vale todo ano; 08/12/2026, só naquele ano. Aviso que cairia num feriado sai no dia
+    útil antes.{% if proximos_feriados %} Próximos: {% for d, nome in proximos_feriados %}{{ d.strftime('%d/%m') }} ({{ nome }}){{ ', ' if not loop.last }}{% endfor %}.{% endif %}</p>
   <label style="max-width:420px;margin-top:10px">Dono das campanhas de renovação<br>
     <select name="dono_id"><option value="">Escolha...</option>
       {% for u in usuarios %}<option value="{{ u.id }}" {{ 'selected' if dono and dono.id == u.id }}>{{ u.nome }}</option>{% endfor %}</select></label>
