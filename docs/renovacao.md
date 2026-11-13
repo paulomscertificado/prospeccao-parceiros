@@ -1,0 +1,72 @@
+# Renovação (avisos de vencimento do certificado)
+
+Pedido da Maria em 12/11/2026: "um espaço para renovação, com as mesmas funcionalidades das Empresas novas, só que a
+base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renovacao.py` + `app/templates/renovacao.html`
+(tela `/renovacao`, menu "Renovação"). Testes em `testes/test_renovacao.py`. Manual: LEIAME, seção "Renovação".
+
+## Fluxo
+
+1. **Importar** (`ler_planilha` → `importar`): o "Relatório de renovação" da certificadora (.xlsx ou CSV, todas as
+   abas; o cabeçalho é achado nas 15 primeiras linhas pela coluna Vencimento). Colunas reconhecidas por nome, sem
+   acento (`_campo`): Vencimento, Protocolo, Certificado, Razão Social (o relatório sai com o acento estragado, e o
+   caractere estragado é ignorado), CNPJ, Cliente, CPF, Email, Telefone, Parceiro. **Email e Telefone vêm duas
+   vezes**: os de antes da coluna Cliente são da empresa, os de depois, da pessoa. **Data Nascimento nunca é lida**
+   (LGPD: não precisa). Cada linha vira um `Certificado` com `origem="planilha"` (chave = `protocolo`; sem protocolo,
+   documento + tipo + vencimento). Importar de novo atualiza os campos e não mexe na situação. Número na célula do
+   Excel perde o zero da frente: `_documento` devolve (CPF com 11, CNPJ com 14).
+2. **Contato** (`dados_do_registro`): WhatsApp = primeiro celular (11 dígitos com o 9) entre o telefone da pessoa e o
+   da empresa; e-mail = o da pessoa, senão o da empresa. Só da planilha (pedido da Maria): nada é buscado em outro
+   lugar.
+3. **Campanha** (`criar_campanha`, "Montar campanha agora" com 10/20/30/40/50/100 contatos ou `rodada_diaria`):
+   certificados `Ativo`, sem campanha, sem `fora_motivo`, vencendo de amanhã até 30 dias (`a_avisar`), **agrupados por
+   contato** (`agrupar`: chave = WhatsApp, senão e-mail). Na planilha de 12/11/2026 um número aparece em 57
+   certificados: um aviso por certificado seria spam. Ficam de fora (`motivo_de_fora`, as mesmas regras de
+   `cadencias.aplicar`): SAIR (grava `fora_motivo`), pessoa atendendo, já respondeu, já em outra sequência. O trabalho
+   em etapas (`campanhas.etapa_gerar`, fase `"renovacao"` → `etapa_preparar`) cria ou reaproveita o lead do contato
+   (origem `"Renovação (planilha)"`; lead que já existe com o mesmo WhatsApp é reaproveitado, para as respostas não
+   embaralharem), prende os certificados (`campanha_id`, `lead_id`) e calcula datas e textos.
+4. **Avisos** (`datas_dos_avisos`): 30, 15, 5 e 1 dia antes do vencimento do PRIMEIRO certificado do contato. Fim de
+   semana vem para a sexta antes. Quem entra tarde: 1º aviso hoje (ou no próximo dia útil) e só os seguintes que
+   cabem com pelo menos 2 dias entre eles (`INTERVALO_MINIMO_DIAS`). As datas vão prontas para `cadencias.aplicar`
+   (`datas_por_lead`); o "dia" dos passos da cadência só ordena. Cada tarefa guarda em `certificado_id` o certificado
+   que define as datas (`depois_de_montar`).
+   **Teto por dia** (`agenda`, `datas_da_campanha`): com a planilha de 12/11/2026, 100 contatos teriam o 1º aviso no
+   mesmo dia e o número só faz `limite_frios_whatsapp` (20) contatos frios por dia (o excesso atrasaria mais de 2 dias
+   e ficaria esperando clique). A agenda põe no máximo `teto_por_dia` WhatsApps de renovação por dia, contando os já
+   marcados nas outras campanhas de renovação (`carga_marcada`): 1ª passada, o 1º aviso de cada contato no primeiro
+   dia com vaga (quem vence antes escolhe antes); 2ª passada, os lembretes nas vagas que sobram, no dia certo ou alguns
+   dias antes (sem vaga, o lembrete não vai). Sem vaga nenhuma até o vencimento, o 1º aviso vai no dia menos cheio.
+   Começa em `primeiro_dia` (hoje, se o horário de envio de hoje não acabou). Quem só tem e-mail não ocupa vaga.
+5. **Textos** (`textos_do_contato`, editáveis na tela, `renov_mensagens`): `{vencimentos}` vira a frase do certificado
+   ("O certificado digital e-CNPJ A1 em nome de X vence no dia dd/mm/aaaa." / "O seu certificado..." no e-CPF do
+   próprio), a lista (até 5) ou um resumo (mais de 5). Também `{responsavel}`, `{data}`, `{vendedor}`,
+   `{minha_empresa}`. Sem preço (regra `sdr.texto_sem_spam` ao editar).
+6. **Envio**: `renovacao` está em `campanhas.TIPOS_QUE_SAEM_SOZINHOS` e `TIPOS_WHATSAPP_PRIMEIRO` (igual às Empresas
+   novas: WhatsApp sozinho depois da aprovação, e-mail ~2 h depois). Na fila do WhatsApp, no mesmo dia, a renovação vem
+   antes (`order_by` com `case`): ela e as Empresas novas dividem o limite de contatos frios do número, e nos dias
+   cheios de renovação as Empresas novas esperam. Contato sem celular: só e-mail (não fica WhatsApp esperando número).
+7. **Aprovação atrasada** (`reajustar_na_aprovacao`): as datas são contadas de novo do vencimento, com o mesmo teto
+   por dia; o que não cabe é cancelado (as outras campanhas empurram tudo para frente).
+8. **Parar** (`encerrar_toques`, chamado pelas filas e pela rotina de hora em hora): aviso de certificado que venceu
+   ou foi marcado Renovado / Não renovará é cancelado. `mudar_situacao` (botões da tela): Renovado/Não renovará
+   cancela os avisos pendentes do contato (se ele tiver outro certificado ativo na mesma campanha, os avisos passam a
+   seguir esse outro); Reabrir volta para a fila se a campanha acabou. Cancelar a campanha devolve à fila quem não
+   recebeu nenhum aviso (`liberar_da_campanha`); excluir marca `fora_motivo` em quem já recebeu (`antes_de_excluir`).
+9. **Respostas**: o fluxo normal (cancela os próximos toques, Oportunidade). A IA SDR não responde
+   (`empresas_novas.e_lead_de_venda` inclui a origem "Renovação"). No WhatsApp Leads o contato ganha a etiqueta da IA
+   SDR (a Atendente IA de lá não responde).
+
+## Banco
+
+Colunas novas em `certificados` (migração automática): `origem`, `protocolo`, `responsavel`, `whatsapp`, `telefone`,
+`email`, `parceiro_nome`, `lead_id`, `campanha_id`, `fora_motivo`, `importado_em`. O controle antigo de vencimentos
+(`vendas_servico.processar_vencimentos`, menu Vencimentos, escondido na MS) só marca "Vencido" nos certificados da
+planilha e não cria tarefa manual para eles.
+
+Configurações (`renov_*`): `renov_ativo`, `renov_hora`, `renov_maximo_dia`, `renov_canais`, `renov_dono_id`,
+`renov_mensagens`, `renov_ultima_rodada`, `renov_ultimo_resultado`, `renov_ultima_importacao`.
+
+## Permissões
+
+Mesmas das Empresas novas: ver `campanhas.ver`; importar, montar, configurar, mensagens e situação do certificado
+`campanhas.gerenciar`.

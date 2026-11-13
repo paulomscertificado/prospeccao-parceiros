@@ -4,6 +4,7 @@
 |---|---|
 | [instalacao.md](instalacao.md) | 1. Como instalar · 2. Como configurar o banco · 7. Como criar usuários · 8. Como importar leads · 9. Como criar uma campanha |
 | [ia-sdr.md](ia-sdr.md) | **IA SDR**: arquitetura, fluxo de dados, integrações, banco, estratégia de IA, segurança, conformidade e MVP |
+| [renovacao.md](renovacao.md) | **Renovação**: planilha de renovação da certificadora → avisos 30, 15, 5 e 1 dia antes do vencimento, um por contato |
 | [configuracao.md](configuracao.md) | 3. IA · 4. WhatsApp · 5. E-mail · 6. APIs externas (Receita, Google Places, OpenStreetMap, BrasilAPI) |
 | [deploy-vercel.md](deploy-vercel.md) | **Publicar na Vercel**: o que muda na nuvem, trabalhos em etapas, agendador, ponte do WhatsApp, passo a passo |
 | [deploy.md](deploy.md) | 10. Como colocar o sistema em produção (Docker + PostgreSQL + HTTPS) |

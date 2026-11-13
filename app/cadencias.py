@@ -97,7 +97,7 @@ def depois_de(db: Session, dia: date, hora: str, minutos: int = INTERVALO_DEPOIS
 def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario, inicio: date | None = None,
             campanha_id: int | None = None, mensagens_sdr: dict | None = None, canais: list[str] | None = None,
             status_tarefa: str = "pendente", cta: str = "", tom: str = "consultivo",
-            foco_whatsapp: bool = False) -> dict:
+            foco_whatsapp: bool = False, datas_por_lead: dict | None = None) -> dict:
     """Cria as tarefas da cadência para cada lead. Pula quem tem opt-out, está encerrado, foi assumido
     por um humano ou já tem uma cadência em andamento.
 
@@ -133,12 +133,20 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
             continue
         responsavel = db.get(Usuario, lead.vendedor_id) if lead.vendedor_id else usuario
         dia_anterior = None
+        # Renovação (app/renovacao.py): a data de cada aviso vem pronta, contada do vencimento do certificado do
+        # contato (None = aviso que não cabe mais antes do vencimento)
+        datas_lead = (datas_por_lead or {}).get(lead.id)
         for indice, passo in enumerate(cadencia.passos):
             com_visual = visual.no_toque(campanha, indice)  # e-mail em HTML / imagem no WhatsApp (app/visual.py)
-            data = inicio + timedelta(days=passo.dia - 1)
-            if pular_fds:
-                while data.weekday() >= 5 or (dia_anterior and data <= dia_anterior):
-                    data += timedelta(days=1)
+            if datas_lead is not None:
+                data = datas_lead[indice] if indice < len(datas_lead) else None
+                if data is None:
+                    continue
+            else:
+                data = inicio + timedelta(days=passo.dia - 1)
+                if pular_fds:
+                    while data.weekday() >= 5 or (dia_anterior and data <= dia_anterior):
+                        data += timedelta(days=1)
             if dia_anterior and data < dia_anterior:
                 data = dia_anterior  # o toque anterior pulou para outro dia: este não fica antes dele
             hora = passo.hora or "09:00"
@@ -168,8 +176,10 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
                            "assunto_email": (msg.get("assunto", "") or "")[:200]}
                 # pedido da Maria: campanha com WhatsApp cria a mensagem de WhatsApp para todas as empresas; quem está
                 # com o campo WhatsApp em branco fica com ela pronta, esperando cadastrarem o número (não sai antes)
+                # (renovação não: o contato vem só da planilha, pedido da Maria em 12/11/2026)
                 if (da_ia and canal != "whatsapp" and "whatsapp" in (canais or [])
-                        and not (lead.whatsapp or "").strip() and (msg.get("whatsapp") or "").strip()):
+                        and not (lead.whatsapp or "").strip() and (msg.get("whatsapp") or "").strip()
+                        and not (campanha is not None and campanha.tipo == "renovacao")):
                     canal_extra = "whatsapp"
                 # pedido da Maria: quem tem WhatsApp e e-mail recebe os dois em cada toque. Empresas novas também
                 # (12/11/2026), mas com o WhatsApp primeiro: o e-mail fica para depois dele (ver data_extra abaixo)

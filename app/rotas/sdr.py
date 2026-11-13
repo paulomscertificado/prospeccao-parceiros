@@ -479,7 +479,7 @@ def lista_campanhas(request: Request, ver: str = "todas", de: str = "", usuario:
 def _cadencias_da_ia(db: Session) -> list[Cadencia]:
     """Cadências que servem para campanha da IA SDR: todo toque tem um ângulo (a mensagem certa para cada toque).
     As da Agenda (com ligação e LinkedIn, sem ângulo) ficam de fora: a campanha não faz ligação nem LinkedIn."""
-    from .. import empresas_novas
+    from .. import empresas_novas, renovacao
 
     ativas, nomes = [], set()
     for c in db.execute(select(Cadencia).where(Cadencia.ativa.is_(True)).order_by(Cadencia.id)).scalars():
@@ -487,7 +487,7 @@ def _cadencias_da_ia(db: Session) -> list[Cadencia]:
             nomes.add(c.nome)
             ativas.append(c)
     da_ia = [c for c in ativas if c.passos and all(p.angulo for p in c.passos)
-             and c.nome != empresas_novas.CADENCIA_NOME]  # a de venda é só das Empresas novas
+             and c.nome not in (empresas_novas.CADENCIA_NOME, renovacao.CADENCIA_NOME)]  # de venda / renovação
     return da_ia or ativas
 
 
@@ -724,7 +724,7 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
         t = db.get(Tarefa, util.para_int(form.get("tarefa_id")) or 0)
         if t and t.campanha_id == cid and t.status in ("rascunho", "pendente"):
             novo = str(form.get("mensagem", "")).strip()
-            regra = sdr.texto_sem_spam if camp.tipo == "empresas_novas" else sdr.texto_seguro
+            regra = sdr.texto_sem_spam if camp.tipo in ("empresas_novas", "renovacao") else sdr.texto_seguro
             if not regra(novo):
                 avisar(request, "A mensagem tem termos que a SDR não pode usar (valores, %, desconto, exclusividade, "
                                 "contrato ou frases de spam). Ajuste o texto.", "erro")

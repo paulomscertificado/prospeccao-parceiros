@@ -115,6 +115,8 @@ def processar_vencimentos(db: Session, hoje: date | None = None) -> int:
         if dias < 0:
             cert.status = "Vencido"
             continue
+        if cert.origem == "planilha":
+            continue  # tela Renovação: os avisos são a campanha de renovação (app/renovacao.py), não tarefa manual
         alcancados = [n for n in niveis if dias <= n]
         if not alcancados:
             continue

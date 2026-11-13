@@ -271,12 +271,21 @@ def _empresas_novas() -> None:
         log.info("Empresas novas: %s", r)
 
 
+def _renovacao() -> None:
+    from . import renovacao
+
+    r = renovacao.rodada_diaria()
+    if r:
+        log.info("Renovação: %s", r)
+
+
 def _rotina_hora() -> None:
-    from . import reservas
+    from . import renovacao, reservas
     from .vendas_servico import processar_vencimentos
 
     with sessao() as db:
         processar_vencimentos(db)
+        renovacao.encerrar_toques(db)  # aviso de renovação de certificado vencido ou renovado não sai
         campanhas.finalizar_cadencias(db)
     with sessao() as db:
         reservas.preencher_reservas_antigas(db)  # só na primeira vez
@@ -298,6 +307,8 @@ def rodada(numero: int | None) -> None:
         _passo("ler_emails", _ler_emails)
     if _na_vez(numero, "ultima_busca_empresas_novas", 15):
         _passo("empresas_novas", _empresas_novas)
+    if _na_vez(numero, "ultima_rodada_renovacao", 15):
+        _passo("renovacao", _renovacao)
     if _na_vez(numero, "ultima_rotina_hora", 60):
         _passo("rotina_hora", _rotina_hora)
     if alertas.ligado() and _na_vez(numero, "ultima_verificacao_alertas", 5):

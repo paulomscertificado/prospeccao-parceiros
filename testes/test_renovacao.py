@@ -1,0 +1,370 @@
+"""Renovação (pedido da Maria em 12/11/2026): planilha de renovação da certificadora → certificados → campanha com os
+avisos 30, 15, 5 e 1 dia antes do vencimento, um por CONTATO (o mesmo WhatsApp recebe uma mensagem só, com a lista
+dos certificados dele). Quem já venceu não recebe aviso; o contato vem só da planilha."""
+
+import io
+import json
+from collections import Counter
+from datetime import date, datetime, time, timedelta
+
+from sqlalchemy import delete, select
+
+from app import campanhas, renovacao, sdr
+from app.banco import agora, gravar_config, sessao
+from app.modelos import Campanha, Certificado, Lead, Tarefa, Trabalho, Usuario
+
+# O cabeçalho exato do "Relatório de renovação" da certificadora: Email e Telefone repetidos (empresa e pessoa),
+# acento estragado em "Razão Social" e a data de nascimento (que nunca é lida).
+CABECALHO = ["Vencimento", "Protocolo", "Certificado", "Raz�o Social", "CNPJ", "Email", "Telefone", "Cliente",
+             "CPF", "Data Nascimento", "Email", "Telefone", "Unidade", "Ponto", "Parceiro", None]
+
+
+def _linha(dias, protocolo, certificado, razao, cnpj, cliente, cpf, email, telefone, parceiro="Sem parceiro"):
+    venc = datetime.combine(date.today() + timedelta(days=dias), time())
+    return [venc, protocolo, certificado, razao, cnpj, email if cnpj else "", telefone if cnpj else "", cliente, cpf,
+            "01/01/1980", email, telefone, "MS CERTIFICACAO DIGITAL LTDA", "MATRIZ", parceiro, None]
+
+
+def _planilha(linhas) -> bytes:
+    from openpyxl import Workbook
+
+    livro = Workbook()
+    aba = livro.active
+    aba.title = "RELATORIO"
+    aba.append(CABECALHO)
+    for linha in linhas:
+        aba.append(linha)
+    saida = io.BytesIO()
+    livro.save(saida)
+    return saida.getvalue()
+
+
+def _admin(db):
+    return db.execute(select(Usuario).where(Usuario.perfil == "admin")).scalars().first()
+
+
+def _limpar(db):
+    """Os testes dividem o banco: começa sem certificados da planilha e sem campanhas de renovação em aberto."""
+    for camp in db.execute(select(Campanha).where(Campanha.tipo == "renovacao",
+                                                  Campanha.status != "cancelada")).scalars():
+        campanhas.cancelar(db, camp, _admin(db))
+        db.execute(delete(Trabalho).where(Trabalho.tipo == "campanha", Trabalho.ref_id == camp.id))
+    db.execute(delete(Certificado).where(Certificado.origem == renovacao.ORIGEM))
+
+
+def _montar(cid):
+    with sessao() as db:
+        t = db.execute(select(Trabalho).where(Trabalho.ref_id == cid, Trabalho.tipo == "campanha")).scalars().first()
+        estado = json.loads(t.estado)
+    while not campanhas.etapa_gerar(cid, None, estado, float("inf")):
+        pass
+
+
+class _SemLinha:  # a montagem roda aqui, não numa linha de execução paralela (evita corrida no teste)
+    def __init__(self, *a, **k):
+        pass
+
+    def start(self):
+        pass
+
+
+def test_le_o_relatorio_da_certificadora():
+    conteudo = _planilha([
+        _linha(20, "1234567", "e-CNPJ A1 12 meses - videoconferencia", "PADARIA LEITURA LTDA", "11222333000181",
+               "MARIA DA SILVA", "12345678901", "maria@padarialeitura.com.br", "81999990001"),
+        # e-CPF: CPF como número (perde o zero da frente) e telefone fixo (sem WhatsApp: só e-mail)
+        _linha(40, 2345678, "e-CPF A1 12 meses", "", "", "JOAO PEREIRA", 1234567890, "joao.leitura@gmail.com",
+               "8133334444", parceiro="ESCRITORIO X CONTABILIDADE"),
+        [None, "999", "e-CNPJ A1", "SEM DATA LTDA", "", "", "", "", "", "", "", "", "", "", "", None],
+    ])
+    registros, problemas = renovacao.ler_planilha("RELATORIO DE RENOVACAO.xlsx", conteudo)
+    assert len(registros) == 2 and len(problemas) == 1 and "sem data de vencimento" in problemas[0]
+    pj, pf = registros
+    assert pj["razao_social"] == "PADARIA LEITURA LTDA" and pj["cnpj"] == "11222333000181"
+    assert pj["email_empresa"] == "maria@padarialeitura.com.br" and pj["telefone_pessoa"] == "81999990001"
+    assert pf["cpf"] == "01234567890" and pf["protocolo"] == "2345678" and not pf["cnpj"]
+    assert all("nascimento" not in k and "1980" not in str(v) for r in registros for k, v in r.items())
+    d = renovacao.dados_do_registro(pj)
+    assert d["whatsapp"] == "(81) 99999-0001" and d["cnpj"] == "11.222.333/0001-81" and d["parceiro_nome"] == ""
+    assert d["cliente_nome"] == "PADARIA LEITURA LTDA" and d["responsavel"] == "MARIA DA SILVA"
+    d = renovacao.dados_do_registro(pf)
+    assert d["whatsapp"] == "" and d["telefone"] == "(81) 3333-4444" and d["email"] == "joao.leitura@gmail.com"
+    assert d["cnpj"] == "012.345.678-90" and d["cliente_nome"] == "JOAO PEREIRA"
+    assert d["parceiro_nome"] == "ESCRITORIO X CONTABILIDADE"
+    assert renovacao.tipo_curto("PJ - INAPTO A3 36 meses - videoconferencia") == "e-CNPJ A3"
+    assert renovacao.tipo_curto("VALID e-CNPJ A1 12 meses - videoconferencia") == "e-CNPJ A1"
+
+
+def test_importar_de_novo_nao_duplica(cliente):
+    linhas = [_linha(20, "7000001", "e-CNPJ A1 12 meses", "LOJA REPETIDA LTDA", "11444777000161", "ANA SOUZA",
+                     "11144477735", "ana@lojarepetida.com.br", "81988880001")]
+    with sessao() as db:
+        _limpar(db)
+        r = renovacao.importar(db, renovacao.ler_planilha("r.xlsx", _planilha(linhas))[0], _admin(db))
+        assert r["novos"] == 1 and r["a_vencer_30"] == 1
+        r = renovacao.importar(db, renovacao.ler_planilha("r.xlsx", _planilha(linhas))[0], _admin(db))
+        assert r["novos"] == 0 and r["iguais"] == 1
+        linhas[0][11] = "81988880002"  # o relatório novo traz outro celular
+        r = renovacao.importar(db, renovacao.ler_planilha("r.xlsx", _planilha(linhas))[0], _admin(db))
+        assert r["novos"] == 0 and r["atualizados"] == 1
+        cert = db.execute(select(Certificado).where(Certificado.protocolo == "7000001")).scalars().one()
+        assert cert.whatsapp == "(81) 98888-0002" and cert.status == "Ativo" and cert.origem == "planilha"
+        _limpar(db)
+
+
+def test_datas_dos_avisos_30_15_5_e_1_dia_antes():
+    hoje = date(2026, 11, 12)  # quinta-feira
+    # longe: os 4 avisos; sábado/domingo vêm para a sexta antes (nunca para depois do vencimento)
+    assert renovacao.datas_dos_avisos(date(2026, 12, 20), hoje) == [
+        date(2026, 11, 20), date(2026, 12, 4), date(2026, 12, 15), date(2026, 12, 18)]
+    # entrou tarde (vence em 8 dias): 1º aviso hoje; o de 5 dias cairia amanhã (dias seguidos): fica o de 1 dia
+    assert renovacao.datas_dos_avisos(date(2026, 11, 20), hoje) == [hoje, None, None, date(2026, 11, 19)]
+    # vence amanhã: só o 1º aviso
+    assert renovacao.datas_dos_avisos(date(2026, 11, 13), hoje) == [hoje, None, None, None]
+    # num sábado: o 1º aviso vai para a segunda; o de 5 dias cairia no dia seguinte; o de 1 dia (sábado) vem para a
+    # sexta
+    assert renovacao.datas_dos_avisos(date(2026, 11, 22), date(2026, 11, 14)) == [date(2026, 11, 16), None, None,
+                                                                                    date(2026, 11, 20)]
+    # já passou do vencimento: nenhum aviso
+    assert renovacao.datas_dos_avisos(date(2026, 11, 10), hoje) == [None] * 4
+
+
+def test_agenda_respeita_o_teto_de_whatsapps_por_dia():
+    """Com 100 clientes vencendo no mês, os 100 primeiros avisos cairiam no mesmo dia (o número só faz 20 contatos frios
+    por dia). A agenda espalha: quem vence antes escolhe antes, todo mundo recebe o 1º aviso e os lembretes ocupam as
+    vagas que sobram."""
+    hoje = date(2026, 11, 16)  # segunda-feira
+    vencimentos = [date(2026, 11, 20)] * 3 + [date(2026, 12, 10)] * 3
+    datas = renovacao.agenda(vencimentos, hoje, True, Counter(), teto=2)
+    assert [d[0] for d in datas] == [date(2026, 11, 16)] * 2 + [date(2026, 11, 17)] * 2 + [date(2026, 11, 18)] * 2
+    assert max(Counter(d for ds in datas for d in ds if d).values()) <= 2
+    assert datas[0][3] == date(2026, 11, 19) and datas[2][3] is None  # sem vaga (e sem dias entre eles): fica sem
+    assert all(d[0] is not None for d in datas)
+    # carga de outras campanhas conta; sem teto, valem só as datas certas
+    assert renovacao.agenda([date(2026, 11, 20)], hoje, True, Counter({date(2026, 11, 16): 2}), 2)[0][0] == date(2026, 11, 17)
+    assert renovacao.agenda(vencimentos, hoje, True, Counter(), 0) == [renovacao.datas_dos_avisos(v, hoje)
+                                                                       for v in vencimentos]
+
+
+def test_mensagem_lista_os_certificados_do_contato():
+    def cert(nome, dias, tipo="e-CNPJ A1 12 meses", doc="11.222.333/0001-81", responsavel="MARIA DA SILVA"):
+        return Certificado(cliente_nome=nome, tipo=tipo, cnpj=doc, responsavel=responsavel,
+                           data_vencimento=date(2026, 12, 1) + timedelta(days=dias))
+
+    um = renovacao.bloco_vencimentos([cert("PADARIA UM LTDA", 0)])
+    assert um == "O certificado digital e-CNPJ A1 em nome de PADARIA UM LTDA vence no dia 01/12/2026."
+    proprio = renovacao.bloco_vencimentos([cert("MARIA DA SILVA", 0, "e-CPF A3 36 meses", "123.456.789-01")])
+    assert proprio == "O seu certificado digital e-CPF A3 vence no dia 01/12/2026."
+    tres = renovacao.bloco_vencimentos([cert("MERCADO DOIS LTDA", 3), cert("PADARIA UM LTDA", 0),
+                                        cert("MARIA DA SILVA", 5, "e-CPF A1", "123.456.789-01")])
+    assert tres.splitlines() == ["Estes certificados digitais vencem em breve:",
+                                 "• PADARIA UM LTDA (e-CNPJ A1): vence em 01/12/2026",
+                                 "• MERCADO DOIS LTDA (e-CNPJ A1): vence em 04/12/2026",
+                                 "• Seu certificado (e-CPF A1): vence em 06/12/2026"]
+    muitos = renovacao.bloco_vencimentos([cert(f"EMPRESA {i} LTDA", i) for i in range(57)])
+    assert muitos.startswith("57 certificados digitais que você acompanha vencem entre 01/12 e 26/01/2027")
+    assert "EMPRESA 30 LTDA" not in muitos  # mais de 5: um resumo, nunca a lista inteira
+
+
+def test_campanha_agrupa_por_contato_e_marca_os_avisos(cliente, monkeypatch):
+    from app import trabalhos
+
+    monkeypatch.setattr(trabalhos.threading, "Thread", _SemLinha)
+    linhas = [
+        # contato A: o mesmo WhatsApp em 3 certificados (2 empresas + o e-CPF dela) → 1 mensagem por aviso
+        _linha(25, "8000001", "e-CNPJ A1 12 meses - videoconferencia", "PADARIA GRUPO LTDA", "11222333000181",
+               "MARIA DA SILVA", "12345678901", "maria@grupoteste.com.br", "81987650001"),
+        _linha(27, "8000002", "e-CNPJ A1 12 meses", "MERCADO GRUPO LTDA", "11444777000161",
+               "MARIA DA SILVA", "12345678901", "maria@grupoteste.com.br", "81987650001"),
+        _linha(28, "8000003", "e-CPF A1 12 meses", "", "", "MARIA DA SILVA", "12345678901",
+               "maria@grupoteste.com.br", "81987650001"),
+        # contato B: um certificado, WhatsApp e e-mail
+        _linha(20, "8000004", "e-CNPJ A1 12 meses", "LOJA SOZINHA LTDA", "22333444000105", "PEDRO LIMA",
+               "98765432100", "pedro@lojasozinha.com.br", "81987650002"),
+        # contato C: telefone fixo → só e-mail
+        _linha(22, "8000005", "e-CPF A3 36 meses", "", "", "JOANA FIXO", "11122233344", "joana.fixo@gmail.com",
+               "8132320000"),
+        # D: sem WhatsApp e sem e-mail; E: vence daqui a 60 dias (fora da janela); F: já venceu
+        _linha(10, "8000006", "e-CPF A1 12 meses", "", "", "SEM CONTATO", "55566677788", "", ""),
+        _linha(60, "8000007", "e-CNPJ A1 12 meses", "LONGE LTDA", "33444555000106", "LUCAS LONGE", "44455566677",
+               "lucas@longe.com.br", "81987650003"),
+        _linha(-2, "8000008", "e-CNPJ A1 12 meses", "VENCIDA LTDA", "44555666000107", "VERA VENCIDA",
+               "77788899900", "vera@vencida.com.br", "81987650004"),
+    ]
+    with sessao() as db:
+        _limpar(db)
+        admin = _admin(db)
+        r = renovacao.importar(db, renovacao.ler_planilha("r.xlsx", _planilha(linhas))[0], admin)
+        assert r["novos"] == 8 and r["vencidos"] == 1 and r["sem_contato"] == 1
+        contatos, fora = renovacao.contatos_para_campanha(db)
+        assert [len(c.certificados) for c in contatos] == [1, 1, 3]  # B (20 dias), C (22) e A (25): quem vence antes
+        assert fora == {"sem WhatsApp e sem e-mail na planilha": 1}
+        camp = renovacao.criar_campanha(db, admin, quantidade=10)
+        cid = camp.id
+    _montar(cid)
+    with sessao() as db:
+        camp = db.get(Campanha, cid)
+        assert camp.tipo == "renovacao" and camp.status == "aguardando_aprovacao", camp.erro
+        tarefas = db.execute(select(Tarefa).where(Tarefa.campanha_id == cid)).scalars().all()
+        leads = {t.lead_id: t.lead for t in tarefas}
+        assert len(leads) == 3
+        a = next(l for l in leads.values() if l.chave_whatsapp == "81987650001")
+        assert a.origem == renovacao.ORIGEM_LEAD and a.empresa == "Maria da Silva (3 certificados)"
+        dela = [t for t in tarefas if t.lead_id == a.id]
+        zaps = sorted((t for t in dela if t.canal == "whatsapp"), key=lambda t: (t.data, t.hora))
+        venc = date.today() + timedelta(days=25)
+        esperado = renovacao.datas_dos_avisos(venc, renovacao.primeiro_dia(db))
+        assert len(zaps) == sum(1 for d in esperado if d) and zaps[0].angulo == "renov_aviso"
+        assert all(t.data <= venc for t in zaps)
+        aviso = zaps[0].mensagem
+        assert aviso.startswith("Olá, Maria! Tudo bem?") and "Estes certificados digitais vencem em breve" in aviso
+        assert "PADARIA GRUPO LTDA (e-CNPJ A1)" in aviso and "Seu certificado (e-CPF A1)" in aviso and "SAIR" in aviso
+        for zap in zaps:  # o e-mail de cada aviso fica para depois do WhatsApp do mesmo aviso
+            mail = [t for t in dela if t.canal == "email" and t.angulo == zap.angulo]
+            assert mail and (mail[0].data, mail[0].hora) > (zap.data, zap.hora)
+        primeiro = db.execute(select(Certificado).where(Certificado.protocolo == "8000001")).scalars().one()
+        assert {t.certificado_id for t in dela} == {primeiro.id}  # o primeiro a vencer define as datas
+        b = next(l for l in leads.values() if l.chave_whatsapp == "81987650002")
+        texto_b = next(t.mensagem for t in tarefas if t.lead_id == b.id and t.angulo == "renov_aviso" and t.canal == "whatsapp")
+        assert "O certificado digital e-CNPJ A1 em nome de LOJA SOZINHA LTDA vence no dia" in texto_b
+        c = next(l for l in leads.values() if l.email == "joana.fixo@gmail.com")
+        assert {t.canal for t in tarefas if t.lead_id == c.id} == {"email"}  # sem celular: só e-mail
+        presos = {x.protocolo for x in db.execute(select(Certificado).where(Certificado.campanha_id == cid)).scalars()}
+        assert presos == {"8000001", "8000002", "8000003", "8000004", "8000005"}
+        # aprovada no mesmo dia: as datas ficam como estão
+        antes = {t.id: t.data for t in tarefas}
+        campanhas.aprovar(db, camp, _admin(db))
+        assert all(t.status == "pendente" and t.data == antes[t.id] for t in tarefas)
+        # cancelada sem nenhum aviso enviado: os certificados voltam para a fila
+        campanhas.cancelar(db, camp, _admin(db))
+        assert not db.execute(select(Certificado).where(Certificado.campanha_id == cid)).scalars().all()
+        _limpar(db)
+
+
+def _cenario(db, dias_vencimento, protocolo, numero):
+    """Campanha de renovação já aprovada com um contato, um certificado e um aviso de WhatsApp para hoje."""
+    admin = _admin(db)
+    camp = Campanha(nome=f"Renovação teste {protocolo}", tipo="renovacao", status="ativa", usuario_id=admin.id,
+                    canais="whatsapp", aprovado_em=agora())
+    lead = Lead(empresa=f"CLIENTE {protocolo} LTDA", whatsapp=numero, status="Abordagem criada",
+                vendedor_id=admin.id, origem=renovacao.ORIGEM_LEAD)
+    db.add_all([camp, lead])
+    db.flush()
+    cert = Certificado(origem="planilha", protocolo=protocolo, cliente_nome=lead.empresa, tipo="e-CNPJ A1",
+                       data_vencimento=date.today() + timedelta(days=dias_vencimento), status="Ativo",
+                       campanha_id=camp.id, lead_id=lead.id, whatsapp=numero)
+    db.add(cert)
+    db.flush()
+    t = Tarefa(tipo="prospeccao", lead_id=lead.id, campanha_id=camp.id, certificado_id=cert.id, canal="whatsapp",
+               data=date.today(), hora="00:01", status="pendente", angulo="renov_aviso",
+               mensagem="Olá! O certificado digital vence em breve.")
+    db.add(t)
+    db.flush()
+    return camp, cert, t
+
+
+def test_aviso_de_certificado_vencido_ou_renovado_nao_sai(cliente):
+    with sessao() as db:
+        _, vencido, t1 = _cenario(db, -1, "9000001", "(81) 98222-0001")
+        _, renovado, t2 = _cenario(db, 10, "9000002", "(81) 98222-0002")
+        camp, outro, t3 = _cenario(db, 12, "9000003", "(81) 98222-0003")
+        # o mesmo contato tem outro certificado na campanha: marcar um como renovado não para os avisos
+        segundo = Certificado(origem="planilha", protocolo="9000004", cliente_nome="SEGUNDA LTDA", tipo="e-CNPJ A1",
+                              data_vencimento=date.today() + timedelta(days=15), status="Ativo",
+                              campanha_id=camp.id, lead_id=outro.lead_id)
+        db.add(segundo)
+        db.flush()
+        assert renovacao.mudar_situacao(db, renovado, "Renovado", _admin(db)) == 1
+        assert t2.status == "cancelada" and "renovado" in t2.resultado
+        assert renovacao.mudar_situacao(db, outro, "Renovado", _admin(db)) == 0
+        assert t3.status == "pendente" and t3.certificado_id == segundo.id
+        assert renovacao.encerrar_toques(db) >= 1
+        assert t1.status == "cancelada" and "vencimento" in t1.resultado  # quem já venceu não recebe aviso
+        db.rollback()
+
+
+def test_aprovada_depois_conta_as_datas_do_vencimento(cliente):
+    """Aprovada 5 dias depois de montada: nada vai para depois do vencimento (nas outras campanhas tudo é empurrado)."""
+    with sessao() as db:
+        camp, cert, aviso = _cenario(db, 4, "9100001", "(81) 98333-0001")
+        camp.status, camp.aprovado_em = "aguardando_aprovacao", None
+        aviso.status, aviso.data = "rascunho", date.today() - timedelta(days=5)
+        extras = {}
+        for angulo, dias in (("renov_lembrete", -2), ("renov_reforco", 0), ("renov_ultimo", 3)):
+            extras[angulo] = Tarefa(tipo="prospeccao", lead_id=aviso.lead_id, campanha_id=camp.id,
+                                    certificado_id=cert.id, canal="whatsapp", data=date.today() + timedelta(days=dias),
+                                    hora="10:07", status="rascunho", angulo=angulo, mensagem="Olá! Aviso.")
+            db.add(extras[angulo])
+        db.flush()
+        campanhas.aprovar(db, camp, _admin(db))
+        esperado = renovacao.datas_dos_avisos(cert.data_vencimento, renovacao.primeiro_dia(db))
+        pendentes = [t for t in [aviso, *extras.values()] if t.status == "pendente"]
+        assert pendentes and all(t.data <= cert.data_vencimento for t in pendentes)
+        assert aviso.status == "pendente" and aviso.data >= date.today()
+        assert (extras["renov_lembrete"].status == "cancelada") == (esperado[1] is None)
+        db.rollback()
+
+
+def test_fila_manda_a_renovacao_sozinha_e_antes(cliente, monkeypatch):
+    from app.integracoes import whatsapp_leads
+
+    enviados = []
+    monkeypatch.setattr(whatsapp_leads, "configurado", lambda: True)
+    monkeypatch.setattr(whatsapp_leads, "status", lambda: {"disponivel": True})
+    monkeypatch.setattr(campanhas.mensagens, "dentro_do_horario", lambda db: True)
+    monkeypatch.setattr(sdr, "enviar_whatsapp_conectado",
+                        lambda db, texto, u, lead=None, tarefa=None: enviados.append(lead.empresa))
+    with sessao() as db:
+        gravar_config(db, "enviar_whatsapp_automatico", "1")
+        admin = _admin(db)
+        novas = Campanha(nome="Empresas novas antes da renovação", tipo="empresas_novas", status="ativa",
+                         usuario_id=admin.id, canais="whatsapp", aprovado_em=agora())
+        lead_nova = Lead(empresa="NOVA EMPRESA FILA LTDA", whatsapp="(81) 98444-0001", status="Abordagem criada",
+                         vendedor_id=admin.id)
+        db.add_all([novas, lead_nova])
+        db.flush()
+        db.add(Tarefa(tipo="prospeccao", lead_id=lead_nova.id, campanha_id=novas.id, canal="whatsapp",
+                      data=date.today(), hora="00:00", status="pendente", mensagem="Olá! Empresa nova."))
+        _, _, t = _cenario(db, 10, "9200001", "(81) 98444-0002")
+        _, _, vencido = _cenario(db, -1, "9200002", "(81) 98444-0003")
+        db.flush()
+        campanhas.processar_fila_whatsapp(db, maximo=1000)
+        # mesmo dia: a renovação (tem prazo) sai antes da Empresa nova, mesmo marcada para um minuto depois
+        assert enviados.index("CLIENTE 9200001 LTDA") < enviados.index("NOVA EMPRESA FILA LTDA")
+        assert "CLIENTE 9200002 LTDA" not in enviados and vencido.status == "cancelada"
+        assert t.resultado == "Enviada sozinha (campanha de Renovação aprovada)"
+        db.rollback()
+
+
+def test_ia_nao_responde_cliente_da_renovacao():
+    from app import empresas_novas
+
+    assert empresas_novas.e_lead_de_venda(Lead(empresa="X", origem=renovacao.ORIGEM_LEAD))
+    assert not empresas_novas.e_lead_de_venda(Lead(empresa="X", origem="Cadastro manual"))
+
+
+def test_tela_importa_a_planilha_e_monta_a_campanha(cliente, csrf, monkeypatch):
+    from app import trabalhos
+
+    monkeypatch.setattr(trabalhos.threading, "Thread", _SemLinha)
+    with sessao() as db:
+        _limpar(db)
+    assert cliente.get("/renovacao").status_code == 200
+    conteudo = _planilha([_linha(15, "9300001", "e-CNPJ A1 12 meses", "TELA RENOVACAO LTDA", "55666777000108",
+                                 "CARLA TELA", "12312312312", "carla@telarenovacao.com.br", "81987659999")])
+    r = cliente.post("/renovacao/importar", data={"csrf": csrf},
+                     files={"arquivo": ("RELATORIO DE RENOVACAO.xlsx", conteudo,
+                                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    assert r.status_code == 200 and "1 certificado novo" in r.text
+    pagina = cliente.get("/renovacao").text
+    assert "TELA RENOVACAO LTDA" in pagina and "Pronto para avisar" in pagina
+    r = cliente.post("/renovacao/montar", data={"csrf": csrf, "quantidade": "10"})
+    assert r.status_code == 200 and "/campanhas/" in str(r.url)
+    with sessao() as db:
+        camp = db.execute(select(Campanha).where(Campanha.tipo == "renovacao")
+                          .order_by(Campanha.id.desc())).scalars().first()
+        assert camp.status == "gerando" and camp.quantidade == 1
+        _limpar(db)
+    r = cliente.post("/renovacao/importar", data={"csrf": csrf},
+                     files={"arquivo": ("outra.pdf", b"%PDF", "application/pdf")})
+    assert "Excel (.xlsx) ou CSV" in r.text

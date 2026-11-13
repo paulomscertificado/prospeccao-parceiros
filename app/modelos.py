@@ -701,9 +701,25 @@ class Certificado(Base):
     status: Mapped[str] = mapped_column(String(20), default="Ativo", index=True)
     ultimo_alerta: Mapped[int | None] = mapped_column(Integer, nullable=True)  # menor alerta já gerado (dias)
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
+    # Renovação (app/renovacao.py, pedido da Maria em 12/11/2026): certificados do "Relatório de renovação" importado
+    # na tela Renovação (origem "planilha"; chave = protocolo). O contato vem só da planilha. A data de nascimento da
+    # planilha nunca é guardada.
+    origem: Mapped[str] = mapped_column(String(20), default="")
+    protocolo: Mapped[str] = mapped_column(String(30), default="", index=True)
+    responsavel: Mapped[str] = mapped_column(String(200), default="")
+    whatsapp: Mapped[str] = mapped_column(String(30), default="")
+    telefone: Mapped[str] = mapped_column(String(30), default="")
+    email: Mapped[str] = mapped_column(String(160), default="")
+    parceiro_nome: Mapped[str] = mapped_column(String(200), default="")
+    lead_id: Mapped[int | None] = mapped_column(ForeignKey("leads.id", ondelete="SET NULL"), nullable=True, index=True)
+    campanha_id: Mapped[int | None] = mapped_column(ForeignKey("campanhas.id", ondelete="SET NULL"), nullable=True,
+                                                    index=True)  # campanha de renovação que avisou (ou vai avisar)
+    fora_motivo: Mapped[str] = mapped_column(String(160), default="")  # não entra em campanha (ex.: pediu SAIR)
+    importado_em: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     parceiro: Mapped["Parceiro | None"] = relationship()
     cliente: Mapped["Cliente | None"] = relationship()
+    lead: Mapped["Lead | None"] = relationship()
 
 
 class Oportunidade(Base):

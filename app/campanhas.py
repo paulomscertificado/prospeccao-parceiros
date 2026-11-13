@@ -12,7 +12,7 @@ import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import aliased
 
 from . import base_receita, bases_importadas, cadencias, config, contas_email, email_validacao, reservas, ia, mensagens, prospeccao, sdr, trabalhos, util
@@ -247,6 +247,16 @@ def etapa_gerar(campanha_id: int, _usuario_id, estado: dict, prazo: float) -> bo
         if not estado["escolhidos"]:
             raise RuntimeError("Nenhuma empresa nova para contatar (todas já estavam cadastradas e em atendimento).")
         estado["fase"] = fase = "montar"
+    if fase == "renovacao":  # Renovação: os clientes vêm da planilha de renovação (app/renovacao.py)
+        from . import renovacao
+
+        _anotar(campanha_id, f"Preparando os avisos de renovação ({estado.get('feitos', 0)} contatos)...", "gerando")
+        if not renovacao.etapa_preparar(campanha_id, estado, prazo):
+            return False
+        if not estado["escolhidos"]:
+            motivos = "; ".join(f"{n} {m}" for m, n in (estado.get("fora") or {}).items())
+            raise RuntimeError("Nenhum cliente para avisar agora" + (f" ({motivos})." if motivos else "."))
+        estado["fase"] = fase = "montar"
     if fase == "buscar":
         with sessao() as db:
             onde = bases_importadas.nome(db, (db.get(Campanha, campanha_id).base or "receita"))
@@ -293,11 +303,15 @@ def etapa_gerar(campanha_id: int, _usuario_id, estado: dict, prazo: float) -> bo
         if len(textos) < len(escolhidos):
             return False
         estado["fase"] = "montar"
-    _montar(campanha_id, estado["escolhidos"], {int(k): v for k, v in estado["textos"].items()}, estado.get("so_fixo", []))
+    from . import renovacao
+
+    _montar(campanha_id, estado["escolhidos"], {int(k): v for k, v in estado["textos"].items()}, estado.get("so_fixo", []),
+            datas=renovacao.datas_do_estado(estado))
     return True
 
 
-def _montar(campanha_id: int, escolhidos: list[int], textos: dict[int, dict], so_fixo: list[int] | None = None) -> None:
+def _montar(campanha_id: int, escolhidos: list[int], textos: dict[int, dict], so_fixo: list[int] | None = None,
+            datas: dict | None = None) -> None:
     with sessao() as db:
         camp = db.get(Campanha, campanha_id)
         usuario = db.get(Usuario, camp.usuario_id)
@@ -316,8 +330,15 @@ def _montar(campanha_id: int, escolhidos: list[int], textos: dict[int, dict], so
                 reservas.reservar(db, lead, usuario, f"campanha \"{camp.nome}\"")
         r = cadencias.aplicar(db, cad, leads, usuario, camp.inicio or date.today(), camp.id, textos,
                               [c for c in camp.canais.split(",") if c], "rascunho", camp.cta, camp.tom,
-                              foco_whatsapp=camp.tipo == "empresas_novas")  # venda: WhatsApp; e-mail se não tiver
-        camp.etapa = (f"Pronta: {r['leads']} empresas, {r['tarefas']} mensagens"
+                              foco_whatsapp=camp.tipo in TIPOS_WHATSAPP_PRIMEIRO,  # venda/renovação: WhatsApp primeiro
+                              datas_por_lead=datas)  # renovação: datas contadas do vencimento
+        if camp.tipo == "renovacao":
+            from . import renovacao
+
+            db.flush()
+            renovacao.depois_de_montar(db, camp)
+        camp.etapa = (f"Pronta: {r['leads']} {'contatos' if camp.tipo == 'renovacao' else 'empresas'}, "
+                      f"{r['tarefas']} mensagens"
                       + (f" ({len(r['pulados'])} puladas)" if r["pulados"] else "") + ".")
         if so_fixo:
             from .modelos import Notificacao
@@ -437,9 +458,15 @@ def aprovar(db, camp: Campanha, usuario: Usuario) -> int:
     for t in [t for t in rascunhos if t.canal not in ("email", "whatsapp")]:
         t.status = "cancelada"  # campanhas antigas com ligação: a campanha só manda e-mail e WhatsApp
     rascunhos = [t for t in rascunhos if t.status == "rascunho"]
+    if rascunhos and camp.tipo == "renovacao":
+        from . import renovacao
+
+        # aprovada depois do dia em que foi montada: as datas são contadas de novo do vencimento (empurrar tudo para
+        # frente, como nas outras, jogaria avisos para depois do vencimento)
+        rascunhos = renovacao.reajustar_na_aprovacao(db, camp, rascunhos)
     if rascunhos:
         primeiro = min(t.data for t in rascunhos)
-        atraso = max(0, (date.today() - primeiro).days)
+        atraso = 0 if camp.tipo == "renovacao" else max(0, (date.today() - primeiro).days)
         for t in rascunhos:
             t.status = "pendente"
             if (t.hora or "09:00").endswith(":00"):  # campanha montada antes (09:00 do passo): vira horário natural
@@ -480,6 +507,10 @@ def _sem_horario_no_passado(db, tarefas: list[Tarefa]) -> int:
 def cancelar(db, camp: Campanha, usuario: Usuario) -> int:
     tarefas = db.execute(select(Tarefa).where(Tarefa.campanha_id == camp.id,
                                               Tarefa.status.in_(["rascunho", "pendente"]))).scalars().all()
+    if camp.tipo == "renovacao":
+        from . import renovacao
+
+        renovacao.liberar_da_campanha(db, camp)  # quem não recebeu nenhum aviso volta para a fila da Renovação
     for t in tarefas:
         t.status, t.concluida_em, t.resultado = "cancelada", agora(), f"Campanha cancelada por {usuario.nome}"
         if t.lead and t.lead.status == "Abordagem criada":
@@ -521,6 +552,10 @@ def excluir(db, camp: Campanha, usuario: Usuario) -> None:
     from .modelos import Mensagem, Trabalho
 
     cancelar(db, camp, usuario)
+    if camp.tipo == "renovacao":
+        from . import renovacao
+
+        renovacao.antes_de_excluir(db, camp)  # os certificados soltam a campanha (quem já recebeu aviso fica marcado)
     db.execute(update(Mensagem).where(Mensagem.campanha_id == camp.id).values(campanha_id=None))
     db.execute(delete(Tarefa).where(Tarefa.campanha_id == camp.id, Tarefa.status.in_(["cancelada", "rascunho"])))
     db.execute(update(Tarefa).where(Tarefa.campanha_id == camp.id).values(campanha_id=None))
@@ -702,6 +737,10 @@ def processar_fila(db, maximo: int = 25) -> dict:
         return feito
     if not _vez_do_canal(db, "email"):
         return feito  # o último e-mail automático saiu há menos de 3 minutos
+    from . import renovacao
+
+    if renovacao.encerrar_toques(db):  # aviso de renovação de certificado vencido ou renovado não sai
+        db.flush()
     hora = agora().strftime("%H:%M")
     # Só o que já está na hora (filtro no banco) e uma consulta folgada: toques que esperam (responsável sem e-mail,
     # caixa pausada, campanha no limite do dia) não podem tomar as vagas e travar os das outras campanhas.
@@ -1061,11 +1100,14 @@ def whatsapp_liberado(db, lead: Lead) -> bool:
     return bool(lead.consentimento) or lead.id in leads_que_conversaram(db, [lead.id])
 
 
-TIPOS_QUE_SAEM_SOZINHOS = ("empresas_novas",)
+# Renovação (app/renovacao.py, pedido da Maria em 12/11/2026): "as mesmas funcionalidades das Empresas novas".
+TIPOS_QUE_SAEM_SOZINHOS = ("empresas_novas", "renovacao")
 # Empresas novas (pedido da Maria em 12/11/2026): quem tem WhatsApp e e-mail recebe os dois em cada toque, mas o WhatsApp
 # tem prioridade: o e-mail do toque é marcado para umas 2 h depois dele (cadencias.depois_de) e a fila de e-mail só o
-# solta depois que o WhatsApp da empresa saiu (_whatsapp_da_empresa_pendente).
-TIPOS_WHATSAPP_PRIMEIRO = ("empresas_novas",)
+# solta depois que o WhatsApp da empresa saiu (_whatsapp_da_empresa_pendente). Renovação: igual.
+TIPOS_WHATSAPP_PRIMEIRO = ("empresas_novas", "renovacao")
+NOMES_DOS_TIPOS = {"empresas_novas": "campanha de Empresas novas aprovada",
+                   "renovacao": "campanha de Renovação aprovada"}
 DIAS_ATRASO_AUTOMATICO = 2  # toque com mais atraso que isto não sai sozinho (espera o clique): evita rajada
 # A fila automática nunca manda dois WhatsApps para a mesma empresa em menos que isto, mesmo com o intervalo mínimo
 # desligado (0) em Configurações: em 12/11/2026 a Britânica recebeu o 1º e o 2º toque com 10 minutos de diferença
@@ -1109,7 +1151,7 @@ def motivo_automatico(automaticas, campanha_id) -> str:
     """Por que o WhatsApp desta campanha sai sozinho (para a Minha fila e o registro do envio)."""
     tipo = automaticas.get(campanha_id) if isinstance(automaticas, dict) else TIPOS_QUE_SAEM_SOZINHOS[0]
     if tipo in TIPOS_QUE_SAEM_SOZINHOS:
-        return "campanha de Empresas novas aprovada"
+        return NOMES_DOS_TIPOS.get(tipo, "campanha aprovada")
     return "campanha aprovada com WhatsApp automático"
 
 
@@ -1223,6 +1265,10 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
         return feito  # a última mensagem automática saiu há menos de 3 minutos
     if not whatsapp_leads.status().get("disponivel"):
         return feito  # computador com o WhatsApp Leads desligado: tudo espera, nada se perde
+    from . import renovacao
+
+    if renovacao.encerrar_toques(db):  # aviso de renovação de certificado vencido ou renovado não sai
+        db.flush()
     from .modelos import Mensagem
 
     hora = agora().strftime("%H:%M")
@@ -1248,7 +1294,10 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
                        or_(Lead.consentimento.is_(True), conversou, da_campanha_automatica),
                        ~_toque_anterior_pendente(),  # o toque anterior da empresa sai primeiro
                        ~recebeu_ha_pouco)  # nunca dois WhatsApps automáticos para a mesma empresa em menos de 20 h
-                .order_by(Tarefa.data, Tarefa.hora, Tarefa.id).limit(200))
+                # no mesmo dia, o aviso de renovação sai antes (tem prazo: o certificado vence) e divide melhor o
+                # limite de contatos frios do número com as Empresas novas
+                .order_by(Tarefa.data, case((Campanha.tipo == "renovacao", 0), else_=1), Tarefa.hora, Tarefa.id)
+                .limit(200))
     automaticas = campanhas_que_saem_sozinhas(db)
     campanhas_no_limite: set[int] = set()
     for t in db.execute(consulta).scalars():

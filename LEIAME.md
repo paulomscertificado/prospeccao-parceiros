@@ -325,6 +325,47 @@ leads: as respostas vão para **Oportunidades** e o time conversa.
 - **Testar a API:** o botão **Testar (10 empresas · 1 crédito)** busca até 10 empresas abertas **num dia** e só
   mostra a lista. Cada teste olha um dia diferente (ontem, anteontem...), para não vir sempre a mesma lista. Se estiver certa, clique em **Montar a campanha com estas empresas** (não gasta crédito).
 
+### Renovação (aviso de vencimento do certificado para os clientes)
+
+Menu **Renovação**. O sistema avisa os clientes da MS antes de o certificado digital vencer: **30, 15, 5 e 1 dia
+antes**, pelo WhatsApp e pelo e-mail. Os clientes vêm do **Relatório de renovação** que vocês exportam do sistema da
+certificadora.
+
+**Passo a passo:**
+1. Exporte o **Relatório de renovação** (Excel) no sistema da certificadora.
+2. Em **Renovação**, no quadro **1. Importar a planilha de renovação**, escolha o arquivo e clique em
+   **Importar planilha**. Pode importar de novo sempre que sair um relatório novo: quem já estava é atualizado, sem
+   duplicar.
+3. No quadro **2. Montar campanha agora**, escolha quantos contatos (10 a 100; vão os que vencem primeiro) e clique
+   em **Montar campanha**. Em alguns minutos a campanha fica **aguardando aprovação**.
+4. Abra a campanha, confira as mensagens e **aprove**. Depois de aprovada, tudo sai sozinho.
+5. (Opcional) No quadro **3**, ligue a **campanha automática**: todo dia, no horário escolhido, o sistema monta a
+   campanha com quem chegou a 30 dias do vencimento (ela também espera a aprovação). Escolha o **dono** (ele assina e
+   as mensagens saem pelo WhatsApp e pelo e-mail dele) e clique em **Salvar configuração**.
+
+**Como funciona:**
+- Entra quem vence nos **próximos 30 dias**. Quem já venceu **não recebe aviso**.
+- **Uma mensagem por contato:** se o mesmo WhatsApp aparece em vários certificados (ex.: um grupo de empresas com o
+  mesmo telefone), ele recebe **uma** mensagem em cada aviso, com a lista dos certificados (até 5; com mais, um
+  resumo: "57 certificados digitais que você acompanha vencem entre..."). Nunca uma mensagem por certificado.
+- **Datas:** 30, 15, 5 e 1 dia antes do vencimento. Quem entra mais tarde recebe o 1º aviso na hora e só os
+  seguintes que ainda cabem (nunca em dias seguidos). Aviso que cairia no sábado ou no domingo vem para a sexta antes.
+- **WhatsApp primeiro, e-mail depois:** igual às Empresas novas (o e-mail de cada aviso sai umas 2 horas depois do
+  WhatsApp). Quem não tem celular na planilha recebe só por e-mail. Sem WhatsApp e sem e-mail na planilha, não recebe
+  aviso (aparece no filtro **Sem WhatsApp e e-mail**): o contato vem só da planilha.
+- **No máximo 20 por dia:** o número só faz 20 contatos frios por dia (Configurações > Geral). Por isso a campanha
+  espalha os avisos: no máximo 20 WhatsApps de renovação por dia, quem vence antes recebe antes, todo mundo recebe o
+  1º aviso e os lembretes entram nas vagas que sobram. Com 100 clientes, os primeiros avisos levam uma semana.
+- **Renovação antes das Empresas novas:** as duas usam o mesmo número e o mesmo limite. No mesmo dia, a renovação sai
+  primeiro (tem prazo). Nos dias cheios de renovação, as Empresas novas esperam.
+- **Os mesmos cuidados com o WhatsApp:** uma mensagem a cada 3 minutos, limites por hora e por dia, só no horário de
+  envio, e quem responde SAIR não recebe mais.
+- **Quando o cliente responde:** os avisos seguintes param e a resposta vai para **Oportunidades** e **Quem precisa de
+  mim hoje**. A IA não responde esses clientes: quem conversa é a equipe.
+- **Renovou?** Na lista de certificados, clique em **Renovado** (ou **Não vai renovar**): os avisos que ainda não
+  saíram param. **Reabrir** desfaz.
+- A data de nascimento que vem no relatório **não é guardada**.
+
 ### Intervalo entre os envios automáticos
 
 Nas campanhas automáticas (depois da aprovação), os **e-mails** e as **mensagens de WhatsApp** que saem sozinhos
@@ -494,6 +535,9 @@ permissão, a conta para de enviar na hora.
 | "Este número já fez 20 contatos frios hoje" | Proteção contra bloqueio: o resto sai amanhã (ou por outro número). O teto fica em Configurações > Geral |
 | "Este número está com os contatos frios pausados até amanhã" | 3 pessoas pediram para sair hoje: revise o texto e a lista da campanha. Amanhã volta sozinho |
 | "Aguardando: o toque anterior desta empresa ainda não saiu" | O toque anterior da empresa está parado (atrasado mais de 2 dias ou sem WhatsApp). Envie o anterior na Minha fila ou cancele-o: os próximos voltam a sair sozinhos |
+| "Nenhum cliente para avisar agora" (Renovação) | Ninguém com certificado vencendo nos próximos 30 dias fora de campanha. Importe o relatório de renovação mais recente |
+| "Não achei a coluna Vencimento na planilha" | O arquivo não é o Relatório de renovação. Exporte de novo no sistema da certificadora e importe o .xlsx |
+| Cliente da Renovação "Sem WhatsApp e sem e-mail" | A planilha não tem celular nem e-mail dele. Corrija o cadastro no sistema da certificadora e importe o relatório de novo |
 | "Sai sozinho depois do WhatsApp desta empresa" | Empresas novas: o e-mail espera o WhatsApp da mesma empresa sair primeiro (o WhatsApp tem prioridade). Não precisa fazer nada |
 | E-mail "[Prospecção MS] ⚠️ ..." | Aviso automático de problema: o próprio e-mail diz o que fazer. Quando resolver, chega o "✅ Resolvido" |
 | (site na internet) "O computador com o WhatsApp Leads está desligado" | Ligue o computador e abra o `iniciar.bat` do WhatsApp Leads; em até 1 minuto volta |

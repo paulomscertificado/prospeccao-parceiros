@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block titulo %}Renovação{% endblock %}
+{% block conteudo %}
+{% set quando = dias_aviso[:-1]|join(', ') ~ ' e ' ~ dias_aviso[-1] ~ (' dia' if dias_aviso[-1] == 1 else ' dias') ~ ' antes' %}
+{% set SELOS = {'aguardando_aprovacao': ('selo-alerta', 'Aguardando aprovação'), 'ativa': ('selo-ok', 'Em andamento'),
+                'pausada': ('', 'Pausada'), 'erro': ('selo-erro', 'Com erro'), 'gerando': ('selo-azul', 'Montando...'),
+                'concluida': ('selo-azul', 'Concluída'), 'cancelada': ('', 'Cancelada')} %}
+<div class="cabecalho">
+  <div><h1>Renovação</h1>
+    <div class="suave">Avisa os clientes da MS antes de o certificado digital vencer: {{ quando }}, pelo WhatsApp e pelo e-mail.</div></div>
+</div>
+<div class="passos-ia"><span>1. Importa a planilha de renovação</span><span>2. Junta os certificados de cada contato</span>
+  <span>3. Monta a campanha</span><span>4. Você aprova</span><span>5. Avisos saem sozinhos (WhatsApp primeiro)</span></div>
+
+<div class="grade">
+  <div class="kpi destaque"><div class="rotulo">Vencem em 30 dias</div><div class="valor">{{ kpis.em_30 }}</div>
+    <div class="detalhe">{{ kpis.base }} certificados a vencer na base</div></div>
+  <div class="kpi"><div class="rotulo">Prontos para avisar</div><div class="valor">{{ kpis.prontos_contatos }}</div>
+    <div class="detalhe">contatos ({{ kpis.prontos_certificados }} certificados) fora de campanha</div></div>
+  <div class="kpi"><div class="rotulo">Em campanha</div><div class="valor">{{ kpis.em_campanha }}</div>
+    <div class="detalhe">{{ kpis.renovados }} já renovados</div></div>
+  <div class="kpi"><div class="rotulo">Sem WhatsApp e e-mail</div><div class="valor">{{ kpis.sem_contato }}</div>
+    <div class="detalhe">não recebem aviso (o contato vem só da planilha)</div></div>
+</div>
+{% if cfg.renov_ultima_importacao %}<div class="aviso aviso-info">Última planilha importada: {{ cfg.renov_ultima_importacao }}</div>{% endif %}
+{% if cfg.renov_ativo == '1' and cfg.renov_ultimo_resultado %}<div class="aviso aviso-info">Campanha automática: {{ cfg.renov_ultimo_resultado }}</div>{% endif %}
+{% if fora %}<p class="pequeno suave">Ficam de fora agora: {% for motivo, n in fora.items() %}{{ n }} {{ 'certificado' if n == 1 else 'certificados' }} ({{ motivo }}){{ '; ' if not loop.last else '.' }}{% endfor %}</p>{% endif %}
+
+{% if pode('campanhas.gerenciar') %}
+<div class="grade-2">
+  <form class="cartao" method="post" action="/renovacao/importar" enctype="multipart/form-data" id="importar">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <h2>1. Importar a planilha de renovação</h2>
+    <label>Relatório de renovação (Excel .xlsx ou CSV)<br><input type="file" name="arquivo" accept=".xlsx,.xlsm,.csv" required></label>
+    <div class="grupo-btn"><button class="btn btn-primario">Importar planilha</button></div>
+    <p class="ajuda" style="margin-bottom:0">Use o relatório exportado do sistema da certificadora (colunas Vencimento, Protocolo, Certificado,
+      Razão Social, CNPJ, Cliente, CPF, Email e Telefone). Pode importar de novo sempre que sair um relatório novo: quem já
+      estava é atualizado, sem duplicar. A data de nascimento do relatório não é guardada.</p>
+  </form>
+
+  <form class="cartao" method="post" action="/renovacao/montar" id="montar">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <h2>2. Montar campanha agora</h2>
+    <div class="campo-quantas" role="radiogroup" aria-label="Quantos contatos">Quantos contatos (os que vencem primeiro)
+      <div class="quantas-empresas">{% for q in quantidades %}<label class="chip"><input type="radio" name="quantidade" value="{{ q }}" {{ 'checked' if loop.first }}> {{ q }}</label>{% endfor %}</div></div>
+    <div class="grupo-btn"><button class="btn btn-primario" {{ 'disabled' if not kpis.prontos_contatos }}>Montar campanha</button></div>
+    <p class="ajuda" style="margin-bottom:0">Entra quem vence nos próximos 30 dias e ainda não está em campanha. Cada contato
+      (mesmo WhatsApp) recebe <b>uma</b> mensagem por aviso, com a lista dos certificados dele. A campanha só sai depois
+      que alguém aprovar.{% if limite_frios %} O WhatsApp segue o ritmo seguro do número (no máximo {{ limite_frios }} contatos
+      frios por dia, junto com as Empresas novas; a renovação do dia sai primeiro).{% endif %}</p>
+  </form>
+</div>
+
+<form method="post" action="/renovacao/configurar" id="configurar" class="cartao">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>3. Campanha automática e quem envia</h2>
+  <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap">
+    <label class="interruptor"><input type="checkbox" name="ativo" {{ 'checked' if cfg.renov_ativo == '1' }}>
+      <span class="trilho" aria-hidden="true"></span>
+      <span><b>Montar a campanha do dia sozinho</b><br><span class="pequeno suave">com quem chegou a 30 dias do vencimento (você aprova antes de sair)</span></span></label>
+    <label style="margin:0">Horário<br><input type="time" name="hora" value="{{ cfg.renov_hora }}" style="width:130px"></label>
+    <label style="margin:0;max-width:260px">Máximo de contatos por campanha<br><input type="number" name="maximo_dia" min="1" max="300" value="{{ cfg.renov_maximo_dia }}"></label>
+  </div>
+  <label style="max-width:420px;margin-top:10px">Dono das campanhas de renovação<br>
+    <select name="dono_id"><option value="">Escolha...</option>
+      {% for u in usuarios %}<option value="{{ u.id }}" {{ 'selected' if dono and dono.id == u.id }}>{{ u.nome }}</option>{% endfor %}</select></label>
+  <p class="ajuda">Ele assina as mensagens, e elas saem pelo WhatsApp e pelo e-mail dele. Sem dono, o "Montar campanha" usa quem clicou.</p>
+  <div class="cartoes-escolha" style="margin-top:10px">
+    <label class="escolha"><input type="checkbox" name="canal_whatsapp" {{ 'checked' if 'whatsapp' in cfg.renov_canais }}>
+      <span class="escolha-corpo"><span class="escolha-marca" aria-hidden="true">✓</span>
+        <b>💬 WhatsApp (principal)</b><span class="pequeno suave">sai sozinho depois da aprovação, um a cada 3 minutos, com os limites do número</span></span></label>
+    <label class="escolha"><input type="checkbox" name="canal_email" {{ 'checked' if 'email' in cfg.renov_canais }}>
+      <span class="escolha-corpo"><span class="escolha-marca" aria-hidden="true">✓</span>
+        <b>✉️ E-mail</b><span class="pequeno suave">em cada aviso, umas 2 h depois do WhatsApp (se o cliente responder antes, não sai). Quem não tem celular recebe só por e-mail</span></span></label>
+  </div>
+  <div class="grupo-btn"><button class="btn btn-verde">Salvar configuração</button></div>
+</form>
+
+<form class="cartao" id="mensagens" method="post" action="/renovacao/mensagens">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>4. Mensagens dos avisos ({{ quando }})</h2>
+  <p class="pequeno suave">{vencimentos} vira a frase com o certificado e a data (ou a lista, quando o contato tem vários).
+    Use também {responsavel} (primeiro nome de quem cuida do certificado), {data} (primeiro vencimento), {vendedor} e
+    {minha_empresa}. A assinatura do e-mail entra sozinha. Sem preço e sem frases de spam como "promoção" e "não perca".</p>
+  {% for angulo, nome in angulos.items() %}{% set m = mensagens[angulo] %}
+  <details {{ 'open' if loop.first }} style="border-top:1px solid var(--borda);padding:8px 0">
+    <summary><b>{{ loop.index }}. {{ nome }}</b></summary>
+    <div class="grade-2" style="margin-top:8px">
+      <label>💬 WhatsApp<br><textarea name="{{ angulo }}_whatsapp" rows="9">{{ m.whatsapp }}</textarea></label>
+      <div><label>✉️ Assunto do e-mail<br><input type="text" name="{{ angulo }}_assunto" value="{{ m.assunto }}"></label>
+        <label>✉️ E-mail<br><textarea name="{{ angulo }}_email" rows="7">{{ m.email }}</textarea></label></div>
+    </div>
+  </details>
+  {% endfor %}
+  <div class="grupo-btn"><button class="btn btn-primario">Salvar mensagens</button></div>
+</form>
+<form method="post" action="/renovacao/restaurar-mensagens" data-confirmar="Voltar as mensagens para o texto inicial?" style="margin:-8px 0 16px"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-pequeno">Voltar as mensagens ao texto inicial</button></form>
+{% endif %}
+
+<div class="cartao" id="certificados">
+  <h2>Certificados da planilha</h2>
+  <nav class="abas" aria-label="Filtro dos certificados">{% for chave, nome in filtros.items() %}<a href="/renovacao?ver={{ chave }}#certificados" class="{{ 'ativa' if ver == chave }}">{{ nome }}</a>{% endfor %}</nav>
+  {% if lista %}
+  <div class="tabela-rolagem"><table>
+    <tr><th>Vence em</th><th>Cliente</th><th>Certificado</th><th>Responsável e contato</th><th>Parceiro</th><th>Situação</th>{% if pode('campanhas.gerenciar') %}<th></th>{% endif %}</tr>
+    {% for c in lista %}{% set s = situacao(c, hoje) %}{% set chave = chave_do_contato(c) %}
+    <tr><td style="white-space:nowrap">{{ c.data_vencimento.strftime('%d/%m/%Y') }}
+          <div class="pequeno suave">{% set dias = (c.data_vencimento - hoje).days %}{{ 'hoje' if dias == 0 else ('amanhã' if dias == 1 else ('em ' ~ dias ~ ' dias' if dias > 0 else 'há ' ~ (-dias) ~ ' dias')) }}</div></td>
+      <td>{{ c.cliente_nome }}<div class="pequeno suave">{{ c.cnpj }}</div></td>
+      <td>{{ tipo_curto(c.tipo) or c.tipo }}<div class="pequeno suave">{{ c.tipo }}</div></td>
+      <td>{{ c.responsavel or '—' }}<div class="pequeno suave">{{ c.whatsapp or c.telefone }}{% if c.email %} · {{ c.email }}{% endif %}
+          {% if chave and por_contato.get(chave, 0) > 1 %}<br><span class="selo">mesmo contato de {{ por_contato[chave] }} certificados</span>{% endif %}</div></td>
+      <td class="pequeno">{{ c.parceiro_nome or '—' }}</td>
+      <td><span class="selo {{ s[0] }}">{{ s[1] }}</span>{% if c.campanha_id %}<div class="pequeno"><a href="/campanhas/{{ c.campanha_id }}">ver campanha</a></div>{% endif %}</td>
+      {% if pode('campanhas.gerenciar') %}<td style="white-space:nowrap;vertical-align:top">
+        {% if c.status == 'Ativo' and c.data_vencimento >= hoje %}
+        <form class="inline" style="display:block;margin:0 0 4px" method="post" action="/renovacao/certificado/{{ c.id }}/situacao"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ver" value="{{ ver }}"><input type="hidden" name="situacao" value="Renovado"><button class="btn btn-pequeno">Renovado</button></form>
+        <form class="inline" style="display:block;margin:0 0 4px" method="post" action="/renovacao/certificado/{{ c.id }}/situacao" data-confirmar="Marcar que {{ c.cliente_nome }} não vai renovar? Os avisos que ainda não saíram param."><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ver" value="{{ ver }}"><input type="hidden" name="situacao" value="Não renovará"><button class="btn btn-pequeno">Não vai renovar</button></form>
+        {% elif c.status in ('Renovado', 'Não renovará') or (c.status == 'Ativo' and c.fora_motivo) %}
+        <form class="inline" style="display:block;margin:0 0 4px" method="post" action="/renovacao/certificado/{{ c.id }}/situacao"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ver" value="{{ ver }}"><input type="hidden" name="situacao" value="Ativo"><button class="btn btn-pequeno">Reabrir</button></form>
+        {% endif %}</td>{% endif %}</tr>
+    {% endfor %}
+  </table></div>
+  {% if total_lista > lista|length %}<p class="pequeno suave">Mostrando {{ lista|length }} de {{ total_lista }}.</p>{% endif %}
+  {% else %}<p class="suave">{{ 'Nenhum certificado ainda. Importe a planilha de renovação no passo 1.' if not kpis.base and ver == 'avisar' else 'Nenhum certificado neste filtro.' }}</p>{% endif %}
+</div>
+
+<div class="cartao">
+  <h2>Campanhas de renovação</h2>
+  {% if campanhas %}
+  <div class="tabela-rolagem"><table>
+    <tr><th>Campanha</th><th>Situação</th><th>Contatos</th><th>Dono</th><th>Criada em</th></tr>
+    {% for c in campanhas %}{% set selo = SELOS.get(c.status, ('', c.status)) %}
+    <tr><td><a href="/campanhas/{{ c.id }}">{{ c.nome }}</a>{% if c.status == 'erro' and c.erro %}<div class="pequeno suave">{{ c.erro[:200] }}</div>{% elif c.etapa %}<div class="pequeno suave">{{ c.etapa }}</div>{% endif %}</td>
+      <td><span class="selo {{ selo[0] }}">{{ selo[1] }}</span></td>
+      <td>{{ contatos_por_campanha.get(c.id, 0) }}</td>
+      <td>{{ (usuarios|selectattr('id', 'equalto', c.usuario_id)|map(attribute='nome')|first) or '—' }}</td>
+      <td>{{ c.criado_em|datahora }}</td></tr>
+    {% endfor %}
+  </table></div>
+  {% else %}<p class="suave">Nenhuma campanha de renovação ainda. Importe a planilha e clique em "Montar campanha".</p>{% endif %}
+</div>
+{% endblock %}

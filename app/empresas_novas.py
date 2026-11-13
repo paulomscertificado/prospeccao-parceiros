@@ -711,4 +711,6 @@ def campanhas_recentes(db, limite: int = 30) -> list[Campanha]:
 
 
 def e_lead_de_venda(lead: Lead) -> bool:
-    return (lead.origem or "").startswith("Empresas novas")
+    """Lead de venda (Empresas novas) ou de renovação do certificado (tela Renovação): quem responde é o time, não a
+    SDR de parcerias."""
+    return (lead.origem or "").startswith(("Empresas novas", "Renovação"))
