@@ -200,7 +200,7 @@
       <div class="largo"><label for="conexao_id">WhatsApp que vai disparar <span class="selo">só admin</span></label>
         <select name="conexao_id" id="conexao_id">
           <option value="">Automático (número do responsável por cada lead)</option>
-          {% for n in numeros_admin %}<option value="{{ n.id }}" {{ 'selected' if atual == n.id }}>{{ n.nome }} — {{ 'conectado' if n.conectado else 'desconectado' }}</option>{% endfor %}
+          {% for n in numeros_admin %}<option value="{{ n.id }}" {{ 'selected' if atual == n.id }}>{{ n.nome }} — {{ 'MODO TESTE (não chega de verdade)' if n.teste else ('conectado' if n.conectado else 'desconectado') }}</option>{% endfor %}
         </select>
         <p class="ajuda">Escolha um número para todas as mensagens de WhatsApp desta campanha saírem por ele.</p></div>
       {% endif %}

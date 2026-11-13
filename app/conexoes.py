@@ -111,21 +111,28 @@ def responsavel(db, lead: Lead | None = None, usuario: Usuario | None = None, ta
     return db.get(Usuario, principal.dono_id) if principal.dono_id else None
 
 
+def em_modo_teste(id_conexao: str, base: dict | None = None) -> bool:
+    """O número está em MODO TESTE no WhatsApp Leads: o envio é só simulado e a mensagem NÃO chega."""
+    return situacao(id_conexao, base).get("tipo") == "teste"
+
+
 def para_enviar(db, quem: Usuario | None) -> str:
-    """Número por onde sai o envio de `quem`: o próprio, se conectado; senão um compartilhado com ele e conectado."""
+    """Número por onde sai o envio de `quem`: o próprio, se conectado; senão um compartilhado com ele e conectado.
+    Sempre um número DE VERDADE antes de um em MODO TESTE (que só simula: em 11 e 12/11/2026, 14 mensagens de campanha
+    saíram pelo principal em modo teste e não chegaram, com um número de verdade conectado). Só com números em modo
+    teste (sistema em teste ou demonstração), sai pelo de modo teste."""
     if quem is None:
         raise SemNumero("Este lead não tem responsável. Defina o vendedor/funcionário do lead.")
     base = whatsapp_leads.status()
     if not base.get("disponivel"):
         raise SemNumero(base.get("erro") or "O computador com o WhatsApp Leads está desligado.")
     proprio = minha(db, quem)
-    if proprio and situacao(proprio.id, base).get("conectado"):
-        return proprio.id
     outros = sorted((c for c in acessiveis(db, quem) if c.id != (proprio.id if proprio else "")),
                     key=lambda c: (c.id != PRINCIPAL, c.criado_em))
-    for c in outros:
-        if situacao(c.id, base).get("conectado"):
-            return c.id
+    conectados = [c for c in ([proprio] if proprio else []) + outros if situacao(c.id, base).get("conectado")]
+    escolhido = next((c for c in conectados if not em_modo_teste(c.id, base)), conectados[0] if conectados else None)
+    if escolhido is not None:
+        return escolhido.id
     raise SemNumero(f"{quem.nome} ainda não conectou o WhatsApp. Conecte em WhatsApp > Meu WhatsApp para enviar "
                     "(ou peça ao administrador para compartilhar um número).")
 

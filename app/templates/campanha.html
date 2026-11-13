@@ -21,12 +21,15 @@
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <div style="flex:1;min-width:260px"><label for="conexao_id">WhatsApp que dispara esta campanha <span class="selo">só admin</span></label>
     <select name="conexao_id" id="conexao_id">
-          <option value="">Automático (número do responsável por cada lead)</option>
-          {% for n in numeros_admin %}<option value="{{ n.id }}" {{ 'selected' if atual == n.id }}>{{ n.nome }} — {{ 'conectado' if n.conectado else 'desconectado' }}</option>{% endfor %}
+          <option value="">Automático (número do responsável por cada lead; sempre um de verdade, nunca o de modo teste se houver outro)</option>
+          {% for n in numeros_admin %}<option value="{{ n.id }}" {{ 'selected' if atual == n.id }}>{{ n.nome }} — {{ 'MODO TESTE (não chega de verdade)' if n.teste else ('conectado' if n.conectado else 'desconectado') }}</option>{% endfor %}
         </select></div>
   <button class="btn btn-primario">Salvar número</button>
 </form>
 {% endif %}
+{% if numero_simulado %}<div class="aviso aviso-alerta">O número escolhido para esta campanha (<b>{{ numero_simulado }}</b>) está em
+  <b>MODO TESTE</b> no WhatsApp Leads: o envio é só simulado e as mensagens NÃO chegam às empresas.
+  {% if numeros_admin %}Escolha um número conectado por QR code acima (ou "Automático").{% else %}Peça ao administrador para trocar o número.{% endif %}</div>{% endif %}
 
 {% if pode_whatsapp_sozinho and c.tipo not in ('empresas_novas', 'renovacao') and c.status in ('aguardando_aprovacao', 'ativa', 'pausada') %}
 <form class="cartao" id="whatsapp-sozinho" method="post" action="/campanhas/{{ c.id }}/whatsapp-sozinho"

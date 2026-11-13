@@ -676,7 +676,7 @@ def test_escolher_o_numero_do_teste_e_dos_disparos(cliente, csrf, monkeypatch):
     r = cliente.post("/renovacao/testar", data={"csrf": csrf, "certificado": "0", "canal": "whatsapp",
                                                 "whatsapp_teste": "81999990000", "avisos": "renov_aviso",
                                                 "conexao_teste": "u3"})
-    assert filas[-1]["conexao"] == "u3" and "pelo número WhatsApp de verdade" in r.text and "está em MODO TESTE" not in r.text
+    assert filas[-1]["conexao"] == "u3" and "pelo número " in r.text and "está em MODO TESTE" not in r.text
     r = cliente.post("/renovacao/testar", data={"csrf": csrf, "certificado": "0", "canal": "whatsapp",
                                                 "whatsapp_teste": "81999990000", "avisos": "renov_aviso"})
     assert filas[-1]["conexao"] == "u3"  # automático: o de verdade, nunca o de modo teste

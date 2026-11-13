@@ -1138,20 +1138,7 @@ def numero_automatico(db, remetente: Usuario | None) -> str:
 
     if remetente is None:
         raise conexoes.SemNumero("Escolha quem assina as campanhas de renovação.")
-    base = whatsapp_leads.status()
-    if not base.get("disponivel"):
-        raise conexoes.SemNumero(base.get("erro") or "O computador com o WhatsApp Leads está desligado.")
-    proprio = conexoes.minha(db, remetente)
-    candidatos = ([proprio] if proprio else []) + sorted(
-        (c for c in conexoes.acessiveis(db, remetente) if proprio is None or c.id != proprio.id),
-        key=lambda c: (c.id != conexoes.PRINCIPAL, c.criado_em))
-    conectados = [c for c in candidatos if conexoes.situacao(c.id, base).get("conectado")]
-    real = next((c for c in conectados if conexoes.situacao(c.id, base).get("tipo") != "teste"), None)
-    escolhido = real or (conectados[0] if conectados else None)
-    if escolhido is None:
-        raise conexoes.SemNumero(f"{remetente.nome} não tem nenhum WhatsApp conectado. Conecte em WhatsApp > Meu "
-                                 "WhatsApp (ou escolha o número na tela Renovação).")
-    return escolhido.id
+    return conexoes.para_enviar(db, remetente)  # já prefere um número de verdade a um em modo teste
 
 
 def numero_do_envio(db, remetente: Usuario | None, escolhido: str = "") -> str:
@@ -1174,9 +1161,8 @@ def numero_do_envio(db, remetente: Usuario | None, escolhido: str = "") -> str:
 
 def numero_em_modo_teste(id_conexao: str) -> bool:
     from . import conexoes
-    from .integracoes import whatsapp_leads
 
-    return conexoes.situacao(id_conexao, whatsapp_leads.status()).get("tipo") == "teste"
+    return conexoes.em_modo_teste(id_conexao)
 
 
 # ---------------------------------------------------------------- Área de teste (como a da IA SDR)

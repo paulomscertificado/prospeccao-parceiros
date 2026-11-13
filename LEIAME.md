@@ -417,6 +417,12 @@ Campanhas montadas antes desta regra podem mostrar o aviso **"⚠️ X empresas 
 responsável"**. Clique em **"Passar para ... e corrigir as assinaturas"**: as empresas passam para quem criou a
 campanha e o nome na assinatura das mensagens que ainda vão sair é trocado.
 
+**Número em MODO TESTE:** no WhatsApp Leads, o modo teste só **simula** o envio: a mensagem não chega. Por isso a
+escolha automática do número (campanhas da IA SDR, Empresas novas e Renovação) **nunca usa um número em modo teste
+quando há um número de verdade conectado** (QR code). Nas listas de números ele aparece como **"MODO TESTE (não chega
+de verdade)"**, e a página da campanha mostra um aviso vermelho se o número escolhido para ela estiver em modo teste.
+(Em 11 e 12/11/2026, 14 mensagens de campanha saíram por números em modo teste e não chegaram.)
+
 ### E-mails que não existem
 
 Muitos e-mails da base da Receita estão desatualizados. O sistema tira esses endereços das campanhas sozinho:

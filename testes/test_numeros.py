@@ -225,3 +225,34 @@ def test_campanha_ativa_mostra_whatsapp_de_hoje(cliente):
     pagina = cliente.get(f"/campanhas/{cid}").text
     assert "WhatsApp de hoje" in pagina and "Contábil Zap Hoje" in pagina and "Olá! Mensagem de hoje." in pagina
     assert 'value="whatsapp" checked' in cliente.get("/campanhas/nova").text  # WhatsApp é o canal padrão
+
+
+
+def test_numero_em_modo_teste_nunca_e_escolhido_se_houver_um_de_verdade(cliente, nuvem):
+    """Em 11 e 12/11/2026, 14 mensagens de campanha saíram pelo principal em MODO TESTE (o WhatsApp Leads só simula: não
+    chegam), havendo um número de verdade conectado. O automático prefere sempre o de verdade; o escolhido para a
+    campanha vale, mas a página da campanha avisa."""
+    _status_ponte(cliente, {"principal": {"conectado": True, "tipo": "teste", "estado_codigo": "conectado"},
+                            "u77": {"conectado": True, "tipo": "qr", "estado_codigo": "conectado"}})
+    with sessao() as db:
+        admin = db.execute(select(Usuario).where(Usuario.perfil == "admin").order_by(Usuario.id)).scalars().first()
+        if db.get(ConexaoWhatsApp, "u77") is None:
+            db.add(ConexaoWhatsApp(id="u77", nome="WhatsApp de verdade (teste)", compartilhada_todos=True))
+        db.flush()
+        assert conexoes.em_modo_teste("principal") and not conexoes.em_modo_teste("u77")
+        assert conexoes.para_enviar(db, admin) == "u77"  # antes: o principal, em modo teste
+        camp = Campanha(nome="Campanha com número simulado", status="ativa", usuario_id=admin.id, canais="whatsapp",
+                        conexao_id="principal", aprovado_em=agora())
+        db.add(camp)
+        db.commit()
+        cid = camp.id
+    pagina = cliente.get(f"/campanhas/{cid}").text
+    assert "está em" in pagina and "MODO TESTE</b> no WhatsApp Leads" in pagina
+    assert "MODO TESTE (não chega de verdade)" in pagina  # na lista de números da campanha
+    # só números em modo teste (sistema em teste/demonstração): continua saindo por ele
+    _status_ponte(cliente, {"principal": {"conectado": True, "tipo": "teste", "estado_codigo": "conectado"}})
+    with sessao() as db:
+        admin = db.execute(select(Usuario).where(Usuario.perfil == "admin").order_by(Usuario.id)).scalars().first()
+        assert conexoes.para_enviar(db, admin) == "principal"
+        db.get(Campanha, cid).status = "cancelada"
+        db.delete(db.get(ConexaoWhatsApp, "u77"))

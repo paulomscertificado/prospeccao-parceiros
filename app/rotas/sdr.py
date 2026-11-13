@@ -584,8 +584,8 @@ def _numeros_para_admin(db: Session, usuario: Usuario) -> list[dict]:
     if not autorizacao.pode(usuario, "campanhas.escolher_numero"):
         return []
     base = whatsapp_leads.status()
-    return [{"id": c.id, "nome": c.nome, "conectado": bool(conexoes.situacao(c.id, base).get("conectado"))}
-            for c in conexoes.todas(db)]
+    return [{"id": c.id, "nome": c.nome, "conectado": bool(conexoes.situacao(c.id, base).get("conectado")),
+             "teste": conexoes.em_modo_teste(c.id, base)} for c in conexoes.todas(db)]
 
 
 def _numero_escolhido(db: Session, usuario: Usuario, form) -> str:
@@ -611,7 +611,7 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(exige("c
     camp = _campanha(db, cid, usuario)
     nomes = {c.codigo: c.nome for c in db.execute(select(Categoria)).scalars()}
     whatsapp_hoje = campanhas.whatsapp_de_hoje(db, camp) if camp.status == "ativa" else []
-    numero, sem_numero = "", ""
+    numero, sem_numero, numero_simulado = "", "", ""
     if whatsapp_hoje:
         try:
             numero_id = (conexoes.da_campanha(db, camp)
@@ -620,6 +620,13 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(exige("c
                       else numero_id)
         except conexoes.SemNumero as erro:
             sem_numero = str(erro)
+    if camp.conexao_id and camp.status in ("aguardando_aprovacao", "ativa", "pausada"):
+        try:  # número escolhido para a campanha em MODO TESTE: as mensagens não chegam (só simula)
+            if conexoes.em_modo_teste(camp.conexao_id):
+                fixo = db.get(conexoes.ConexaoWhatsApp, camp.conexao_id)
+                numero_simulado = fixo.nome if fixo else camp.conexao_id
+        except Exception:  # noqa: BLE001 - a tela abre mesmo sem a situação dos números
+            numero_simulado = ""
     ids_fixo = [int(i) for i in (camp.so_fixo or "").split(",") if i.isdigit()]
     so_fixo = db.execute(select(Lead).where(Lead.id.in_(ids_fixo))).scalars().all() if ids_fixo else []
     testaveis_q = (select(Campanha).where(Campanha.arquivada.is_(False),
@@ -640,6 +647,7 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(exige("c
         "responsaveis_diferentes": campanhas.responsaveis_diferentes(db, camp),
         "andamento": campanhas.andamento(db, camp) if camp.status not in ("gerando", "erro") else [],
         "whatsapp_hoje": whatsapp_hoje, "numero_whatsapp": numero, "sem_numero": sem_numero,
+        "numero_simulado": numero_simulado,
         "disparar": {k: len(v) for k, v in campanhas.para_disparar(db, camp).items()},
         "numeros_admin": _numeros_para_admin(db, usuario), "visual_resumo": visual.resumo_da_campanha(db, camp),
         "pode_whatsapp_sozinho": autorizacao.pode(usuario, "campanhas.whatsapp_sozinho"),
