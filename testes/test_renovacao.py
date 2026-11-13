@@ -312,6 +312,7 @@ def test_fila_manda_a_renovacao_sozinha_e_antes(cliente, monkeypatch):
     monkeypatch.setattr(whatsapp_leads, "configurado", lambda: True)
     monkeypatch.setattr(whatsapp_leads, "status", lambda: {"disponivel": True})
     monkeypatch.setattr(campanhas.mensagens, "dentro_do_horario", lambda db: True)
+    monkeypatch.setattr(renovacao, "fora_do_horario", lambda db, momento=None, margem_minutos=0: "")
     monkeypatch.setattr(sdr, "enviar_whatsapp_conectado",
                         lambda db, texto, u, lead=None, tarefa=None: enviados.append(lead.empresa))
     with sessao() as db:
@@ -854,3 +855,126 @@ def test_campanha_de_renovacao_aparece_como_renovacao(cliente):
     with sessao() as db:
         for i in (cid, sid):
             db.get(Campanha, i).status = "cancelada"
+
+
+
+# ---------------------------------------------------------------- Só nos dias comerciais (pedido de 13/11/2026)
+
+def test_renovacao_so_envia_de_segunda_a_sexta_das_10_as_18(cliente):
+    """Pedido da Maria (13/11/2026): "os disparos das campanhas de renovação só enviem nos dias comerciais. Segunda a
+    sexta das 10:00 - 18:00". O WhatsApp para 10 minutos antes do fim (ainda passa pelo computador do WhatsApp Leads)."""
+    from app import cadencias
+
+    margem = renovacao.MARGEM_WHATSAPP_MINUTOS
+    sexta = datetime(2026, 11, 13)
+    with sessao() as db:
+        antes = _configurar_piloto(db)  # a partir das 10:00
+        assert renovacao.hora_fim(db) == "18:00"  # o padrão já é até as 18:00
+        assert renovacao.fora_do_horario(db, sexta.replace(hour=10)) == ""
+        assert renovacao.fora_do_horario(db, sexta.replace(hour=9, minute=59))
+        assert renovacao.fora_do_horario(db, sexta.replace(hour=17, minute=49), margem) == ""
+        assert renovacao.fora_do_horario(db, sexta.replace(hour=17, minute=50), margem)  # WhatsApp: até 17:50
+        assert renovacao.fora_do_horario(db, sexta.replace(hour=17, minute=55)) == ""  # e-mail: até as 18:00
+        assert renovacao.fora_do_horario(db, sexta.replace(hour=18))
+        for dia in (14, 15):  # sábado e domingo, em qualquer horário
+            motivo = renovacao.fora_do_horario(db, datetime(2026, 11, dia, 11, 0))
+            assert motivo == "A Renovação só envia de segunda a sexta, das 10:00 às 18:00"
+        # os horários marcados nas campanhas também ficam dentro (com folga de 20 minutos no fim)
+        for _ in range(40):
+            hora = cadencias.hora_natural(db, date(2026, 12, 7), minimo="10:00", maximo="16:00")
+            assert "10:00" <= hora <= "15:44"
+        assert cadencias.dia_e_hora_futuros(db, date(2026, 12, 5), True, "10:00", "18:00")[0] == date(2026, 12, 7)
+        _desfazer(db, antes)
+
+
+def test_fila_segura_a_renovacao_fora_do_horario(cliente, monkeypatch):
+    """Sábado ou fora das 10:00–18:00: a fila não manda os avisos da Renovação (as outras campanhas seguem) e o clique
+    em "Disparar" ou em "Enviar" na Minha fila para e explica. No horário, sai."""
+    from app.integracoes import whatsapp_leads
+
+    enviados = []
+    monkeypatch.setattr(whatsapp_leads, "configurado", lambda: True)
+    monkeypatch.setattr(whatsapp_leads, "status", lambda: {"disponivel": True})
+    monkeypatch.setattr(campanhas.mensagens, "dentro_do_horario", lambda db: True)
+    monkeypatch.setattr(sdr, "enviar_whatsapp_conectado",
+                        lambda db, texto, u, lead=None, tarefa=None: enviados.append(lead.empresa))
+    real = renovacao.fora_do_horario
+    relogio = {"agora": datetime(2026, 11, 14, 11, 0)}  # sábado
+    monkeypatch.setattr(renovacao, "fora_do_horario",
+                        lambda db, momento=None, margem_minutos=0: real(db, relogio["agora"], margem_minutos))
+    with sessao() as db:
+        gravar_config(db, "enviar_whatsapp_automatico", "1")
+        antes = _configurar_piloto(db)
+        admin = _admin(db)
+        novas = Campanha(nome="Empresas novas no sábado", tipo="empresas_novas", status="ativa", usuario_id=admin.id,
+                         canais="whatsapp", aprovado_em=agora())
+        lead_nova = Lead(empresa="NOVA EMPRESA SABADO LTDA", whatsapp="(81) 98555-0001", status="Abordagem criada",
+                         vendedor_id=admin.id)
+        db.add_all([novas, lead_nova])
+        db.flush()
+        db.add(Tarefa(tipo="prospeccao", lead_id=lead_nova.id, campanha_id=novas.id, canal="whatsapp",
+                      data=date.today(), hora="00:00", status="pendente", mensagem="Olá! Empresa nova."))
+        camp, _, aviso = _cenario(db, 10, "9300001", "(81) 98555-0002")
+        db.flush()
+        campanhas.processar_fila_whatsapp(db, maximo=1000)
+        assert "NOVA EMPRESA SABADO LTDA" in enviados and "CLIENTE 9300001 LTDA" not in enviados
+        assert aviso.status == "pendente"  # espera o horário, não se perde
+        r = campanhas.disparar(db, camp, admin, "whatsapp")
+        assert r["enviados"] == 0 and "segunda a sexta" in r["parou"]
+        assert "segunda a sexta" in campanhas.enviar_toque_agora(db, aviso, admin, "whatsapp")
+        relogio["agora"] = datetime(2026, 11, 16, 9, 59)  # segunda, antes das 10h
+        campanhas.processar_fila_whatsapp(db, maximo=1000)
+        assert "CLIENTE 9300001 LTDA" not in enviados
+        relogio["agora"] = datetime(2026, 11, 16, 10, 0)
+        campanhas.processar_fila_whatsapp(db, maximo=1000)
+        assert "CLIENTE 9300001 LTDA" in enviados
+        db.rollback()
+    with sessao() as db:
+        _desfazer(db, antes)
+        db.commit()
+
+
+def test_vence_no_fim_de_semana_ultimo_aviso_na_sexta():
+    """Pedido da Maria (13/11/2026): "os de sábados e domingos avisar na sexta". Vence no domingo com os avisos 12, 6,
+    3 e 1 dia antes: o de 3 dias (quinta) vai para a quarta, para o último aviso caber na sexta (antes ficava sem ele).
+    Nada sai no fim de semana nem depois do vencimento."""
+    hoje = date(2026, 11, 2)  # segunda-feira
+    dias = (12, 6, 3, 1)
+    sabado, domingo = date(2026, 11, 28), date(2026, 11, 29)
+    assert renovacao.datas_dos_avisos(domingo, hoje, True, dias) == [
+        date(2026, 11, 17), date(2026, 11, 23), date(2026, 11, 25), date(2026, 11, 27)]
+    assert renovacao.datas_dos_avisos(sabado, hoje, True, dias) == [
+        date(2026, 11, 16), date(2026, 11, 20), date(2026, 11, 25), date(2026, 11, 27)]
+    # com o teto de WhatsApps por dia, igual (e a sexta cheia não empurra ninguém para o fim de semana)
+    assert renovacao.agenda([domingo], hoje, True, Counter(), 20, dias) == [
+        renovacao.datas_dos_avisos(domingo, hoje, True, dias)]
+    cheia = renovacao.agenda([domingo], hoje, True, Counter({date(2026, 11, 27): 20}), 20, dias)[0]
+    assert cheia[3] is None and all(d is None or d.weekday() < 5 for d in cheia)
+    for venc in (sabado, domingo, date(2026, 12, 20)):
+        for padrao in (dias, renovacao.DIAS_AVISO):
+            datas = renovacao.datas_dos_avisos(venc, hoje, True, padrao)
+            assert datas[-1] == venc - timedelta(days=venc.weekday() - 4)  # a sexta antes
+            assert all(d is None or (d.weekday() < 5 and d < venc) for d in datas)
+    # vence amanhã (sábado) e hoje é sexta: o aviso é hoje
+    assert renovacao.datas_dos_avisos(date(2026, 11, 14), date(2026, 11, 13), True, dias) == [
+        date(2026, 11, 13), None, None, None]
+
+
+def test_tela_salva_ate_que_horas_os_avisos_saem(cliente, csrf):
+    base = {"csrf": csrf, "canal_whatsapp": "on", "canal_email": "on", "maximo_dia": "40", "hora": "07:45",
+            "arte": "on", "hora_inicio": "10:00"}
+    r = cliente.post("/renovacao/configurar", data={**base, "hora_fim": "17:30"})
+    assert r.status_code == 200
+    with sessao() as db:
+        assert renovacao.hora_fim(db) == "17:30"
+        assert "das 10:00 às 17:30" in renovacao.fora_do_horario(db, datetime(2026, 11, 14, 11, 0))
+    pagina = cliente.get("/renovacao").text
+    assert 'name="hora_fim" value="17:30"' in pagina and "de segunda a sexta" in pagina
+    r = cliente.post("/renovacao/configurar", data={**base, "hora_fim": "09:00"})
+    assert "precisa ser depois do inicial" in r.text
+    with sessao() as db:
+        assert renovacao.hora_fim(db) == "17:30"  # nada mudou
+        for chave in ("renov_hora_inicio", "renov_hora_fim"):
+            gravar_config(db, chave, "")
+        db.commit()
+        assert renovacao.hora_fim(db) == "18:00"

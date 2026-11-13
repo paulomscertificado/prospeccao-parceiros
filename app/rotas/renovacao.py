@@ -173,8 +173,16 @@ async def configurar(request: Request, usuario: Usuario = Depends(exige("campanh
     hora_inicio = str(form.get("hora_inicio", "") or "")[:5]
     if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", hora_inicio):
         hora_inicio = ""
+    # até que horas (pedido da Maria em 13/11/2026: segunda a sexta, das 10:00 às 18:00; vazio = 18:00)
+    hora_fim = str(form.get("hora_fim", "") or "")[:5]
+    if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", hora_fim):
+        hora_fim = ""
+    if hora_fim and hora_fim <= (hora_inicio or "00:00"):
+        avisar(request, "O horário final dos avisos precisa ser depois do inicial (ex.: das 10:00 às 18:00).", "erro")
+        return voltar("/renovacao#configurar")
     desde = util.para_data(form.get("ativo_desde"))
     gravar_config(db, "renov_hora_inicio", hora_inicio)
+    gravar_config(db, "renov_hora_fim", hora_fim)
     gravar_config(db, "renov_ativo_desde", desde.isoformat() if desde else "")
     hora = str(form.get("hora", "07:45"))[:5] or "07:45"
     dono_id = util.para_int(form.get("dono_id"))

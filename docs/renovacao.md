@@ -94,7 +94,18 @@ base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renova
     "Campanha de Renovação" no topo (sem cidade/tom da IA SDR) e o "Voltar" leva à tela Renovação
     (`rotas/sdr.AREAS_DAS_CAMPANHAS`; Empresas novas: igual, para a tela delas). A lista da IA SDR (`/campanhas`) não
     mostra campanhas de renovação: elas ficam no quadro "Campanhas de renovação" da tela Renovação.
-14. **Respostas**: o fluxo normal (cancela os próximos toques, Oportunidade). A IA SDR não responde
+14. **Só em dia comercial** (pedido da Maria em 13/11/2026: "segunda a sexta das 10:00 - 18:00"):
+    `fora_do_horario(db, momento, margem_minutos)` devolve o motivo no sábado/domingo, antes de `hora_inicio`
+    (`renov_hora_inicio`) ou a partir de `hora_fim` (`renov_hora_fim`, padrão 18:00) menos a margem. As filas
+    (`campanhas.processar_fila` e `processar_fila_whatsapp`, este com `MARGEM_WHATSAPP_MINUTOS`=10, porque o WhatsApp
+    ainda passa pelo computador do WhatsApp Leads) tiram as campanhas `tipo="renovacao"` da consulta fora do horário (as
+    outras seguem); `disparar` e `_enviar_toque` (Minha fila) param com o motivo. As datas também: `hora_maxima`/`maximo`
+    em `cadencias.aplicar`/`hora_natural`/`dia_e_hora_futuros`/`depois_de`, `campanhas._hora_maxima` e
+    `primeiro_dia`; a Renovação sempre pula o fim de semana (`pular_fds=True`, mesmo com a opção geral desligada).
+    Vence no sábado ou no domingo ("os de sábados e domingos avisar na sexta"): o último aviso fica na sexta
+    (`_limites_para_a_sexta`: os avisos de antes ficam pelo menos `INTERVALO_MINIMO_DIAS` antes dela; ex.: vence no
+    domingo com 12, 6, 3 e 1: o de 3 dias vai da quinta para a quarta). Nenhum aviso depois do vencimento.
+15. **Respostas**: o fluxo normal (cancela os próximos toques, Oportunidade). A IA SDR não responde
    (`empresas_novas.e_lead_de_venda` inclui a origem "Renovação"). No WhatsApp Leads o contato ganha a etiqueta da IA
    SDR (a Atendente IA de lá não responde).
 

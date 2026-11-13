@@ -348,9 +348,14 @@ certificadora.
    espera a aprovação). Clique em **Salvar configuração**.
 
 **Dias, horário e início (quadro 4):** em **Avisar quantos dias antes de vencer** você escreve os 4 dias dos avisos
-(padrão 30, 15, 5, 1; no piloto de 13/11/2026: **12, 6, 3, 1**). **Avisos a partir das** limita o horário (ex.: 10:00).
-**Começar em** é o dia em que a campanha automática começa a montar sozinha (no piloto: 01/01/2027). Valem para as
-campanhas montadas depois de salvar.
+(padrão 30, 15, 5, 1; no piloto de 13/11/2026: **12, 6, 3, 1**). **Avisos a partir das** e **até as** limitam o
+horário (hoje: das 10:00 às 18:00). **Começar em** é o dia em que a campanha automática começa a montar sozinha (no
+piloto: 01/01/2027). Valem para as campanhas montadas depois de salvar.
+
+**Só em dia comercial:** os avisos da Renovação só saem **de segunda a sexta, das 10:00 às 18:00** (o horário do quadro
+4). Fora disso eles esperam e saem no próximo horário permitido; o WhatsApp para às 17:50, para chegar ao cliente antes
+das 18:00. O botão **Disparar** e o **Enviar** da Minha fila também só funcionam nesse horário. Quem vence no
+**sábado ou no domingo** recebe o **último aviso na sexta** antes (nunca no fim de semana nem depois do vencimento).
 
 **Piloto de 13/11/2026 a 01/01/2027:** a campanha **"Renovação – piloto"** leva todos os clientes da planilha que vencem
 até 31/12, com os avisos já marcados (12, 6, 3 e 1 dia antes, a partir das 10h, WhatsApp com a arte pelo número do
@@ -367,7 +372,8 @@ renovação novo antes, para entrarem os clientes de janeiro).
   mesmo telefone), ele recebe **uma** mensagem em cada aviso, com a lista dos certificados (até 5; com mais, um
   resumo: "57 certificados digitais que você acompanha vencem entre..."). Nunca uma mensagem por certificado.
 - **Datas:** 30, 15, 5 e 1 dia antes do vencimento. Quem entra mais tarde recebe o 1º aviso na hora e só os
-  seguintes que ainda cabem (nunca em dias seguidos). Aviso que cairia no sábado ou no domingo vem para a sexta antes.
+  seguintes que ainda cabem (nunca em dias seguidos). Aviso que cairia no sábado ou no domingo vem para a sexta antes;
+  quem vence no fim de semana tem o último aviso na sexta (se preciso, o aviso anterior vem um dia antes para caber).
 - **WhatsApp primeiro, e-mail depois:** igual às Empresas novas (o e-mail de cada aviso sai umas 2 horas depois do
   WhatsApp). Quem não tem celular na planilha recebe só por e-mail. Sem WhatsApp e sem e-mail na planilha, não recebe
   aviso (aparece no filtro **Sem WhatsApp e e-mail**): o contato vem só da planilha.

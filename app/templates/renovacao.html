@@ -110,7 +110,10 @@
   <div style="display:flex;gap:24px;align-items:end;flex-wrap:wrap;margin-top:10px">
     <label style="margin:0;max-width:300px">Avisar quantos dias antes de vencer (4 avisos)<br><input type="text" name="dias" value="{{ dias_aviso|join(', ') }}" placeholder="12, 6, 3, 1"></label>
     <label style="margin:0">Avisos a partir das<br><input type="time" name="hora_inicio" value="{{ cfg.renov_hora_inicio }}" style="width:130px"></label>
+    <label style="margin:0">até as<br><input type="time" name="hora_fim" value="{{ cfg.renov_hora_fim }}" style="width:130px"></label>
   </div>
+  <p class="ajuda">Os avisos só saem <b>de segunda a sexta</b>, nesse horário (o WhatsApp para 10 minutos antes do fim, para
+    chegar a tempo). Quem vence no sábado ou no domingo recebe o último aviso na sexta.</p>
   <label style="max-width:420px;margin-top:10px">Dono das campanhas de renovação<br>
     <select name="dono_id"><option value="">Escolha...</option>
       {% for u in usuarios %}<option value="{{ u.id }}" {{ 'selected' if dono and dono.id == u.id }}>{{ u.nome }}</option>{% endfor %}</select></label>

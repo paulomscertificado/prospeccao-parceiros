@@ -332,7 +332,8 @@ def _montar(campanha_id: int, escolhidos: list[int], textos: dict[int, dict], so
                               [c for c in camp.canais.split(",") if c], "rascunho", camp.cta, camp.tom,
                               foco_whatsapp=camp.tipo in TIPOS_WHATSAPP_PRIMEIRO,  # venda/renovação: WhatsApp primeiro
                               datas_por_lead=datas,  # renovação: datas contadas do vencimento
-                              hora_minima=_hora_minima(db, camp))  # renovação: "a partir das 10:00"
+                              hora_minima=_hora_minima(db, camp),  # renovação: "das 10:00 às 18:00"
+                              hora_maxima=_hora_maxima(db, camp))
         if camp.tipo == "renovacao":
             from . import renovacao
 
@@ -365,6 +366,15 @@ def _hora_minima(db, camp: Campanha) -> str:
     from . import renovacao
 
     return renovacao.hora_inicio(db)
+
+
+def _hora_maxima(db, camp: Campanha) -> str:
+    """Até que horário saem os toques desta campanha ("" = o horário de envio geral)."""
+    if camp.tipo != "renovacao":
+        return ""
+    from . import renovacao
+
+    return renovacao.hora_fim(db)
 
 
 def gerar(campanha_id: int) -> None:
@@ -479,20 +489,20 @@ def aprovar(db, camp: Campanha, usuario: Usuario) -> int:
     if rascunhos:
         primeiro = min(t.data for t in rascunhos)
         atraso = 0 if camp.tipo == "renovacao" else max(0, (date.today() - primeiro).days)
-        minimo = _hora_minima(db, camp)
+        minimo, maximo = _hora_minima(db, camp), _hora_maxima(db, camp)
         for t in rascunhos:
             t.status = "pendente"
             if (t.hora or "09:00").endswith(":00"):  # campanha montada antes (09:00 do passo): vira horário natural
-                t.hora = cadencias.hora_natural(db, minimo=minimo)  # (horário escolhido à mão, como 10:20, fica)
+                t.hora = cadencias.hora_natural(db, minimo=minimo, maximo=maximo)  # (escolhido à mão, como 10:20, fica)
             t.data = util.proximo_dia_util(t.data + timedelta(days=atraso)) if atraso else t.data
-        _sem_horario_no_passado(db, rascunhos, minimo)
+        _sem_horario_no_passado(db, rascunhos, minimo, maximo)
     camp.status = "ativa"
     camp.aprovado_por_id = usuario.id if usuario else None
     camp.aprovado_em = agora()
     return len(rascunhos)
 
 
-def _sem_horario_no_passado(db, tarefas: list[Tarefa], minimo: str = "") -> int:
+def _sem_horario_no_passado(db, tarefas: list[Tarefa], minimo: str = "", maximo: str = "") -> int:
     """Aprovada depois do horário marcado (ex.: montada de manhã e aprovada à tarde): o toque de hoje que já passou ganha
     um horário novo daqui a pouco (ou vai para o próximo dia, se o horário de envio de hoje acabou). Os toques seguintes
     da mesma empresa nunca ficam antes dele. Devolve quantos mudaram."""
@@ -506,12 +516,13 @@ def _sem_horario_no_passado(db, tarefas: list[Tarefa], minimo: str = "") -> int:
         anterior = None
         for t in lista:
             if f"{t.data:%Y-%m-%d} {t.hora or '00:00'}" <= agora_txt:
-                t.data, t.hora = cadencias.dia_e_hora_futuros(db, t.data, minimo=minimo)
+                t.data, t.hora = cadencias.dia_e_hora_futuros(db, t.data, minimo=minimo, maximo=maximo)
                 mudou += 1
             if anterior and (t.data, t.hora or "") < (anterior.data, anterior.hora or ""):
-                t.data, t.hora = cadencias.dia_e_hora_futuros(db, anterior.data, minimo=minimo)
+                t.data, t.hora = cadencias.dia_e_hora_futuros(db, anterior.data, minimo=minimo, maximo=maximo)
                 if (t.data, t.hora) <= (anterior.data, anterior.hora or ""):
-                    t.data, t.hora = cadencias.dia_e_hora_futuros(db, anterior.data + timedelta(days=1), minimo=minimo)
+                    t.data, t.hora = cadencias.dia_e_hora_futuros(db, anterior.data + timedelta(days=1),
+                                                                  minimo=minimo, maximo=maximo)
                 mudou += 1
             anterior = t
     return mudou
@@ -768,6 +779,8 @@ def processar_fila(db, maximo: int = 25) -> dict:
                        # Empresas novas: o WhatsApp tem prioridade, o e-mail do toque só sai depois dele
                        ~and_(Campanha.tipo.in_(TIPOS_WHATSAPP_PRIMEIRO), _whatsapp_da_empresa_pendente(date.today())))
                 .order_by(Tarefa.data, Tarefa.hora, Tarefa.id).limit(max(maximo * 3, 400)))
+    if renovacao.fora_do_horario(db):  # Renovação: só de segunda a sexta, das 10:00 às 18:00 (pedido da Maria)
+        consulta = consulta.where(Campanha.tipo != renovacao.TIPO_CAMPANHA)
     campanhas_no_limite: set[int] = set()
     for t in db.execute(consulta).scalars():
         if feito["enviados"] >= maximo:
@@ -1019,6 +1032,15 @@ def _enviar_toque(db, t: Tarefa, usuario: Usuario) -> str:
         return "Este toque está sem mensagem."
     if not mensagens.dentro_do_horario(db):
         return "Fora do horário de envio (Configurações). Tente de novo no horário comercial."
+    if t.campanha_id:
+        from . import renovacao
+
+        camp = db.get(Campanha, t.campanha_id)
+        if camp is not None and camp.tipo == renovacao.TIPO_CAMPANHA:
+            fora = renovacao.fora_do_horario(
+                db, margem_minutos=renovacao.MARGEM_WHATSAPP_MINUTOS if t.canal == "whatsapp" else 0)
+            if fora:
+                return fora + "."
     if t.canal == "email" and not lead.email:
         return "Este lead não tem e-mail."
     bloqueio = mensagens.bloqueio_de_envio(db, lead, t.canal, t.campanha_id)
@@ -1055,6 +1077,14 @@ def disparar(db, camp: Campanha, usuario: Usuario, canal: str) -> dict:
     if not mensagens.dentro_do_horario(db):
         feito["parou"] = "fora do horário de envio (Configurações). Tente de novo no horário comercial"
         return feito
+    if camp.tipo == "renovacao":
+        from . import renovacao
+
+        fora = renovacao.fora_do_horario(
+            db, margem_minutos=renovacao.MARGEM_WHATSAPP_MINUTOS if canal == "whatsapp" else 0)
+        if fora:
+            feito["parou"] = fora
+            return feito
     for t in para_disparar(db, camp)[canal]:
         lead = t.lead
         trocar_canal(t, canal)
@@ -1320,6 +1350,10 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
                 # limite de contatos frios do número com as Empresas novas
                 .order_by(Tarefa.data, case((Campanha.tipo == "renovacao", 0), else_=1), Tarefa.hora, Tarefa.id)
                 .limit(200))
+    # Renovação: só de segunda a sexta, das 10:00 às 18:00 (pedido da Maria em 13/11/2026). O WhatsApp para uns minutos
+    # antes do fim: ainda passa pela fila do computador do WhatsApp Leads e precisa chegar dentro do horário.
+    if renovacao.fora_do_horario(db, margem_minutos=renovacao.MARGEM_WHATSAPP_MINUTOS):
+        consulta = consulta.where(Campanha.tipo != renovacao.TIPO_CAMPANHA)
     automaticas = campanhas_que_saem_sozinhas(db)
     campanhas_no_limite: set[int] = set()
     for t in db.execute(consulta).scalars():
