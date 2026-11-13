@@ -53,7 +53,20 @@ class PonteWhatsApp(Base):
     id_wl: Mapped[str] = mapped_column(String(40), default="")  # id da mensagem no WhatsApp Leads
     erro: Mapped[str] = mapped_column(Text, default="")
     midia_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # imagem do visual (app/visual.py)
+    # aviso de vencimento (Renovação): os dados da arte do site, em JSON; o computador do WhatsApp Leads desenha
+    arte: Mapped[str] = mapped_column(Text, default="")
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
+
+
+class ArteAviso(Base):
+    """A arte do aviso de vencimento (Renovação) que o computador do WhatsApp Leads desenhou para uma mensagem da ponte
+    e mandou de volta: vai no e-mail do mesmo aviso. Guardada por poucos dias (renovacao.DIAS_GUARDANDO_ARTE)."""
+    __tablename__ = "artes_aviso"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ponte_id: Mapped[int] = mapped_column(Integer, index=True)
+    tarefa_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    imagem: Mapped[bytes] = mapped_column(LargeBinary, deferred=True)
+    criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, index=True)
 
 
 class VisualCampanha(Base):

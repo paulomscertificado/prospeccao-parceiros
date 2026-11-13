@@ -362,6 +362,14 @@ certificadora.
   envio, e quem responde SAIR não recebe mais.
 - **Quando o cliente responde:** os avisos seguintes param e a resposta vai para **Oportunidades** e **Quem precisa de
   mim hoje**. A IA não responde esses clientes: quem conversa é a equipe.
+- **Arte do aviso:** cada aviso vai com a **arte do site** (mscertificados.com.br/interno/aviso-vencimento)
+  preenchida com os dados do cliente: e-CNPJ ou e-CPF, A1 ou A3, razão social ou nome, CNPJ ou CPF, a data de
+  vencimento e quantos dias faltam. No WhatsApp a arte vai como imagem e o texto como legenda, **para todos os
+  clientes**, também quem nunca conversou com a MS (decisão da Maria em 12/11/2026, ciente do risco maior de bloqueio
+  do número). O e-mail do mesmo aviso leva a mesma arte. Quem tem vários certificados recebe a lista no texto, sem a
+  arte. Quem desenha a arte é o **computador do WhatsApp Leads**, que precisa do **Google Chrome instalado** e de
+  internet. Se a arte falhar, o aviso sai só com o texto e a tela Renovação avisa. Mudou a arte no site? Em até 6
+  horas os avisos já saem com a arte nova. Para desligar: quadro 3, opção **Arte do aviso junto**.
 - **Renovou?** Na lista de certificados, clique em **Renovado** (ou **Não vai renovar**): os avisos que ainda não
   saíram param. **Reabrir** desfaz.
 - A data de nascimento que vem no relatório **não é guardada**.
@@ -537,6 +545,7 @@ permissão, a conta para de enviar na hora.
 | "Aguardando: o toque anterior desta empresa ainda não saiu" | O toque anterior da empresa está parado (atrasado mais de 2 dias ou sem WhatsApp). Envie o anterior na Minha fila ou cancele-o: os próximos voltam a sair sozinhos |
 | "Nenhum cliente para avisar agora" (Renovação) | Ninguém com certificado vencendo nos próximos 30 dias fora de campanha. Importe o relatório de renovação mais recente |
 | "Não achei a coluna Vencimento na planilha" | O arquivo não é o Relatório de renovação. Exporte de novo no sistema da certificadora e importe o .xlsx |
+| "Avisos saíram sem a arte" (Renovação) | O computador do WhatsApp Leads não conseguiu desenhar a arte. Confira se o **Google Chrome** está instalado nele e se a internet está funcionando |
 | Cliente da Renovação "Sem WhatsApp e sem e-mail" | A planilha não tem celular nem e-mail dele. Corrija o cadastro no sistema da certificadora e importe o relatório de novo |
 | "Sai sozinho depois do WhatsApp desta empresa" | Empresas novas: o e-mail espera o WhatsApp da mesma empresa sair primeiro (o WhatsApp tem prioridade). Não precisa fazer nada |
 | E-mail "[Prospecção MS] ⚠️ ..." | Aviso automático de problema: o próprio e-mail diz o que fazer. Quando resolver, chega o "✅ Resolvido" |

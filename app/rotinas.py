@@ -286,6 +286,7 @@ def _rotina_hora() -> None:
     with sessao() as db:
         processar_vencimentos(db)
         renovacao.encerrar_toques(db)  # aviso de renovação de certificado vencido ou renovado não sai
+        renovacao.limpar_artes(db)  # as artes do aviso ficam só uns dias (já foram no WhatsApp e no e-mail)
         campanhas.finalizar_cadencias(db)
     with sessao() as db:
         reservas.preencher_reservas_antigas(db)  # só na primeira vez

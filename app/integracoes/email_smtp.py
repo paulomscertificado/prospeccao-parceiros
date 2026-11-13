@@ -73,10 +73,12 @@ RODAPE_OPT_OUT = rodape(None)
 # ---------------------------------------------------------------- Envio
 
 def enviar(para: str, assunto: str, corpo: str, responder_para: str = "", com_rodape: bool = True,
-           lead_id: int | None = None, em_resposta_a: str = "", conta=None, html: str = "") -> str:
+           lead_id: int | None = None, em_resposta_a: str = "", conta=None, html: str = "",
+           imagens: dict | None = None) -> str:
     """Envia e devolve o Message-ID. em_resposta_a: Message-ID do e-mail do lead (a resposta fica no mesmo fio).
     conta: ContaEmail por onde sai (app/contas_email.py); None = a principal da MS.
-    html: versão com visual (app/visual.py); o e-mail sai com as duas versões, texto e HTML."""
+    html: versão com visual (app/visual.py); o e-mail sai com as duas versões, texto e HTML.
+    imagens: {cid: PNG} que vão dentro do HTML (<img src="cid:...">), ex.: a arte do aviso de vencimento."""
     from .. import arquivo_env, contas_email
 
     principal = conta is None or conta.principal
@@ -117,6 +119,10 @@ def enviar(para: str, assunto: str, corpo: str, responder_para: str = "", com_ro
     msg.set_content(corpo + (rodape(lead_id) if com_rodape else ""))
     if html:
         msg.add_alternative(html, subtype="html")  # o programa de e-mail mostra esta; o texto fica de reserva
+        parte_html = msg.get_payload()[-1]
+        for cid, dados in (imagens or {}).items():  # imagem dentro do e-mail (aparece sem "mostrar imagens")
+            parte_html.add_related(dados, maintype="image", subtype="png", cid=f"<{cid}>", filename=f"{cid}.png",
+                                   disposition="inline")
     usuario = c.login or remetente
     google = "gmail" in c.host or "google" in c.host
     onde = "Configurações > E-mail" if principal else "a tela E-mail"

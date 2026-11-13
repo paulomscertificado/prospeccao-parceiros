@@ -368,3 +368,132 @@ def test_tela_importa_a_planilha_e_monta_a_campanha(cliente, csrf, monkeypatch):
     r = cliente.post("/renovacao/importar", data={"csrf": csrf},
                      files={"arquivo": ("outra.pdf", b"%PDF", "application/pdf")})
     assert "Excel (.xlsx) ou CSV" in r.text
+
+
+# ---------------------------------------------------------------- Arte do aviso (a do site), pedido de 12/11/2026
+
+PNG_ARTE = b"\x89PNG\r\n\x1a\n" + b"arte-do-aviso" * 50
+
+
+def test_arte_do_toque_so_para_quem_tem_um_certificado(cliente):
+    with sessao() as db:
+        camp, cert, t = _cenario(db, 8, "9400001", "(81) 98555-0001")
+        cert.tipo, cert.cnpj = "e-CNPJ A1 12 meses - videoconferencia", "11.222.333/0001-81"
+        arte = renovacao.arte_do_toque(db, t)
+        assert arte == {"tarefa": t.id, "modelo": "cnpj", "tipo": "A1", "nome": "CLIENTE 9400001 LTDA",
+                        "doc": "11.222.333/0001-81", "data": cert.data_vencimento.isoformat()}
+        cert.tipo, cert.cnpj = "e-CPF A3 36 meses", "123.456.789-01"
+        assert renovacao.arte_do_toque(db, t)["modelo"] == "cpf" and renovacao.arte_do_toque(db, t)["tipo"] == "A3"
+        # dois certificados no mesmo contato: a lista vai no texto, sem a arte (ela é de um certificado só)
+        db.add(Certificado(origem="planilha", protocolo="9400002", cliente_nome="OUTRA LTDA", tipo="e-CNPJ A1",
+                           data_vencimento=date.today() + timedelta(days=12), status="Ativo", campanha_id=camp.id,
+                           lead_id=t.lead_id))
+        db.flush()
+        assert renovacao.arte_do_toque(db, t) is None
+        db.rollback()
+    with sessao() as db:
+        _, _, t = _cenario(db, 8, "9400003", "(81) 98555-0002")
+        gravar_config(db, "renov_arte", "0")
+        assert renovacao.arte_do_toque(db, t) is None  # desligada na tela
+        db.rollback()
+
+
+def test_whatsapp_da_renovacao_leva_a_arte_mesmo_para_contato_frio(cliente, monkeypatch):
+    from app import config
+    from app.integracoes import whatsapp_leads
+
+    filas = []
+    monkeypatch.setattr(config, "WHATSAPP_PONTE", True)  # a arte só vai pela ponte (sistema na nuvem)
+    monkeypatch.setattr(whatsapp_leads, "enviar", lambda *a, **k: filas.append(k) or "p1")
+    monkeypatch.setattr(whatsapp_leads, "configurado", lambda: True)
+    with sessao() as db:
+        _, cert, t = _cenario(db, 8, "9500001", "(81) 98666-0001")
+        cert.tipo = "e-CNPJ A1 12 meses"
+        msg = sdr.enviar_whatsapp_conectado(db, t.mensagem, _admin(db), lead=t.lead, tarefa=t, conexao="numero-teste")
+        assert filas[-1]["arte"]["tarefa"] == t.id and filas[-1]["midia_id"] is None
+        assert msg.assunto == "[com a arte do aviso de vencimento]"
+        db.rollback()
+
+
+def test_ponte_leva_a_arte_e_a_copia_volta_para_o_email(cliente, monkeypatch):
+    from types import SimpleNamespace
+
+    from app import config, contas_email
+    from app.integracoes import email_smtp, whatsapp_leads
+    from app.modelos import ArteAviso, Configuracao, PonteWhatsApp
+
+    monkeypatch.setattr(config, "NA_NUVEM", True)
+    monkeypatch.setattr(config, "WHATSAPP_PONTE", True)
+    monkeypatch.setattr(config, "WHATSAPP_PONTE_TOKEN", "token-arte")
+    whatsapp_leads._cache["status"] = None
+    cab = {"x-token": "token-arte"}
+    status = {"conectado": True, "tipo": "teste", "estado": "Conectado", "numero": "5581900000000"}
+    cliente.post("/api/ponte/troca", json={"status": status}, headers=cab)
+    with sessao() as db:
+        camp, cert, zap = _cenario(db, 8, "9600001", "(81) 98777-0001")
+        email = Tarefa(tipo="prospeccao", lead_id=zap.lead_id, campanha_id=camp.id, certificado_id=cert.id,
+                       canal="email", data=date.today(), hora="10:00", status="pendente", angulo="renov_aviso",
+                       assunto="Vencimento do certificado digital", mensagem="Olá! O certificado vence em breve.")
+        db.add(email)
+        item = PonteWhatsApp(telefone="81987770001", nome="Cliente", texto="Olá com a arte",
+                             arte=json.dumps(renovacao.arte_do_toque(db, zap)))
+        db.add(item)
+        db.commit()
+        pid, email_id, zap_id = item.id, email.id, zap.id
+    envios = cliente.post("/api/ponte/troca", json={"status": status}, headers=cab).json()["envios"]
+    com_arte = [e for e in envios if e["id"] == pid][0]
+    assert com_arte["arte"]["tarefa"] == zap_id and com_arte["arte"]["modelo"] == "cnpj" and "midia" not in com_arte
+    assert cliente.post(f"/api/ponte/arte/{pid}", content=PNG_ARTE, headers={"x-token": "errado"}).status_code == 403
+    assert cliente.post(f"/api/ponte/arte/{pid}", content=b"nao-e-png", headers=cab).status_code == 400
+    assert cliente.post(f"/api/ponte/arte/{pid}", content=PNG_ARTE, headers=cab).status_code == 200
+    with sessao() as db:
+        assert db.execute(select(ArteAviso).where(ArteAviso.ponte_id == pid)).scalars().one().tarefa_id == zap_id
+        html, imagens = renovacao.email_com_arte(db, db.get(Tarefa, email_id), "Olá! O certificado vence em breve.",
+                                                 "https://exemplo/descadastrar/1/x")
+        assert 'src="cid:arte-aviso"' in html and "vence em breve" in html and "descadastrar" in html
+        assert imagens == {"arte-aviso": PNG_ARTE}
+    # o e-mail sai com a arte DENTRO (aparece sem "mostrar imagens") e a versão em texto
+    enviados = []
+
+    class SMTPFalso:
+        def __init__(self, *a, **k):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def starttls(self, context=None):
+            pass
+
+        def login(self, usuario, senha):
+            pass
+
+        def send_message(self, msg):
+            enviados.append(msg)
+
+    monkeypatch.setattr(email_smtp.smtplib, "SMTP", SMTPFalso)
+    monkeypatch.setattr(email_smtp, "problema_de_configuracao", lambda: "")
+    monkeypatch.setattr(contas_email, "credenciais", lambda conta: SimpleNamespace(
+        host="smtp.gmail.com", porta=587, tls=True, login="", senha="x", remetente="MS <aviso@mscertificados.com.br>",
+        endereco="aviso@mscertificados.com.br", responder_para="", imap_host="", imap_porta=993, rotulo="principal"))
+    from app import arquivo_env
+
+    monkeypatch.setattr(arquivo_env, "carregar_do_banco", lambda forcar=False: None)
+    email_smtp.enviar("cliente@exemplo.com.br", "Vencimento", "Olá! O certificado vence em breve.", html=html,
+                      imagens=imagens)
+    partes = {p.get_content_type(): p for p in enviados[0].walk()}
+    assert "text/plain" in partes and "text/html" in partes and "multipart/related" in partes
+    assert partes["image/png"]["Content-ID"] == "<arte-aviso>" and partes["image/png"].get_content() == PNG_ARTE
+    with sessao() as db:
+        db.execute(delete(Configuracao).where(Configuracao.chave == "wl_status"))
+        assert renovacao.limpar_artes(db) == 0  # nova: fica uns dias
+        arte = db.execute(select(ArteAviso).where(ArteAviso.ponte_id == pid)).scalars().one()
+        arte.criado_em = agora() - timedelta(days=renovacao.DIAS_GUARDANDO_ARTE + 1)
+        db.flush()
+        assert renovacao.limpar_artes(db) == 1
+        for t in db.execute(select(Tarefa).where(Tarefa.id.in_((email_id, zap_id)))).scalars():
+            t.status = "cancelada"
+    whatsapp_leads._cache["status"] = None

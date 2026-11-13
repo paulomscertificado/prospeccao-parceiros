@@ -117,6 +117,7 @@ def test_toda_rota_da_equipe_confere_permissao():
                "/descadastrar/{lead_id:int}/{assinatura}", "/api/saude", "/api/webhooks/whatsapp", "/api/cron",
                "/api/ponte/teste", "/api/ponte/troca", "/api/ponte/retorno", "/static",
                "/api/ponte/midia/{mid:int}",  # imagem do visual para o WhatsApp Leads (senha da ponte)
+               "/api/ponte/arte/{pid:int}",  # arte do aviso de vencimento que o WhatsApp Leads desenhou (senha da ponte)
                "/visual/arquivo/{aid:int}/{nome}"}  # imagem do e-mail: o programa de e-mail do lead precisa abrir
     sem_porteiro = []
     for rota in app.routes:

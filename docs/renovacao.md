@@ -52,19 +52,33 @@ base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renova
    cancela os avisos pendentes do contato (se ele tiver outro certificado ativo na mesma campanha, os avisos passam a
    seguir esse outro); Reabrir volta para a fila se a campanha acabou. Cancelar a campanha devolve à fila quem não
    recebeu nenhum aviso (`liberar_da_campanha`); excluir marca `fora_motivo` em quem já recebeu (`antes_de_excluir`).
-9. **Respostas**: o fluxo normal (cancela os próximos toques, Oportunidade). A IA SDR não responde
+9. **Arte do aviso** (pedido da Maria em 12/11/2026: "pegue o HTML e vá atualizando para cada cliente"): a arte
+   é a do site, `https://mscertificados.com.br/interno/aviso-vencimento` (canvas 1080 x 1350). Com `renov_arte` = 1
+   (padrão), `arte_do_toque` monta os dados do toque (`tarefa`, `modelo` cnpj/cpf, `tipo` A1/A3, `nome`, `doc`, `data`)
+   só para contato com UM certificado ativo na campanha (com vários, a lista vai no texto). `sdr.enviar_whatsapp_conectado`
+   manda em `whatsapp_leads.enviar(arte=...)` → `PonteWhatsApp.arte` (JSON) → a troca da ponte leva `envio["arte"]`. O
+   computador do WhatsApp Leads (`app/arte_aviso.py` lá) baixa a página do site (de novo a cada 6 h; última cópia boa
+   se o site cair), injeta os dados, escreve "FALTAM N DIAS" ao lado de "AVISO DE VENCIMENTO" e exporta o próprio
+   canvas pelo Google Chrome sem janela (`--dump-dom`; o Edge não serve). A imagem sai com o texto de legenda, PARA
+   TODOS (também contato frio: risco aceito pela Maria; nas outras campanhas a imagem continua só para quem já
+   conversou). Uma cópia volta em `POST /api/ponte/arte/<id da ponte>` (senha da ponte) → `ArteAviso` (guardada
+   `DIAS_GUARDANDO_ARTE` dias, `limpar_artes` na rotina de hora em hora; fora do backup) e vai no e-mail do mesmo
+   aviso, dentro do HTML (`email_com_arte`, `cid:arte-aviso`, multipart/related em `email_smtp.enviar(imagens=)`).
+   Sem Chrome ou com erro, sai só o texto; a tela avisa quando nenhuma arte voltou em 7 dias (`situacao_das_artes`).
+10. **Respostas**: o fluxo normal (cancela os próximos toques, Oportunidade). A IA SDR não responde
    (`empresas_novas.e_lead_de_venda` inclui a origem "Renovação"). No WhatsApp Leads o contato ganha a etiqueta da IA
    SDR (a Atendente IA de lá não responde).
 
 ## Banco
 
-Colunas novas em `certificados` (migração automática): `origem`, `protocolo`, `responsavel`, `whatsapp`, `telefone`,
+Tabela nova `artes_aviso` (cópia da arte para o e-mail) e coluna `ponte_whatsapp.arte`. Colunas novas em
+`certificados` (migração automática): `origem`, `protocolo`, `responsavel`, `whatsapp`, `telefone`,
 `email`, `parceiro_nome`, `lead_id`, `campanha_id`, `fora_motivo`, `importado_em`. O controle antigo de vencimentos
 (`vendas_servico.processar_vencimentos`, menu Vencimentos, escondido na MS) só marca "Vencido" nos certificados da
 planilha e não cria tarefa manual para eles.
 
 Configurações (`renov_*`): `renov_ativo`, `renov_hora`, `renov_maximo_dia`, `renov_canais`, `renov_dono_id`,
-`renov_mensagens`, `renov_ultima_rodada`, `renov_ultimo_resultado`, `renov_ultima_importacao`.
+`renov_mensagens`, `renov_ultima_rodada`, `renov_ultimo_resultado`, `renov_ultima_importacao`, `renov_arte`.
 
 ## Permissões
 

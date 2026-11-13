@@ -110,10 +110,13 @@ def status(usar_cache: bool = True) -> dict:
 
 
 def enviar(telefone: str, nome: str, texto: str, resposta: bool = False, db=None, manual: bool = False,
-           usuario_id: int | None = None, conexao: str = "principal", midia_id: int | None = None) -> str:
+           usuario_id: int | None = None, conexao: str = "principal", midia_id: int | None = None,
+           arte: dict | None = None) -> str:
     """Coloca a mensagem na fila do WhatsApp Leads. Devolve o id da mensagem lá
     (na ponte: "p" + id da espera aqui; vira o id de lá quando o computador confirmar).
-    midia_id: visual (app/visual.py) cuja imagem vai junto, com o texto como legenda (só pela ponte)."""
+    midia_id: visual (app/visual.py) cuja imagem vai junto, com o texto como legenda (só pela ponte).
+    arte: aviso de vencimento da Renovação (renovacao.arte_do_toque): o computador desenha a arte do site com estes
+    dados e manda junto, com o texto como legenda (só pela ponte)."""
     if config.WHATSAPP_PONTE:
         # db: a sessão de quem chamou (a mensagem entra na mesma transação do registro do envio)
         situacao = _status_da_ponte(db) if config.WHATSAPP_PONTE_TOKEN else status(usar_cache=False)
@@ -123,7 +126,8 @@ def enviar(telefone: str, nome: str, texto: str, resposta: bool = False, db=None
         from ..modelos import PonteWhatsApp
 
         item = PonteWhatsApp(telefone=telefone, nome=nome[:200], texto=texto, resposta=resposta, manual=manual,
-                             usuario_id=usuario_id, conexao=conexao or "principal", midia_id=midia_id)
+                             usuario_id=usuario_id, conexao=conexao or "principal", midia_id=midia_id,
+                             arte=json.dumps(arte, ensure_ascii=False) if arte else "")
         if db is not None:
             db.add(item)
             db.flush()

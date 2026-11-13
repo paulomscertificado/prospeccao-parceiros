@@ -130,6 +130,33 @@ def ponte_midia(request: Request, mid: int):
                         headers={"X-Hash": v.imagem_hash})
 
 
+@rotas.post("/ponte/arte/{pid:int}")
+async def ponte_arte(request: Request, pid: int):
+    """A arte do aviso de vencimento que o computador desenhou para a mensagem `pid` da ponte (senha da ponte): fica
+    guardada para ir no e-mail do mesmo aviso (renovacao.email_com_arte)."""
+    from ..modelos import ArteAviso
+
+    if not _ponte_autorizada(request):
+        return JSONResponse({"erro": "token inválido"}, status_code=403)
+    dados = await request.body()
+    if not dados.startswith(b"\x89PNG") or len(dados) > 3_000_000:
+        return JSONResponse({"erro": "imagem inválida"}, status_code=400)
+    with sessao() as db:
+        item = db.get(PonteWhatsApp, pid)
+        if item is None or not item.arte:
+            return JSONResponse({"erro": "mensagem não encontrada"}, status_code=404)
+        try:
+            tarefa_id = int(json.loads(item.arte).get("tarefa") or 0) or None
+        except (ValueError, TypeError, AttributeError):
+            tarefa_id = None
+        existente = db.execute(select(ArteAviso).where(ArteAviso.ponte_id == pid)).scalars().first()
+        if existente is not None:
+            existente.imagem = dados
+        else:
+            db.add(ArteAviso(ponte_id=pid, tarefa_id=tarefa_id, imagem=dados))
+    return {"ok": True}
+
+
 @rotas.post("/ponte/troca")
 async def ponte_troca(request: Request):
     """O computador com o WhatsApp Leads avisa o status e leva as mensagens que estão esperando."""
@@ -148,6 +175,11 @@ async def ponte_troca(request: Request):
             item.status = "retirada"
             envio = {"id": item.id, "telefone": item.telefone, "nome": item.nome, "texto": item.texto,
                      "resposta": item.resposta, "manual": item.manual, "conexao": item.conexao or "principal"}
+            if item.arte:  # aviso de vencimento (Renovação): o computador desenha a arte do site com estes dados
+                try:
+                    envio["arte"] = json.loads(item.arte)
+                except ValueError:
+                    pass
             if item.midia_id:  # imagem do visual: o computador baixa em /api/ponte/midia/<id> (e guarda pelo hash)
                 from ..modelos import VisualCampanha
 

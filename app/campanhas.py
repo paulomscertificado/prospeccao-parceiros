@@ -674,8 +674,12 @@ def enviar_teste(db, camp: Campanha, usuario: Usuario, canal: str, destino: str,
             else:
                 # no teste a imagem vai mesmo para contato frio: quem recebe é a própria pessoa que testa
                 imagem = visual.imagem_do_whatsapp(db, t, t.lead, so_para_quem_conversou=False)
+                from . import renovacao
+
                 whatsapp_leads.enviar(destino, "Teste", f"{rotulo}\n\n{texto}", db=db, manual=True,
-                                      usuario_id=usuario.id, conexao=numero, midia_id=imagem.id if imagem else None)
+                                      usuario_id=usuario.id, conexao=numero, midia_id=imagem.id if imagem else None,
+                                      arte=None if imagem or not config.WHATSAPP_PONTE
+                                      else renovacao.arte_do_toque(db, t))
             feito["enviadas"] += 1
         except (email_smtp.ErroEmail, whatsapp_leads.ErroWhatsAppLeads) as erro:
             feito["erros"].append(f"{'E-mail' if canal == 'email' else 'WhatsApp'}: {erro}")
@@ -884,9 +888,14 @@ def _enviar_email_da_tarefa(db, t: Tarefa, usuario: Usuario | None, resultado: s
     quem = conexoes.responsavel(db, lead, usuario, t)
     t.assunto, t.mensagem = marca.aplicar(t.assunto, quem), marca.aplicar(t.mensagem, quem)
     html = visual.html_do_email(db, t, lead, quem, t.mensagem, email_smtp.link_descadastro(lead.id))
+    imagens = {}
+    if not html:  # Renovação: a arte do aviso que foi no WhatsApp do mesmo aviso vai também no e-mail
+        from . import renovacao
+
+        html, imagens = renovacao.email_com_arte(db, t, t.mensagem, email_smtp.link_descadastro(lead.id))
     try:
         id_externo = email_smtp.enviar(lead.email, t.assunto or marca.da_pessoa(quem)["nome"], t.mensagem,
-                                       lead_id=lead.id, conta=conta, html=html)
+                                       lead_id=lead.id, conta=conta, html=html, **({"imagens": imagens} if imagens else {}))
     except email_smtp.ErroEmail as erro:
         do_lead = isinstance(erro, email_smtp.ErroDestinatario)
         if not do_lead and not registrar_erro_da_caixa:

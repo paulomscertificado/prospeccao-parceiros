@@ -73,6 +73,18 @@
       <span class="escolha-corpo"><span class="escolha-marca" aria-hidden="true">✓</span>
         <b>✉️ E-mail</b><span class="pequeno suave">em cada aviso, umas 2 h depois do WhatsApp (se o cliente responder antes, não sai). Quem não tem celular recebe só por e-mail</span></span></label>
   </div>
+  <div class="cartoes-escolha" style="margin-top:10px">
+    <label class="escolha"><input type="checkbox" name="arte" {{ 'checked' if cfg.renov_arte == '1' }}>
+      <span class="escolha-corpo"><span class="escolha-marca" aria-hidden="true">✓</span>
+        <b>🖼️ Arte do aviso junto</b><span class="pequeno suave">a <a href="{{ url_da_arte }}" target="_blank" rel="noopener">arte do site</a>
+          com os dados do certificado e quantos dias faltam, no WhatsApp (o texto vai de legenda) e no e-mail. Vai para
+          todos os clientes com um certificado; quem tem vários recebe a lista no texto</span></span></label>
+  </div>
+  {% if cfg.renov_arte == '1' and artes.pedidas and not artes.feitas %}<div class="aviso aviso-alerta" style="margin-top:10px">Nos últimos 7 dias
+    {{ artes.pedidas }} {{ 'aviso saiu' if artes.pedidas == 1 else 'avisos saíram' }} sem a arte: o computador do WhatsApp Leads não
+    conseguiu desenhá-la. Confira se o <b>Google Chrome</b> está instalado nele e se a internet está funcionando.</div>
+  {% elif cfg.renov_arte == '1' and artes.feitas %}<p class="pequeno suave" style="margin:10px 0 0">Arte feita em {{ artes.feitas }} de
+    {{ artes.pedidas }} avisos nos últimos 7 dias.</p>{% endif %}
   <div class="grupo-btn"><button class="btn btn-verde">Salvar configuração</button></div>
 </form>
 

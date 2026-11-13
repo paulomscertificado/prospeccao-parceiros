@@ -73,7 +73,8 @@ def tela_renovacao(request: Request, ver: str = "avisar", usuario: Usuario = Dep
         "contatos_por_campanha": contagem, "usuarios": usuarios, "dono": renovacao.dono(db),
         "limite_frios": ler_config_int(db, "limite_frios_whatsapp", 0), "situacoes": renovacao.SITUACOES,
         "situacao": renovacao.situacao_na_tela, "chave_do_contato": renovacao.chave_do_contato,
-        "tipo_curto": renovacao.tipo_curto,
+        "tipo_curto": renovacao.tipo_curto, "url_da_arte": renovacao.URL_DA_ARTE,
+        "artes": renovacao.situacao_das_artes(db),
     })
 
 
@@ -147,6 +148,7 @@ async def configurar(request: Request, usuario: Usuario = Depends(exige("campanh
     if dono_id and not db.get(Usuario, dono_id):
         dono_id = None
     for chave, valor in [("renov_ativo", "1" if form.get("ativo") else "0"), ("renov_canais", canais),
+                         ("renov_arte", "1" if form.get("arte") else "0"),
                          ("renov_maximo_dia", str(maximo)), ("renov_hora", hora), ("renov_dono_id", str(dono_id or ""))]:
         gravar_config(db, chave, valor)
     registrar_log(db, usuario, "configurou_renovacao", "configuracao", None, request=request)

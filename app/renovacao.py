@@ -68,7 +68,20 @@ PADRAO = {
     "renov_ultima_rodada": "",        # dia em que a campanha automática rodou (AAAA-MM-DD)
     "renov_ultimo_resultado": "",
     "renov_ultima_importacao": "",
+    "renov_arte": "1",                # a arte do aviso (a do site) vai junto no WhatsApp e no e-mail
 }
+URL_DA_ARTE = "https://mscertificados.com.br/interno/aviso-vencimento"  # quem desenha: whatsapp-leads/app/arte_aviso.py
+DIAS_GUARDANDO_ARTE = 10  # a cópia da arte que voltou do computador (para o e-mail) fica só uns dias
+# E-mail com a arte: a imagem primeiro (como no WhatsApp, onde o texto é a legenda) e o texto do aviso embaixo
+HTML_EMAIL_COM_ARTE = (
+    "<!doctype html><html><body style=\"margin:0;padding:24px 12px;background:#F3F6FA\">"
+    "<div style=\"max-width:560px;margin:0 auto;font-family:Arial,Helvetica,sans-serif;font-size:15px;"
+    "line-height:1.5;color:#0E3B66\">"
+    "<img src=\"cid:arte-aviso\" alt=\"Aviso de vencimento do certificado digital\" width=\"540\" "
+    "style=\"display:block;width:100%;max-width:540px;height:auto;border-radius:12px;margin:0 0 20px\">"
+    "{{mensagem}}"
+    "<div style=\"font-size:12px;color:#777;margin:22px 0 0;text-align:center\">{{descadastro}}</div>"
+    "</div></body></html>")
 
 # {vencimentos} vira a frase (ou a lista) dos certificados do contato com as datas; {data} é o primeiro vencimento.
 MENSAGENS_PADRAO = {
@@ -1016,6 +1029,73 @@ def rodada_diaria() -> str:
         gravar_config(db, "renov_ultimo_resultado", texto)
         db.commit()
         return texto
+
+
+# ---------------------------------------------------------------- Arte do aviso (a do site)
+
+def arte_do_toque(db, tarefa: Tarefa | None) -> dict | None:
+    """Os dados para o computador do WhatsApp Leads desenhar a arte do aviso (a do site, URL_DA_ARTE) neste toque, ou
+    None (sai só o texto). Só para contato com UM certificado na campanha: a arte é de um certificado; com vários, a
+    lista vai no texto. Pedido da Maria em 12/11/2026, com a arte também para quem nunca conversou (risco aceito)."""
+    if tarefa is None or not tarefa.certificado_id or not tarefa.campanha_id or cfg(db, "renov_arte") != "1":
+        return None
+    camp = db.get(Campanha, tarefa.campanha_id)
+    if camp is None or camp.tipo != TIPO_CAMPANHA:
+        return None
+    certs = db.execute(select(Certificado).where(Certificado.campanha_id == camp.id, Certificado.lead_id == tarefa.lead_id,
+                                                 Certificado.status == "Ativo")).scalars().all()
+    if len(certs) != 1:
+        return None
+    cert = certs[0]
+    curto = tipo_curto(cert.tipo)
+    midia = curto[-2:] if curto[-2:] in ("A1", "A3") else ""
+    if not midia:
+        return None  # a arte só tem A1 e A3
+    return {"tarefa": tarefa.id, "modelo": "cpf" if _e_pessoa(cert) else "cnpj", "tipo": midia,
+            "nome": (cert.cliente_nome or "")[:200], "doc": cert.cnpj or "", "data": cert.data_vencimento.isoformat()}
+
+
+def email_com_arte(db, tarefa: Tarefa | None, texto: str, link_descadastro: str = "") -> tuple[str, dict]:
+    """O e-mail do aviso com a arte que foi no WhatsApp do mesmo aviso (o computador mandou uma cópia de volta):
+    (html, {cid: png}). Sem a arte, ("", {}) e o e-mail sai só com o texto."""
+    from types import SimpleNamespace
+
+    from . import visual
+    from .modelos import ArteAviso
+
+    if tarefa is None or tarefa.canal != "email" or not tarefa.campanha_id or cfg(db, "renov_arte") != "1":
+        return "", {}
+    zaps = select(Tarefa.id).where(Tarefa.campanha_id == tarefa.campanha_id, Tarefa.lead_id == tarefa.lead_id,
+                                   Tarefa.angulo == tarefa.angulo, Tarefa.canal == "whatsapp")
+    arte = db.execute(select(ArteAviso).where(ArteAviso.tarefa_id.in_(zaps))
+                      .order_by(ArteAviso.id.desc()).limit(1)).scalars().first()
+    if arte is None:
+        return "", {}
+    html = visual.montar_html(SimpleNamespace(html=HTML_EMAIL_COM_ARTE), texto, {}, link_descadastro)
+    return html, {"arte-aviso": arte.imagem}
+
+
+def limpar_artes(db, hoje: date | None = None) -> int:
+    """Apaga as cópias das artes com mais de DIAS_GUARDANDO_ARTE dias (já foram no WhatsApp e no e-mail)."""
+    from sqlalchemy import delete
+
+    from .banco import agora as _agora
+    from .modelos import ArteAviso
+
+    limite = _agora() - timedelta(days=DIAS_GUARDANDO_ARTE)
+    return db.execute(delete(ArteAviso).where(ArteAviso.criado_em < limite)).rowcount or 0
+
+
+def situacao_das_artes(db, dias: int = 7) -> dict:
+    """Para a tela: dos avisos que saíram com a arte nos últimos dias, quantos o computador desenhou de fato (a cópia
+    voltou). Nenhuma de volta = o computador não está conseguindo (ex.: sem o Google Chrome)."""
+    from .modelos import ArteAviso, PonteWhatsApp
+
+    desde = agora() - timedelta(days=dias)
+    pedidas = db.scalar(select(func.count(PonteWhatsApp.id)).where(
+        PonteWhatsApp.arte != "", PonteWhatsApp.criado_em >= desde, PonteWhatsApp.status.in_(("na_fila", "retirada")))) or 0
+    feitas = db.scalar(select(func.count(ArteAviso.id)).where(ArteAviso.criado_em >= desde)) or 0
+    return {"pedidas": pedidas, "feitas": feitas}
 
 
 def campanhas_recentes(db, limite: int = 30) -> list[Campanha]:
