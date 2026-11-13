@@ -69,6 +69,7 @@ PADRAO = {
     "renov_ultimo_resultado": "",
     "renov_ultima_importacao": "",
     "renov_arte": "1",                # a arte do aviso (a do site) vai junto no WhatsApp e no e-mail
+    "renov_conexao": "",              # número de WhatsApp dos disparos ("" = automático, sempre um número de verdade)
 }
 URL_DA_ARTE = "https://mscertificados.com.br/interno/aviso-vencimento"  # quem desenha: whatsapp-leads/app/arte_aviso.py
 DIAS_GUARDANDO_ARTE = 10  # a cópia da arte que voltou do computador (para o e-mail) fica só uns dias
@@ -741,10 +742,16 @@ def criar_campanha(db, usuario: Usuario, quantidade: int | None = None) -> Campa
         return None
     ultimo = max(c.vencimento for c in escolhidos)
     datas = datas_da_campanha(db, escolhidos)
+    from . import conexoes
+
+    try:  # o número dos disparos fica gravado na campanha (dá para trocar na página dela): nunca um de modo teste
+        numero = numero_do_envio(db, usuario)
+    except conexoes.SemNumero:  # computador desligado agora: vale o escolhido na tela (ou o automático no envio)
+        numero = cfg(db, "renov_conexao")
     camp = Campanha(nome=f"Renovação {hoje:%d/%m} – vencem até {ultimo:%d/%m}"[:160], tipo=TIPO_CAMPANHA,
                     objetivo="Renovar o certificado digital dos clientes", quantidade=len(escolhidos),
                     canais=cfg(db, "renov_canais"), status="gerando", usuario_id=usuario.id, inicio=hoje,
-                    cadencia_id=garantir_cadencia(db).id,
+                    cadencia_id=garantir_cadencia(db).id, conexao_id=numero or "",
                     pedido=f"Clientes com certificado vencendo até {ultimo:%d/%m/%Y} (planilha de renovação)")
     db.add(camp)
     db.commit()
@@ -1103,6 +1110,75 @@ def situacao_das_artes(db, dias: int = 7) -> dict:
     return {"pedidas": pedidas, "feitas": feitas}
 
 
+# ---------------------------------------------------------------- Número de WhatsApp (teste e disparos)
+# Pedido da Maria em 12/11/2026, depois que o teste dela não chegou: saiu pelo número "principal", que estava em MODO
+# TESTE (o WhatsApp Leads só simula o envio). Ela escolhe o número do teste e o dos disparos; no automático, a
+# Renovação nunca escolhe um número em modo teste se houver um de verdade conectado.
+
+def numeros_para_escolher(db) -> list[dict]:
+    """Todos os números de WhatsApp cadastrados, com a situação: conectado e se está em modo teste (simulado)."""
+    from . import conexoes
+    from .integracoes import whatsapp_leads
+
+    base = whatsapp_leads.status()
+    lista = []
+    for c in conexoes.todas(db):
+        s = conexoes.situacao(c.id, base)
+        numero = util.normalizar_telefone(str(s.get("numero") or ""))
+        lista.append({"id": c.id, "nome": c.nome or c.id, "conectado": bool(s.get("conectado")),
+                      "teste": s.get("tipo") == "teste", "numero": util.formatar_telefone(numero) if numero else ""})
+    return lista
+
+
+def numero_automatico(db, remetente: Usuario | None) -> str:
+    """Sem número escolhido: o de quem assina, ou um compartilhado com ele e conectado, sempre preferindo um número DE
+    VERDADE a um em modo teste (que só simula: a mensagem não chega). Lança conexoes.SemNumero."""
+    from . import conexoes
+    from .integracoes import whatsapp_leads
+
+    if remetente is None:
+        raise conexoes.SemNumero("Escolha quem assina as campanhas de renovação.")
+    base = whatsapp_leads.status()
+    if not base.get("disponivel"):
+        raise conexoes.SemNumero(base.get("erro") or "O computador com o WhatsApp Leads está desligado.")
+    proprio = conexoes.minha(db, remetente)
+    candidatos = ([proprio] if proprio else []) + sorted(
+        (c for c in conexoes.acessiveis(db, remetente) if proprio is None or c.id != proprio.id),
+        key=lambda c: (c.id != conexoes.PRINCIPAL, c.criado_em))
+    conectados = [c for c in candidatos if conexoes.situacao(c.id, base).get("conectado")]
+    real = next((c for c in conectados if conexoes.situacao(c.id, base).get("tipo") != "teste"), None)
+    escolhido = real or (conectados[0] if conectados else None)
+    if escolhido is None:
+        raise conexoes.SemNumero(f"{remetente.nome} não tem nenhum WhatsApp conectado. Conecte em WhatsApp > Meu "
+                                 "WhatsApp (ou escolha o número na tela Renovação).")
+    return escolhido.id
+
+
+def numero_do_envio(db, remetente: Usuario | None, escolhido: str = "") -> str:
+    """O número por onde sai: o escolhido (no teste), senão o da configuração da Renovação, senão o automático.
+    Número escolhido e desconectado: avisa (lança conexoes.SemNumero), nunca troca sozinho."""
+    from . import conexoes
+    from .integracoes import whatsapp_leads
+
+    escolhido = escolhido or cfg(db, "renov_conexao")
+    c = db.get(conexoes.ConexaoWhatsApp, escolhido) if escolhido else None
+    if c is None:
+        return numero_automatico(db, remetente)
+    base = whatsapp_leads.status()
+    if not base.get("disponivel"):
+        raise conexoes.SemNumero(base.get("erro") or "O computador com o WhatsApp Leads está desligado.")
+    if not conexoes.situacao(c.id, base).get("conectado"):
+        raise conexoes.SemNumero(f"O número {c.nome or c.id} está desconectado. Conecte em WhatsApp ou escolha outro.")
+    return c.id
+
+
+def numero_em_modo_teste(id_conexao: str) -> bool:
+    from . import conexoes
+    from .integracoes import whatsapp_leads
+
+    return conexoes.situacao(id_conexao, whatsapp_leads.status()).get("tipo") == "teste"
+
+
 # ---------------------------------------------------------------- Área de teste (como a da IA SDR)
 
 EXEMPLO_TESTE = {"cliente_nome": "EMPRESA EXEMPLO LTDA", "cnpj": "11.222.333/0001-81", "tipo": "e-CNPJ A1 12 meses"}
@@ -1165,10 +1241,11 @@ def arte_do_teste_no_email(db, cert_id: int, dados_arte: dict) -> bytes | None:
 
 
 def enviar_teste(db, usuario: Usuario, cert_id: int, canal: str, destino: str, avisos: str = "renov_aviso",
-                 com_arte: bool = True) -> dict:
+                 com_arte: bool = True, conexao: str = "") -> dict:
     """Ambiente de teste (como o da IA SDR): manda os avisos para o WhatsApp ou o e-mail DE QUEM ESTÁ TESTANDO, com
     "[TESTE]" no começo, do jeito que o cliente receberia (o texto e, se marcado, a arte do site). Sai pelo número e
-    pelo e-mail de quem assina as campanhas de renovação. Nenhum cliente recebe nada e nenhuma campanha muda."""
+    pelo e-mail de quem assina as campanhas de renovação; o WhatsApp, pelo número escolhido no teste (`conexao`), senão
+    pelo dos disparos da Renovação, senão o automático. Nenhum cliente recebe nada e nenhuma campanha muda."""
     from types import SimpleNamespace
 
     from . import config, conexoes, contas_email, visual
@@ -1182,11 +1259,13 @@ def enviar_teste(db, usuario: Usuario, cert_id: int, canal: str, destino: str, a
     # a arte é de UM certificado: com vários no mesmo contato, o cliente recebe a lista no texto (o teste mostra igual)
     dados_arte = _arte_do_certificado(cert) if com_arte and len(contato.certificados) == 1 else None
     feito = {"enviadas": 0, "erros": [], "arte": False, "remetente": remetente.nome,
-             "certificados": len(contato.certificados), "arte_pedida": com_arte}
+             "certificados": len(contato.certificados), "arte_pedida": com_arte, "numero": "", "modo_teste": False}
     numero, conta, imagem_email = "", None, None
     try:
         if canal == "whatsapp":
-            numero = conexoes.para_enviar(db, remetente)
+            numero = numero_do_envio(db, remetente, conexao)
+            c = db.get(conexoes.ConexaoWhatsApp, numero)
+            feito["numero"], feito["modo_teste"] = (c.nome if c else numero), numero_em_modo_teste(numero)
         else:
             conta = contas_email.para_enviar(db, remetente)
     except (conexoes.SemNumero, contas_email.SemConta) as erro:

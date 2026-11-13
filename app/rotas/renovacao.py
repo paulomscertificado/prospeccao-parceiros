@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .. import renovacao, util
+from .. import autorizacao, renovacao, util
 from ..banco import gravar_config, ler_config_int, obter_db
 from ..modelos import Certificado, Tarefa, Usuario
 from ..seguranca import exige, registrar_log, verificar_csrf
@@ -65,6 +65,15 @@ def tela_renovacao(request: Request, ver: str = "avisar", usuario: Usuario = Dep
                                .group_by(Tarefa.campanha_id)).all()) if campanhas else {}
     usuarios = db.execute(select(Usuario).where(Usuario.ativo.is_(True), Usuario.perfil != "parceiro")
                           .order_by(Usuario.nome)).scalars().all()
+    from .. import conexoes
+
+    numeros = renovacao.numeros_para_escolher(db)
+    try:
+        auto = renovacao.numero_automatico(db, renovacao.dono(db) or usuario)
+        numero_auto = next((f"{n['nome']}{' · ' + n['numero'] if n['numero'] else ''}"
+                            + (" · MODO TESTE" if n["teste"] else "") for n in numeros if n["id"] == auto), auto)
+    except conexoes.SemNumero:
+        numero_auto = "nenhum número conectado"
     return tela(request, "renovacao.html", {
         "cfg": {c: renovacao.cfg(db, c) for c in renovacao.PADRAO}, "mensagens": renovacao.mensagens(db),
         "angulos": renovacao.ANGULOS, "dias_aviso": renovacao.DIAS_AVISO, "quantidades": renovacao.QUANTIDADES,
@@ -76,7 +85,8 @@ def tela_renovacao(request: Request, ver: str = "avisar", usuario: Usuario = Dep
         "tipo_curto": renovacao.tipo_curto, "url_da_arte": renovacao.URL_DA_ARTE,
         "artes": renovacao.situacao_das_artes(db),
         "exemplos": renovacao.exemplos_para_teste(db), "avisos_teste": renovacao.AVISOS_TESTE,
-        "remetente": renovacao.dono(db) or usuario,
+        "remetente": renovacao.dono(db) or usuario, "numeros": numeros,
+        "numero_auto": numero_auto, "pode_escolher_numero": autorizacao.pode(usuario, "campanhas.escolher_numero"),
     })
 
 
@@ -149,6 +159,11 @@ async def configurar(request: Request, usuario: Usuario = Depends(exige("campanh
     dono_id = util.para_int(form.get("dono_id"))
     if dono_id and not db.get(Usuario, dono_id):
         dono_id = None
+    if autorizacao.pode(usuario, "campanhas.escolher_numero"):  # só quem pode escolher o número (administrador)
+        from ..modelos import ConexaoWhatsApp
+
+        conexao = str(form.get("conexao") or "")
+        gravar_config(db, "renov_conexao", conexao if conexao and db.get(ConexaoWhatsApp, conexao) else "")
     for chave, valor in [("renov_ativo", "1" if form.get("ativo") else "0"), ("renov_canais", canais),
                          ("renov_arte", "1" if form.get("arte") else "0"),
                          ("renov_maximo_dia", str(maximo)), ("renov_hora", hora), ("renov_dono_id", str(dono_id or ""))]:
@@ -218,8 +233,9 @@ async def testar(request: Request, usuario: Usuario = Depends(exige("campanhas.g
         return voltar("/renovacao#testar")
     cert_id = util.para_int(form.get("certificado")) or 0
     try:
+        conexao = str(form.get("conexao_teste") or "") if autorizacao.pode(usuario, "campanhas.escolher_numero") else ""
         r = renovacao.enviar_teste(db, usuario, cert_id, canal, destino, str(form.get("avisos", "renov_aviso")),
-                                   com_arte=bool(form.get("com_arte")))
+                                   com_arte=bool(form.get("com_arte")), conexao=conexao)
     except ValueError as erro:
         avisar(request, str(erro), "erro")
         return voltar("/renovacao#testar")
@@ -229,8 +245,11 @@ async def testar(request: Request, usuario: Usuario = Depends(exige("campanhas.g
     if r["enviadas"]:
         para = destino if canal == "email" else util.formatar_telefone(destino[2:])
         texto = (f"Teste enviado: {_n(r['enviadas'], 'mensagem', 'mensagens')} de "
-                 f"{'e-mail' if canal == 'email' else 'WhatsApp'} para {para}, assinado por {r['remetente']}. "
-                 "Nenhum cliente recebeu nada.")
+                 f"{'e-mail' if canal == 'email' else 'WhatsApp'} para {para}, assinado por {r['remetente']}"
+                 + (f", pelo número {r['numero']}" if r["numero"] else "") + ". Nenhum cliente recebeu nada.")
+        if r["modo_teste"]:
+            avisar(request, f"Atenção: o número {r['numero']} está em MODO TESTE. O WhatsApp Leads só simula o envio, "
+                            "e a mensagem NÃO chega de verdade. Escolha um número conectado por QR code.", "alerta")
         if r["arte"]:
             texto += (" Com a arte: o computador do WhatsApp Leads desenha e manda em até 1 minuto."
                       if canal == "whatsapp" else " Com a arte do teste de WhatsApp deste cliente.")

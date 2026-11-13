@@ -501,6 +501,23 @@ def test_ponte_leva_a_arte_e_a_copia_volta_para_o_email(cliente, monkeypatch):
 
 # ---------------------------------------------------------------- Área de teste (pedido de 12/11/2026)
 
+# situação dos números como o WhatsApp Leads informa: o principal em MODO TESTE (só simula) e o u3 por QR code
+_NUMEROS = {"disponivel": True, "conectado": True, "tipo": "teste",
+            "conexoes": {"principal": {"conectado": True, "tipo": "teste", "estado": "Conectado"},
+                         "u3": {"conectado": True, "tipo": "qr", "estado": "Conectado", "numero": "5581999990003"},
+                         "u9": {"conectado": False, "tipo": "qr", "estado": "Desconectado"}}}
+
+
+def _numeros_cadastrados(db):
+    from app import conexoes
+    from app.modelos import ConexaoWhatsApp
+
+    conexoes.garantir_principal(db)
+    for cid, nome in (("u3", "WhatsApp de verdade"), ("u9", "WhatsApp desconectado")):
+        if db.get(ConexaoWhatsApp, cid) is None:
+            db.add(ConexaoWhatsApp(id=cid, nome=nome, compartilhada_todos=True))
+    db.flush()
+
 def test_area_de_teste_manda_so_para_quem_testa_com_a_arte(cliente, csrf, monkeypatch):
     """Como o teste da IA SDR: os avisos chegam no WhatsApp de quem testa, com "[TESTE]", o texto do aviso e a arte
     do site (opção marcada). Nenhum cliente recebe nada e nenhuma campanha muda."""
@@ -510,7 +527,7 @@ def test_area_de_teste_manda_so_para_quem_testa_com_a_arte(cliente, csrf, monkey
     filas = []
     monkeypatch.setattr(config, "WHATSAPP_PONTE", True)
     monkeypatch.setattr(whatsapp_leads, "enviar", lambda *a, **k: filas.append((a, k)) or "p1")
-    monkeypatch.setattr(conexoes, "para_enviar", lambda db, quem: "numero-teste")
+    monkeypatch.setattr(whatsapp_leads, "status", lambda usar_cache=True: _NUMEROS)
     with sessao() as db:
         _limpar(db)
         renovacao.importar(db, renovacao.ler_planilha("r.xlsx", _planilha([
@@ -607,3 +624,73 @@ def test_computador_do_whatsapp_a_noite_nao_aparece_como_desligado():
                 disponivel = 250 <= wl.espera_do_computador({}, visto) + wl.FOLGA_DO_SINAL
             assert s["disponivel"] is disponivel, (segundos, espera, s)
         gravar_config(db, "wl_status", "")
+
+
+
+def test_numero_automatico_nunca_e_o_de_modo_teste_se_houver_um_de_verdade(cliente, monkeypatch):
+    """Em 12/11/2026 o teste da Maria não chegou: saiu pelo "principal", em MODO TESTE (o WhatsApp Leads só simula).
+    No automático a Renovação prefere um número de verdade; o escolhido vale como foi escolhido (com aviso)."""
+    from app import conexoes
+    from app.integracoes import whatsapp_leads
+
+    monkeypatch.setattr(whatsapp_leads, "status", lambda usar_cache=True: _NUMEROS)
+    with sessao() as db:
+        _numeros_cadastrados(db)
+        admin = _admin(db)
+        numeros = {n["id"]: n for n in renovacao.numeros_para_escolher(db)}
+        assert numeros["principal"]["teste"] and numeros["principal"]["conectado"]
+        assert not numeros["u3"]["teste"] and numeros["u3"]["numero"] == "(81) 99999-0003"
+        assert not numeros["u9"]["conectado"]
+        assert renovacao.numero_automatico(db, admin) == "u3"  # nunca o principal em modo teste
+        assert renovacao.numero_do_envio(db, admin, "principal") == "principal"  # escolhido: vale (a tela avisa)
+        assert renovacao.numero_em_modo_teste("principal") and not renovacao.numero_em_modo_teste("u3")
+        try:
+            renovacao.numero_do_envio(db, admin, "u9")
+            assert False, "número desconectado não pode ser usado"
+        except conexoes.SemNumero as erro:
+            assert "desconectado" in str(erro)
+        db.rollback()
+
+
+def test_escolher_o_numero_do_teste_e_dos_disparos(cliente, csrf, monkeypatch):
+    from app import config, trabalhos
+    from app.integracoes import whatsapp_leads
+
+    filas = []
+    monkeypatch.setattr(config, "WHATSAPP_PONTE", True)
+    monkeypatch.setattr(whatsapp_leads, "enviar", lambda *a, **k: filas.append(k) or "p1")
+    monkeypatch.setattr(whatsapp_leads, "status", lambda usar_cache=True: _NUMEROS)
+    monkeypatch.setattr(trabalhos.threading, "Thread", _SemLinha)
+    with sessao() as db:
+        _limpar(db)
+        _numeros_cadastrados(db)
+        db.commit()
+    pagina = cliente.get("/renovacao").text
+    assert 'name="conexao_teste"' in pagina and 'name="conexao"' in pagina and "MODO TESTE (não chega de verdade)" in pagina
+    assert pagina.index('id="testar"') < pagina.index('id="importar"')  # o teste é o 1º passo da tela
+    # teste pelo principal (modo teste): sai por ele, mas a tela avisa que não chega de verdade
+    r = cliente.post("/renovacao/testar", data={"csrf": csrf, "certificado": "0", "canal": "whatsapp",
+                                                "whatsapp_teste": "81999990000", "avisos": "renov_aviso",
+                                                "conexao_teste": "principal"})
+    assert filas[-1]["conexao"] == "principal" and "está em MODO TESTE" in r.text
+    r = cliente.post("/renovacao/testar", data={"csrf": csrf, "certificado": "0", "canal": "whatsapp",
+                                                "whatsapp_teste": "81999990000", "avisos": "renov_aviso",
+                                                "conexao_teste": "u3"})
+    assert filas[-1]["conexao"] == "u3" and "pelo número WhatsApp de verdade" in r.text and "está em MODO TESTE" not in r.text
+    r = cliente.post("/renovacao/testar", data={"csrf": csrf, "certificado": "0", "canal": "whatsapp",
+                                                "whatsapp_teste": "81999990000", "avisos": "renov_aviso"})
+    assert filas[-1]["conexao"] == "u3"  # automático: o de verdade, nunca o de modo teste
+    # número dos disparos: fica gravado e cada campanha nova já nasce com ele
+    cliente.post("/renovacao/configurar", data={"csrf": csrf, "canal_whatsapp": "on", "canal_email": "on",
+                                                "maximo_dia": "40", "hora": "07:45", "conexao": "u3", "arte": "on"})
+    with sessao() as db:
+        assert renovacao.cfg(db, "renov_conexao") == "u3"
+        renovacao.importar(db, renovacao.ler_planilha("r.xlsx", _planilha([
+            _linha(12, "9800001", "e-CNPJ A1 12 meses", "NUMERO ESCOLHIDO LTDA", "11222333000181", "ANA NUMERO",
+                   "12345678901", "ana@numeroescolhido.com.br", "81987653333")]))[0], _admin(db))
+        camp = renovacao.criar_campanha(db, _admin(db), 10)
+        assert camp.conexao_id == "u3"
+        _limpar(db)
+        from app.banco import gravar_config
+
+        gravar_config(db, "renov_conexao", "")

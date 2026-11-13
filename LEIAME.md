@@ -332,16 +332,19 @@ antes**, pelo WhatsApp e pelo e-mail. Os clientes vêm do **Relatório de renova
 certificadora.
 
 **Passo a passo:**
-1. Exporte o **Relatório de renovação** (Excel) no sistema da certificadora.
-2. Em **Renovação**, no quadro **1. Importar a planilha de renovação**, escolha o arquivo e clique em
-   **Importar planilha**. Pode importar de novo sempre que sair um relatório novo: quem já estava é atualizado, sem
+1. **Teste primeiro** (quadro **1. Testar os avisos**, ver abaixo): mande os avisos para o seu WhatsApp e confira.
+2. Exporte o **Relatório de renovação** (Excel) no sistema da certificadora. Em **Renovação**, no quadro
+   **2. Importar a planilha de renovação**, escolha o arquivo e clique em **Importar planilha**. Pode importar de novo sempre que sair um relatório novo: quem já estava é atualizado, sem
    duplicar.
-3. No quadro **2. Montar campanha agora**, escolha quantos contatos (10 a 100; vão os que vencem primeiro) e clique
+3. No quadro **3. Montar campanha agora**, escolha quantos contatos (10 a 100; vão os que vencem primeiro) e clique
    em **Montar campanha**. Em alguns minutos a campanha fica **aguardando aprovação**.
 4. Abra a campanha, confira as mensagens e **aprove**. Depois de aprovada, tudo sai sozinho.
-5. (Opcional) No quadro **3**, ligue a **campanha automática**: todo dia, no horário escolhido, o sistema monta a
-   campanha com quem chegou a 30 dias do vencimento (ela também espera a aprovação). Escolha o **dono** (ele assina e
-   as mensagens saem pelo WhatsApp e pelo e-mail dele) e clique em **Salvar configuração**.
+5. No quadro **4**, escolha o **dono** (ele assina e os e-mails saem pela conta dele) e o **Número de WhatsApp dos
+   disparos** (só o administrador escolhe; fica gravado em cada campanha e dá para trocar na página da campanha).
+   **Número em "MODO TESTE" só simula o envio: a mensagem não chega.** No automático, o sistema usa o número de quem
+   assina e nunca um em modo teste quando há um de verdade conectado. Se quiser, ligue a **campanha automática**:
+   todo dia, no horário escolhido, o sistema monta a campanha com quem chegou a 30 dias do vencimento (ela também
+   espera a aprovação). Clique em **Salvar configuração**.
 
 **Como funciona:**
 - Entra quem vence nos **próximos 30 dias**. Quem já venceu **não recebe aviso**.
@@ -370,7 +373,8 @@ certificadora.
   arte. Quem desenha a arte é o **computador do WhatsApp Leads**, que precisa do **Google Chrome instalado** e de
   internet. Se a arte falhar, o aviso sai só com o texto e a tela Renovação avisa. Mudou a arte no site? Em até 6
   horas os avisos já saem com a arte nova. Para desligar: quadro 3, opção **Arte do aviso junto**.
-- **Testar antes (quadro 5, "Testar os avisos"):** como o teste da IA SDR. Escolha um cliente da planilha (ou o
+- **Testar antes (quadro 1, "Testar os avisos"):** como o teste da IA SDR. Escolha também **por qual número** o teste
+  sai (número em modo teste: a tela avisa que não chega de verdade). Escolha um cliente da planilha (ou o
   cliente fictício), o canal (WhatsApp ou e-mail), digite o **seu** WhatsApp ou e-mail, escolha os avisos (só o 1º, um
   deles ou os 4) e deixe marcado **Mandar a arte junto** para receber a arte do site com os dados do cliente. Chega
   com "[TESTE]" no começo, assinado por quem assina as campanhas de renovação e pelo WhatsApp/e-mail dele. Nenhum

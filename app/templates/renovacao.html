@@ -9,8 +9,8 @@
   <div><h1>Renovação</h1>
     <div class="suave">Avisa os clientes da MS antes de o certificado digital vencer: {{ quando }}, pelo WhatsApp e pelo e-mail.</div></div>
 </div>
-<div class="passos-ia"><span>1. Importa a planilha de renovação</span><span>2. Junta os certificados de cada contato</span>
-  <span>3. Monta a campanha</span><span>4. Você aprova</span><span>5. Avisos saem sozinhos (WhatsApp primeiro)</span></div>
+<div class="passos-ia"><span>1. Testa os avisos com você</span><span>2. Importa a planilha de renovação</span>
+  <span>3. Monta a campanha (um aviso por contato)</span><span>4. Você aprova</span><span>5. Avisos saem sozinhos (WhatsApp primeiro)</span></div>
 
 <div class="grade">
   <div class="kpi destaque"><div class="rotulo">Vencem em 30 dias</div><div class="valor">{{ kpis.em_30 }}</div>
@@ -27,10 +27,55 @@
 {% if fora %}<p class="pequeno suave">Ficam de fora agora: {% for motivo, n in fora.items() %}{{ n }} {{ 'certificado' if n == 1 else 'certificados' }} ({{ motivo }}){{ '; ' if not loop.last else '.' }}{% endfor %}</p>{% endif %}
 
 {% if pode('campanhas.gerenciar') %}
+<details class="cartao" id="testar" open>
+  <summary><h2 style="display:inline">🧪 1. Testar os avisos</h2>
+    <span class="pequeno suave">— receba no SEU WhatsApp ou e-mail, do jeito que o cliente recebe. Nenhum cliente recebe nada.</span></summary>
+  <form method="post" action="/renovacao/testar" style="margin-top:12px">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="campos">
+      <div><label>1. Com os dados de qual cliente</label>
+        <select name="certificado">
+          <option value="0">Cliente fictício (EMPRESA EXEMPLO LTDA · e-CNPJ A1 · vence em 30 dias)</option>
+          {% for c, n in exemplos %}<option value="{{ c.id }}">{{ c.data_vencimento.strftime('%d/%m') }} – {{ c.cliente_nome[:60] }} · {{ tipo_curto(c.tipo) or c.tipo[:20] }}{{ ' · ' ~ n ~ ' certificados no mesmo contato (sem arte)' if n > 1 }}</option>{% endfor %}
+        </select></div>
+      <div><label>2. Testar qual canal</label>
+        <select name="canal" id="canal-teste-renov">
+          <option value="whatsapp">💬 WhatsApp</option>
+          <option value="email">✉ E-mail</option>
+        </select></div>
+      <div id="campo-whatsapp-renov"><label>3. Seu WhatsApp (recebe o teste)</label><input type="text" inputmode="tel" name="whatsapp_teste" placeholder="(81) 99999-0000"></div>
+      <div id="campo-email-renov"><label>3. Seu e-mail (recebe o teste)</label><input type="email" name="email_teste" value="{{ usuario.email }}"></div>
+      {% if pode_escolher_numero %}<div><label>4. Sai pelo número</label>
+        <select name="conexao_teste"><option value="">Automático: {{ numero_auto }}</option>
+          {% set desabilitar = True %}{% for n in numeros %}<option value="{{ n.id }}" {{ 'selected' if n.id == cfg.renov_conexao }}{{ ' disabled' if desabilitar and not n.conectado }}>{{ n.nome }}{{ ' · ' ~ n.numero if n.numero }} — {{ 'MODO TESTE (não chega de verdade)' if n.teste else ('conectado' if n.conectado else 'desconectado') }}</option>{% endfor %}</select></div>{% endif %}
+      <div><label>Quais avisos</label><select name="avisos">{% for v, nome in avisos_teste.items() %}<option value="{{ v }}">{{ nome }}</option>{% endfor %}</select></div>
+    </div>
+    <label class="escolha" style="max-width:560px;margin-top:10px"><input type="checkbox" name="com_arte" checked>
+      <span class="escolha-corpo"><span class="escolha-marca" aria-hidden="true">✓</span>
+        <b>🖼️ Mandar a arte junto</b><span class="pequeno suave">a <a href="{{ url_da_arte }}" target="_blank" rel="noopener">arte do site</a> com os dados
+          desse cliente e quantos dias faltam (no WhatsApp, o texto vai de legenda). No e-mail, a arte vai quando o teste de
+          WhatsApp do mesmo cliente já saiu na última hora (quem desenha é o computador do WhatsApp Leads)</span></span></label>
+    <p class="pequeno suave">Chega com "[TESTE]" e o nome do cliente no começo, assinado por {{ remetente.nome }}
+      (quem assina as campanhas de renovação). O WhatsApp sai pelo número escolhido; número em <b>modo teste</b> só simula
+      o envio e a mensagem não chega. Não muda nada nas campanhas.</p>
+    <button class="btn btn-primario">Enviar teste para mim</button>
+  </form>
+</details>
+<script>
+(function () {
+  const canal = document.getElementById("canal-teste-renov");
+  function atualizar() {
+    document.getElementById("campo-whatsapp-renov").style.display = canal.value === "whatsapp" ? "" : "none";
+    document.getElementById("campo-email-renov").style.display = canal.value === "email" ? "" : "none";
+  }
+  canal.addEventListener("change", atualizar);
+  atualizar();
+})();
+</script>
 <div class="grade-2">
   <form class="cartao" method="post" action="/renovacao/importar" enctype="multipart/form-data" id="importar">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    <h2>1. Importar a planilha de renovação</h2>
+    <h2>2. Importar a planilha de renovação</h2>
     <label>Relatório de renovação (Excel .xlsx ou CSV)<br><input type="file" name="arquivo" accept=".xlsx,.xlsm,.csv" required></label>
     <div class="grupo-btn"><button class="btn btn-primario">Importar planilha</button></div>
     <p class="ajuda" style="margin-bottom:0">Use o relatório exportado do sistema da certificadora (colunas Vencimento, Protocolo, Certificado,
@@ -40,7 +85,7 @@
 
   <form class="cartao" method="post" action="/renovacao/montar" id="montar">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    <h2>2. Montar campanha agora</h2>
+    <h2>3. Montar campanha agora</h2>
     <div class="campo-quantas" role="radiogroup" aria-label="Quantos contatos">Quantos contatos (os que vencem primeiro)
       <div class="quantas-empresas">{% for q in quantidades %}<label class="chip"><input type="radio" name="quantidade" value="{{ q }}" {{ 'checked' if loop.first }}> {{ q }}</label>{% endfor %}</div></div>
     <div class="grupo-btn"><button class="btn btn-primario" {{ 'disabled' if not kpis.prontos_contatos }}>Montar campanha</button></div>
@@ -53,7 +98,7 @@
 
 <form method="post" action="/renovacao/configurar" id="configurar" class="cartao">
   <input type="hidden" name="csrf" value="{{ csrf }}">
-  <h2>3. Campanha automática e quem envia</h2>
+  <h2>4. Campanha automática, quem envia e por qual número</h2>
   <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap">
     <label class="interruptor"><input type="checkbox" name="ativo" {{ 'checked' if cfg.renov_ativo == '1' }}>
       <span class="trilho" aria-hidden="true"></span>
@@ -65,6 +110,18 @@
     <select name="dono_id"><option value="">Escolha...</option>
       {% for u in usuarios %}<option value="{{ u.id }}" {{ 'selected' if dono and dono.id == u.id }}>{{ u.nome }}</option>{% endfor %}</select></label>
   <p class="ajuda">Ele assina as mensagens, e elas saem pelo WhatsApp e pelo e-mail dele. Sem dono, o "Montar campanha" usa quem clicou.</p>
+  {% if pode_escolher_numero %}<label style="max-width:560px;margin-top:10px">Número de WhatsApp dos disparos<br>
+    <select name="conexao"><option value="">Automático: {{ numero_auto }}</option>
+      {% set desabilitar = False %}{% for n in numeros %}<option value="{{ n.id }}" {{ 'selected' if n.id == cfg.renov_conexao }}{{ ' disabled' if desabilitar and not n.conectado }}>{{ n.nome }}{{ ' · ' ~ n.numero if n.numero }} — {{ 'MODO TESTE (não chega de verdade)' if n.teste else ('conectado' if n.conectado else 'desconectado') }}</option>{% endfor %}</select></label>
+  <p class="ajuda">Fica gravado em cada campanha de renovação (dá para trocar depois na página da campanha). No
+    automático vai o número de quem assina, e nunca um número em modo teste quando há um de verdade conectado.</p>
+  {% set escolhido = numeros|selectattr('id', 'equalto', cfg.renov_conexao)|first %}
+  {% if escolhido and escolhido.teste %}<div class="aviso aviso-alerta">O número escolhido para os disparos está em
+    <b>MODO TESTE</b>: os avisos NÃO chegam de verdade aos clientes. Escolha um número conectado por QR code.</div>
+  {% elif escolhido and not escolhido.conectado %}<div class="aviso aviso-alerta">O número escolhido para os disparos está
+    desconectado: os avisos esperam até ele conectar (WhatsApp > Meu WhatsApp).</div>{% endif %}
+  {% else %}<p class="ajuda">Número dos disparos: {{ numero_auto if not cfg.renov_conexao else cfg.renov_conexao }}
+    (quem troca é o administrador).</p>{% endif %}
   <div class="cartoes-escolha" style="margin-top:10px">
     <label class="escolha"><input type="checkbox" name="canal_whatsapp" {{ 'checked' if 'whatsapp' in cfg.renov_canais }}>
       <span class="escolha-corpo"><span class="escolha-marca" aria-hidden="true">✓</span>
@@ -90,7 +147,7 @@
 
 <form class="cartao" id="mensagens" method="post" action="/renovacao/mensagens">
   <input type="hidden" name="csrf" value="{{ csrf }}">
-  <h2>4. Mensagens dos avisos ({{ quando }})</h2>
+  <h2>5. Mensagens dos avisos ({{ quando }})</h2>
   <p class="pequeno suave">{vencimentos} vira a frase com o certificado e a data (ou a lista, quando o contato tem vários).
     Use também {responsavel} (primeiro nome de quem cuida do certificado), {data} (primeiro vencimento), {vendedor} e
     {minha_empresa}. A assinatura do e-mail entra sozinha. Sem preço e sem frases de spam como "promoção" e "não perca".</p>
@@ -108,47 +165,6 @@
 </form>
 <form method="post" action="/renovacao/restaurar-mensagens" data-confirmar="Voltar as mensagens para o texto inicial?" style="margin:-8px 0 16px"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-pequeno">Voltar as mensagens ao texto inicial</button></form>
 
-<details class="cartao" id="testar" open>
-  <summary><h2 style="display:inline">🧪 5. Testar os avisos</h2>
-    <span class="pequeno suave">— receba no SEU WhatsApp ou e-mail, do jeito que o cliente recebe. Nenhum cliente recebe nada.</span></summary>
-  <form method="post" action="/renovacao/testar" style="margin-top:12px">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <div class="campos">
-      <div><label>1. Com os dados de qual cliente</label>
-        <select name="certificado">
-          <option value="0">Cliente fictício (EMPRESA EXEMPLO LTDA · e-CNPJ A1 · vence em 30 dias)</option>
-          {% for c, n in exemplos %}<option value="{{ c.id }}">{{ c.data_vencimento.strftime('%d/%m') }} – {{ c.cliente_nome[:60] }} · {{ tipo_curto(c.tipo) or c.tipo[:20] }}{{ ' · ' ~ n ~ ' certificados no mesmo contato (sem arte)' if n > 1 }}</option>{% endfor %}
-        </select></div>
-      <div><label>2. Testar qual canal</label>
-        <select name="canal" id="canal-teste-renov">
-          <option value="whatsapp">💬 WhatsApp</option>
-          <option value="email">✉ E-mail</option>
-        </select></div>
-      <div id="campo-whatsapp-renov"><label>3. Seu WhatsApp (recebe o teste)</label><input type="text" inputmode="tel" name="whatsapp_teste" placeholder="(81) 99999-0000"></div>
-      <div id="campo-email-renov"><label>3. Seu e-mail (recebe o teste)</label><input type="email" name="email_teste" value="{{ usuario.email }}"></div>
-      <div><label>Quais avisos</label><select name="avisos">{% for v, nome in avisos_teste.items() %}<option value="{{ v }}">{{ nome }}</option>{% endfor %}</select></div>
-    </div>
-    <label class="escolha" style="max-width:560px;margin-top:10px"><input type="checkbox" name="com_arte" checked>
-      <span class="escolha-corpo"><span class="escolha-marca" aria-hidden="true">✓</span>
-        <b>🖼️ Mandar a arte junto</b><span class="pequeno suave">a <a href="{{ url_da_arte }}" target="_blank" rel="noopener">arte do site</a> com os dados
-          desse cliente e quantos dias faltam (no WhatsApp, o texto vai de legenda). No e-mail, a arte vai quando o teste de
-          WhatsApp do mesmo cliente já saiu na última hora (quem desenha é o computador do WhatsApp Leads)</span></span></label>
-    <p class="pequeno suave">Chega com "[TESTE]" e o nome do cliente no começo, assinado por {{ remetente.nome }} e pelo
-      WhatsApp/e-mail dele (quem assina as campanhas de renovação). Não muda nada nas campanhas.</p>
-    <button class="btn btn-primario">Enviar teste para mim</button>
-  </form>
-</details>
-<script>
-(function () {
-  const canal = document.getElementById("canal-teste-renov");
-  function atualizar() {
-    document.getElementById("campo-whatsapp-renov").style.display = canal.value === "whatsapp" ? "" : "none";
-    document.getElementById("campo-email-renov").style.display = canal.value === "email" ? "" : "none";
-  }
-  canal.addEventListener("change", atualizar);
-  atualizar();
-})();
-</script>
 {% endif %}
 
 <div class="cartao" id="certificados">

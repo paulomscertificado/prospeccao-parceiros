@@ -73,7 +73,13 @@ base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renova
     fictício (`EXEMPLO_TESTE`, vence em 30 dias). Com "Mandar a arte junto", o WhatsApp vai pela ponte com
     `arte = {"teste": id do certificado, ...}` (sem `tarefa`), `manual=True`. O teste de e-mail leva a arte que voltou do
     teste de WhatsApp do mesmo cliente na última hora (`arte_do_teste_no_email`). Não mexe em campanha nem certificado.
-11. **Respostas**: o fluxo normal (cancela os próximos toques, Oportunidade). A IA SDR não responde
+11. **Número do WhatsApp** (pedido da Maria em 12/11/2026, depois que o teste dela saiu pelo "principal" em MODO
+    TESTE, que só simula): `renov_conexao` (tela, só com `campanhas.escolher_numero`) é gravado em cada campanha nova
+    (`Campanha.conexao_id`, troca na página da campanha). Vazio = `numero_automatico`: o número de quem assina ou um
+    compartilhado, preferindo SEMPRE um conectado por QR a um em modo teste. No teste, o número escolhido no quadro
+    (`conexao_teste`) vale como foi escolhido e a tela avisa quando ele está em modo teste (`numero_em_modo_teste`).
+    `numeros_para_escolher` lista todos com conectado/modo teste. A área de teste é o 1º quadro da tela.
+12. **Respostas**: o fluxo normal (cancela os próximos toques, Oportunidade). A IA SDR não responde
    (`empresas_novas.e_lead_de_venda` inclui a origem "Renovação"). No WhatsApp Leads o contato ganha a etiqueta da IA
    SDR (a Atendente IA de lá não responde).
 
