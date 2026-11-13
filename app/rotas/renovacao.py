@@ -94,6 +94,7 @@ def tela_renovacao(request: Request, ver: str = "avisar", usuario: Usuario = Dep
         "artes": renovacao.situacao_das_artes(db),
         "exemplos": renovacao.exemplos_para_teste(db), "avisos_teste": renovacao.avisos_teste(db),
         "remetente": renovacao.dono(db) or usuario, "numeros": numeros,
+        "numeros_disparo": renovacao.numeros_para_escolher(db, renovacao.dono(db) or usuario),
         "numero_auto": numero_auto, "pode_escolher_numero": autorizacao.pode(usuario, "campanhas.escolher_numero"),
         "pode_aprovar": autorizacao.pode(usuario, "campanhas.gerenciar"),
         "proximos_feriados": renovacao.proximos_feriados(db),
@@ -206,8 +207,17 @@ async def configurar(request: Request, usuario: Usuario = Depends(exige("campanh
     if autorizacao.pode(usuario, "campanhas.escolher_numero"):  # só quem pode escolher o número (administrador)
         from ..modelos import ConexaoWhatsApp
 
+        from .. import conexoes as _conexoes
+
         conexao = str(form.get("conexao") or "")
-        gravar_config(db, "renov_conexao", conexao if conexao and db.get(ConexaoWhatsApp, conexao) else "")
+        c = db.get(ConexaoWhatsApp, conexao) if conexao else None
+        quem_assina = db.get(Usuario, dono_id) if dono_id else usuario
+        if c is not None and not _conexoes.pode_disparar(quem_assina, c):  # regra da Maria em 13/11/2026
+            avisar(request, f"O número {c.nome} não é de {quem_assina.nome} nem está compartilhado com ele: pela regra "
+                            "da MS, os disparos de cada pessoa saem só pelo WhatsApp dela (ou um compartilhado com ela).",
+                   "erro")
+            return voltar("/renovacao#configurar")
+        gravar_config(db, "renov_conexao", conexao if c is not None else "")
     for chave, valor in [("renov_ativo", "1" if form.get("ativo") else "0"), ("renov_canais", canais),
                          ("renov_arte", "1" if form.get("arte") else "0"),
                          ("renov_maximo_dia", str(maximo)), ("renov_hora", hora), ("renov_dono_id", str(dono_id or ""))]:

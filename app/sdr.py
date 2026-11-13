@@ -765,9 +765,10 @@ def enviar_whatsapp_conectado(db, texto: str, usuario: Usuario | None, lead: Lea
         raise EnvioRecusado(bloqueio)
     if not conexao:
         try:
+            quem = conexoes.responsavel(db, lead, usuario, tarefa)  # de quem é o disparo (nunca o número de outro)
             conexao = (conexoes.da_campanha(db, db.get(Campanha, tarefa.campanha_id) if tarefa and tarefa.campanha_id
-                                            else None)
-                       or conexoes.para_enviar(db, conexoes.responsavel(db, lead, usuario, tarefa)))
+                                            else None, quem)
+                       or conexoes.para_enviar(db, quem))
         except conexoes.SemNumero as erro:
             raise EnvioRecusado(str(erro)) from None
     bloqueio = mensagens.limite_do_numero(db, conexao)

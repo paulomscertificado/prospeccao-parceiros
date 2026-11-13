@@ -78,8 +78,10 @@ Na 1ª leitura depois desta mudança, o sistema começa do zero (`imap_ler_desde
 `app/contas_email.py` + tabela `contas_email` + `rotas/email_contas.py`. O principal da MS é uma linha com
 `principal=1` cujos dados de acesso continuam em Configurações > E-mail (`SMTP_*`/`IMAP_*`); as outras contas guardam
 endereço, login e senha de app criptografada (Google Workspace: smtp.gmail.com:587 e imap.gmail.com:993).
-- Conta de envio de um lead (`para_enviar`): a do responsável (ligada) → uma compartilhada com ele → a principal, se
-  liberada para ele (começa liberada para todos). Sem nenhuma: o toque espera e a pessoa recebe um aviso por dia.
+- Conta de envio de um lead (`para_enviar`): só a do cadastro do responsável (regra da Maria em 13/11/2026: "cada
+  usuário tem seu disparo, nunca misture os disparos de um usuário com outro"). A principal conta como do cadastro do
+  dono dela (`garantir_principal` dá o primeiro administrador como dono quando falta). Conta compartilhada não vale para
+  disparos. Sem conta própria (ou pausada): o toque espera e a pessoa recebe um aviso por dia.
 - Compartilhar (`pode_compartilhar`): dono, administrador e gestor. Trocar senha, pausar, remover: dono e administrador.
 - Respostas: `rotinas.ler_respostas_por_email` lê todas as caixas com leitura ligada (`para_ler`); conta nova só lê o
   que chegou depois de cadastrada. A resposta automática sai pela mesma conta.

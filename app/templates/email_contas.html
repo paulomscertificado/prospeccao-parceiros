@@ -85,7 +85,8 @@
       <form class="inline" method="post" action="/email/{{ minha.id }}/remover"><input type="hidden" name="csrf" value="{{ csrf }}">
         <button class="btn btn-pequeno btn-perigo" data-confirmar="Remover o seu e-mail do sistema? As campanhas dos seus leads passam a sair por outra conta liberada para você (ou esperam).">Remover</button></form>
     </div>
-    <p class="pequeno suave">O teste vai para {{ usuario.email }}. Pausada, a conta não envia: os e-mails dos seus leads saem por outra conta liberada para você.</p>
+    <p class="pequeno suave">O teste vai para {{ usuario.email }}. Pausada, a conta não envia: os e-mails dos seus leads esperam até ligar de novo (pela regra da MS, os disparos
+      de cada pessoa saem só pelo e-mail dela).</p>
     {% if c %}{% set conta = c %}{% include "_compartilhar_email.html" %}{% endif %}
   </div>
   {% endif %}

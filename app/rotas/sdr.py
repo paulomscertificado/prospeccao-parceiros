@@ -517,7 +517,7 @@ def nova_campanha(request: Request, pedido: str = "", base: str = "", usuario: U
     return tela(request, "campanha_nova.html", {
         "pedido": pedido, "entendido": entendido, "contagem": contagem,
         "bases": bases_importadas.opcoes(db), "base": base,
-        "numeros_admin": _numeros_para_admin(db, usuario),
+        "numeros_admin": _numeros_para_admin(db, usuario, usuario),
         "ultima_cidade": ultima.cidade if ultima else "", "ultima_uf": ultima.estado if ultima else "",
         "categorias": db.execute(select(Categoria).where(Categoria.ativa.is_(True)).order_by(Categoria.prioridade)).scalars().all(),
         "cadencias": _cadencias_da_ia(db), "cadencia_sdr": campanhas.cadencia_sdr(db), "ia_ligada": ia.disponivel(),
@@ -567,7 +567,7 @@ async def criar_campanha(request: Request, usuario: Usuario = Depends(exige("cam
         objetivo=str(form.get("objetivo") or "Encontrar parceiros")[:200],
         tom=str(form.get("tom")) if str(form.get("tom")) in config.TONS else "consultivo",
         cta=cta[:200], cadencia_id=util.para_int(form.get("cadencia_id")), usuario_id=usuario.id,
-        conexao_id=_numero_escolhido(db, usuario, form),
+        conexao_id=_numero_escolhido(db, usuario, form, usuario),
         whatsapp_sozinho=ler_config(db, "whatsapp_sozinho_padrao") != "0",  # regra desde 12/11/2026 (pedido da Maria)
         inicio=util.para_data(form.get("inicio")) or date.today(), status="gerando", personalizar_ia=ia.disponivel(),
     )
@@ -581,8 +581,9 @@ async def criar_campanha(request: Request, usuario: Usuario = Depends(exige("cam
     return voltar(f"/campanhas/{camp.id}")
 
 
-def _numeros_para_admin(db: Session, usuario: Usuario) -> list[dict]:
-    """Números de WhatsApp que o administrador pode escolher para disparar a campanha (com a situação de cada um)."""
+def _numeros_para_admin(db: Session, usuario: Usuario, dono: Usuario | None = None) -> list[dict]:
+    """Números de WhatsApp que o administrador pode escolher para disparar a campanha (com a situação de cada um): só
+    os do dono da campanha ou compartilhados com ele (regra da Maria em 13/11/2026: nunca misturar os disparos)."""
     from .. import conexoes
     from ..integracoes import whatsapp_leads
 
@@ -590,15 +591,20 @@ def _numeros_para_admin(db: Session, usuario: Usuario) -> list[dict]:
         return []
     base = whatsapp_leads.status()
     return [{"id": c.id, "nome": c.nome, "conectado": bool(conexoes.situacao(c.id, base).get("conectado")),
-             "teste": conexoes.em_modo_teste(c.id, base)} for c in conexoes.todas(db)]
+             "teste": conexoes.em_modo_teste(c.id, base)} for c in conexoes.todas(db)
+            if dono is None or conexoes.pode_disparar(dono, c)]
 
 
-def _numero_escolhido(db: Session, usuario: Usuario, form) -> str:
-    """Só o administrador escolhe o número; vazio = automático (número do responsável pelo lead)."""
+def _numero_escolhido(db: Session, usuario: Usuario, form, dono: Usuario | None = None) -> str:
+    """Só o administrador escolhe o número; vazio = automático (número do responsável pelo lead). Só vale um número do
+    dono da campanha ou compartilhado com ele (regra da Maria em 13/11/2026)."""
     from .. import conexoes
 
     escolhido = str(form.get("conexao_id") or "")
-    if not autorizacao.pode(usuario, "campanhas.escolher_numero") or not escolhido or db.get(conexoes.ConexaoWhatsApp, escolhido) is None:
+    c = db.get(conexoes.ConexaoWhatsApp, escolhido) if escolhido else None
+    if not autorizacao.pode(usuario, "campanhas.escolher_numero") or c is None:
+        return ""
+    if dono is not None and not conexoes.pode_disparar(dono, c):
         return ""
     return escolhido
 
@@ -654,7 +660,8 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(exige("c
         "whatsapp_hoje": whatsapp_hoje, "numero_whatsapp": numero, "sem_numero": sem_numero,
         "numero_simulado": numero_simulado,
         "disparar": {k: len(v) for k, v in campanhas.para_disparar(db, camp).items()},
-        "numeros_admin": _numeros_para_admin(db, usuario), "visual_resumo": visual.resumo_da_campanha(db, camp),
+        "numeros_admin": _numeros_para_admin(db, usuario, db.get(Usuario, camp.usuario_id) if camp.usuario_id else None),
+        "visual_resumo": visual.resumo_da_campanha(db, camp),
         "pode_whatsapp_sozinho": autorizacao.pode(usuario, "campanhas.whatsapp_sozinho"),
         "pode_gerenciar": autorizacao.pode(usuario, "campanhas.gerenciar", camp),
         "dono": db.get(Usuario, camp.usuario_id) if camp.usuario_id else None,
@@ -857,8 +864,14 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
         if not autorizacao.pode(usuario, "campanhas.escolher_numero"):
             avisar(request, "Só o administrador escolhe o número da campanha.", "erro")
         else:
-            camp.conexao_id = _numero_escolhido(db, usuario, form)
-            avisar(request, "Número da campanha atualizado.")
+            dono = db.get(Usuario, camp.usuario_id) if camp.usuario_id else None
+            camp.conexao_id = _numero_escolhido(db, usuario, form, dono)
+            if form.get("conexao_id") and not camp.conexao_id:
+                avisar(request, "Esse número não é de " + (dono.nome if dono else "quem é dono da campanha")
+                       + " nem está compartilhado com ele: pela regra da MS, os disparos de cada pessoa saem só pelo "
+                         "WhatsApp dela (ou um compartilhado com ela). A campanha ficou no automático.", "erro")
+            else:
+                avisar(request, "Número da campanha atualizado.")
     elif acao == "whatsapp-sozinho":
         if not autorizacao.pode(usuario, "campanhas.whatsapp_sozinho"):
             avisar(request, "Só o administrador liga ou desliga o WhatsApp automático da campanha.", "erro")

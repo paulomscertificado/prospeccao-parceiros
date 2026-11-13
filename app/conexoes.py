@@ -66,6 +66,15 @@ def pode_usar(usuario: Usuario, c: ConexaoWhatsApp) -> bool:
     return pode_gerenciar(usuario, c) or c.compartilhada_todos or usuario.id in compartilhada_com(c)
 
 
+def pode_disparar(quem: Usuario, c: ConexaoWhatsApp) -> bool:
+    """Os disparos de `quem` (campanhas, filas, Minha fila) podem sair por este número: é dele ou foi compartilhado com
+    ele. Regra da Maria (13/11/2026): "cada usuário tem seu disparo, nunca misture os disparos de um usuário com outro
+    usuário". Ser administrador não basta: o administrador vê e cuida de todos os números, mas não dispara pelo de
+    outra pessoa sem que ela compartilhe."""
+    return (c.dono_id == quem.id or c.id == id_do_usuario(quem.id) or c.compartilhada_todos
+            or quem.id in compartilhada_com(c))
+
+
 def acessiveis(db, usuario: Usuario) -> list[ConexaoWhatsApp]:
     return [c for c in todas(db) if pode_usar(usuario, c)]
 
@@ -117,7 +126,8 @@ def em_modo_teste(id_conexao: str, base: dict | None = None) -> bool:
 
 
 def para_enviar(db, quem: Usuario | None) -> str:
-    """Número por onde sai o envio de `quem`: o próprio, se conectado; senão um compartilhado com ele e conectado.
+    """Número por onde sai o envio de `quem`: o próprio, se conectado; senão um compartilhado com ele e conectado
+    (nunca o de outra pessoa sem compartilhar, nem para o administrador: pode_disparar).
     Sempre um número DE VERDADE antes de um em MODO TESTE (que só simula: em 11 e 12/11/2026, 14 mensagens de campanha
     saíram pelo principal em modo teste e não chegaram, com um número de verdade conectado). Só com números em modo
     teste (sistema em teste ou demonstração), sai pelo de modo teste."""
@@ -127,7 +137,7 @@ def para_enviar(db, quem: Usuario | None) -> str:
     if not base.get("disponivel"):
         raise SemNumero(base.get("erro") or "O computador com o WhatsApp Leads está desligado.")
     proprio = minha(db, quem)
-    outros = sorted((c for c in acessiveis(db, quem) if c.id != (proprio.id if proprio else "")),
+    outros = sorted((c for c in todas(db) if c.id != (proprio.id if proprio else "") and pode_disparar(quem, c)),
                     key=lambda c: (c.id != PRINCIPAL, c.criado_em))
     conectados = [c for c in ([proprio] if proprio else []) + outros if situacao(c.id, base).get("conectado")]
     escolhido = next((c for c in conectados if not em_modo_teste(c.id, base)), conectados[0] if conectados else None)
@@ -137,12 +147,14 @@ def para_enviar(db, quem: Usuario | None) -> str:
                     "(ou peça ao administrador para compartilhar um número).")
 
 
-def da_campanha(db, campanha: Campanha | None) -> str:
-    """Número fixado pelo administrador na campanha ("" = automático, pelo responsável). Desconectado: avisa."""
+def da_campanha(db, campanha: Campanha | None, quem: Usuario | None = None) -> str:
+    """Número fixado pelo administrador na campanha ("" = automático, pelo responsável). Desconectado: avisa. Número
+    que não é de `quem` nem compartilhado com ele não vale: o disparo sai pelo do responsável (regra da Maria em
+    13/11/2026: nunca misturar os disparos de um usuário com os de outro)."""
     if campanha is None or not campanha.conexao_id:
         return ""
     c = db.get(ConexaoWhatsApp, campanha.conexao_id)
-    if c is None:
+    if c is None or (quem is not None and not pode_disparar(quem, c)):
         return ""
     base = whatsapp_leads.status()
     if not base.get("disponivel"):

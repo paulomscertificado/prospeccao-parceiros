@@ -132,10 +132,11 @@
   <p class="ajuda">Ele assina as mensagens, e elas saem pelo WhatsApp e pelo e-mail dele. Sem dono, o "Montar campanha" usa quem clicou.</p>
   {% if pode_escolher_numero %}<label style="max-width:560px;margin-top:10px">Número de WhatsApp dos disparos<br>
     <select name="conexao"><option value="">Automático: {{ numero_auto }}</option>
-      {% set desabilitar = False %}{% for n in numeros %}<option value="{{ n.id }}" {{ 'selected' if n.id == cfg.renov_conexao }}{{ ' disabled' if desabilitar and not n.conectado }}>{{ n.nome }}{{ ' · ' ~ n.numero if n.numero }} — {{ 'MODO TESTE (não chega de verdade)' if n.teste else ('conectado' if n.conectado else 'desconectado') }}</option>{% endfor %}</select></label>
-  <p class="ajuda">Fica gravado em cada campanha de renovação (dá para trocar depois na página da campanha). No
-    automático vai o número de quem assina, e nunca um número em modo teste quando há um de verdade conectado.</p>
-  {% set escolhido = numeros|selectattr('id', 'equalto', cfg.renov_conexao)|first %}
+      {% set desabilitar = False %}{% for n in numeros_disparo %}<option value="{{ n.id }}" {{ 'selected' if n.id == cfg.renov_conexao }}{{ ' disabled' if desabilitar and not n.conectado }}>{{ n.nome }}{{ ' · ' ~ n.numero if n.numero }} — {{ 'MODO TESTE (não chega de verdade)' if n.teste else ('conectado' if n.conectado else 'desconectado') }}</option>{% endfor %}</select></label>
+  <p class="ajuda">Fica gravado em cada campanha de renovação (dá para trocar depois na página da campanha). Só
+    aparecem os números de quem assina ou compartilhados com ele: os disparos de cada pessoa saem só pelo WhatsApp
+    dela. No automático vai o número de quem assina, e nunca um número em modo teste quando há um de verdade conectado.</p>
+  {% set escolhido = numeros_disparo|selectattr('id', 'equalto', cfg.renov_conexao)|first %}
   {% if escolhido and escolhido.teste %}<div class="aviso aviso-alerta">O número escolhido para os disparos está em
     <b>MODO TESTE</b>: os avisos NÃO chegam de verdade aos clientes. Escolha um número conectado por QR code.</div>
   {% elif escolhido and not escolhido.conectado %}<div class="aviso aviso-alerta">O número escolhido para os disparos está

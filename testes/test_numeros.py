@@ -256,3 +256,33 @@ def test_numero_em_modo_teste_nunca_e_escolhido_se_houver_um_de_verdade(cliente,
         assert conexoes.para_enviar(db, admin) == "principal"
         db.get(Campanha, cid).status = "cancelada"
         db.delete(db.get(ConexaoWhatsApp, "u77"))
+
+
+def test_regra_cada_usuario_dispara_pelo_proprio_numero(cliente, nuvem):
+    """Regra da Maria (13/11/2026): "cada usuário tem seu disparo, nunca misture os disparos de um usuário com outro
+    usuário". O WhatsApp de cada disparo é o da pessoa ou um compartilhado com ela: a administradora vê e cuida de todos
+    os números, mas não dispara pelo de outra pessoa sem que ela compartilhe; o número fixado na campanha que não é do
+    responsável (nem compartilhado com ele) não vale."""
+    rid = _usuario("regra1@teste.com.br", "funcionario", "Rui Regra")
+    sid = _usuario("regra2@teste.com.br", "admin", "Sara Admin Regra")
+    _status_ponte(cliente, {f"u{rid}": {"conectado": True, "estado_codigo": "conectado"}})
+    with sessao() as db:
+        rui, sara = db.get(Usuario, rid), db.get(Usuario, sid)
+        numero_rui = conexoes.minha(db, rui, criar=True)
+        principal = conexoes.garantir_principal(db)
+        antes = (principal.compartilhada_todos, principal.compartilhada_com)
+        principal.compartilhada_todos, principal.compartilhada_com = False, "[]"
+        assert conexoes.para_enviar(db, rui) == numero_rui.id
+        assert conexoes.pode_usar(sara, numero_rui)  # a administradora vê e cuida do número...
+        with pytest.raises(conexoes.SemNumero):      # ...mas não dispara por ele
+            conexoes.para_enviar(db, sara)
+        camp = Campanha(nome="Regra do número", status="ativa", usuario_id=sid, conexao_id=numero_rui.id)
+        db.add(camp)
+        db.flush()
+        assert conexoes.da_campanha(db, camp, sara) == ""            # fixado com o número do Rui: não vale para ela
+        assert conexoes.da_campanha(db, camp, rui) == numero_rui.id
+        numero_rui.compartilhada_com = json.dumps([sid])             # o Rui compartilhou com ela: agora pode
+        assert conexoes.para_enviar(db, sara) == numero_rui.id
+        assert conexoes.da_campanha(db, camp, sara) == numero_rui.id
+        principal.compartilhada_todos, principal.compartilhada_com = antes
+        camp.status = "cancelada"

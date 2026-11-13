@@ -1564,14 +1564,17 @@ def situacao_das_artes(db, dias: int = 7) -> dict:
 # TESTE (o WhatsApp Leads só simula o envio). Ela escolhe o número do teste e o dos disparos; no automático, a
 # Renovação nunca escolhe um número em modo teste se houver um de verdade conectado.
 
-def numeros_para_escolher(db) -> list[dict]:
-    """Todos os números de WhatsApp cadastrados, com a situação: conectado e se está em modo teste (simulado)."""
+def numeros_para_escolher(db, dono: Usuario | None = None) -> list[dict]:
+    """Os números de WhatsApp cadastrados, com a situação: conectado e se está em modo teste (simulado). Com `dono`,
+    só os dele ou compartilhados com ele (os disparos: regra da Maria em 13/11/2026; o teste pode usar qualquer um)."""
     from . import conexoes
     from .integracoes import whatsapp_leads
 
     base = whatsapp_leads.status()
     lista = []
     for c in conexoes.todas(db):
+        if dono is not None and not conexoes.pode_disparar(dono, c):
+            continue
         s = conexoes.situacao(c.id, base)
         numero = util.normalizar_telefone(str(s.get("numero") or ""))
         lista.append({"id": c.id, "nome": c.nome or c.id, "conectado": bool(s.get("conectado")),
@@ -1590,14 +1593,17 @@ def numero_automatico(db, remetente: Usuario | None) -> str:
     return conexoes.para_enviar(db, remetente)  # já prefere um número de verdade a um em modo teste
 
 
-def numero_do_envio(db, remetente: Usuario | None, escolhido: str = "") -> str:
+def numero_do_envio(db, remetente: Usuario | None, escolhido: str = "", teste: bool = False) -> str:
     """O número por onde sai: o escolhido (no teste), senão o da configuração da Renovação, senão o automático.
-    Número escolhido e desconectado: avisa (lança conexoes.SemNumero), nunca troca sozinho."""
+    Número escolhido e desconectado: avisa (lança conexoes.SemNumero), nunca troca sozinho. Fora do teste, só um número
+    de quem assina ou compartilhado com ele (regra da Maria em 13/11/2026: nunca misturar os disparos)."""
     from . import conexoes
     from .integracoes import whatsapp_leads
 
     escolhido = escolhido or cfg(db, "renov_conexao")
     c = db.get(conexoes.ConexaoWhatsApp, escolhido) if escolhido else None
+    if c is not None and not teste and remetente is not None and not conexoes.pode_disparar(remetente, c):
+        c = None
     if c is None:
         return numero_automatico(db, remetente)
     base = whatsapp_leads.status()
@@ -1700,7 +1706,7 @@ def enviar_teste(db, usuario: Usuario, cert_id: int, canal: str, destino: str, a
     numero, conta, imagem_email = "", None, None
     try:
         if canal == "whatsapp":
-            numero = numero_do_envio(db, remetente, conexao)
+            numero = numero_do_envio(db, remetente, conexao, teste=True)
             c = db.get(conexoes.ConexaoWhatsApp, numero)
             feito["numero"], feito["modo_teste"] = (c.nome if c else numero), numero_em_modo_teste(numero)
         else:

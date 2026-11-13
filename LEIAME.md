@@ -524,9 +524,14 @@ celular.
 sua linha em Configurações > Usuários: no próximo login você lê um QR code novo. Se o próprio administrador ficar sem
 acesso: `redefinir_senha.bat` (escolha "sistema na internet") cria uma senha nova e desliga o código do celular.
 
+**Regra da MS: cada usuário tem o seu disparo** (pedido da Maria em 13/11/2026). Os disparos de uma pessoa nunca
+saem pelo WhatsApp ou pelo e-mail de outra pessoa: o **e-mail** sai só pelo do cadastro dela (tela **E-mail**); o
+**WhatsApp**, pelo número dela ou por um que outra pessoa **compartilhou** com ela. Ser administrador não muda isso.
+Sem e-mail ou número, os disparos dela esperam e ela recebe um aviso para cadastrar.
+
 **Cada pessoa com o seu WhatsApp:** no menu **WhatsApp > Meu WhatsApp**, cada um conecta o próprio número pelo
-QR code. A IA SDR manda os WhatsApps dos leads de cada pessoa pelo número dela; sem número conectado, as
-mensagens esperam e a pessoa recebe um aviso para conectar. Em **Conversas**, cada um vê só as conversas do
+QR code. A IA SDR manda os WhatsApps dos leads de cada pessoa pelo número dela (ou por um compartilhado com ela);
+sem número, as mensagens esperam e a pessoa recebe um aviso para conectar. Em **Conversas**, cada um vê só as conversas do
 próprio número e dos números compartilhados com ele.
 **Compartilhar um número:** no cartão do número, **Compartilhar este número** → "Toda a equipe" ou escolha as
 pessoas. O dono do número, o administrador e o gestor escolhem com quem compartilhar; só o dono e o administrador
@@ -535,9 +540,8 @@ conectam, pausam ou desligam.
 **Cada pessoa com o seu e-mail:** no menu **E-mail**, cada um pode cadastrar o próprio e-mail @mscertificados.com.br
 (com a senha de app do Google, 16 letras) e clicar em **Enviar e-mail de teste**. Os e-mails das campanhas dos leads
 de cada pessoa saem pelo e-mail dela, e as respostas chegam na caixa dela (a IA SDR lê todas as caixas marcadas).
-Sem e-mail próprio, sai por uma conta compartilhada com a pessoa; por último, pelo **e-mail principal da MS**, que
-começa liberado para toda a equipe. O dono da conta, o administrador e o gestor escolhem com quem compartilhar cada
-conta (inclusive o principal) em **Compartilhar esta conta**. Os limites de envio por hora e por dia continuam
+Sem e-mail próprio cadastrado, os e-mails dos leads dela **esperam** (não saem por uma conta compartilhada nem pelo
+**e-mail principal da MS**, que é do cadastro do administrador dono dele) e ela recebe um aviso para cadastrar. Os limites de envio por hora e por dia continuam
 valendo para a MS inteira.
 
 **Gestor com o domínio da própria empresa:** o gestor (e o administrador) pode cadastrar um e-mail de outro domínio,

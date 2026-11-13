@@ -99,7 +99,9 @@ entrega os pedidos (`comandos`, marcados "retirado") e o retorno devolve o resul
 sessão em `dados/sessoes/<id>.db`; o principal continua em `dados/sessao_whatsapp.db`) com fila, pausa e limite
 diário próprios; só o principal dispara as automações/Atendente IA de lá (SAIR vale em todos). O status chega em
 `status.conexoes`; pedidos e envios levam `conexao`. A IA SDR envia pelo número do responsável pelo lead
-(`conexoes.responsavel` → `para_enviar`: o próprio ou um compartilhado com ele, sempre um número de verdade antes de
+(`conexoes.responsavel` → `para_enviar`: o próprio ou um compartilhado com ele — `pode_disparar`, regra da Maria em
+13/11/2026: ser administrador não basta para disparar pelo número de outra pessoa; o número fixado na campanha só vale
+se for do responsável ou compartilhado com ele, `da_campanha(db, camp, quem)` — sempre um número de verdade antes de
 um em MODO TESTE, `conexoes.em_modo_teste`: o modo teste do WhatsApp Leads só simula; em 11 e 12/11/2026, 14 mensagens
 de campanha saíram pelo principal em modo teste com um número de verdade conectado; só com números em modo teste, sai
 por ele); sem número, a fila espera e
