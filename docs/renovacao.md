@@ -65,7 +65,15 @@ base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renova
    `DIAS_GUARDANDO_ARTE` dias, `limpar_artes` na rotina de hora em hora; fora do backup) e vai no e-mail do mesmo
    aviso, dentro do HTML (`email_com_arte`, `cid:arte-aviso`, multipart/related em `email_smtp.enviar(imagens=)`).
    Sem Chrome ou com erro, sai só o texto; a tela avisa quando nenhuma arte voltou em 7 dias (`situacao_das_artes`).
-10. **Respostas**: o fluxo normal (cancela os próximos toques, Oportunidade). A IA SDR não responde
+10. **Área de teste** (`POST /renovacao/testar`, `enviar_teste`; pedido da Maria em 12/11/2026, "igual à da IA SDR",
+    com a opção de mandar a arte): manda os avisos (o 1º, um deles ou os 4) para o WhatsApp ou o e-mail de quem testa,
+    com "[TESTE · cliente · aviso]" no começo, pelo número/conta de quem assina as campanhas (`dono`, senão quem
+    testa). O contato vem de `contato_do_teste`: o cliente escolhido (com os outros certificados do mesmo contato que
+    entrariam na mesma campanha: com mais de um, vai a lista e sem a arte, como no envio de verdade) ou o cliente
+    fictício (`EXEMPLO_TESTE`, vence em 30 dias). Com "Mandar a arte junto", o WhatsApp vai pela ponte com
+    `arte = {"teste": id do certificado, ...}` (sem `tarefa`), `manual=True`. O teste de e-mail leva a arte que voltou do
+    teste de WhatsApp do mesmo cliente na última hora (`arte_do_teste_no_email`). Não mexe em campanha nem certificado.
+11. **Respostas**: o fluxo normal (cancela os próximos toques, Oportunidade). A IA SDR não responde
    (`empresas_novas.e_lead_de_venda` inclui a origem "Renovação"). No WhatsApp Leads o contato ganha a etiqueta da IA
    SDR (a Atendente IA de lá não responde).
 

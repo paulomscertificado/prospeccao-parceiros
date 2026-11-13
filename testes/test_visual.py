@@ -179,6 +179,9 @@ def test_escolha_nas_duas_areas(cliente, monkeypatch):
         camp = empresas_novas.criar_campanha(db, [{"empresa": "Nova Visual Ltda", "cnpj": "12345678000199",
                                                     "whatsapp": "81975550004", "email": ""}], _admin(db), "teste visual")
         assert (camp.visual_id, camp.visual_canais) == (ids[1], "whatsapp")
-        for chave in ("novas_visual_id", "novas_visual_canais", "novas_visual_toques"):
+        # volta ao padrão tudo o que o formulário gravou (senão "só WhatsApp" fica valendo para os outros testes)
+        for chave in ("novas_visual_id", "novas_visual_canais", "novas_visual_toques", "novas_ativo", "novas_ufs",
+                      "novas_canais", "novas_maximo_dia", "novas_hora", "novas_sem_individual", "novas_dono_id",
+                      "novas_excluir_listas"):
             db.execute(delete(Configuracao).where(Configuracao.chave == chave))
         camp.status = "cancelada"

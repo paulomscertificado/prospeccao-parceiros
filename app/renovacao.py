@@ -1046,13 +1046,18 @@ def arte_do_toque(db, tarefa: Tarefa | None) -> dict | None:
                                                  Certificado.status == "Ativo")).scalars().all()
     if len(certs) != 1:
         return None
-    cert = certs[0]
+    dados = _arte_do_certificado(certs[0])
+    return {"tarefa": tarefa.id, **dados} if dados else None
+
+
+def _arte_do_certificado(cert: Certificado) -> dict | None:
+    """Os campos da arte do site para um certificado (None: tipo sem A1/A3, que a arte não tem)."""
     curto = tipo_curto(cert.tipo)
     midia = curto[-2:] if curto[-2:] in ("A1", "A3") else ""
     if not midia:
-        return None  # a arte só tem A1 e A3
-    return {"tarefa": tarefa.id, "modelo": "cpf" if _e_pessoa(cert) else "cnpj", "tipo": midia,
-            "nome": (cert.cliente_nome or "")[:200], "doc": cert.cnpj or "", "data": cert.data_vencimento.isoformat()}
+        return None
+    return {"modelo": "cpf" if _e_pessoa(cert) else "cnpj", "tipo": midia, "nome": (cert.cliente_nome or "")[:200],
+            "doc": cert.cnpj or "", "data": cert.data_vencimento.isoformat()}
 
 
 def email_com_arte(db, tarefa: Tarefa | None, texto: str, link_descadastro: str = "") -> tuple[str, dict]:
@@ -1096,6 +1101,121 @@ def situacao_das_artes(db, dias: int = 7) -> dict:
         PonteWhatsApp.arte != "", PonteWhatsApp.criado_em >= desde, PonteWhatsApp.status.in_(("na_fila", "retirada")))) or 0
     feitas = db.scalar(select(func.count(ArteAviso.id)).where(ArteAviso.criado_em >= desde)) or 0
     return {"pedidas": pedidas, "feitas": feitas}
+
+
+# ---------------------------------------------------------------- Área de teste (como a da IA SDR)
+
+EXEMPLO_TESTE = {"cliente_nome": "EMPRESA EXEMPLO LTDA", "cnpj": "11.222.333/0001-81", "tipo": "e-CNPJ A1 12 meses"}
+AVISOS_TESTE = {"renov_aviso": "Só o 1º aviso", **{a: f"Só: {n}" for a, n in list(ANGULOS.items())[1:]},
+                "todos": "Os 4 avisos"}
+
+
+def exemplos_para_teste(db, limite: int = 40) -> list[tuple[Certificado, int]]:
+    """Clientes da planilha para escolher no teste (os que vencem primeiro) e quantos certificados o contato teria
+    na mesma campanha (com mais de um, vai a lista no texto e não vai a arte)."""
+    hoje = date.today()
+    certs = db.execute(select(Certificado).where(
+        Certificado.origem == ORIGEM, Certificado.status == "Ativo", Certificado.data_vencimento > hoje)
+        .order_by(Certificado.data_vencimento, Certificado.id).limit(600)).scalars().all()
+    no_mes = Counter(chave_do_contato(c) for c in certs if c.data_vencimento <= hoje + timedelta(days=JANELA_DIAS))
+    return [(c, no_mes.get(chave_do_contato(c), 1) if chave_do_contato(c) else 1) for c in certs[:limite]]
+
+
+def contato_do_teste(db, cert_id: int, remetente: Usuario | None) -> Contato:
+    """O contato do teste: o cliente escolhido (com os outros certificados do mesmo contato que entrariam na mesma
+    campanha) ou um cliente fictício (cert_id 0) que vence daqui a 30 dias, com o nome de quem assina."""
+    hoje = date.today()
+    if not cert_id:
+        exemplo = Certificado(origem=ORIGEM, protocolo="", status="Ativo", data_vencimento=hoje + timedelta(days=JANELA_DIAS),
+                              responsavel=(remetente.nome if remetente else ""), **EXEMPLO_TESTE)
+        return Contato("teste:exemplo", [exemplo])
+    cert = db.get(Certificado, cert_id)
+    if cert is None or cert.origem != ORIGEM:
+        raise ValueError("Esse cliente não está na planilha de renovação.")
+    chave = chave_do_contato(cert)
+    certs = [cert]
+    if chave:
+        limite = max(hoje + timedelta(days=JANELA_DIAS), cert.data_vencimento)
+        certs = [c for c in db.execute(select(Certificado).where(
+            Certificado.origem == ORIGEM, Certificado.status == "Ativo", Certificado.data_vencimento > hoje,
+            Certificado.data_vencimento <= limite)).scalars() if chave_do_contato(c) == chave]
+        if cert not in certs:
+            certs.append(cert)
+    return Contato(chave or f"teste:{cert.id}", sorted(certs, key=lambda c: (c.data_vencimento, c.id)))
+
+
+def arte_do_teste_no_email(db, cert_id: int, dados_arte: dict) -> bytes | None:
+    """A arte que o computador desenhou no teste de WhatsApp deste cliente na última hora (a cópia volta pela ponte):
+    vai no teste de e-mail. A arte é desenhada só no computador do WhatsApp Leads."""
+    from .modelos import ArteAviso, PonteWhatsApp
+
+    itens = db.execute(select(PonteWhatsApp).where(
+        PonteWhatsApp.manual.is_(True), PonteWhatsApp.arte != "", PonteWhatsApp.criado_em >= agora() - timedelta(hours=1))
+        .order_by(PonteWhatsApp.id.desc()).limit(50)).scalars().all()
+    for item in itens:
+        try:
+            dados = json.loads(item.arte)
+        except ValueError:
+            continue
+        if dados.get("teste") == cert_id and all(dados.get(k) == dados_arte.get(k) for k in ("nome", "data", "tipo")):
+            arte = db.execute(select(ArteAviso).where(ArteAviso.ponte_id == item.id)).scalars().first()
+            if arte is not None:
+                return arte.imagem
+    return None
+
+
+def enviar_teste(db, usuario: Usuario, cert_id: int, canal: str, destino: str, avisos: str = "renov_aviso",
+                 com_arte: bool = True) -> dict:
+    """Ambiente de teste (como o da IA SDR): manda os avisos para o WhatsApp ou o e-mail DE QUEM ESTÁ TESTANDO, com
+    "[TESTE]" no começo, do jeito que o cliente receberia (o texto e, se marcado, a arte do site). Sai pelo número e
+    pelo e-mail de quem assina as campanhas de renovação. Nenhum cliente recebe nada e nenhuma campanha muda."""
+    from types import SimpleNamespace
+
+    from . import config, conexoes, contas_email, visual
+    from .integracoes import email_smtp, whatsapp_leads
+
+    remetente = dono(db) or usuario
+    contato = contato_do_teste(db, cert_id, remetente)
+    textos = textos_do_contato(db, contato, remetente)
+    angulos = list(ANGULOS) if avisos == "todos" else [avisos if avisos in ANGULOS else "renov_aviso"]
+    cert = contato.certificados[0]
+    # a arte é de UM certificado: com vários no mesmo contato, o cliente recebe a lista no texto (o teste mostra igual)
+    dados_arte = _arte_do_certificado(cert) if com_arte and len(contato.certificados) == 1 else None
+    feito = {"enviadas": 0, "erros": [], "arte": False, "remetente": remetente.nome,
+             "certificados": len(contato.certificados), "arte_pedida": com_arte}
+    numero, conta, imagem_email = "", None, None
+    try:
+        if canal == "whatsapp":
+            numero = conexoes.para_enviar(db, remetente)
+        else:
+            conta = contas_email.para_enviar(db, remetente)
+    except (conexoes.SemNumero, contas_email.SemConta) as erro:
+        feito["erros"].append(f"{'WhatsApp' if canal == 'whatsapp' else 'E-mail'}: {erro}")
+        return feito
+    if canal == "email" and dados_arte:
+        imagem_email = arte_do_teste_no_email(db, cert_id, dados_arte)
+    for angulo in angulos:
+        t = textos[angulo]
+        rotulo = f"[TESTE · {cert.cliente_nome[:60]} · {ANGULOS[angulo]}]"
+        try:
+            if canal == "whatsapp":
+                arte = {"teste": cert_id, **dados_arte} if dados_arte and config.WHATSAPP_PONTE else None
+                whatsapp_leads.enviar(destino, "Teste", f"{rotulo}\n\n{t['whatsapp']}", db=db, manual=True,
+                                      usuario_id=usuario.id, conexao=numero, arte=arte)
+                feito["arte"] = feito["arte"] or bool(arte)
+            else:
+                html, imagens = "", {}
+                if imagem_email:
+                    html = visual.montar_html(SimpleNamespace(html=HTML_EMAIL_COM_ARTE), f"{rotulo}\n\n{t['email']}", {})
+                    imagens = {"arte-aviso": imagem_email}
+                    feito["arte"] = True
+                email_smtp.enviar(destino, f"[TESTE] {t['assunto']}", f"{rotulo}\n\n{t['email']}", lead_id=None,
+                                  conta=conta, html=html, **({"imagens": imagens} if imagens else {}))
+            feito["enviadas"] += 1
+        except (email_smtp.ErroEmail, whatsapp_leads.ErroWhatsAppLeads) as erro:
+            feito["erros"].append(f"{'E-mail' if canal == 'email' else 'WhatsApp'}: {erro}")
+            break
+    return feito
 
 
 def campanhas_recentes(db, limite: int = 30) -> list[Campanha]:

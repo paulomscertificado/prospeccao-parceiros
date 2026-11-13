@@ -370,6 +370,12 @@ certificadora.
   arte. Quem desenha a arte é o **computador do WhatsApp Leads**, que precisa do **Google Chrome instalado** e de
   internet. Se a arte falhar, o aviso sai só com o texto e a tela Renovação avisa. Mudou a arte no site? Em até 6
   horas os avisos já saem com a arte nova. Para desligar: quadro 3, opção **Arte do aviso junto**.
+- **Testar antes (quadro 5, "Testar os avisos"):** como o teste da IA SDR. Escolha um cliente da planilha (ou o
+  cliente fictício), o canal (WhatsApp ou e-mail), digite o **seu** WhatsApp ou e-mail, escolha os avisos (só o 1º, um
+  deles ou os 4) e deixe marcado **Mandar a arte junto** para receber a arte do site com os dados do cliente. Chega
+  com "[TESTE]" no começo, assinado por quem assina as campanhas de renovação e pelo WhatsApp/e-mail dele. Nenhum
+  cliente recebe nada e nenhuma campanha muda. A arte do teste de e-mail vem da arte que o computador desenhou no teste
+  de WhatsApp do mesmo cliente: mande primeiro o teste no WhatsApp e, 1 minuto depois, o de e-mail.
 - **Renovou?** Na lista de certificados, clique em **Renovado** (ou **Não vai renovar**): os avisos que ainda não
   saíram param. **Reabrir** desfaz.
 - A data de nascimento que vem no relatório **não é guardada**.

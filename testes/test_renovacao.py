@@ -497,3 +497,87 @@ def test_ponte_leva_a_arte_e_a_copia_volta_para_o_email(cliente, monkeypatch):
         for t in db.execute(select(Tarefa).where(Tarefa.id.in_((email_id, zap_id)))).scalars():
             t.status = "cancelada"
     whatsapp_leads._cache["status"] = None
+
+
+# ---------------------------------------------------------------- Área de teste (pedido de 12/11/2026)
+
+def test_area_de_teste_manda_so_para_quem_testa_com_a_arte(cliente, csrf, monkeypatch):
+    """Como o teste da IA SDR: os avisos chegam no WhatsApp de quem testa, com "[TESTE]", o texto do aviso e a arte
+    do site (opção marcada). Nenhum cliente recebe nada e nenhuma campanha muda."""
+    from app import config, conexoes
+    from app.integracoes import whatsapp_leads
+
+    filas = []
+    monkeypatch.setattr(config, "WHATSAPP_PONTE", True)
+    monkeypatch.setattr(whatsapp_leads, "enviar", lambda *a, **k: filas.append((a, k)) or "p1")
+    monkeypatch.setattr(conexoes, "para_enviar", lambda db, quem: "numero-teste")
+    with sessao() as db:
+        _limpar(db)
+        renovacao.importar(db, renovacao.ler_planilha("r.xlsx", _planilha([
+            _linha(12, "9700001", "e-CNPJ A1 12 meses", "TESTE ARTE LTDA", "11222333000181", "PAULA TESTE",
+                   "12345678901", "paula@testearte.com.br", "81987651111"),
+            _linha(14, "9700002", "e-CNPJ A1 12 meses", "GRUPO UM LTDA", "11444777000161", "RUI GRUPO",
+                   "98765432100", "rui@grupo-teste.com.br", "81987652222"),
+            _linha(15, "9700003", "e-CPF A3 36 meses", "", "", "RUI GRUPO", "98765432100", "rui@grupo-teste.com.br",
+                   "81987652222"),
+        ]))[0], _admin(db))
+        um = db.execute(select(Certificado).where(Certificado.protocolo == "9700001")).scalars().one().id
+        grupo = db.execute(select(Certificado).where(Certificado.protocolo == "9700002")).scalars().one().id
+    pagina = cliente.get("/renovacao").text
+    assert 'id="testar"' in pagina and "TESTE ARTE LTDA" in pagina and "2 certificados no mesmo contato" in pagina
+    r = cliente.post("/renovacao/testar", data={"csrf": csrf, "certificado": str(um), "canal": "whatsapp",
+                                                "whatsapp_teste": "(81) 99999-0000", "avisos": "todos", "com_arte": "on"})
+    assert r.status_code == 200 and "Teste enviado: 4 mensagens de WhatsApp" in r.text and "Com a arte" in r.text
+    assert len(filas) == 4
+    for (destino, _nome, texto), k in filas:
+        assert destino == "5581999990000" and k["manual"] is True and texto.startswith("[TESTE · TESTE ARTE LTDA ·")
+        assert k["arte"]["teste"] == um and k["arte"]["nome"] == "TESTE ARTE LTDA" and k["arte"]["modelo"] == "cnpj"
+        assert "tarefa" not in k["arte"]  # é teste: não é de nenhum aviso de campanha
+    filas.clear()
+    cliente.post("/renovacao/testar", data={"csrf": csrf, "certificado": str(um), "canal": "whatsapp",
+                                            "whatsapp_teste": "81999990000", "avisos": "renov_aviso"})
+    assert len(filas) == 1 and filas[0][1]["arte"] is None  # opção da arte desmarcada: só o texto
+    filas.clear()
+    r = cliente.post("/renovacao/testar", data={"csrf": csrf, "certificado": str(grupo), "canal": "whatsapp",
+                                                "whatsapp_teste": "81999990000", "avisos": "renov_aviso", "com_arte": "on"})
+    assert filas[0][1]["arte"] is None and "Estes certificados digitais vencem em breve" in filas[0][0][2]
+    assert "tem 2 certificados" in r.text  # explica por que foi sem a arte (no envio de verdade é igual)
+    r = cliente.post("/renovacao/testar", data={"csrf": csrf, "certificado": "0", "canal": "whatsapp",
+                                                "whatsapp_teste": "abc", "avisos": "renov_aviso"})
+    assert "celular com DDD" in r.text
+    with sessao() as db:
+        assert not db.execute(select(Certificado).where(Certificado.origem == "planilha",
+                                                        Certificado.campanha_id.is_not(None))).first()
+        assert not db.execute(select(Campanha).where(Campanha.tipo == "renovacao",
+                                                     Campanha.status != "cancelada")).first()
+        _limpar(db)
+
+
+def test_teste_de_email_leva_a_arte_que_voltou_do_whatsapp(cliente, monkeypatch):
+    from app import contas_email
+    from app.integracoes import email_smtp
+    from app.modelos import ArteAviso, PonteWhatsApp
+
+    enviados = []
+    monkeypatch.setattr(email_smtp, "enviar", lambda para, assunto, corpo, **k: enviados.append((assunto, corpo, k))
+                        or "<id@teste>")
+    monkeypatch.setattr(contas_email, "para_enviar", lambda db, quem: None)
+    with sessao() as db:
+        admin = _admin(db)
+        r = renovacao.enviar_teste(db, admin, 0, "email", "eu@teste.com.br", "renov_aviso", com_arte=True)
+        assert r["enviadas"] == 1 and not r["arte"] and "imagens" not in enviados[-1][2]  # a arte ainda não foi feita
+        assert enviados[-1][0].startswith("[TESTE] ") and "EMPRESA EXEMPLO LTDA" in enviados[-1][1]
+        # o teste de WhatsApp do cliente fictício saiu e a arte voltou do computador pela ponte
+        exemplo = renovacao.contato_do_teste(db, 0, admin).certificados[0]
+        item = PonteWhatsApp(telefone="5581999990000", nome="Teste", texto="[TESTE]", manual=True,
+                             arte=json.dumps({"teste": 0, **renovacao._arte_do_certificado(exemplo)}))
+        db.add(item)
+        db.flush()
+        db.add(ArteAviso(ponte_id=item.id, tarefa_id=None, imagem=PNG_ARTE))
+        db.flush()
+        r = renovacao.enviar_teste(db, admin, 0, "email", "eu@teste.com.br", "todos", com_arte=True)
+        assert r["enviadas"] == 4 and r["arte"]
+        assert all(k["imagens"] == {"arte-aviso": PNG_ARTE} and "cid:arte-aviso" in k["html"] for _, _, k in enviados[-4:])
+        r = renovacao.enviar_teste(db, admin, 0, "email", "eu@teste.com.br", "renov_aviso", com_arte=False)
+        assert not r["arte"] and "imagens" not in enviados[-1][2]
+        db.rollback()

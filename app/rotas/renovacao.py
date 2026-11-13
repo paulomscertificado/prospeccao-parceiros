@@ -75,6 +75,8 @@ def tela_renovacao(request: Request, ver: str = "avisar", usuario: Usuario = Dep
         "situacao": renovacao.situacao_na_tela, "chave_do_contato": renovacao.chave_do_contato,
         "tipo_curto": renovacao.tipo_curto, "url_da_arte": renovacao.URL_DA_ARTE,
         "artes": renovacao.situacao_das_artes(db),
+        "exemplos": renovacao.exemplos_para_teste(db), "avisos_teste": renovacao.AVISOS_TESTE,
+        "remetente": renovacao.dono(db) or usuario,
     })
 
 
@@ -196,6 +198,54 @@ def restaurar_mensagens(request: Request, usuario: Usuario = Depends(exige("camp
     db.commit()
     avisar(request, "Mensagens voltaram ao texto inicial.")
     return voltar("/renovacao#mensagens")
+
+
+@rotas.post("/renovacao/testar", dependencies=[Depends(verificar_csrf)])
+async def testar(request: Request, usuario: Usuario = Depends(exige("campanhas.gerenciar")),
+                 db: Session = Depends(obter_db)):
+    """Área de teste (como a da IA SDR): os avisos chegam no WhatsApp ou no e-mail de quem testa, com "[TESTE]"."""
+    form = await request.form()
+    canal = "email" if form.get("canal") == "email" else "whatsapp"
+    if canal == "email":
+        destino = str(form.get("email_teste", "")).strip()
+        invalido = "" if util.email_valido(destino) else "Digite um e-mail válido para receber o teste."
+    else:
+        digitos = util.normalizar_telefone(str(form.get("whatsapp_teste", "")))
+        destino = "55" + digitos if digitos else ""
+        invalido = "" if digitos else "Digite o seu celular com DDD para receber o teste no WhatsApp."
+    if invalido:
+        avisar(request, invalido, "erro")
+        return voltar("/renovacao#testar")
+    cert_id = util.para_int(form.get("certificado")) or 0
+    try:
+        r = renovacao.enviar_teste(db, usuario, cert_id, canal, destino, str(form.get("avisos", "renov_aviso")),
+                                   com_arte=bool(form.get("com_arte")))
+    except ValueError as erro:
+        avisar(request, str(erro), "erro")
+        return voltar("/renovacao#testar")
+    registrar_log(db, usuario, "testou_renovacao", "certificado", cert_id or None,
+                  f"{r['enviadas']} de {canal} para {destino}" + (" com a arte" if r["arte"] else ""), request)
+    db.commit()
+    if r["enviadas"]:
+        para = destino if canal == "email" else util.formatar_telefone(destino[2:])
+        texto = (f"Teste enviado: {_n(r['enviadas'], 'mensagem', 'mensagens')} de "
+                 f"{'e-mail' if canal == 'email' else 'WhatsApp'} para {para}, assinado por {r['remetente']}. "
+                 "Nenhum cliente recebeu nada.")
+        if r["arte"]:
+            texto += (" Com a arte: o computador do WhatsApp Leads desenha e manda em até 1 minuto."
+                      if canal == "whatsapp" else " Com a arte do teste de WhatsApp deste cliente.")
+        elif r["arte_pedida"] and r["certificados"] > 1:
+            texto += (f" Sem a arte: este contato tem {r['certificados']} certificados, e no envio de verdade ele recebe "
+                      "a lista no texto (a arte é de um certificado só).")
+        elif r["arte_pedida"] and canal == "email":
+            texto += (" Sem a arte: quem desenha a arte é o computador do WhatsApp Leads. Mande antes o teste no "
+                      "WhatsApp deste cliente; em 1 minuto a arte volta e o teste de e-mail já sai com ela.")
+        elif r["arte_pedida"]:
+            texto += " Sem a arte (o certificado não é A1 nem A3, ou o sistema não está na nuvem)."
+        avisar(request, texto)
+    for erro in r["erros"]:
+        avisar(request, erro, "erro")
+    return voltar("/renovacao#testar")
 
 
 @rotas.post("/renovacao/certificado/{cid:int}/situacao", dependencies=[Depends(verificar_csrf)])
