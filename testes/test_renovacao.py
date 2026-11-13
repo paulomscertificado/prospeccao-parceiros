@@ -1101,18 +1101,32 @@ def test_remarcar_avisos_que_caem_em_feriado(cliente):
         zap = aviso(x, cx, "renov_lembrete", "whatsapp", feriado, "11:07")
         email = aviso(x, cx, "renov_lembrete", "email", feriado, "13:41")
         aviso(x, cx, "renov_reforco", "whatsapp", depois, "10:33")
-        aviso(y, cy, "renov_reforco", "whatsapp", vespera, "10:41")
+        reforco_y = aviso(y, cy, "renov_reforco", "whatsapp", vespera, "10:41")
         ultimo = aviso(y, cy, "renov_ultimo", "whatsapp", feriado, "15:12")
+        # Z: o aviso anterior já saiu na véspera; o último (no feriado, dia do vencimento) não cabe em outro dia
+        z = Lead(empresa="CLIENTE FERIADO Z LTDA", whatsapp="(81) 98666-0003", status="Abordagem criada",
+                 vendedor_id=admin.id, origem=renovacao.ORIGEM_LEAD)
+        db.add(z)
+        db.flush()
+        cz = Certificado(origem="planilha", protocolo="9400003", cliente_nome=z.empresa, status="Ativo",
+                         data_vencimento=feriado, campanha_id=camp.id, lead_id=z.id)
+        db.add(cz)
+        db.flush()
+        aviso(z, cz, "renov_reforco", "whatsapp", vespera, "10:51").status = "feita"
+        ultimo_z = aviso(z, cz, "renov_ultimo", "whatsapp", feriado, "15:22")
         db.flush()
         # só calcular não muda nada
         previa = renovacao.remarcar_feriados(db, aplicar=False)
-        assert previa["remarcados"] == 2 and previa["cancelados"] == 1 and zap.data == feriado
+        assert previa["remarcados"] == 4 and previa["cancelados"] == 1 and zap.data == feriado
         r = renovacao.remarcar_feriados(db)
-        assert r["remarcados"] == 2 and r["cancelados"] == 1
+        assert r["remarcados"] == 4 and r["cancelados"] == 1
         assert zap.data == vespera and zap.hora == "11:07"  # o dia útil antes do feriado
         assert email.data != feriado and (email.data, email.hora) > (zap.data, zap.hora)
         assert email.data <= cx.data_vencimento and email.data.weekday() < 5
-        assert ultimo.status == "cancelada" and "feriado" in ultimo.resultado  # vence no feriado e não cabe antes
+        # Y vence no feriado: o anterior recua e o último fica na véspera
+        assert ultimo.data == vespera and ultimo.status == "rascunho"
+        assert (vespera - reforco_y.data).days >= 2 and reforco_y.data.weekday() < 5
+        assert ultimo_z.status == "cancelada" and "feriado" in ultimo_z.resultado  # o anterior já saiu: não cabe
         assert renovacao.remarcar_feriados(db) == {"remarcados": 0, "cancelados": 0, "so_email": 0,
                                                    "mudancas": Counter()}  # nada mais em feriado
         db.rollback()
