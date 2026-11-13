@@ -895,7 +895,9 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
                 t.lead.status = "Pesquisando" if t.lead.pesquisado_em else "Novo"
         avisar(request, "Empresa removida da campanha.")
     db.commit()
-    return voltar(f"/campanhas/{cid}")
+    # aprovada na tela Renovação (ou Empresas novas): volta para ela (só esses endereços, nunca um qualquer)
+    destino = str(form.get("voltar") or "")
+    return voltar(destino if destino in {area[0] for area in AREAS_DAS_CAMPANHAS.values()} else f"/campanhas/{cid}")
 
 
 # ---------------------------------------------------------------- Inteligência de Prospecção

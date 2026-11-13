@@ -58,7 +58,8 @@
 {% elif c.status == 'erro' %}
 <div class="aviso aviso-erro">{{ c.etapa }} {{ c.erro }}</div>
 {% elif c.status == 'aguardando_aprovacao' %}
-<div class="faixa" style="background:#8a5a10"><b>APROVAÇÃO NECESSÁRIA</b> <span>{{ c.etapa }}</span></div>
+<div class="faixa" style="background:#8a5a10"><b>APROVAÇÃO NECESSÁRIA</b> <span>{{ c.etapa }}</span>
+  {% if c.tipo == 'renovacao' and pode_aprovar %}<form method="post" action="/campanhas/{{ c.id }}/aprovar" style="display:inline;margin-left:12px" data-confirmar="Aprovar a campanha? Os avisos começam a sair sozinhos, cada um no seu dia e horário."><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar" value="/renovacao"><button class="btn btn-verde">APROVAR CAMPANHA</button></form>{% endif %}</div>
 {% elif c.status in ('ativa', 'concluida', 'pausada') %}
 <div class="aviso aviso-ok">Campanha {{ c.status }}{% if aprovador %} · aprovada por {{ aprovador.nome }} em {{ c.aprovado_em|datahora }}{% endif %}.</div>
 {% elif c.status == 'cancelada' %}<div class="aviso aviso-alerta">Campanha cancelada.</div>{% endif %}

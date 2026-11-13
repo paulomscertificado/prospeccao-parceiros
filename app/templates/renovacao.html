@@ -9,6 +9,13 @@
   <div><h1>Renovação</h1>
     <div class="suave">Avisa os clientes da MS antes de o certificado digital vencer: {{ quando }}, pelo WhatsApp e pelo e-mail.</div></div>
 </div>
+{% for c in campanhas if c.status == 'aguardando_aprovacao' %}
+<div class="aviso aviso-alerta" style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+  <div><b>Campanha esperando aprovação:</b> {{ c.nome }} ({{ contatos_por_campanha.get(c.id, 0) }} contatos).
+    Nada sai antes de aprovar. <a href="/campanhas/{{ c.id }}">Ver os avisos</a></div>
+  {% if pode_aprovar %}<form method="post" action="/campanhas/{{ c.id }}/aprovar" data-confirmar="Aprovar a campanha &quot;{{ c.nome }}&quot;? Os avisos começam a sair sozinhos, cada um no seu dia e horário."><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar" value="/renovacao"><button class="btn btn-verde">APROVAR CAMPANHA</button></form>{% endif %}
+</div>
+{% endfor %}
 <div class="passos-ia"><span>1. Testa os avisos com você</span><span>2. Importa a planilha de renovação</span>
   <span>3. Monta a campanha (um aviso por contato)</span><span>4. Você aprova</span><span>5. Avisos saem sozinhos (WhatsApp primeiro)</span></div>
 
@@ -207,13 +214,14 @@
   <h2>Campanhas de renovação</h2>
   {% if campanhas %}
   <div class="tabela-rolagem"><table>
-    <tr><th>Campanha</th><th>Situação</th><th>Contatos</th><th>Dono</th><th>Criada em</th></tr>
+    <tr><th>Campanha</th><th>Situação</th><th>Contatos</th><th>Dono</th><th>Criada em</th><th></th></tr>
     {% for c in campanhas %}{% set selo = SELOS.get(c.status, ('', c.status)) %}
     <tr><td><a href="/campanhas/{{ c.id }}">{{ c.nome }}</a>{% if c.status == 'erro' and c.erro %}<div class="pequeno suave">{{ c.erro[:200] }}</div>{% elif c.etapa %}<div class="pequeno suave">{{ c.etapa }}</div>{% endif %}</td>
       <td><span class="selo {{ selo[0] }}">{{ selo[1] }}</span></td>
       <td>{{ contatos_por_campanha.get(c.id, 0) }}</td>
       <td>{{ (usuarios|selectattr('id', 'equalto', c.usuario_id)|map(attribute='nome')|first) or '—' }}</td>
-      <td>{{ c.criado_em|datahora }}</td></tr>
+      <td>{{ c.criado_em|datahora }}</td>
+      <td>{% if c.status == 'aguardando_aprovacao' and pode_aprovar %}<form method="post" action="/campanhas/{{ c.id }}/aprovar" data-confirmar="Aprovar a campanha &quot;{{ c.nome }}&quot;? Os avisos começam a sair sozinhos, cada um no seu dia e horário."><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar" value="/renovacao"><button class="btn btn-verde">APROVAR CAMPANHA</button></form>{% else %}<a class="btn" href="/campanhas/{{ c.id }}">Ver</a>{% endif %}</td></tr>
     {% endfor %}
   </table></div>
   {% else %}<p class="suave">Nenhuma campanha de renovação ainda. Importe a planilha e clique em "Montar campanha".</p>{% endif %}

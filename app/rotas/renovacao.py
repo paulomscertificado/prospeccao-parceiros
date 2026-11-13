@@ -92,6 +92,7 @@ def tela_renovacao(request: Request, ver: str = "avisar", usuario: Usuario = Dep
         "exemplos": renovacao.exemplos_para_teste(db), "avisos_teste": renovacao.avisos_teste(db),
         "remetente": renovacao.dono(db) or usuario, "numeros": numeros,
         "numero_auto": numero_auto, "pode_escolher_numero": autorizacao.pode(usuario, "campanhas.escolher_numero"),
+        "pode_aprovar": autorizacao.pode(usuario, "campanhas.gerenciar"),
     })
 
 

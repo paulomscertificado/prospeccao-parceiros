@@ -978,3 +978,31 @@ def test_tela_salva_ate_que_horas_os_avisos_saem(cliente, csrf):
             gravar_config(db, chave, "")
         db.commit()
         assert renovacao.hora_fim(db) == "18:00"
+
+
+
+def test_tela_renovacao_tem_o_botao_de_aprovar(cliente, csrf):
+    """Pedido da Maria (13/11/2026): "preciso de um botão na área de renovação de aprovação da campanha". A tela
+    Renovação mostra a campanha que espera aprovação no topo, com o botão, e volta para a tela depois de aprovar."""
+    with sessao() as db:
+        admin = _admin(db)
+        camp = Campanha(nome="Renovação para aprovar na tela", tipo="renovacao", status="aguardando_aprovacao",
+                        usuario_id=admin.id, canais="whatsapp,email", objetivo="Renovar o certificado digital")
+        db.add(camp)
+        db.commit()
+        cid = camp.id
+    pagina = cliente.get("/renovacao").text
+    assert "Campanha esperando aprovação:" in pagina and "Renovação para aprovar na tela" in pagina
+    assert pagina.count(f'action="/campanhas/{cid}/aprovar"') == 2  # no topo e na lista de campanhas
+    assert 'name="voltar" value="/renovacao"' in pagina
+    assert f'action="/campanhas/{cid}/aprovar"' in cliente.get(f"/campanhas/{cid}").text  # e na página dela
+    r = cliente.post(f"/campanhas/{cid}/aprovar", data={"csrf": csrf, "voltar": "/renovacao"})
+    assert r.status_code == 200 and str(r.url).endswith("/renovacao") and "Campanha aprovada" in r.text
+    assert f'action="/campanhas/{cid}/aprovar"' not in r.text  # aprovada: o botão some
+    # endereço de volta que não é de uma área: vai para a página da campanha (nunca para fora do sistema)
+    r = cliente.post(f"/campanhas/{cid}/pausar", data={"csrf": csrf, "voltar": "https://exemplo.com"})
+    assert str(r.url).endswith(f"/campanhas/{cid}")
+    with sessao() as db:
+        assert db.get(Campanha, cid).status == "pausada"
+        db.get(Campanha, cid).status = "cancelada"
+        db.commit()
