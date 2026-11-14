@@ -106,18 +106,46 @@ def lista(busca: str = "", numero: str = "", usuario: Usuario = Depends(exige("c
         consulta = consulta.where(or_(*filtros))
     resultado = []
     escolhidos = _nomes_escolhidos(db)
-    for conexao, telefone, _ultima_em, nao_lidas in db.execute(consulta).all():
-        m = db.execute(select(MensagemWhatsApp).where(MensagemWhatsApp.telefone == telefone, MensagemWhatsApp.conexao == conexao)
-                       .order_by(MensagemWhatsApp.criado_em.desc(), MensagemWhatsApp.id.desc()).limit(1)).scalars().first()
-        nome = escolhidos.get(m.telefone) or m.nome or db.execute(select(MensagemWhatsApp.nome).where(MensagemWhatsApp.telefone == m.telefone,
-                                                                         MensagemWhatsApp.nome != "")
-                                    .order_by(MensagemWhatsApp.id.desc()).limit(1)).scalar() or ""
+    linhas = db.execute(consulta).all()
+    # A última mensagem e o último nome de todas as conversas da lista em 2 consultas (antes eram 1 ou 2 por conversa,
+    # a cada 4 s com a tela aberta: 400 mil consultas em 3 semanas, 14/11/2026)
+    ultimas = _ultimas_mensagens(db, {c for c, *_ in linhas}, {t for _, t, *_ in linhas})
+    nomes = _ultimos_nomes(db, {t for _, t, *_ in linhas})
+    for conexao, telefone, _ultima_em, nao_lidas in linhas:
+        m = ultimas.get((conexao, telefone))
+        if m is None:
+            continue
+        nome = escolhidos.get(m.telefone) or m.nome or nomes.get(m.telefone, "")
         resultado.append({"telefone": m.telefone, "telefone_formatado": util.formatar_telefone(m.telefone),
                           "numero": conexao, "numero_nome": nomes_numeros.get(conexao, conexao),
                           "nome": nome, "ultima": m.texto[:120], "ultima_direcao": m.direcao,
                           "quando": _quando_curto(m.criado_em), "nao_lidas": int(nao_lidas or 0)})
     return JSONResponse({"conversas": resultado, "situacao": _situacao(db, numero or _numero_padrao(db, usuario)),
                          "varios_numeros": len(_numeros(db, usuario)) > 1})
+
+
+def _ultimas_mensagens(db: Session, conexoes_: set, telefones: set) -> dict:
+    """{(conexão, telefone): a última mensagem} numa consulta só, só com o que a lista mostra (texto até 120)."""
+    if not telefones:
+        return {}
+    ordem = func.row_number().over(partition_by=(MensagemWhatsApp.conexao, MensagemWhatsApp.telefone),
+                                   order_by=(MensagemWhatsApp.criado_em.desc(), MensagemWhatsApp.id.desc())).label("n")
+    sub = (select(MensagemWhatsApp.conexao, MensagemWhatsApp.telefone, MensagemWhatsApp.nome,
+                  func.substr(MensagemWhatsApp.texto, 1, 120).label("texto"), MensagemWhatsApp.direcao,
+                  MensagemWhatsApp.criado_em, ordem)
+           .where(MensagemWhatsApp.conexao.in_(conexoes_), MensagemWhatsApp.telefone.in_(telefones)).subquery())
+    return {(r.conexao, r.telefone): r for r in db.execute(select(sub).where(sub.c.n == 1)).all()}
+
+
+def _ultimos_nomes(db: Session, telefones: set) -> dict:
+    """{telefone: o último nome que veio do WhatsApp}, numa consulta só."""
+    if not telefones:
+        return {}
+    ordem = func.row_number().over(partition_by=MensagemWhatsApp.telefone,
+                                   order_by=MensagemWhatsApp.id.desc()).label("n")
+    sub = (select(MensagemWhatsApp.telefone, MensagemWhatsApp.nome, ordem)
+           .where(MensagemWhatsApp.telefone.in_(telefones), MensagemWhatsApp.nome != "").subquery())
+    return {t: n for t, n, _ in db.execute(select(sub).where(sub.c.n == 1)).all()}
 
 
 def _quando_curto(momento) -> str:

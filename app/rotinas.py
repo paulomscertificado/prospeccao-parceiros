@@ -102,7 +102,7 @@ def ler_respostas_por_email() -> int:
         except ValueError:  # 1ª leitura neste formato: começa agora (as respostas antigas já foram tratadas)
             desde = agora().replace(microsecond=0)
             gravar_config(db, "imap_ler_desde", desde.isoformat())
-        emails = {e for (e,) in db.execute(select(Lead.chave_email).where(Lead.chave_email != "")) if e}
+        emails = _EmailsDeLeads()  # pergunta só pelos remetentes que chegaram (antes: todos os e-mails a cada 5 min)
         enviados = dict(db.execute(select(Mensagem.id_externo, Mensagem.lead_id).where(
             Mensagem.canal == "email", Mensagem.direcao == "saida", Mensagem.id_externo != "",
             Mensagem.lead_id.is_not(None), Mensagem.criado_em >= agora() - timedelta(days=120))).all())
@@ -170,7 +170,25 @@ def _ler_devolucoes(conta, enviados: dict) -> int:
     return marcados
 
 
-def _ler_caixa(conta, emails: set[str], enviados: dict, ja_processados: set[str], desde) -> int:
+class _EmailsDeLeads:
+    """"remetente in emails": o e-mail é de algum lead? Pergunta ao banco só pelos remetentes que aparecem na caixa
+    (antes vinham todos os e-mails de leads a cada leitura: 3 milhões de linhas em 3 semanas, 14/11/2026)."""
+
+    def __init__(self):
+        self._sabidos: dict[str, bool] = {}
+
+    def __contains__(self, email) -> bool:
+        email = (email or "").strip().lower()
+        if not email:
+            return False
+        if email not in self._sabidos:
+            with sessao() as db:
+                self._sabidos[email] = db.execute(
+                    select(Lead.id).where(Lead.chave_email == email).limit(1)).first() is not None
+        return self._sabidos[email]
+
+
+def _ler_caixa(conta, emails, enviados: dict, ja_processados: set[str], desde) -> int:
     total = 0
     for item in email_imap.ler_respostas(emails, set(enviados), ja_processados, desde, conta=conta):
         ja_processados.add(item["message_id"])  # o mesmo e-mail em duas caixas é tratado uma vez só

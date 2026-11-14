@@ -791,7 +791,7 @@ def processar_fila(db, maximo: int = 25) -> dict:
     hora = agora().strftime("%H:%M")
     # Só o que já está na hora (filtro no banco) e uma consulta folgada: toques que esperam (responsável sem e-mail,
     # caixa pausada, campanha no limite do dia) não podem tomar as vagas e travar os das outras campanhas.
-    consulta = (select(Tarefa).join(Campanha, Tarefa.campanha_id == Campanha.id)
+    consulta = (select(Tarefa.id).join(Campanha, Tarefa.campanha_id == Campanha.id)
                 .where(Tarefa.status == "pendente", Tarefa.tipo == "prospeccao", Tarefa.canal == "email",
                        _ja_na_hora(date.today(), hora), Campanha.status == "ativa",
                        Campanha.aprovado_em.is_not(None),  # só campanhas aprovadas na IA SDR
@@ -801,7 +801,7 @@ def processar_fila(db, maximo: int = 25) -> dict:
     if renovacao.fora_do_horario(db):  # Renovação: só de segunda a sexta, das 10:00 às 18:00 (pedido da Maria)
         consulta = consulta.where(Campanha.tipo != renovacao.TIPO_CAMPANHA)
     campanhas_no_limite: set[int] = set()
-    for t in db.execute(consulta).scalars():
+    for t in _em_lotes(db, db.execute(consulta).scalars().all()):
         if feito["enviados"] >= maximo:
             break
         if t.campanha_id in campanhas_no_limite:
@@ -1322,6 +1322,21 @@ def leads_que_conversaram(db, ids) -> set[int]:
     return {lid for lid, corpo in linhas if not sdr.e_resposta_automatica(corpo or "")}
 
 
+def _em_lotes(db, ids: list[int], tamanho: int = 10):
+    """As tarefas da fila em lotes de 10, com o lead junto (selectinload), na ordem dos ids. A rodada costuma parar no
+    primeiro envio: antes ela trazia as 200 (ou 400) tarefas inteiras e cada lead numa consulta separada, a cada 3
+    minutos (tráfego do Supabase grátis, 14/11/2026)."""
+    from sqlalchemy.orm import selectinload
+
+    for inicio in range(0, len(ids), tamanho):
+        parte = ids[inicio:inicio + tamanho]
+        carregadas = {t.id: t for t in db.execute(select(Tarefa).where(Tarefa.id.in_(parte))
+                                                   .options(selectinload(Tarefa.lead))).scalars()}
+        for tarefa_id in parte:
+            if tarefa_id in carregadas:
+                yield carregadas[tarefa_id]
+
+
 def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
     """Envia pelo WhatsApp conectado (WhatsApp Leads) os passos de WhatsApp das campanhas aprovadas, só para
     leads liberados (ver whatsapp_liberado). Poucos por rodada: a fila de lá ainda aplica pausas e limite diário."""
@@ -1357,7 +1372,7 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
         Mensagem.lead_id == Lead.id, Mensagem.canal == "whatsapp", Mensagem.direcao == "saida",
         Mensagem.angulo != "resposta", Mensagem.status.in_(mensagens.ENVIADAS),
         Mensagem.criado_em > agora() - timedelta(hours=horas_minimas_automatico(db))).exists())
-    consulta = (select(Tarefa).join(Campanha, Tarefa.campanha_id == Campanha.id)
+    consulta = (select(Tarefa.id).join(Campanha, Tarefa.campanha_id == Campanha.id)
                 .join(Lead, Tarefa.lead_id == Lead.id)
                 .where(Tarefa.status == "pendente", Tarefa.tipo == "prospeccao", Tarefa.canal == "whatsapp",
                        _ja_na_hora(hoje, hora), Campanha.status == "ativa", Campanha.aprovado_em.is_not(None),
@@ -1375,7 +1390,7 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
         consulta = consulta.where(Campanha.tipo != renovacao.TIPO_CAMPANHA)
     automaticas = campanhas_que_saem_sozinhas(db)
     campanhas_no_limite: set[int] = set()
-    for t in db.execute(consulta).scalars():
+    for t in _em_lotes(db, db.execute(consulta).scalars().all()):
         if feito["enviados"] >= maximo:
             break
         if t.campanha_id in campanhas_no_limite:

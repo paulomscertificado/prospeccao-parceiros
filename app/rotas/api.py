@@ -10,7 +10,7 @@ import time
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 
 from .. import config, relogio, sdr, trabalhos, util
 from ..rotinas import responder_automaticamente, rodada
@@ -241,10 +241,17 @@ def _guardar_conversas(db, conversas: dict) -> None:
                                 status=str(m.get("status") or "")[:20], erro=str(m.get("erro") or "")[:500],
                                 origem=str(m.get("origem") or "")[:30], criado_em=criado,
                                 lida=m.get("direcao") != "entrada" or m.get("origem") == "historico"))
-    for s in conversas.get("status") or []:
-        msg = db.execute(select(MensagemWhatsApp).where(MensagemWhatsApp.id_wl == int(s["id"]))).scalars().first()
-        if msg and (msg.status != s.get("status") or msg.erro != (s.get("erro") or "")):
-            msg.status, msg.erro = str(s.get("status") or "")[:20], str(s.get("erro") or "")[:500]
+    # Status das mensagens: UMA consulta, só com as colunas que mudam. Antes era uma consulta por mensagem, com a linha
+    # inteira, a cada 30 s (3 s com a tela aberta): era o que mais gastava o tráfego do Supabase (14/11/2026).
+    novos = {int(s["id"]): (str(s.get("status") or "")[:20], str(s.get("erro") or "")[:500])
+             for s in conversas.get("status") or []}
+    if novos:
+        for id_, id_wl, atual, erro in db.execute(
+                select(MensagemWhatsApp.id, MensagemWhatsApp.id_wl, MensagemWhatsApp.status, MensagemWhatsApp.erro)
+                .where(MensagemWhatsApp.id_wl.in_(list(novos)))).all():
+            if (atual, erro or "") != novos[id_wl]:
+                db.execute(update(MensagemWhatsApp).where(MensagemWhatsApp.id == id_)
+                           .values(status=novos[id_wl][0], erro=novos[id_wl][1]))
     if "ultimo_id" in conversas:
         gravar_config(db, "wl_conv_ultimo_id", str(int(conversas["ultimo_id"])))
     gravar_config(db, "wl_conv_pendente", "1" if len(mensagens) >= 300 else "0")

@@ -107,8 +107,8 @@ def copiar(origem, destino, avisar=print, pular=frozenset()) -> dict[str, int]:
             for id_, valor in valores:
                 d.execute(update(tabela).where(tabela.c.id == id_).values({coluna.name: valor}))
         if destino.dialect.name == "postgresql":  # o próximo id continua depois do maior copiado
-            for tabela in tabelas:
-                if "id" in tabela.c and contagem.get(tabela.name):
+            for tabela in tabelas:  # só id numérico tem sequência (conexoes_whatsapp usa "principal", "u3"...)
+                if "id" in tabela.c and contagem.get(tabela.name) and tabela.c.id.type.python_type is int:
                     d.execute(text(f"SELECT setval(pg_get_serial_sequence('{tabela.name}', 'id'), "
                                    f"(SELECT MAX(id) FROM {tabela.name}))"))
     return contagem
@@ -116,6 +116,8 @@ def copiar(origem, destino, avisar=print, pular=frozenset()) -> dict[str, int]:
 
 def esvaziar(destino, pular=frozenset()) -> None:
     tabelas = [t for t in reversed(Base.metadata.sorted_tables) if t.name not in pular and inspect(destino).has_table(t.name)]
+    if not tabelas:  # banco novo, ainda sem tabelas (ex.: o banco de teste na primeira cópia): nada a esvaziar
+        return
     with destino.begin() as d:
         if destino.dialect.name == "postgresql":
             d.execute(text("TRUNCATE " + ", ".join(t.name for t in tabelas) + " RESTART IDENTITY CASCADE"))
