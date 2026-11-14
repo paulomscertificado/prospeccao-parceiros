@@ -196,9 +196,12 @@ def preencher(con, decisoes: dict | None = None, gravar: bool = True, limpar: bo
 
 def _limpar(con, tabelas) -> None:
     """VACUUM depois de muitas alterações (o espaço das linhas antigas volta a ser usado pela tabela)."""
-    with con.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as livre:
-        for t in tabelas:
-            livre.exec_driver_sql(f"VACUUM (ANALYZE) {t}")
+    try:
+        with con.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as livre:
+            for t in tabelas:
+                livre.exec_driver_sql(f"VACUUM (ANALYZE) {t}")
+    except Exception:  # noqa: BLE001 - a limpeza é um extra: o autovacuum do Postgres faz o mesmo depois
+        log.warning("VACUUM depois do preenchimento não rodou (o autovacuum cuida disso)", exc_info=True)
 
 
 # ---------------------------------------------------------------- Contagem e conferência
