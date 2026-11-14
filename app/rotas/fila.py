@@ -20,7 +20,7 @@ rotas = APIRouter()
 
 
 def _numero_da_pessoa(db, usuario: Usuario) -> str:
-    """O WhatsApp da pessoa (o limite diário é de cada número); sem número próprio, o principal da MS."""
+    """O WhatsApp da pessoa (o limite diário é de cada número); sem número próprio, o principal."""
     from .. import conexoes
 
     proprio = conexoes.minha(db, usuario)
@@ -99,7 +99,7 @@ def _situacao(t: Tarefa, hoje: date, no_horario: bool, conversaram: set[int], em
                                   f"{campanhas.HORAS_MINIMAS_FILA_AUTOMATICA} h (nunca dois no mesmo dia)")
         if da_campanha_automatica:
             return "sozinho", f"Sai sozinho: {campanhas.motivo_automatico(automaticas, t.campanha_id)} (um por vez, com pausas)"
-        return "sozinho", "Sai sozinho (contato já conversou com a MS)"
+        return "sozinho", "Sai sozinho (contato já conversou com a empresa)"
     if t.campanha_id in automaticas:
         return "clique", (f"Aguardando seu clique: atrasado mais de {campanhas.DIAS_ATRASO_AUTOMATICO} dias, "
                           "não sai sozinho")

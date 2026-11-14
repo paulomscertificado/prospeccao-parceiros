@@ -3,7 +3,7 @@
 {% block publico %}
 <div class="login"><form class="cartao" method="post" action="{{ caminho_form }}">
   <h1 style="margin-bottom:8px">Não receber mais mensagens</h1>
-  <p>Confirme para não receber mais mensagens da MS Certificação Digital.</p>
+  <p>Confirme para não receber mais mensagens {{ marca.frase('de', nome=True) }}.</p>
   <button class="btn btn-primario">Confirmar descadastro</button>
 </form></div>
 {% endblock %}

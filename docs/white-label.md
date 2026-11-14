@@ -11,7 +11,7 @@ O dono da plataforma e Admin Master é o Paulo Marinho (`Usuario.master`).
 | 2 | Isolamento obrigatório (filtro, porteiro com AR, RLS, testes nas 178 rotas) | nenhuma rota abre registro de outra AR | **Parte 1 (isolamento dos dados) no ar desde 14/11/2026**; **parte 2 (configurações por AR) no ar desde 14/11/2026**; RLS, `NOT NULL` e índices adiados (ver abaixo) |
 | 3 | Permissões por AR e painel /master | admin de uma AR não alcança outra nem o /master | **No ar desde 14/11/2026** (painel /master, o que é da plataforma só o master muda, módulos por AR); admins das ARs promovidos em 14/11/2026 |
 | 4 | WhatsApp, e-mail e filas por AR | uma AR parada não atrasa as outras | **Fila justa e avisos por AR no ar desde 14/11/2026**; computador do WhatsApp por AR espera a decisão (próprio ou servidor central) |
-| 5 | Marca (white label) | nenhuma tela ou mensagem mostra a MS em outra AR | Endereço decidido em 14/11/2026: um só para todas (o da Vercel), tela de entrada neutra e a marca da AR depois de entrar; nome e domínio da plataforma depois |
+| 5 | Marca (white label) | nenhuma tela ou mensagem mostra a MS em outra AR | Endereço decidido em 14/11/2026 (um só para todas, tela de entrada neutra); marca de cada AR (nome, logo, cores, fonte) pronta e ensaiada em 14/11/2026; nome e domínio da plataforma depois |
 | 6 | Auditoria, LGPD e planos | exportar e apagar uma AR de teste sem tocar nas outras | **Auditoria e LGPD no ar desde 14/11/2026** (quem agiu como quem; exportar e apagar uma AR, ensaiados no banco de teste); planos e cobrança esperam a decisão |
 
 Os planos pagos são obrigatórios antes da Fase 3 (a primeira AR nova): o Hobby da Vercel não permite uso comercial
@@ -184,6 +184,29 @@ fica igual às outras. O nome e o domínio da plataforma ficam para depois; subd
 (`tenant_dominios`) adiados.
 **Por quê:** sem custo e sem nada para as ARs configurarem agora. Aceito: a marca só aparece depois de entrar e os
 links dos e-mails (descadastro, avisos) levam o endereço da Vercel.
+**Marca de cada AR** (`app/marca.py`, tabela `marcas_ar`, Configurações > Marca): nome nas mensagens, nome curto
+nas telas, artigo ("a MS", "o Grupo Certy"), apresentação, site, domínio do e-mail da equipe, cores (principal,
+detalhes, fundo), fonte (lista `FONTES`) e logo (PNG/JPG/WebP até 300 KB; SVG não, pode levar código). As telas
+recebem `marca` (`web.tela`): `{{ marca.curto }}`, `{{ marca.frase('com') }}` ("com a MS", "com o Grupo Certy"),
+`{{ marca.logo_url }}`, `{{ marca.css }}`. Antes de entrar e para o Admin Master fora das ARs: a plataforma
+(`plataforma_nome`, "sua empresa" nas frases). A marca fica na memória 5 minutos (tráfego do Supabase); o logo, no
+navegador, por uma semana (o endereço muda com a versão).
+**Mensagens:** os modelos continuam escritos com o nome da MS e `marca.aplicar` troca pela empresa de quem envia: a
+"empresa que eu represento" (Minha conta) ou, sem ela, a marca da AR (Admin Master: a AR MS). O que é só da MS
+(validação em Recife, a arte do aviso de vencimento do site da MS, o WhatsApp do convite) sai para as outras.
+`banco.CHAVES_DA_MARCA` (nome, link e texto do programa de parceria, WhatsApp do convite): sem valor próprio da AR, vêm
+da marca dela (`marca.config_da_marca`), nunca da plataforma; os textos da MS que eram da plataforma passaram para a
+AR MS (`marca.garantir`, uma vez por publicação, que também cria a marca da AR MS com o logo de sempre e troca o papel
+"Funcionário MS" por "Funcionário"). E-mail da equipe: o domínio da marca da AR (`contas_email.dominio_da_equipe` e
+`dominio_ok`, também na hora de enviar). Alertas, PDF dos relatórios, autenticador (2 etapas) e prompts da IA: neutros
+ou com a marca de quem pede.
+**O que é da plataforma** (e-mail principal, chave da CNPJá, base da Receita, listas importadas, backup e relógio):
+só o Admin Master vê e muda (`admin._so_da_plataforma`).
+**Teste do portão:** `testes/test_marca_ar.py` (uma administradora do Grupo Certy percorre todas as telas, as abas das
+Configurações e os modelos e cadências da plataforma sem achar a MS; as mensagens dela saem com a marca dela).
+Ensaio no Postgres de teste (14/11/2026): marca da AR MS criada com o logo, textos da MS só nela, marca do Grupo Certy
+gravada; dados das ARs iguais antes e depois (MS 189.492 linhas, Grupo Certy 1.234).
+
 **Para mudar depois:** a Vercel aceita até 50 domínios por projeto, também no Hobby (subdomínio = registro CNAME no DNS
 do dono do domínio; vários de uma vez = `*.dominio` com a validação delegada em `_acme-challenge`). Um `.com.br` custa
 R$ 40 por ano no Registro.br (Pix ou boleto).

@@ -2,7 +2,7 @@
 {% block titulo %}Vencimentos{% endblock %}
 {% block conteudo %}
 <div class="cabecalho">
-  <div><h1>Vencimentos</h1><div class="suave">Controle de renovação: a MS renova e o contador continua parceiro.</div></div>
+  <div><h1>Vencimentos</h1><div class="suave">Controle de renovação: {{ marca.frase() }} renova e o contador continua parceiro.</div></div>
   <div class="acoes"><a class="btn" href="/exportar/vencimentos.xlsx">Exportar</a><a class="btn" href="/agenda?tipo=renovacao">Tarefas de renovação</a></div>
 </div>
 <div class="grade">

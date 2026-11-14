@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import autorizacao, hoje as fila_hoje, ia, metricas, planilhas, util
+from .. import autorizacao, hoje as fila_hoje, ia, marca, metricas, planilhas, util
 from ..banco import ler_config_int, obter_db
 from ..leads_servico import filtrar_por_usuario
 from ..modelos import Certificado, Cliente, Lead, Parceiro, Usuario, Venda
@@ -132,7 +132,9 @@ def relatorio_exportar(request: Request, formato: str, periodo: str = "30d", usu
     db.commit()
     nome = f"relatorio_comercial_{date.today():%Y-%m-%d}.{formato}"
     if formato == "pdf":
-        return arquivo(planilhas.gerar_pdf(f"Relatório comercial – {p.nome}", secoes), nome, TIPOS_ARQUIVO["pdf"])
+        return arquivo(planilhas.gerar_pdf(f"Relatório comercial – {p.nome}", secoes,
+                                           empresa=marca.da_tela(request, usuario, db)["nome"]),
+                       nome, TIPOS_ARQUIVO["pdf"])
     # CSV/Excel: uma tabela única com a coluna "Seção"
     linhas = [[titulo] + linha for titulo, _, ls in secoes for linha in ls]
     colunas = ["Seção", "Item", "Valor 1", "Valor 2", "Valor 3", "Valor 4", "Valor 5", "Valor 6"]
@@ -225,7 +227,8 @@ def exportar(request: Request, tipo: str, formato: str, usuario: Usuario = Depen
     if formato == "xlsx":
         return arquivo(planilhas.gerar_xlsx(titulo, colunas, linhas), nome, TIPOS_ARQUIVO["xlsx"])
     # PDF: até 12 colunas para caber na página
-    return arquivo(planilhas.gerar_pdf(titulo, [("", colunas[:12], [l[:12] for l in linhas])]), nome, TIPOS_ARQUIVO["pdf"])
+    return arquivo(planilhas.gerar_pdf(titulo, [("", colunas[:12], [l[:12] for l in linhas])],
+                                       empresa=marca.da_tela(request, usuario, db)["nome"]), nome, TIPOS_ARQUIVO["pdf"])
 
 
 # ---------------------------------------------------------------- IA Comercial

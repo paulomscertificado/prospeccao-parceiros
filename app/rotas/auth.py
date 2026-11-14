@@ -90,9 +90,10 @@ def ativar_codigo_tela(request: Request, db: Session = Depends(obter_db)):
         return voltar("/login/codigo")
     segredo = request.session.get("segredo_novo") or dois_fatores.novo_segredo()
     request.session["segredo_novo"] = segredo  # só a própria pessoa vê (é o que ela digita no app)
+    emissor = dois_fatores.emissor(db)
     return tela(request, "dois_fatores_ativar.html", {
-        "qr": dois_fatores.qr_svg(dois_fatores.link_do_app(segredo, usuario.email)),
-        "chave": dois_fatores.segredo_em_grupos(segredo), "pessoa": usuario})
+        "qr": dois_fatores.qr_svg(dois_fatores.link_do_app(segredo, usuario.email, emissor)),
+        "chave": dois_fatores.segredo_em_grupos(segredo), "pessoa": usuario, "emissor": emissor})
 
 
 @rotas.post("/login/ativar-codigo", dependencies=[Depends(verificar_csrf)])
@@ -217,12 +218,16 @@ def descadastrar(request: Request, lead_id: int, assinatura: str, db: Session = 
     if not lead or not _hmac.compare_digest(email_smtp.assinatura_descadastro(lead_id), assinatura):
         return tela(request, "erro.html", {"titulo": "Link inválido", "mensagem": "Este link de descadastro não é válido."},
                     status_code=404)
+    from .. import marca
+
+    da_ar = marca.da_ar(db, lead.tenant_id or marca.ar_padrao(db))  # a empresa que mandou o e-mail (a AR do lead)
     if request.method == "GET":  # abrir o link só pergunta (antivírus "abrem" links sozinhos)
-        return tela(request, "descadastro.html", {"caminho_form": request.url.path})
+        return tela(request, "descadastro.html", {"caminho_form": request.url.path, "marca": da_ar})
     registrar_opt_out(db, lead, None, "pediu descadastro pelo e-mail")
     db.commit()
-    return tela(request, "erro.html", {"titulo": "Pronto!", "mensagem": "Seu contato foi removido. Você não receberá "
-                                       "mais mensagens da MS Certificação Digital."})
+    return tela(request, "erro.html", {"titulo": "Pronto!", "marca": da_ar,
+                                       "mensagem": "Seu contato foi removido. Você não receberá mais mensagens "
+                                       f"{marca.frase(da_ar, 'de', nome=True)}."})
 
 
 @rotas.get("/sair")
@@ -232,12 +237,14 @@ def sair(request: Request):
 
 
 @rotas.get("/minha-conta")
-def minha_conta(request: Request, usuario: Usuario = Depends(usuario_logado)):
+def minha_conta(request: Request, usuario: Usuario = Depends(usuario_logado), db: Session = Depends(obter_db)):
     from .. import marca
 
     return tela(request, "minha_conta.html", {"restam_codigos": dois_fatores.codigos_restantes(usuario),
                                               "exige_2fa": dois_fatores.precisa(usuario),
-                                              "marca_padrao": marca.PADRAO})
+                                              # sem "empresa que eu represento", as mensagens saem pela marca da AR
+                                              "marca_padrao": marca.da_ar(db, usuario.tenant_id or marca.ar_padrao(db)),
+                                              "quem_fala": marca.da_pessoa(usuario, db=db)})
 
 
 @rotas.post("/minha-conta/empresa", dependencies=[Depends(verificar_csrf)])

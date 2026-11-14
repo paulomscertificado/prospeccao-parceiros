@@ -487,7 +487,7 @@ def test_marcar_autorizacao_de_whatsapp_na_ficha(cliente):
         lead = _novo_lead(db, "Contábil Autoriza Ficha", whatsapp="(81) 98222-0001")
         lead_id = lead.id
     pagina = cliente.get(f"/leads/{lead_id}").text
-    assert "Autorizou receber mensagens da MS pelo WhatsApp" in pagina
+    assert "Autorizou receber mensagens da sua empresa pelo WhatsApp" in pagina  # Admin Master fora das ARs
     from app.leads_servico import preencher
 
     with sessao() as db:

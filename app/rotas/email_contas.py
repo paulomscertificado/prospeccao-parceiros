@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import config, contas_email, util
+from .. import config, contas_email, marca, util
 from ..banco import obter_db
 from ..autorizacao import pode
 from ..integracoes import dns_email, email_imap, email_smtp
@@ -48,9 +48,11 @@ def tela_email(request: Request, usuario: Usuario = Depends(exige("email.ver")),
         avisar(request, str(erro), "alerta")
     minha = contas_email.minha(db, usuario)
     dominio_minha = util.dominio(minha.endereco) if minha else ""
+    dominio = contas_email.dominio_da_equipe(db, usuario)  # o da marca da AR (white label, Fase 5)
     dns = (dns_email.verificar(dominio_minha) if dominio_minha and dominio_minha != config.EMAIL_DOMINIO.lower()
-           else None)  # o domínio da MS é conferido em Configurações > E-mail
-    return tela(request, "email_contas.html", {"contas": contas, "equipe": equipe_, "dominio": config.EMAIL_DOMINIO,
+           else None)  # o domínio do e-mail principal é conferido em Configurações > E-mail
+    return tela(request, "email_contas.html", {"contas": contas, "equipe": equipe_, "dominio": dominio or "suaempresa.com.br",
+                                               "quem_fala": marca.da_pessoa(usuario, db=db),
                                                "minha": minha, "por_onde": por_onde, "dns": dns,
                                                "dominio_minha": dominio_minha,
                                                "outro_provedor": bool(minha and minha.smtp_host != "smtp.gmail.com")})
@@ -93,14 +95,15 @@ def salvar_minha(request: Request, endereco: str = Form(...), nome_remetente: st
     if not util.email_valido(endereco) or not util.email_valido(login):
         avisar(request, "Digite um e-mail válido.", "erro")
         return voltar(DESTINO)
-    fora_da_ms = bool(config.EMAIL_DOMINIO) and not endereco.endswith("@" + config.EMAIL_DOMINIO)
+    dominio = contas_email.dominio_da_equipe(db, usuario)  # o da marca da AR (white label, Fase 5)
+    fora_da_ms = bool(dominio) and not endereco.endswith("@" + dominio)
     outro_servidor = provedor == "outro"
     if (fora_da_ms or outro_servidor) and not pode(usuario, "email.outro_dominio"):
-        avisar(request, f"O e-mail precisa ser do domínio @{config.EMAIL_DOMINIO} (é ele que tem a autorização "
+        avisar(request, f"O e-mail precisa ser do domínio @{dominio} (é ele que tem a autorização "
                         "SPF/DKIM para não cair no spam). Para usar outro domínio, peça ao administrador a permissão "
                         "\"Enviar pelo próprio domínio\".", "erro")
         return voltar(DESTINO)
-    if fora_da_ms and not util.dominio_empresarial(endereco):
+    if (fora_da_ms or not dominio) and not util.dominio_empresarial(endereco):
         avisar(request, "Use um e-mail do domínio da sua empresa (ex.: nome@suaempresa.com.br). Gmail, Hotmail, "
                         "Outlook.com e Yahoo pessoais não servem para prospecção: caem no spam e a conta pode ser "
                         "bloqueada.", "erro")
@@ -126,7 +129,7 @@ def salvar_minha(request: Request, endereco: str = Form(...), nome_remetente: st
     outra = db.execute(select(ContaEmail).where(ContaEmail.endereco == endereco, ContaEmail.dono_id != usuario.id,
                                                 ContaEmail.principal.is_(False))).scalars().first()
     if outra or endereco == contas_email.credenciais(None).endereco:
-        avisar(request, "Este e-mail já está cadastrado no sistema por outra pessoa (ou é o principal da MS). "
+        avisar(request, "Este e-mail já está cadastrado no sistema por outra pessoa (ou é o principal da plataforma). "
                         "Peça para compartilharem com você.", "erro")
         return voltar(DESTINO)
     c = contas_email.minha(db, usuario)
@@ -154,7 +157,7 @@ def salvar_minha(request: Request, endereco: str = Form(...), nome_remetente: st
     c.dominio_livre = fora_da_ms or outro_servidor
     c.endereco, c.login = endereco, login
     c.nome_remetente = (" ".join(nome_remetente.replace('"', "").split())
-                        or f"{usuario.nome} | MS Certificação Digital")[:120]
+                        or f"{usuario.nome} | {marca.da_pessoa(usuario, db=db)['nome']}")[:120]
     c.nome = c.nome or f"E-mail de {usuario.nome}"
     if digitada:
         c.senha_cripto = criptografar(digitada)
@@ -173,7 +176,7 @@ def testar(request: Request, conta_id: int, usuario: Usuario = Depends(exige("em
     if not (contas_email.pode_gerenciar(usuario, c) or contas_email.pode_usar(usuario, c)):
         raise HTTPException(403)
     try:
-        email_smtp.enviar(usuario.email, "Teste – e-mail das campanhas da MS Certificação Digital",
+        email_smtp.enviar(usuario.email, f"Teste – e-mail das campanhas {marca.da_pessoa(usuario, db=db)['frase']('de', nome=True)}",
                           "Este é um e-mail de teste do sistema de Prospecção de Parceiros.\n\nSe ele chegou na caixa "
                           "de entrada (e não no spam), esta conta está pronta para as campanhas.", com_rodape=False,
                           conta=c)

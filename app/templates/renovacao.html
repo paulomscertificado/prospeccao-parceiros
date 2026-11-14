@@ -7,7 +7,7 @@
                 'concluida': ('selo-azul', 'Concluída'), 'cancelada': ('', 'Cancelada')} %}
 <div class="cabecalho">
   <div><h1>Renovação</h1>
-    <div class="suave">Avisa os clientes da MS antes de o certificado digital vencer: {{ quando }}, pelo WhatsApp e pelo e-mail.</div></div>
+    <div class="suave">Avisa os clientes {{ marca.frase('de') }} antes de o certificado digital vencer: {{ quando }}, pelo WhatsApp e pelo e-mail.</div></div>
 </div>
 {% for c in campanhas if c.status == 'aguardando_aprovacao' %}
 <div class="aviso aviso-alerta" style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap">
@@ -57,11 +57,11 @@
           {% set desabilitar = True %}{% for n in numeros %}<option value="{{ n.id }}" {{ 'selected' if n.id == cfg.renov_conexao }}{{ ' disabled' if desabilitar and not n.conectado }}>{{ n.nome }}{{ ' · ' ~ n.numero if n.numero }} — {{ 'MODO TESTE (não chega de verdade)' if n.teste else ('conectado' if n.conectado else 'desconectado') }}</option>{% endfor %}</select></div>{% endif %}
       <div><label>Quais avisos</label><select name="avisos">{% for v, nome in avisos_teste.items() %}<option value="{{ v }}">{{ nome }}</option>{% endfor %}</select></div>
     </div>
-    <label class="escolha" style="max-width:560px;margin-top:10px"><input type="checkbox" name="com_arte" checked>
+    {% if url_da_arte %}<label class="escolha" style="max-width:560px;margin-top:10px"><input type="checkbox" name="com_arte" checked>
       <span class="escolha-corpo"><span class="escolha-marca" aria-hidden="true">✓</span>
         <b>🖼️ Mandar a arte junto</b><span class="pequeno suave">a <a href="{{ url_da_arte }}" target="_blank" rel="noopener">arte do site</a> com os dados
           desse cliente e quantos dias faltam (no WhatsApp, o texto vai de legenda). No e-mail, a arte vai quando o teste de
-          WhatsApp do mesmo cliente já saiu na última hora (quem desenha é o computador do WhatsApp Leads)</span></span></label>
+          WhatsApp do mesmo cliente já saiu na última hora (quem desenha é o computador do WhatsApp Leads)</span></span></label>{% endif %}
     <p class="pequeno suave">Chega com "[TESTE]" e o nome do cliente no começo, assinado por {{ remetente.nome }}
       (quem assina as campanhas de renovação). O WhatsApp sai pelo número escolhido; número em <b>modo teste</b> só simula
       o envio e a mensagem não chega. Não muda nada nas campanhas.</p>
@@ -152,11 +152,11 @@
         <b>✉️ E-mail</b><span class="pequeno suave">em cada aviso, umas 2 h depois do WhatsApp (se o cliente responder antes, não sai). Quem não tem celular recebe só por e-mail</span></span></label>
   </div>
   <div class="cartoes-escolha" style="margin-top:10px">
-    <label class="escolha"><input type="checkbox" name="arte" {{ 'checked' if cfg.renov_arte == '1' }}>
+    {% if url_da_arte %}<label class="escolha"><input type="checkbox" name="arte" {{ 'checked' if cfg.renov_arte == '1' }}>
       <span class="escolha-corpo"><span class="escolha-marca" aria-hidden="true">✓</span>
         <b>🖼️ Arte do aviso junto</b><span class="pequeno suave">a <a href="{{ url_da_arte }}" target="_blank" rel="noopener">arte do site</a>
           com os dados do certificado e quantos dias faltam, no WhatsApp (o texto vai de legenda) e no e-mail. Vai para
-          todos os clientes com um certificado; quem tem vários recebe a lista no texto</span></span></label>
+          todos os clientes com um certificado; quem tem vários recebe a lista no texto</span></span></label>{% endif %}
   </div>
   {% if cfg.renov_arte == '1' and artes.pedidas and not artes.feitas %}<div class="aviso aviso-alerta" style="margin-top:10px">Nos últimos 7 dias
     {{ artes.pedidas }} {{ 'aviso saiu' if artes.pedidas == 1 else 'avisos saíram' }} sem a arte: o computador do WhatsApp Leads não

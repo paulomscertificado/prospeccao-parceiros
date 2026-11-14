@@ -19,7 +19,7 @@ from .modelos import Lead, Usuario
 
 log = logging.getLogger(__name__)
 
-REGRAS = """Você é especialista em prospecção B2B da MS Certificação Digital e ajuda vendedores a
+REGRAS = """Você é especialista em prospecção B2B da EMPRESA (abaixo) e ajuda vendedores a
 conquistar escritórios de contabilidade como PARCEIROS comerciais recorrentes.
 
 Regras obrigatórias:
@@ -49,15 +49,16 @@ def criar_cliente():
 
 
 def _contexto_empresa(db: Session) -> str:
-    return (f"{ler_config(db, 'programa_parceria')}\nComissão: {ler_config(db, 'texto_comissao')}.\n"
-            f"Link da parceria: {ler_config(db, 'link_parceria')}")
+    # white label, Fase 5: a empresa da AR de quem pede (marca.config_da_marca quando a AR não tem texto próprio)
+    return (f"Empresa: {ler_config(db, 'empresa_nome')}\n{ler_config(db, 'programa_parceria')}\n"
+            f"Comissão: {ler_config(db, 'texto_comissao')}.\nLink da parceria: {ler_config(db, 'link_parceria')}")
 
 
 def perguntar(db: Session, pedido: str, esquema: dict | None = None, max_tokens: int = 4000):
     """Chama o Claude. Com esquema, devolve dict (JSON validado); sem esquema, devolve texto."""
     import anthropic
 
-    sistema = [{"type": "text", "text": REGRAS + "\nSOBRE A MS E O PROGRAMA DE PARCERIA:\n" + _contexto_empresa(db),
+    sistema = [{"type": "text", "text": REGRAS + "\nSOBRE A EMPRESA E O PROGRAMA DE PARCERIA:\n" + _contexto_empresa(db),
                 "cache_control": {"type": "ephemeral"}}]
     opcoes = {"effort": "low"}
     if esquema:
@@ -251,7 +252,7 @@ OBJECOES_CONHECIDAS = [
      "Que bom que vocês já oferecem! Muitos escritórios trabalham com mais de uma opção para comparar prazo e "
      "atendimento. Posso te mostrar em 10 minutos como funciona nosso controle de renovação e a comissão?"),
     (("preco", "preço", "caro", "valor"), "Preço",
-     "Entendo. Nossos valores seguem a tabela da MS e o escritório ainda recebe comissão por certificado. "
+     "Entendo. Nossos valores seguem a nossa tabela e o escritório ainda recebe comissão por certificado. "
      "Posso te enviar a tabela e um exemplo de quanto a carteira de vocês pode gerar?"),
     (("sem tempo", "corrido", "depois", "mais tarde", "outro momento"), "Falta de tempo",
      "Sem problema! A parceria foi pensada para não dar trabalho: vocês só indicam, nós fazemos o resto. "

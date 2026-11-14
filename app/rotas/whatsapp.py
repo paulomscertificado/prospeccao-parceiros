@@ -106,7 +106,7 @@ async def comando_whatsapp(request: Request, acao: str = Form(...), numero: str 
             avisar(request, "Só o dono do número (ou o administrador) pode fazer isso.", "erro")
             return voltar("/whatsapp")
         if acao == "remover" and c.id == conexoes.PRINCIPAL:
-            avisar(request, "O número principal da MS não pode ser removido (use Desligar).", "erro")
+            avisar(request, "O número principal não pode ser removido (use Desligar).", "erro")
             return voltar("/whatsapp")
         dados = {"conexao": c.id}
         if acao == "conectar":

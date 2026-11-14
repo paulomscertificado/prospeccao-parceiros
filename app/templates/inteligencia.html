@@ -3,7 +3,7 @@
 {% macro taxa_ou_traco(v) %}{{ v|pct if v is not none else '—' }}{% endmacro %}
 {% block conteudo %}
 <div class="cabecalho">
-  <div><h1>Inteligência de Prospecção</h1><div class="suave">{{ p.nome }} · o que funciona para a MS: segmento, mensagem, canal e abordagem.</div></div>
+  <div><h1>Inteligência de Prospecção</h1><div class="suave">{{ p.nome }} · o que funciona {{ marca.frase('para') }}: segmento, mensagem, canal e abordagem.</div></div>
   <form method="get"><input type="hidden" name="uf" value="{{ uf }}"><input type="hidden" name="cidade" value="{{ cidade }}">
     <select name="periodo" onchange="this.form.submit()" aria-label="Período">{% for c, n in [("30d","Últimos 30 dias"),("90d","Últimos 90 dias"),("12m","Últimos 12 meses"),("tudo","Todo o período")] %}<option value="{{ c }}" {{ 'selected' if periodo == c }}>{{ n }}</option>{% endfor %}</select></form>
 </div>

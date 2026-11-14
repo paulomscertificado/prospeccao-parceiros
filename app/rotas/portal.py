@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import util
+from .. import marca, util
 from ..banco import obter_db
 from ..modelos import Certificado, Cliente, Parceiro, Tarefa, Usuario, Venda
 from ..seguranca import exige, registrar_log, verificar_csrf
@@ -21,7 +21,7 @@ def _meu(db: Session, usuario: Usuario) -> Parceiro:
     if not p:
         from ..seguranca import SemPermissao
 
-        raise SemPermissao("Seu usuário não está ligado a um parceiro. Fale com a MS.")
+        raise SemPermissao("Seu usuário não está ligado a um parceiro. Fale com a empresa que convidou você.")
     return p
 
 
@@ -57,22 +57,25 @@ def indicar(request: Request, nome: str = Form(...), cnpj: str = Form(""), conta
             telefone: str = Form(""), email: str = Form(""), produto: str = Form(""), observacoes: str = Form(""),
             autorizou: str = Form(""), usuario: Usuario = Depends(exige("portal.usar")), db: Session = Depends(obter_db)):
     p = _meu(db, usuario)
+    quem = marca.da_ar(db, usuario.tenant_id or marca.ar_padrao(db))  # a AR do parceiro (white label, Fase 5)
     if not nome.strip() or not (util.normalizar_telefone(telefone) or util.email_valido(email)):
         avisar(request, "Informe o nome do cliente e um telefone ou e-mail válido.", "erro")
         return voltar("/portal/indicar")
     if autorizou != "on":
-        avisar(request, "Confirme que o cliente autorizou o contato da MS (LGPD).", "erro")
+        avisar(request, f"Confirme que o cliente autorizou o contato {quem['frase']('de')} (LGPD).", "erro")
         return voltar("/portal/indicar")
     c = Cliente(nome=nome.strip(), cnpj=util.formatar_cnpj(cnpj), contato=contato.strip(),
                 telefone=util.formatar_telefone(telefone), email=email.strip().lower(), parceiro_id=p.id,
                 status="Indicado", produto_interesse=produto.strip(), origem="Indicação (portal)",
-                observacoes=(observacoes.strip() + "\nCliente autorizou o contato da MS (informado pelo parceiro).").strip())
+                observacoes=(observacoes.strip() + f"\nCliente autorizou o contato {quem['frase']('de')} "
+                             "(informado pelo parceiro).").strip())
     db.add(c)
     db.flush()
     db.add(Tarefa(tipo="indicacao", cliente_id=c.id, parceiro_id=p.id, usuario_id=responsavel_padrao(db, p),
                   canal="whatsapp" if c.telefone else "email", data=date.today(), hora="09:00",
                   acao=f"Contatar cliente indicado por {p.escritorio}: {c.nome}" + (f" ({produto})" if produto else ""),
-                  mensagem=f"Olá{', ' + util.primeiro_nome(contato) if contato else ''}! Aqui é da MS Certificação Digital. "
+                  mensagem=f"Olá{', ' + util.primeiro_nome(contato) if contato else ''}! "
+                           f"Aqui é {quem['frase']('de', nome=True)}. "
                            f"O escritório {p.escritorio} nos indicou para cuidar do seu certificado digital. "
                            f"Podemos agendar a emissão?"))
     registrar_log(db, usuario, "indicou_cliente", "cliente", c.id, c.nome, request)

@@ -3,14 +3,16 @@
 {% block conteudo %}
 <div class="cabecalho"><h1>{{ t.nome or 'Novo template' }}</h1><a class="btn" href="/cadencias#templates">Voltar</a></div>
 <div class="grade-2">
+{# white label: o modelo da plataforma foi escrito com o nome da MS; quem é de uma AR vê com a marca dela #}
+{% set com_a_marca = t.id and t.tenant_id is none and not marca.plataforma %}
 <form class="cartao" method="post" action="/templates/{{ t.id or 0 }}">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <div class="campos">
     <div class="largo"><label>Nome</label><input type="text" name="nome" value="{{ t.nome }}" required></div>
     <div><label>Canal</label><select name="canal">{% for c, n in CANAIS.items() %}<option value="{{ c }}" {{ 'selected' if t.canal == c }}>{{ n }}</option>{% endfor %}</select></div>
     <label class="marcar"><input type="checkbox" name="ativo" {{ 'checked' if t.ativo }}> Ativo</label>
-    <div class="largo"><label>Assunto (e-mail)</label><input type="text" name="assunto" value="{{ t.assunto }}"></div>
-    <div class="largo"><label>Mensagem</label><textarea name="corpo" style="min-height:240px" required>{{ t.corpo }}</textarea></div>
+    <div class="largo"><label>Assunto (e-mail)</label><input type="text" name="assunto" value="{{ com_marca(t.assunto or '') if com_a_marca else t.assunto }}"></div>
+    <div class="largo"><label>Mensagem</label><textarea name="corpo" style="min-height:240px" required>{{ com_marca(t.corpo or '') if com_a_marca else t.corpo }}</textarea></div>
     <div class="largo"><label>Nome do template aprovado na Meta (só para envio pela API oficial do WhatsApp)</label><input type="text" name="nome_meta" value="{{ t.nome_meta }}" placeholder="ex.: parceria_primeiro_contato">
       <div class="ajuda">A Meta só permite iniciar conversa com templates aprovados. O template na Meta deve ter 3 variáveis no corpo: {{ '{{1}}' }} nome, {{ '{{2}}' }} empresa, {{ '{{3}}' }} vendedor.</div></div>
   </div>

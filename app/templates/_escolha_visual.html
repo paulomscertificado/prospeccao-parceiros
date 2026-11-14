@@ -18,7 +18,7 @@
     <label class="marcar"><input type="checkbox" name="visual_email" {{ 'checked' if 'email' in (visual_canais or 'email') }}> ✉️ E-mail com o HTML do visual</label>
     <label class="marcar"><input type="checkbox" name="visual_whatsapp" {{ 'checked' if 'whatsapp' in (visual_canais or '') }}> 💬 WhatsApp com a imagem do visual (o texto vai embaixo)</label>
   </div>
-  <p class="ajuda">A imagem no WhatsApp só vai para quem <b>já conversou com a MS</b>; para contato frio sai só o texto (proteção do número).
+  <p class="ajuda">A imagem no WhatsApp só vai para quem <b>já conversou {{ marca.frase('com') }}</b>; para contato frio sai só o texto (proteção do número).
     O 1º contato frio costuma responder melhor só com texto, por isso o padrão é usar o visual do 2º toque em diante.
     <a href="/visuais">Ver e cadastrar visuais</a>.</p>
   {% else %}

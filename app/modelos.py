@@ -54,6 +54,27 @@ class ConfiguracaoAR(Base):
     valor: Mapped[str] = mapped_column(Text, default="")
 
 
+class MarcaAR(Base):
+    """A marca de uma AR (white label, Fase 5; app/marca.py): o que as telas de quem é dela mostram (logo, cores,
+    fonte, nome curto) e em nome de quem as mensagens saem (nome, site, descrição). Vazio = o padrão: o nome da AR e
+    as cores do sistema. Quem muda: o administrador da AR (Configurações > Marca) e o Admin Master."""
+    __tablename__ = "marcas_ar"
+    tenant_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    nome: Mapped[str] = mapped_column(String(120), default="")  # nas mensagens: "MS Certificação Digital"
+    curto: Mapped[str] = mapped_column(String(60), default="")  # nas telas: "MS", "Grupo Certy"
+    artigo: Mapped[str] = mapped_column(String(1), default="")  # "a" (a MS) ou "o" (o Grupo Certy); vazio = adivinha
+    site: Mapped[str] = mapped_column(String(120), default="")
+    descricao: Mapped[str] = mapped_column(String(160), default="")  # "Autoridade de Registro ICP-Brasil"
+    dominio_email: Mapped[str] = mapped_column(String(120), default="")  # e-mails da equipe: @dominio
+    cor: Mapped[str] = mapped_column(String(7), default="")  # principal: menu, botões, títulos (#RRGGBB)
+    cor_detalhe: Mapped[str] = mapped_column(String(7), default="")  # detalhes e botões de ação
+    cor_fundo: Mapped[str] = mapped_column(String(7), default="")  # fundo das telas
+    fonte: Mapped[str] = mapped_column(String(40), default="")  # uma de marca.FONTES; vazio = Inter
+    logo: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True, deferred=True)  # para fundo colorido
+    logo_tipo: Mapped[str] = mapped_column(String(20), default="")  # image/png...; vazio = sem logo
+    atualizado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, onupdate=agora)
+
+
 class Trava(Base):
     """Impede que duas cópias do sistema (na nuvem) façam a mesma coisa ao mesmo tempo. Ver app/trabalhos.py."""
     __tablename__ = "travas"
@@ -928,7 +949,7 @@ CADENCIAS_SDR_EXTRAS = [
       (10, "auto", "conteudo", "Dica útil para os clientes deles"), (18, "auto", "receita", "Foco em receita recorrente"),
       (30, "auto", "encerramento", "Último contato (encerramento educado)")]),
     ("Convite por e-mail – 3 e-mails (D1, D5, D11)",
-     "Só e-mail, sem WhatsApp frio: convida para conversar (responder ou chamar no WhatsApp da MS). Quem chamar vira "
+     "Só e-mail, sem WhatsApp frio: convida para conversar (responder ou chamar no WhatsApp da empresa). Quem chamar vira "
      "conversa e pode receber WhatsApp depois.",
      [(1, "email", "convite", "Convite para conversar"), (5, "email", "pergunta", "Pergunta rápida"),
       (11, "email", "encerramento", "Último contato (encerramento educado)")]),

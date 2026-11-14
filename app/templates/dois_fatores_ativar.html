@@ -3,7 +3,7 @@
 {% block publico %}
 <div class="login"><div class="conteiner largo">
   <div class="capa">
-    <div class="marca"><img class="logo-img" src="/static/logo-ms.png" alt="MS Certificação Digital"></div>
+    <div class="marca"><span class="logo-texto">{{ marca.titulo }}</span></div>
     <h1>Mais segurança.</h1>
     <p>Quem é administrador ou gestor entra com a senha e um código de 6 números do celular. Isso protege os dados
       dos leads e dos parceiros mesmo se alguém descobrir a sua senha.</p>
@@ -19,7 +19,7 @@
     </ol>
     <div class="qr-2fa" aria-label="QR code para o app autenticador">{{ qr|safe }}</div>
     <details class="pequeno" style="margin-bottom:12px"><summary>A câmera não leu? Digite esta chave no app</summary>
-      <p class="suave" style="margin:6px 0">No app, escolha "Inserir chave de configuração", dê o nome "MS Prospeccao" e digite:</p>
+      <p class="suave" style="margin:6px 0">No app, escolha "Inserir chave de configuração", dê o nome "{{ emissor }}" e digite:</p>
       <div class="chave-2fa">{{ chave }}</div></details>
     <div class="campo"><label>4. Digite o código de 6 números que apareceu no app</label>
       <input class="campo-codigo" type="text" name="codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="7"

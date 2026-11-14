@@ -10,7 +10,7 @@
     <div class="lista-pessoas">
       {% for p in equipe if p.nome != conta.dono or conta.principal %}<label class="marcar"><input type="checkbox" name="usuarios" value="{{ p.id }}" {{ 'checked' if p.id in conta.compartilhada_com }}> {{ p.nome }}</label>{% endfor %}
     </div>
-    <p class="pequeno suave">Regra da MS: os disparos de cada pessoa saem só pelo e-mail cadastrado dela. Compartilhar
+    <p class="pequeno suave">Regra do sistema: os disparos de cada pessoa saem só pelo e-mail cadastrado dela. Compartilhar
       mostra a conta para a pessoa, mas os disparos dela não saem por aqui.</p>
     <button class="btn btn-pequeno btn-primario">Salvar compartilhamento</button>
   </form>

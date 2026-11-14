@@ -55,7 +55,7 @@ async def ciclo_de_vida(app: FastAPI):
     tarefa.cancel()
 
 
-app = FastAPI(title="Prospecção de Parceiros – MS Certificação Digital", lifespan=ciclo_de_vida,
+app = FastAPI(title="Prospecção de Parceiros", lifespan=ciclo_de_vida,
               docs_url=None, redoc_url=None, openapi_url=None)
 app.add_middleware(SessionMiddleware, secret_key=config.SECRET_KEY, session_cookie="ms_sessao",
                    max_age=12 * 60 * 60, same_site="lax", https_only=config.PRODUCAO)

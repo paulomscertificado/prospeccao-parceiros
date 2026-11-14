@@ -70,13 +70,13 @@ def test_funcionario_ve_so_os_proprios_dados_e_usa_ferramentas(cliente):
         de_outro, _ = criar_lead(db, {"empresa": "Contábil Do Admin", "vendedor_id": admin.id}, admin)
         dela_id, outro_id = dela.id, de_outro.id
     c = _entrar("func1@teste.com.br")
-    assert "Funcionário MS" in c.get("/").text
+    assert "Funcionário" in c.get("/").text and "Funcionário MS" not in c.get("/").text
     lista = c.get("/leads").text
     assert "Contábil Da Fernanda" in lista and "Contábil Do Admin" not in lista
     assert c.get(f"/leads/{outro_id}").status_code in (403, 404) and c.get(f"/leads/{dela_id}").status_code == 200
     assert c.get("/cadencias").status_code == 200 and c.get("/categorias").status_code == 200  # ferramentas
     assert c.get("/configuracoes").status_code == 403  # configurações: só administrador
-    assert "Funcionário MS" in config.PERFIS.values()
+    assert "Funcionário" in config.PERFIS.values()  # Fase 5: sem "MS" (todas as ARs veem)
 
 
 def test_cada_um_conecta_o_seu_numero_e_pode_compartilhar(cliente, nuvem):

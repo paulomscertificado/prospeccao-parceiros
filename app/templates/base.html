@@ -23,24 +23,27 @@
  "engrenagem": "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"
 } -%}
 <!doctype html>
-<html lang="pt-BR">
+<html lang="pt-BR"{% if marca.css %} data-tema-da-marca{% endif %}>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf" content="{{ csrf }}">
-  <title>{% block titulo %}Prospecção{% endblock %} · MS Parceiros</title>
+  <title>{% block titulo %}Prospecção{% endblock %} · {{ marca.titulo }}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
-  <link rel="stylesheet" href="/static/estilo.css?v=10">
-  <link rel="icon" href="/static/logo-ms.png">
+  {% if marca.fonte_url %}<link rel="stylesheet" href="{{ marca.fonte_url }}">{% endif %}
+  <link rel="stylesheet" href="/static/estilo.css?v=11">
+  {# white label, Fase 5: cores e fonte da marca da AR (app/marca.py, tema; só #RRGGBB e fontes da lista) #}
+  {% if marca.css %}<style>:root { {{ marca.css|safe }} }</style>{% endif %}
+  {% if marca.logo_url %}<link rel="icon" href="{{ marca.logo_url }}">{% endif %}
 </head>
 <body>
 {% if usuario %}
-<div class="topo-celular"><button id="abrir-menu" aria-label="Abrir menu">☰</button><img src="/static/logo-ms.png" alt="MS Certificação Digital"><b>Parceiros</b></div>
+<div class="topo-celular"><button id="abrir-menu" aria-label="Abrir menu">☰</button>{% if marca.logo_url %}<img src="{{ marca.logo_url }}" alt="{{ marca.nome }}">{% else %}<b>{{ marca.titulo if marca.plataforma else marca.curto }}</b>{% endif %}<b>Parceiros</b></div>
 <div class="estrutura">
   <nav class="menu">
-    <div class="marca"><img class="logo-img" src="/static/logo-ms.png" alt="MS Certificação Digital"><span class="divisor"></span>
+    <div class="marca">{% if marca.logo_url %}<img class="logo-img" src="{{ marca.logo_url }}" alt="{{ marca.nome }}">{% else %}<span class="logo-texto">{{ marca.titulo if marca.plataforma else marca.curto }}</span>{% endif %}<span class="divisor"></span>
       <span class="rotulo-marca">Parceiros<br>Prospecção B2B</span></div>
     {% for link, nome, icone in menu %}
       <a class="item {{ 'ativo' if (caminho == link or (link not in ['/', '/portal'] and caminho.startswith(link))) }}" href="{{ link }}">
@@ -48,7 +51,7 @@
     {% endfor %}
     <div class="rodape">
       <div><b>{{ usuario.nome }}</b></div>
-      <div class="suave" style="color:#9fb3c8">{{ usuario.perfil_nome }}</div>
+      <div class="suave" style="color:var(--menu-suave)">{{ usuario.perfil_nome }}</div>
       {% if usuario.master %}<div style="margin-top:6px"><a href="/master">Painel master</a></div>{% endif %}
       <div style="margin-top:6px"><a href="/notificacoes">Avisos{{ ' (' ~ avisos_novos ~ ')' if avisos_novos }}</a> · <a href="/minha-conta">Minha conta</a> · <a href="/sair">Sair</a></div>
     </div>

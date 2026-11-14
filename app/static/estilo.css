@@ -1,6 +1,6 @@
-/* Prospecção de Parceiros – MS Certificação Digital.
-   Cores e medidas nas variáveis abaixo (ver docs/design-system.md).
-   Identidade do Portfólio MS 2026: azul-marinho #0D3B66/#0A2F57, verde #3CC77A, Inter + etiquetas em monoespaçada. */
+/* Prospecção de Parceiros (white label).
+   Cores e medidas nas variáveis abaixo (ver docs/design-system.md). Padrão: azul-marinho #0D3B66/#0A2F57, verde
+   #3CC77A, Inter + etiquetas em monoespaçada. A marca de cada AR troca as variáveis (app/marca.py, tema). */
 :root {
   --azul: #0d3b66;
   --azul-escuro: #0a2f57;
@@ -24,6 +24,18 @@
   --sombra: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .08);
   --fonte: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
   --fonte-mono: "JetBrains Mono", "DejaVu Sans Mono", Consolas, "Courier New", monospace;
+  /* o que a marca de cada AR troca além das cores acima (app/marca.py, tema); aqui, o padrão */
+  --cta: #1f9d5c;           /* botões de ação e escolhas marcadas */
+  --cta-escuro: #188a4f;
+  --cta-claro: #e3f6ec;
+  --roxo-escuro: #174d7b;
+  --foco: rgba(60, 199, 122, .45);
+  --menu-texto: #dbe6f0;
+  --menu-suave: #9fb3c8;
+  --menu-rotulo: #9fb4c9;
+  --menu-ativo: rgba(60, 199, 122, .12);
+  --texto-sobre-azul: #c9d9ea;
+  --destaque-rotulo: #3cc77a;  /* rótulo do indicador em destaque */
 }
 
 * { box-sizing: border-box; }
@@ -45,7 +57,7 @@ hr { border: 0; border-top: 1px solid var(--borda); margin: 16px 0; }
 
 /* ---------- Estrutura ---------- */
 .estrutura { display: flex; min-height: 100vh; }
-.menu { width: 232px; flex-shrink: 0; background: var(--azul-escuro); color: #dbe6f2; display: flex; flex-direction: column;
+.menu { width: 232px; flex-shrink: 0; background: var(--azul-escuro); color: var(--menu-texto); display: flex; flex-direction: column;
         padding: 16px 12px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
 .marca { display: flex; align-items: center; gap: 10px; padding: 4px 8px 18px; color: #fff; }
 .marca .logo { width: 34px; height: 34px; border-radius: 8px; background: #fff; color: var(--azul); font-weight: 800;
@@ -77,7 +89,7 @@ hr { border: 0; border-top: 1px solid var(--borda); margin: 16px 0; }
 .kpi .valor { font-size: 1.55rem; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
 .kpi .detalhe { font-size: .78rem; color: var(--suave); }
 .kpi.destaque { background: var(--azul); color: #fff; border-color: var(--azul); }
-.kpi.destaque .rotulo, .kpi.destaque .detalhe { color: #c9d9ea; }
+.kpi.destaque .rotulo, .kpi.destaque .detalhe { color: var(--texto-sobre-azul); }
 .grafico { position: relative; height: 260px; }
 .grafico.baixo { height: 210px; }
 
@@ -117,10 +129,10 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-sp
 .btn:hover { background: #f6f8fb; text-decoration: none; }
 .btn-primario { background: var(--azul); border-color: var(--azul); color: #fff; }
 .btn-primario:hover { background: var(--azul-escuro); }
-.btn-verde { background: var(--verde); border-color: var(--verde); color: #fff; }
-.btn-verde:hover { background: #178a52; }
+.btn-verde { background: var(--cta); border-color: var(--cta); color: #fff; }
+.btn-verde:hover { background: var(--cta-escuro); }
 .btn-ia { background: var(--roxo); border-color: var(--roxo); color: #fff; }
-.btn-ia:hover { background: #174d7b; }
+.btn-ia:hover { background: var(--roxo-escuro); }
 .btn-perigo { color: var(--erro); border-color: #f2c4bf; }
 .btn-pequeno { padding: 4px 9px; font-size: .8rem; }
 .btn[disabled] { opacity: .5; cursor: not-allowed; }
@@ -241,20 +253,20 @@ dialog::backdrop { background: rgba(10, 30, 50, .45); }
 .escolha-qtd { align-self: flex-start; font-size: .75rem; color: var(--suave); background: #f1f4f7; border-radius: 999px; padding: 2px 9px; }
 .escolha-qtd:empty { display: none; }
 .escolha-marca { position: absolute; top: 10px; right: 10px; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--borda); font-size: .7rem; line-height: 16px; text-align: center; color: transparent; }
-.escolha input:checked + .escolha-corpo .escolha-marca { background: var(--verde); border-color: var(--verde); color: #fff; }
-.escolha input:checked + .escolha-corpo .escolha-qtd { background: #fff; color: var(--verde); }
-.escolha input:checked + .escolha-corpo { border-color: var(--verde); background: var(--verde-claro); box-shadow: 0 0 0 1px var(--verde); }
+.escolha input:checked + .escolha-corpo .escolha-marca { background: var(--cta); border-color: var(--cta); color: #fff; }
+.escolha input:checked + .escolha-corpo .escolha-qtd { background: #fff; color: var(--cta); }
+.escolha input:checked + .escolha-corpo { border-color: var(--cta); background: var(--cta-claro); box-shadow: 0 0 0 1px var(--cta); }
 .escolha input:focus-visible + .escolha-corpo { outline: 2px solid #9cc1e6; }
 .escolha.vazia .escolha-corpo { opacity: .55; }
 .chip { display: inline-flex; align-items: center; gap: 6px; border: 2px solid var(--borda); border-radius: 999px; padding: 8px 18px; font-size: 1rem; font-weight: 600; cursor: pointer; margin: 0; background: #fff; }
 .chip input { width: auto; }
-.chip:has(input:checked) { border-color: var(--verde); background: var(--verde-claro); }
+.chip:has(input:checked) { border-color: var(--cta); background: var(--cta-claro); }
 .btn-grande { font-size: 1.1rem; padding: 14px 28px; }
 
 .ponto { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; background: #94a3b8; }
 .ponto.verde { background: #22c55e; } .ponto.amarelo { background: #f59e0b; } .ponto.vermelho { background: #ef4444; }
 
-/* ---------- Identidade visual MS (Portfólio 2026) ---------- */
+/* ---------- Identidade visual (padrão; cada AR troca as cores pela marca dela) ---------- */
 h1 { font-weight: 800; letter-spacing: -.025em; }
 h2 { font-weight: 700; letter-spacing: -.01em; }
 .cabecalho h1::after { content: ""; display: block; width: 40px; height: 3px; border-radius: 2px;
@@ -267,14 +279,16 @@ h2 { font-weight: 700; letter-spacing: -.01em; }
 .etiqueta::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--verde-marca); }
 
 /* Menu lateral: azul-marinho do portfólio, logotipo e item ativo com traço verde */
-.menu { background: linear-gradient(180deg, var(--azul) 0%, var(--azul-escuro) 100%); color: #dbe6f0; }
+.menu { background: linear-gradient(180deg, var(--azul) 0%, var(--azul-escuro) 100%); color: var(--menu-texto); }
 .marca { gap: 12px; padding: 6px 8px 20px; }
-.marca .logo-img { height: 34px; width: auto; display: block; }
+.marca .logo-img { height: 34px; width: auto; max-width: 150px; object-fit: contain; display: block; }
+.marca .logo-texto { color: #fff; font-weight: 800; font-size: 1.05rem; letter-spacing: -.01em; line-height: 1.15;
+                     max-width: 130px; }
 .marca .divisor { width: 1px; align-self: stretch; background: rgba(219, 230, 240, .25); }
 .marca .rotulo-marca { font-family: var(--fonte-mono); font-size: .62rem; letter-spacing: .14em; line-height: 1.5;
-                       text-transform: uppercase; color: #9fb4c9; }
+                       text-transform: uppercase; color: var(--menu-rotulo); }
 .menu a.item:hover { background: rgba(255, 255, 255, .06); }
-.menu a.item.ativo { background: rgba(60, 199, 122, .12); color: #fff; box-shadow: inset 3px 0 0 var(--verde-marca); }
+.menu a.item.ativo { background: var(--menu-ativo); color: #fff; box-shadow: inset 3px 0 0 var(--verde-marca); }
 .menu a.item.ativo svg { color: var(--verde-marca); opacity: 1; }
 .menu .rodape { border-top-color: rgba(219, 230, 240, .15); }
 .topo-celular img { height: 22px; }
@@ -283,10 +297,10 @@ h2 { font-weight: 700; letter-spacing: -.01em; }
 .kpi { border-radius: 12px; }
 .kpi .valor { font-weight: 800; letter-spacing: -.02em; }
 .kpi.destaque { background: var(--azul); border-color: var(--azul); }
-.kpi.destaque .rotulo { color: var(--verde-marca); }
+.kpi.destaque .rotulo { color: var(--destaque-rotulo); }
 .cartao { border-radius: 12px; }
-.btn-verde:hover { background: #188a4f; }
-input:focus, select:focus, textarea:focus { outline: 2px solid rgba(60, 199, 122, .45); border-color: var(--verde); }
+.btn-verde:hover { background: var(--cta-escuro); }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--foco); border-color: var(--cta); }
 
 /* Login e primeiro acesso: como a capa do portfólio (azul-marinho com círculos finos) */
 .login { background:

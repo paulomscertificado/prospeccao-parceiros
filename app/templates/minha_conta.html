@@ -6,12 +6,12 @@
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <h2>Empresa que eu represento</h2>
   <p class="pequeno suave">As suas campanhas e mensagens (WhatsApp, e-mail e assinatura) falam em nome desta empresa.
-    Deixe em branco para usar a padrão do sistema ({{ marca_padrao.nome }}).</p>
+    Deixe em branco para usar a marca da sua empresa no sistema ({{ marca_padrao.nome }}).</p>
   <div class="grade-2">
     <div class="campo"><label>Nome da empresa</label><input type="text" name="nome" maxlength="160" value="{{ usuario.empresa_nome }}" placeholder="{{ marca_padrao.nome }}"></div>
     <div class="campo"><label>Site</label><input type="text" name="site" maxlength="160" value="{{ usuario.empresa_site }}" placeholder="{{ marca_padrao.site }}"></div>
     <div class="campo"><label>Apresentação curta</label><input type="text" name="descricao" maxlength="80" value="{{ usuario.empresa_descricao }}" placeholder="{{ marca_padrao.descricao }}">
-      <div class="ajuda pequeno suave">Poucas palavras, sem ponto no fim. Entra logo depois do nome: "Sou Ana, da {{ usuario.empresa_nome or marca_padrao.nome }}, <b>{{ usuario.empresa_descricao or marca_padrao.descricao }}</b>."</div></div>
+      <div class="ajuda pequeno suave">Poucas palavras, sem ponto no fim. Entra logo depois do nome: "Sou Ana, {{ quem_fala.frase('de', nome=True) }}, <b>{{ quem_fala.descricao }}</b>."</div></div>
   </div>
   <button class="btn btn-primario">Salvar empresa</button>
 </form>

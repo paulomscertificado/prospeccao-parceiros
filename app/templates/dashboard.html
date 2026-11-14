@@ -175,7 +175,10 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 const G = {{ graficos|json }};
-const AZUL = '#0f3a64', VERDE = '#1fa463', ROXO = '#6b46c1', CINZA = '#cbd5e1';
+// white label: com a marca de uma AR, as barras usam a cor principal dela (o verde de "deu certo" fica)
+const TEMA = document.documentElement.hasAttribute('data-tema-da-marca');
+const AZUL = TEMA ? getComputedStyle(document.documentElement).getPropertyValue('--azul').trim() : '#0f3a64';
+const VERDE = '#1fa463', ROXO = '#6b46c1', CINZA = '#cbd5e1';
 if (window.Chart) {
   Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
   Chart.defaults.color = '#637083';

@@ -128,7 +128,7 @@ def novo_papel(request: Request, nome: str = Form(...), copiar_de: str = Form(..
     modelo = db.execute(select(Papel).where(Papel.codigo == copiar_de)).scalars().first()
     nome = nome.strip()[:120]
     if not nome or modelo is None or modelo.base not in BASES_COPIAVEIS:
-        avisar(request, "Informe o nome e escolha de qual papel copiar (Gestor, Funcionário MS, Vendedor ou um papel "
+        avisar(request, "Informe o nome e escolha de qual papel copiar (Gestor, Funcionário, Vendedor ou um papel "
                         "criado a partir deles).", "erro")
         return voltar(DESTINO)
     base = re.sub(r"[^a-z0-9]+", "_", util.chave_texto(nome)).strip("_")

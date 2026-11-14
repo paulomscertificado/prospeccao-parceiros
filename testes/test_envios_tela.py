@@ -26,7 +26,7 @@ def _lead(db, nome, **campos):
 
 def _aba(html: str, nome: str) -> str:
     """O conteúdo de uma aba (as outras também vêm na página, escondidas)."""
-    marcas = {"enviados": "O que a MS mandou, o mais novo primeiro", "proximos": "Toques das campanhas ativas que ainda"}
+    marcas = {"enviados": "mandou, o mais novo primeiro", "proximos": "Toques das campanhas ativas que ainda"}
     return html.split(marcas[nome])[1].split("</section>")[0]
 
 

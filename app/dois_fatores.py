@@ -23,7 +23,18 @@ from . import config
 PASSO_SEG = 30
 DIGITOS = 6
 PERFIS_OBRIGADOS = ("admin", "gestor")
-EMISSOR = "MS Prospeccao"  # sem acento: alguns apps autenticadores erram com acentos no QR
+EMISSOR = "Prospeccao de Parceiros"  # sem acento: alguns apps autenticadores erram com acentos no QR
+
+
+def emissor(db=None) -> str:
+    """Nome da conta no app autenticador: o da plataforma, sem acento (white label: nunca o de uma AR). Quem
+    ligou antes da Fase 5 continua com "MS Prospeccao" no app: o nome não muda o código."""
+    import unicodedata
+
+    from . import marca
+
+    nome = unicodedata.normalize("NFKD", marca.da_plataforma(db)["nome"]).encode("ascii", "ignore").decode()
+    return nome.strip() or EMISSOR
 COOKIE_APARELHO = "ms_aparelho"
 DIAS_APARELHO = 30
 _LETRAS_RECUPERACAO = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # sem 0/O e 1/I, que se confundem
@@ -69,9 +80,11 @@ def conferir(segredo: str, digitado: str, ultimo_passo: int = 0) -> int | None:
     return None
 
 
-def link_do_app(segredo: str, email: str) -> str:
-    rotulo = quote(f"{EMISSOR}:{email}")
-    return f"otpauth://totp/{rotulo}?secret={segredo}&issuer={quote(EMISSOR)}&digits={DIGITOS}&period={PASSO_SEG}"
+def link_do_app(segredo: str, email: str, nome_emissor: str = "") -> str:
+    nome_emissor = nome_emissor or EMISSOR
+    rotulo = quote(f"{nome_emissor}:{email}")
+    return (f"otpauth://totp/{rotulo}?secret={segredo}&issuer={quote(nome_emissor)}&digits={DIGITOS}"
+            f"&period={PASSO_SEG}")
 
 
 def qr_svg(texto: str) -> str:

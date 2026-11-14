@@ -267,8 +267,8 @@ Em **Minha conta > Empresa que eu represento**, cada pessoa preenche: nome da em
 A partir daí, as campanhas, mensagens de WhatsApp, e-mails e a assinatura dessa pessoa falam em nome da empresa
 dela (nas campanhas de parceria e na área Empresas novas). Para outra empresa, as mensagens não falam de onde é a
 validação (o "presencial em Recife" é da MS).
-Quem deixa em branco fala pela MS Certificação Digital. Mensagens já enviadas não mudam; as que ainda vão sair
-são corrigidas na hora do envio.
+Quem deixa em branco fala pela **marca da sua empresa** no sistema (Configurações > Marca). Mensagens já enviadas
+não mudam; as que ainda vão sair são corrigidas na hora do envio.
 
 ### Empresas novas (venda de certificado para empresas recém-abertas)
 
@@ -512,6 +512,18 @@ marca, como o administrador dela vê; **Nova AR**; **Suspender** (as pessoas da 
 **módulos de cada marca**. O administrador de uma marca não muda os papéis do sistema, os modelos de mensagem, as
 cadências e as categorias que valem para todas: ele cria os da própria marca (pode copiar de um da plataforma).
 O que o admin master faz dentro de uma marca aparece no histórico dela (Configurações > Logs), marcado como dele.
+
+**A marca de cada empresa nas telas e nas mensagens.** O endereço é um só para todas as marcas. A tela de entrada é
+neutra (sem o nome de nenhuma marca); depois de entrar, cada pessoa vê o **nome, o logo, as cores e a fonte da própria
+marca**, e as mensagens dela saem em nome da marca. Quem muda: o administrador da marca, em **Configurações > Marca**
+(nome nas mensagens, nome curto nas telas, "a" ou "o" antes do nome, apresentação curta, site, domínio do e-mail da
+equipe, cor principal, cor dos detalhes, cor do fundo, fonte e logo). O logo vai no menu colorido: de preferência a
+versão branca, em PNG com fundo transparente, até 300 KB. Botões e títulos usam a cor principal um pouco mais escura
+quando a original não dá leitura com letra branca. Depois de salvar, as outras pessoas veem a mudança em até 5 minutos.
+O admin master muda o **nome neutro da plataforma** (tela de entrada) em Configurações > Marca, fora das marcas.
+O e-mail de cada pessoa precisa ser do **domínio da marca** dela (Configurações > Marca); o e-mail principal, as
+chaves (CNPJá), a base da Receita e as listas importadas são da plataforma: só o admin master muda.
+A arte do aviso de vencimento (Renovação) é a do site da MS: só a AR MS manda; as outras marcas mandam só o texto.
 
 **Dados de uma marca (LGPD):** para entregar os dados a uma marca, dois cliques em **exportar_ar.bat** (pede o
 apelido da marca e uma senha; o arquivo fechado fica em `dados\exportacoes`; mande a senha por outro caminho). Para

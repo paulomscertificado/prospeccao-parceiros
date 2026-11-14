@@ -14,7 +14,7 @@
     <div class="largo"><label>Certificado que precisa</label><input type="text" name="produto" placeholder="Ex.: e-CNPJ A1, e-CPF A3 token"></div>
     <div class="largo"><label>Observações</label><textarea name="observacoes" style="min-height:60px"></textarea></div>
   </div>
-  <label class="marcar" style="margin-top:10px"><input type="checkbox" name="autorizou" required> O cliente autorizou ser contatado pela MS Certificação Digital.</label>
+  <label class="marcar" style="margin-top:10px"><input type="checkbox" name="autorizou" required> O cliente autorizou ser contatado {{ marca.frase('por', nome=True) }}.</label>
   <button class="btn btn-verde" style="margin-top:10px">Enviar indicação</button>
 </form>
 {% endblock %}

@@ -4,7 +4,7 @@
 <div class="cabecalho"><h1>Configurações</h1>
   <div class="acoes"><a class="btn" href="/categorias">Categorias de parceiros</a><a class="btn" href="/conhecimento">Base de conhecimento da IA</a></div></div>
 <div class="abas">
-  {% for c, n in [("geral","Geral"),("score","Score"),("usuarios","Usuários"),("email","E-mail"),("integracoes","Integrações"),("lgpd","LGPD e dados"),("logs","Registro de atividades")] %}<a class="{{ 'ativa' if aba == c }}" href="?aba={{ c }}">{{ n }}</a>{% endfor %}
+  {% for c, n in [("geral","Geral"),("marca","Marca"),("score","Score"),("usuarios","Usuários"),("email","E-mail"),("integracoes","Integrações"),("lgpd","LGPD e dados"),("logs","Registro de atividades")] %}<a class="{{ 'ativa' if aba == c }}" href="?aba={{ c }}">{{ n }}</a>{% endfor %}
 </div>
 
 {% if aba == 'geral' %}
@@ -22,6 +22,90 @@
   <button class="btn btn-primario">Salvar</button>
 </form>
 
+{% elif aba == 'marca' %}
+{% set m = marca_ar %}{% set l = marca_linha %}
+{% if m.plataforma %}
+<form class="cartao" method="post" action="/configuracoes/marca" style="max-width:640px">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>Nome da plataforma</h2>
+  <p class="suave">Aparece na tela de entrada e para o Admin Master fora das empresas. É neutro: nenhuma empresa vê o
+    nome de outra.</p>
+  <div class="campo"><label for="p-nome">Nome</label>
+    <input id="p-nome" type="text" name="plataforma_nome" maxlength="60" value="{{ m.nome }}"></div>
+  <button class="btn btn-primario">Salvar</button>
+  <p class="ajuda">A marca de cada empresa (nome, logo, cores e fonte) muda dentro dela: no
+    <a href="/master">Painel master</a>, clique em "Entrar na AR" e depois em Configurações &gt; Marca.</p>
+</form>
+{% else %}
+<div class="grade-2">
+<form class="cartao" method="post" action="/configuracoes/marca" enctype="multipart/form-data">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>Marca {{ m.frase('de') }}</h2>
+  <p class="suave">O que a equipe vê nas telas e em nome de quem as mensagens saem. Campo vazio = o padrão (o texto
+    clarinho dentro dele).</p>
+  <div class="campo"><label for="m-nome">Nome nas mensagens</label>
+    <input id="m-nome" type="text" name="nome" maxlength="120" value="{{ l.nome if l }}" placeholder="{{ m.nome }}">
+    <p class="ajuda">Ex.: "Sou Ana, {{ m.frase('de', nome=True) }}". Quem representa outra empresa troca em Minha conta.</p></div>
+  <div class="grade-2">
+    <div class="campo"><label for="m-curto">Nome curto (nas telas)</label>
+      <input id="m-curto" type="text" name="curto" maxlength="60" value="{{ l.curto if l }}" placeholder="{{ m.curto }}"></div>
+    <div class="campo"><label for="m-artigo">Como se fala</label>
+      <select id="m-artigo" name="artigo">
+        <option value="" {{ 'selected' if not (l and l.artigo) }}>Automático ({{ m.frase() }})</option>
+        <option value="a" {{ 'selected' if l and l.artigo == 'a' }}>a {{ m.curto }}</option>
+        <option value="o" {{ 'selected' if l and l.artigo == 'o' }}>o {{ m.curto }}</option></select></div>
+  </div>
+  <div class="campo"><label for="m-desc">Apresentação curta</label>
+    <input id="m-desc" type="text" name="descricao" maxlength="160" value="{{ l.descricao if l }}" placeholder="{{ m.descricao }}">
+    <p class="ajuda">Entra logo depois do nome: "Sou Ana, {{ m.frase('de', nome=True) }}, <b>{{ m.descricao }}</b>." Sem ponto no fim.</p></div>
+  <div class="grade-2">
+    <div class="campo"><label for="m-site">Site</label>
+      <input id="m-site" type="text" name="site" maxlength="120" value="{{ l.site if l }}" placeholder="suaempresa.com.br"></div>
+    <div class="campo"><label for="m-dominio">Domínio do e-mail da equipe</label>
+      <input id="m-dominio" type="text" name="dominio_email" maxlength="120" value="{{ l.dominio_email if l }}" placeholder="suaempresa.com.br">
+      <p class="ajuda">Cada pessoa cadastra o e-mail @este domínio na tela E-mail.</p></div>
+  </div>
+  <h3>Cores e fonte</h3>
+  <div class="grade-3">
+    {% for campo, rotulo, ajuda in [('cor', 'Cor principal', 'menu, botões e títulos'), ('cor_detalhe', 'Cor dos detalhes', 'traços e botões de ação'), ('cor_fundo', 'Cor do fundo', 'fundo das telas')] %}
+    <div class="campo"><label for="m-{{ campo }}">{{ rotulo }}</label>
+      <div style="display:flex;gap:6px;align-items:center">
+        <input type="color" aria-label="Escolher {{ rotulo|lower }}" value="{{ (l[campo] if l and l[campo] else '#ffffff')|lower }}" data-cor="m-{{ campo }}" style="width:42px;height:34px;padding:2px">
+        <input id="m-{{ campo }}" type="text" name="{{ campo }}" maxlength="7" value="{{ l[campo] if l }}" placeholder="padrão" pattern="#[0-9A-Fa-f]{6}" style="flex:1"></div>
+      <p class="ajuda">{{ ajuda }}</p></div>
+    {% endfor %}
+  </div>
+  <div class="campo"><label for="m-fonte">Fonte</label>
+    <select id="m-fonte" name="fonte">{% for f in fontes %}<option value="{{ '' if f == 'Inter' else f }}" {{ 'selected' if (l and l.fonte == f) or (f == 'Inter' and not (l and l.fonte)) }}>{{ f }}{{ ' (padrão)' if f == 'Inter' }}</option>{% endfor %}</select></div>
+  <h3>Logo</h3>
+  <p class="pequeno suave">Para fundo colorido (o menu): de preferência a versão branca, em PNG com fundo transparente.
+    {{ tipos_logo }}, até 300 KB.</p>
+  <input type="file" name="logo" accept="image/png,image/jpeg,image/webp" aria-label="Arquivo do logo">
+  {% if m.logo_url %}<label class="marcar" style="margin-top:6px"><input type="checkbox" name="tirar_logo" value="1"> Tirar o logo (as telas mostram o nome curto)</label>{% endif %}
+  <p class="ajuda">Botões e títulos usam a cor principal um pouco mais escura quando a original não dá leitura com
+    letra branca (acessibilidade). Os detalhes usam a cor original.</p>
+  <button class="btn btn-primario" style="margin-top:10px">Salvar marca</button>
+</form>
+<div>
+  <div class="cartao"><h2>Como fica</h2>
+    <div class="menu" style="position:static;height:auto;width:100%;border-radius:12px;padding:16px 12px">
+      <div class="marca">{% if m.logo_url %}<img class="logo-img" src="{{ m.logo_url }}" alt="{{ m.nome }}">{% else %}<span class="logo-texto">{{ m.curto }}</span>{% endif %}<span class="divisor"></span>
+        <span class="rotulo-marca">Parceiros<br>Prospecção B2B</span></div>
+      <a class="item ativo" href="#" onclick="return false">Dashboard</a><a class="item" href="#" onclick="return false">Leads</a></div>
+    <p style="margin-top:12px"><span class="etiqueta">{{ m.curto }}</span></p>
+    <p><button type="button" class="btn btn-primario">Botão principal</button> <button type="button" class="btn btn-verde">Aprovar</button></p>
+    <p class="suave pequeno">A tela inteira já está com a marca salva. Depois de salvar, as outras pessoas veem a
+      mudança em até 5 minutos.</p>
+  </div>
+</div>
+</div>
+<script>
+  document.querySelectorAll('input[type=color][data-cor]').forEach(function (seletor) {
+    var texto = document.getElementById(seletor.dataset.cor);
+    seletor.addEventListener('input', function () { texto.value = seletor.value.toUpperCase(); });
+  });
+</script>
+{% endif %}
 {% elif aba == 'score' %}
 <form class="cartao" method="post" action="/configuracoes/score" style="max-width:720px">
   <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -39,7 +123,7 @@
 
 {% elif aba == 'usuarios' %}
 <div class="cartao"><h2>Usuários</h2>
-  <p class="suave">Administrador: acesso total · Gestor: equipe e indicadores · Funcionário MS e Vendedor: só os próprios dados · Parceiro: só a própria carteira (portal). O que cada papel pode fazer, papéis novos, exceções por pessoa e equipes: <a href="/permissoes">Permissões</a>.</p>
+  <p class="suave">Administrador: acesso total · Gestor: equipe e indicadores · Funcionário e Vendedor: só os próprios dados · Parceiro: só a própria carteira (portal). O que cada papel pode fazer, papéis novos, exceções por pessoa e equipes: <a href="/permissoes">Permissões</a>.</p>
   <p class="pequeno suave">🔐 Administrador e gestor entram com a senha e o código de 6 números de um app no celular (verificação em 2 etapas). Se a pessoa perder o celular, clique em "zerar" na linha dela.</p>
   <div class="tabela-rolagem"><table>
     <tr><th>Nome</th><th>E-mail</th><th>Papel</th><th>Equipe</th><th>Parceiro</th><th>Expediente (reuniões)</th><th>Ativo</th><th>Nova senha</th><th></th></tr>
@@ -79,16 +163,23 @@
 </div>
 
 {% elif aba == 'email' %}
+{% if not marca.plataforma %}
+<div class="cartao" style="max-width:760px"><h2>E-mail da equipe</h2>
+  <p>Cada pessoa cadastra o próprio e-mail na tela <a href="/email">E-mail</a>: os disparos dela saem só por ele (regra do sistema).</p>
+  {% if marca.dominio_email %}<p>Os e-mails da equipe são do domínio <b>@{{ marca.dominio_email }}</b> (aba <a href="?aba=marca">Marca</a>).</p>
+  {% else %}<p class="aviso aviso-alerta">Falta informar o domínio de e-mail da sua empresa na aba <a href="?aba=marca">Marca</a>.</p>{% endif %}
+</div>
+{% else %}
 <div class="grade-2">
 <form class="cartao" method="post" action="/configuracoes/email">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <h2>E-mail de envio das campanhas</h2>
-  <p class="pequeno suave">Este é o e-mail <b>principal da MS</b>. Cada pessoa também pode cadastrar o próprio e-mail, e você escolhe com quem cada conta é compartilhada na tela <a href="/email">E-mail</a>.</p>
+  <p class="pequeno suave">Este é o e-mail <b>principal da plataforma</b>. Cada pessoa também pode cadastrar o próprio e-mail, e você escolhe com quem cada conta é compartilhada na tela <a href="/email">E-mail</a>.</p>
   <p class="suave">As campanhas saem deste e-mail. Ele precisa ser do domínio <b>@{{ email.dominio }}</b>.</p>
   <div class="campo"><label for="e-end">E-mail de envio</label><input id="e-end" type="email" name="endereco" value="{{ email.endereco }}" placeholder="parcerias@{{ email.dominio }}" required></div>
   <div class="campo"><label for="e-login">Conta que faz o login no Google (opcional)</label><input id="e-login" type="email" name="usuario_login" value="{{ email.usuario_login }}" placeholder="vazio = o próprio e-mail de envio">
     <p class="ajuda">Preencha só se o e-mail de envio for um <b>apelido (alias)</b> ou grupo de outra conta: coloque aqui a conta que entra no Gmail (a senha de app é dessa conta).</p></div>
-  <div class="campo"><label for="e-nome">Nome que aparece para quem recebe</label><input id="e-nome" type="text" name="nome" value="{{ email.nome or 'MS Certificação Digital' }}"></div>
+  <div class="campo"><label for="e-nome">Nome que aparece para quem recebe</label><input id="e-nome" type="text" name="nome" value="{{ email.nome }}"></div>
   <div class="campo"><label for="e-senha">Senha de app {% if email.tem_senha %}<span class="suave">(já salva — deixe vazio para manter)</span>{% endif %}</label>
     <input id="e-senha" type="password" name="senha" autocomplete="new-password" placeholder="16 letras, ex.: abcd efgh ijkl mnop"></div>
   <div class="campo"><label>Provedor</label>
@@ -124,8 +215,9 @@
   </div>
 </div>
 </div>
+{% endif %}
 {% if dns %}
-<div class="cartao"><h2>O domínio {{ email.dominio }} está pronto para não cair no spam?</h2>
+<div class="cartao"><h2>O domínio {{ dominio_dns }} está pronto para não cair no spam?</h2>
   <p class="suave">Provedor de e-mail: <b>{{ dns.provedor }}</b></p>
   <table>{% for nome, ok, detalhe, como in dns.itens %}
     <tr><td style="width:90px"><b>{{ nome }}</b></td><td style="width:120px"><span class="selo {{ 'selo-ok' if ok else 'selo-erro' }}">{{ 'OK' if ok else 'Falta configurar' }}</span></td>
@@ -150,17 +242,17 @@
   {% if not painel_avisos.email_ok %}<p class="aviso aviso-erro">O e-mail de envio não está configurado: os avisos aparecem só no sino.</p>{% endif %}
   {% if painel_avisos.banco_mb is not none %}<p>Banco de dados: <b>{{ '%.0f'|format(painel_avisos.banco_mb) }} MB</b>{% if painel_avisos.banco_limite %} de {{ painel_avisos.banco_limite }} MB
     <span class="selo {{ 'selo-erro' if painel_avisos.banco_mb >= 0.8 * painel_avisos.banco_limite else 'selo-ok' }}">{{ '%.0f'|format(100 * painel_avisos.banco_mb / painel_avisos.banco_limite) }}%</span>{% endif %}</p>{% endif %}
-  {% set b = painel_avisos.backup %}
+  {% if sou_master %}{% set b = painel_avisos.backup %}
   <p>Cópia de segurança (backup): {% if b.em %}<b>{{ b.em[8:10] }}/{{ b.em[5:7] }} às {{ b.em[11:16] }}</b>, {{ b.tamanho_mb }} MB,
     criptografada e conferida ·
-    {% if b.fora_do_pc %}<span class="selo selo-ok">cópia fora do computador</span>{% else %}<span class="selo selo-alerta">só no computador da MS</span>
-    <span class="pequeno suave">(instale o Google Drive para computador com o e-mail da MS e a próxima cópia vai para lá)</span>{% endif %}
-    {% else %}<span class="selo selo-alerta">ainda sem registro</span> <span class="pequeno suave">(o computador da MS faz todo dia depois do meio-dia)</span>{% endif %}</p>
+    {% if b.fora_do_pc %}<span class="selo selo-ok">cópia fora do computador</span>{% else %}<span class="selo selo-alerta">só no computador da plataforma</span>
+    <span class="pequeno suave">(instale o Google Drive para computador com o e-mail da plataforma e a próxima cópia vai para lá)</span>{% endif %}
+    {% else %}<span class="selo selo-alerta">ainda sem registro</span> <span class="pequeno suave">(o computador da plataforma faz todo dia depois do meio-dia)</span>{% endif %}</p>
   {% set rl = painel_avisos.relogio %}
   <p>Relógio das filas: {% if rl.nuvem_desde %}<b>nuvem (Vercel), a cada minuto</b> desde {{ rl.nuvem_desde.strftime('%d/%m') }}{% if rl.nuvem_em %} · última chamada {{ rl.nuvem_em.strftime('%d/%m %H:%M') }}{% endif %} ·
-    reserva do computador da MS: {% if rl.reserva_vezes %}precisou {{ rl.reserva_vezes }} {{ 'vez' if rl.reserva_vezes == 1 else 'vezes' }}, a última em {{ rl.reserva_em.strftime('%d/%m %H:%M') }}{% else %}nunca precisou{% endif %}
+    reserva do computador da plataforma: {% if rl.reserva_vezes %}precisou {{ rl.reserva_vezes }} {{ 'vez' if rl.reserva_vezes == 1 else 'vezes' }}, a última em {{ rl.reserva_em.strftime('%d/%m %H:%M') }}{% else %}nunca precisou{% endif %}
     {% if rl.portao_ok %}<span class="selo selo-ok">portão da Fase 0 cumprido: 7 dias sem o computador</span>{% else %}<span class="selo selo-alerta">{{ rl.dias_sem_reserva }} de 7 dias seguidos sem o computador</span>{% endif %}
-    {% else %}<b>computador da MS</b> (Agendador do Windows, a cada minuto) <span class="pequeno suave">(no plano gratuito a Vercel só chama 1 vez por dia; com o plano Pro a nuvem assume e o computador vira reserva)</span>{% endif %}</p>
+    {% else %}<b>computador da plataforma</b> (Agendador do Windows, a cada minuto) <span class="pequeno suave">(no plano gratuito a Vercel só chama 1 vez por dia; com o plano Pro a nuvem assume e o computador vira reserva)</span>{% endif %}</p>{% endif %}
   {% if painel_avisos.ativos %}<h3>Problemas abertos agora</h3>
   <ul>{% for a in painel_avisos.ativos %}<li><b>{{ a.titulo }}</b> <span class="pequeno suave">desde {{ a.desde[8:10] }}/{{ a.desde[5:7] }} {{ a.desde[11:16] }}{{ ' · e-mail enviado' if a.avisado_em else ' · esperando confirmar' }}</span></li>{% endfor %}</ul>
   {% else %}<p><span class="selo selo-ok">Nenhum problema aberto</span></p>{% endif %}
@@ -171,7 +263,7 @@
   <p>A API paga da <b>CNPJá</b> traz, todo dia, as empresas que acabaram de abrir para a campanha de venda do e-CNPJ
     (menu <a href="/empresas-novas">Empresas novas</a>). Cada 10 empresas encontradas gastam 1 crédito.</p>
   <p>Chave da API: {% if tem_chave_cnpja %}<span class="selo selo-ok">configurada</span>{% else %}<span class="selo selo-erro">falta colocar</span>{% endif %}</p>
-  {% if pode('configuracoes.alterar') %}
+  {% if sou_master %}
   <form method="post" action="/configuracoes/cnpja" class="filtros">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <input type="password" name="chave" autocomplete="off" required style="flex:1;min-width:260px" aria-label="Chave da API da CNPJá"
@@ -191,9 +283,9 @@
     <li>Coloque todos numa pasta (ex.: <code>C:\Receita\2026-10</code>).</li>
     <li>Cole o caminho da pasta abaixo e clique em Importar. O sistema guarda só os escritórios de contabilidade ativos (atividade 6920-6/01 e 6920-6/02). Depois você pode apagar os .zip.</li>
   </ol>
-  <form method="post" action="/configuracoes/receita" class="filtros"><input type="hidden" name="csrf" value="{{ csrf }}">
+  {% if sou_master %}<form method="post" action="/configuracoes/receita" class="filtros"><input type="hidden" name="csrf" value="{{ csrf }}">
     <input type="text" name="pasta" required placeholder="C:\Receita\2026-10" style="flex:1;min-width:260px" aria-label="Pasta">
-    <button class="btn btn-primario">Importar base</button></form>
+    <button class="btn btn-primario">Importar base</button></form>{% endif %}
   <p class="ajuda">Atualize uma vez por mês. Passo a passo com o link de download em docs/configuracao.md.</p>
 </div>
 <div class="cartao" style="max-width:860px" id="listas"><h2>Listas de empresas (bases separadas da Receita)</h2>
@@ -205,19 +297,21 @@
     {% for b in listas %}<tr><td><b>{{ b.nome }}</b><div class="pequeno suave">{{ b.origem }}{% if b.arquivo %} · {{ b.arquivo }}{% endif %}</div></td>
       <td class="num">{{ '{:,}'.format(b.total).replace(',', '.') }}</td><td class="pequeno">{{ b.estados }}</td>
       <td>{{ b.atualizado_em|datahora }}</td>
-      <td>{% if pode('configuracoes.alterar') %}<form method="post" action="/configuracoes/listas/{{ b.id }}/apagar" data-confirmar="Apagar a lista &quot;{{ b.nome }}&quot;? Os leads já criados a partir dela continuam no sistema.">
+      <td>{% if sou_master %}<form method="post" action="/configuracoes/listas/{{ b.id }}/apagar" data-confirmar="Apagar a lista &quot;{{ b.nome }}&quot;? Os leads já criados a partir dela continuam no sistema.">
         <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-pequeno">Apagar</button></form>{% endif %}</td></tr>
     {% endfor %}
   </table></div>
   {% else %}<p class="suave">Nenhuma lista importada ainda.</p>{% endif %}
-  {% if pode('configuracoes.alterar') %}
+  {% if sou_master %}
   <form method="post" action="/configuracoes/listas/importar" enctype="multipart/form-data" class="filtros" id="form-lista" style="margin-top:10px">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <input type="text" name="nome" placeholder="Nome da lista (ex.: contabilidades e adm cond PE & MG)" maxlength="160" style="flex:1;min-width:260px" aria-label="Nome da lista">
     <input type="file" name="arquivo" accept=".xlsx" required aria-label="Arquivo da CNPJá">
     <button class="btn btn-primario">Importar lista</button></form>
   <p class="ajuda">Mesmo nome de uma lista que já existe = a lista é <b>atualizada</b> (as empresas antigas dela são trocadas pelas novas).
-    {% if config.NA_NUVEM %}Arquivos com mais de 4 MB não passam pela internet: no computador da MS, dê dois cliques em <code>importar_lista.bat</code>.{% endif %}</p>
+    {% if config.NA_NUVEM %}Arquivos com mais de 4 MB não passam pela internet: no computador da plataforma, dê dois cliques em <code>importar_lista.bat</code>.{% endif %}</p>
+  {% endif %}
+  {% if pode('configuracoes.alterar') %}
   <form method="post" action="/configuracoes/listas/receita" style="margin-top:12px">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     {% if receita_oculta %}<p><span class="selo selo-alerta">Base da Receita escondida</span> Os usuários só veem as listas importadas.</p>
@@ -230,7 +324,7 @@
 {% if config.NA_NUVEM %}<script>
 document.getElementById('form-lista')?.addEventListener('submit', ev => {
   const f = ev.target.querySelector('input[type=file]').files[0];
-  if (f && f.size > 4 * 1024 * 1024) { ev.preventDefault(); aviso('Arquivo grande demais para enviar pela internet. No computador da MS, dê dois cliques em importar_lista.bat.'); }
+  if (f && f.size > 4 * 1024 * 1024) { ev.preventDefault(); aviso('Arquivo grande demais para enviar pela internet. No computador da plataforma, dê dois cliques em importar_lista.bat.'); }
 });
 </script>{% endif %}
 

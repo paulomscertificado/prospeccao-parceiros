@@ -187,11 +187,11 @@ def vocabulario(lead, confirmado: bool) -> dict:
 
 
 def convite(db, usuario) -> str:
-    """Final do convite: o link do WhatsApp da MS (Configurações > Geral) ou "é só responder"."""
+    """Final do convite: o link do WhatsApp da empresa (Configurações > Geral, de cada AR) ou "é só responder"."""
     from . import marca
 
-    numero = util.so_digitos(ler_config(db, "whatsapp_convite") or "")
-    if numero and not marca.da_pessoa(usuario)["propria"]:
+    numero = util.so_digitos(ler_config(db, "whatsapp_convite") or "")  # sem número próprio da AR: vazio (Fase 5)
+    if numero and not marca.da_pessoa(usuario)["outra_empresa"]:  # quem representa outra empresa: sem o número
         link = util.link_whatsapp(numero)  # sem texto pronto: o "%" da URL esbarra na trava de percentuais
         return f"é só responder este e-mail ou chamar no WhatsApp: {link}"
     return "é só responder esta mensagem que eu explico em poucos minutos."

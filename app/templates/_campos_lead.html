@@ -27,7 +27,7 @@
   <div class="largo"><label>Sócios / responsáveis (dados públicos, um por linha)</label><textarea name="socios" style="min-height:60px">{{ lead.socios or '' }}</textarea></div>
   <div class="largo">
     <label class="marcar"><input type="checkbox" name="consentimento" {{ 'checked' if lead.consentimento }}>
-      <b>Autorizou receber mensagens da MS pelo WhatsApp</b> <span class="pequeno suave">(com o celular conectado, a IA SDR manda os próximos passos sozinha)</span></label>
+      <b>Autorizou receber mensagens {{ marca.frase('de') }} pelo WhatsApp</b> <span class="pequeno suave">(com o celular conectado, a IA SDR manda os próximos passos sozinha)</span></label>
   </div>
   <div class="largo">
     <label>Critérios observados (entram no score)</label>

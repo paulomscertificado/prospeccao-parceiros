@@ -104,6 +104,11 @@ def tela(request: Request, nome: str, contexto: dict | None = None, status_code:
         with FabricaSessao() as db:
             wl = conexoes.para_o_menu(db, usuario)
             db.commit()
+    from . import marca
+    from .banco import FabricaSessao as _Fabrica
+
+    with _Fabrica() as db:  # white label, Fase 5: a marca da AR de quem vê (antes de entrar: a plataforma, neutra)
+        marca_tela = marca.da_tela(request, usuario, db)
     permissoes = autorizacao.efetivas(usuario) if usuario else {}
     menu = MENU_PARCEIRO if usuario and usuario.perfil == "parceiro" else MENU_EQUIPE
     dados = {
@@ -122,6 +127,10 @@ def tela(request: Request, nome: str, contexto: dict | None = None, status_code:
         "mostrar_agenda": mostrar_agenda,
         "caminho": request.url.path,
         "hoje": date.today(),
+        # {{ marca.curto }}, {{ marca.frase('com') }} ("com a MS", "com o Grupo Certy"), {{ marca.logo_url }}...
+        "marca": marca_tela,
+        # textos do sistema escritos com o nome da MS (ex.: exemplos dos tons): com a empresa de quem vê
+        "com_marca": lambda texto: marca.aplicar(texto, usuario, marca_tela["ar"]) if marca_tela["ar"] else texto,
     }
     dados.update(contexto or {})
     return modelos_html.TemplateResponse(request, nome, dados, status_code=status_code)

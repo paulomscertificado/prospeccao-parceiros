@@ -2,15 +2,15 @@
 
 import re
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from .. import (alertas, autorizacao, base_receita, bases_importadas, config, ia, leads_servico, prospeccao, relogio,
-               score, util)
+from .. import (alertas, autorizacao, base_receita, bases_importadas, config, ia, leads_servico, marca, prospeccao,
+               relogio, score, util)
 from ..banco import CHAVES_DA_AR, CHAVES_SO_MASTER, gravar_config, ler_config, ler_config_json, obter_db
 from ..integracoes import dns_email, email_imap, email_smtp, whatsapp_cloud, whatsapp_leads
-from ..modelos import Equipe, Lead, LogAuditoria, Papel, Parceiro, Usuario
+from ..modelos import Equipe, Lead, LogAuditoria, MarcaAR, Papel, Parceiro, Usuario
 from ..seguranca import exige, problema_na_senha, registrar_log, resumir_senha, verificar_csrf
 from ..web import avisar, tela, voltar
 
@@ -19,7 +19,6 @@ rotas = APIRouter()
 CAMPOS_GERAIS = [
     ("mostrar_vendas", "Mostrar Vendas, Vencimentos e Comissões no menu e no Dashboard (1 = sim, 0 = não)", "numero"),
     ("mostrar_agenda", "Mostrar a Agenda de prospecção (follow-ups) no menu e no Dashboard (1 = sim, 0 = não)", "numero"),
-    ("empresa_nome", "Nome da empresa", "texto"),
     ("link_parceria", "Link da página de parceria ({{link_parceria}})", "texto"),
     ("texto_comissao", "Texto da comissão nas mensagens ({{comissao}})", "texto"),
     ("programa_parceria", "Descrição do programa de parceria (usada pela IA)", "area"),
@@ -37,7 +36,7 @@ CAMPOS_GERAIS = [
     ("prioridade_canais", "IA SDR · prioridade dos canais (ex.: whatsapp,email,linkedin)", "texto"),
     ("limite_hora_email", "IA SDR · limite de e-mails por hora", "numero"),
     ("limite_hora_whatsapp", "IA SDR · limite de WhatsApp por hora", "numero"),
-    ("limite_frios_whatsapp", "WhatsApp · contatos frios por número por dia (quem nunca conversou com a MS; "
+    ("limite_frios_whatsapp", "WhatsApp · contatos frios por número por dia (quem nunca conversou com a empresa; "
      "protege o número contra bloqueio; 0 = sem teto)", "numero"),
     ("pausa_frios_sair", "WhatsApp · pedidos de SAIR no mesmo dia que pausam os contatos frios do número até amanhã "
      "(0 = não pausa)", "numero"),
@@ -54,13 +53,20 @@ CAMPOS_GERAIS = [
     ("whatsapp_sozinho_padrao", "IA SDR · campanha nova já vem com o WhatsApp automático ligado: depois da aprovação, "
      "sai sozinho também para contato frio (1 = sim, 0 = não; o administrador desliga em cada campanha)", "numero"),
     ("aprovacao_obrigatoria", "IA SDR · campanha só começa com aprovação (1 = sim, 0 = não)", "numero"),
-    ("whatsapp_convite", "IA SDR · WhatsApp da MS para os convites por e-mail (com DDD, ex.: 81999998888). Quem "
+    ("whatsapp_convite", "IA SDR · WhatsApp da empresa para os convites por e-mail (com DDD, ex.: 81999998888). Quem "
      "clicar abre a conversa com este número; vazio = o convite pede para responder o e-mail", "texto"),
     ("notificar_por_email", "IA SDR · avisar o responsável por e-mail quando surgir oportunidade (1 = sim)", "numero"),
     ("alertas_emails", "Avisos de problema · e-mails que recebem (separados por vírgula; vazio = os administradores)",
      "texto"),
     ("limite_banco_mb", "Avisos de problema · tamanho do banco contratado em MB (o aviso sai em 80%)", "numero"),
 ]
+
+
+def _so_da_plataforma(request: Request, destino: str):
+    """O que é da plataforma (e-mail principal, chaves, base da Receita, listas da CNPJá) vale para todas as ARs: só o
+    Admin Master muda (white label, Fase 5)."""
+    avisar(request, "Isto é da plataforma e vale para todas as empresas: só o Admin Master muda.", "erro")
+    return voltar(destino)
 
 
 def _papeis(db: Session) -> list[Papel]:
@@ -71,6 +77,8 @@ def _papeis(db: Session) -> list[Papel]:
 @rotas.get("/configuracoes")
 def configuracoes(request: Request, aba: str = "geral", usuario: Usuario = Depends(exige("configuracoes.ver")), db: Session = Depends(obter_db)):
     wl = whatsapp_leads.status(False)  # uma consulta só (antes eram duas a cada abertura da tela)
+    ar_tela = marca.ar_da_tela(request, usuario)
+    dominio_dns = (marca.da_ar(db, ar_tela)["dominio_email"] if ar_tela else config.EMAIL_DOMINIO) if aba == "email" else ""
     return tela(request, "configuracoes.html", {
         # white label: quem é de uma AR muda só as configurações da AR (o resto é da plataforma: Admin Master)
         "aba": aba, "campos": [(c, n, t, ler_config(db, c), autorizacao.e_master(usuario)
@@ -107,9 +115,59 @@ def configuracoes(request: Request, aba: str = "geral", usuario: Usuario = Depen
         if aba == "integracoes" else None,
         "demo": db.execute(select(Lead.id).where(Lead.origem == "Demonstração").limit(1)).first() is not None,
         "email": _email_atual() if aba == "email" else None,
-        "dns": dns_email.verificar(config.EMAIL_DOMINIO)
-        if aba == "email" and config.EMAIL_DOMINIO else None,
+        # white label: o domínio da AR de quem vê (Configurações > Marca); fora das ARs, o do e-mail principal
+        "dns": dns_email.verificar(dominio_dns) if aba == "email" and dominio_dns else None, "dominio_dns": dominio_dns,
+        "marca_ar": marca.da_ar(db, ar_tela) if aba == "marca" else None,
+        "marca_linha": db.get(MarcaAR, ar_tela) if aba == "marca" and ar_tela else None,
+        "fontes": marca.FONTES, "tipos_logo": ", ".join(marca.TIPOS_LOGO.values()),
     })
+
+
+@rotas.post("/configuracoes/marca", dependencies=[Depends(verificar_csrf)])
+async def salvar_marca(request: Request, usuario: Usuario = Depends(exige("configuracoes.alterar")),
+                       db: Session = Depends(obter_db)):
+    """Marca da AR de quem salva (white label, Fase 5; o Admin Master: a da AR em que entrou). Fora das ARs, o Admin
+    Master muda o nome neutro da plataforma (tela de entrada)."""
+    form = await request.form()
+    destino = "/configuracoes?aba=marca"
+    ar = marca.ar_da_tela(request, usuario)
+    if ar is None:
+        if not autorizacao.e_master(usuario):
+            return _so_da_plataforma(request, destino)
+        nome = re.sub(r"\s+", " ", str(form.get("plataforma_nome") or "")).strip()[:60]
+        gravar_config(db, "plataforma_nome", nome or marca.PLATAFORMA)
+        registrar_log(db, usuario, "salvou_nome_da_plataforma", "configuracao", None, nome, request)
+        db.commit()
+        marca.esquecer()
+        avisar(request, "Nome da plataforma salvo.")
+        return voltar(destino)
+    arquivo = form.get("logo")
+    novo_logo = await arquivo.read() if arquivo is not None and getattr(arquivo, "filename", "") else None
+    campos = ("nome", "curto", "artigo", "site", "descricao", "dominio_email", "cor", "cor_detalhe", "cor_fundo", "fonte")
+    problemas = marca.salvar(db, ar, {c: str(form.get(c) or "") for c in campos if c in form}, novo_logo,
+                             tirar_logo=form.get("tirar_logo") == "1")
+    registrar_log(db, usuario, "salvou_marca", "tenant", ar, "; ".join(problemas)[:250], request)
+    db.commit()
+    marca.esquecer(ar)
+    for problema in problemas:
+        avisar(request, problema, "erro")
+    if not problemas:
+        avisar(request, "Marca salva. As telas e as próximas mensagens já saem com ela.")
+    return voltar(destino)
+
+
+@rotas.get("/marca/logo/{ar:int}/{assinatura}")
+def logo_da_marca(ar: int, assinatura: str, db: Session = Depends(obter_db)):
+    """O logo de uma AR (aberto: aparece nas telas e na página de descadastro). O endereço leva uma assinatura e a
+    versão (muda quando o logo muda), então o navegador guarda a imagem por uma semana."""
+    if not marca.logo_confere(ar, assinatura):
+        raise HTTPException(404)
+    achado = marca.logo(db, ar)
+    if achado is None:
+        raise HTTPException(404)
+    dados, tipo = achado
+    return Response(dados, media_type=tipo, headers={"Cache-Control": "public, max-age=604800, immutable",
+                                                     "X-Content-Type-Options": "nosniff"})
 
 
 @rotas.post("/configuracoes/geral", dependencies=[Depends(verificar_csrf)])
@@ -155,10 +213,12 @@ def _email_atual() -> dict:
 
 
 @rotas.post("/configuracoes/email", dependencies=[Depends(verificar_csrf)])
-def salvar_email(request: Request, endereco: str = Form(...), nome: str = Form("MS Certificação Digital"),
+def salvar_email(request: Request, endereco: str = Form(...), nome: str = Form(""),
                  senha: str = Form(""), provedor: str = Form("google"), host: str = Form(""), porta: str = Form("587"),
                  responder_para: str = Form(""), ler_respostas: str = Form(""), imap_host: str = Form(""),
                  usuario_login: str = Form(""), usuario: Usuario = Depends(exige("configuracoes.alterar")), db: Session = Depends(obter_db)):
+    if not autorizacao.e_master(usuario):  # white label: é da plataforma (vale para todas as ARs)
+        return _so_da_plataforma(request, "/configuracoes?aba=email")
     from .. import arquivo_env
 
     destino = "/configuracoes?aba=email"
@@ -194,7 +254,7 @@ def salvar_email(request: Request, endereco: str = Form(...), nome: str = Form("
         if not host.strip():
             avisar(request, "Informe o servidor de envio (SMTP).", "erro")
             return voltar(destino)
-    nome = nome.strip().replace('"', "") or "MS Certificação Digital"
+    nome = nome.strip().replace('"', "") or "Prospecção de Parceiros"
     valores = {"SMTP_HOST": host.strip(), "SMTP_PORTA": str(porta_n), "SMTP_TLS": tls, "SMTP_USUARIO": login,
                "SMTP_SENHA": senha, "SMTP_REMETENTE": f"{nome} <{endereco}>",
                "SMTP_RESPONDER_PARA": responder_para.strip()}
@@ -212,9 +272,11 @@ def salvar_email(request: Request, endereco: str = Form(...), nome: str = Form("
 @rotas.post("/configuracoes/email/testar", dependencies=[Depends(verificar_csrf)])
 def testar_email(request: Request, para: str = Form(""), usuario: Usuario = Depends(exige("configuracoes.alterar")),
                  db: Session = Depends(obter_db)):
+    if not autorizacao.e_master(usuario):  # white label: é da plataforma (vale para todas as ARs)
+        return _so_da_plataforma(request, "/configuracoes?aba=email")
     para = para.strip() or usuario.email
     try:
-        email_smtp.enviar(para, "Teste – e-mail das campanhas da MS Certificação Digital",
+        email_smtp.enviar(para, "Teste – e-mail principal das campanhas",
                           "Este é um e-mail de teste do sistema de Prospecção de Parceiros.\n\nSe ele chegou na caixa "
                           "de entrada (e não no spam), o envio das campanhas está funcionando.", com_rodape=False)
         registrar_log(db, usuario, "testou_email", "configuracao", None, f"para {para}", request)
@@ -229,6 +291,8 @@ def testar_email(request: Request, para: str = Form(""), usuario: Usuario = Depe
 
 @rotas.post("/configuracoes/email/testar-leitura", dependencies=[Depends(verificar_csrf)])
 def testar_leitura(request: Request, usuario: Usuario = Depends(exige("configuracoes.alterar")), db: Session = Depends(obter_db)):
+    if not autorizacao.e_master(usuario):  # white label: é da plataforma (vale para todas as ARs)
+        return _so_da_plataforma(request, "/configuracoes?aba=email")
     try:
         avisar(request, email_imap.testar())
     except email_imap.ErroImap as erro:
@@ -337,6 +401,8 @@ def salvar_usuario(request: Request, uid: int, nome: str = Form(...), email: str
 @rotas.post("/configuracoes/receita", dependencies=[Depends(verificar_csrf)])
 def importar_receita(request: Request, pasta: str = Form(...), usuario: Usuario = Depends(exige("configuracoes.alterar")),
                      db: Session = Depends(obter_db)):
+    if not autorizacao.e_master(usuario):  # white label: é da plataforma (vale para todas as ARs)
+        return _so_da_plataforma(request, "/configuracoes?aba=integracoes")
     if config.NA_NUVEM:
         avisar(request, "Na nuvem a base da Receita não é importada por esta tela: o banco grátis tem só 500 MB e uma "
                         "importação inteira não cabe junto com o que já está lá. Para acrescentar um ramo ou uma "
@@ -361,6 +427,8 @@ def _chave_cnpja() -> str:
 def salvar_chave_cnpja(request: Request, chave: str = Form(""), usuario: Usuario = Depends(exige("configuracoes.alterar")),
                        db: Session = Depends(obter_db)):
     """Chave da API da CNPJá (usada em Empresas novas). Fica no .env (na nuvem: no banco, criptografada)."""
+    if not autorizacao.e_master(usuario):  # white label: é da plataforma (vale para todas as ARs)
+        return _so_da_plataforma(request, "/configuracoes?aba=integracoes#cnpja")
     from .. import arquivo_env
 
     chave = chave.strip()
@@ -385,7 +453,7 @@ def testar_alertas(request: Request, usuario: Usuario = Depends(exige("configura
         return voltar("/configuracoes?aba=integracoes#avisos")
     try:
         for destino in para:
-            email_smtp.enviar(destino, "[Prospecção MS] Teste dos avisos de problema",
+            email_smtp.enviar(destino, "[Prospecção] Teste dos avisos de problema",
                               f"Este é um teste pedido por {usuario.nome}. Quando algo parar no sistema (WhatsApp, "
                               "e-mails, banco, agendador), o aviso chega assim, neste endereço.\n\n"
                               f"Abrir o sistema: {config.URL_PUBLICA}/configuracoes?aba=integracoes", com_rodape=False)
@@ -422,6 +490,8 @@ MAXIMO_UPLOAD_NUVEM = 4 * 1024 * 1024  # a Vercel recusa pedidos maiores que 4,5
 async def importar_lista(request: Request, usuario: Usuario = Depends(exige("configuracoes.alterar")),
                          db: Session = Depends(obter_db)):
     """Lista de empresas exportada da CNPJá (.xlsx) → base separada da Receita (ver app/bases_importadas.py)."""
+    if not autorizacao.e_master(usuario):  # white label: é da plataforma (vale para todas as ARs)
+        return _so_da_plataforma(request, "/configuracoes?aba=integracoes#listas")
     form = await request.form()
     arquivo = form.get("arquivo")
     nome = str(form.get("nome") or "").strip()
@@ -430,7 +500,7 @@ async def importar_lista(request: Request, usuario: Usuario = Depends(exige("con
         return voltar("/configuracoes?aba=integracoes#listas")
     conteudo = await arquivo.read()
     if config.NA_NUVEM and len(conteudo) > MAXIMO_UPLOAD_NUVEM:
-        avisar(request, "Arquivo grande demais para enviar pela internet. No computador da MS, dê dois cliques em "
+        avisar(request, "Arquivo grande demais para enviar pela internet. No computador da plataforma, dê dois cliques em "
                         "importar_lista.bat e escolha o arquivo.", "alerta")
         return voltar("/configuracoes?aba=integracoes#listas")
     try:
@@ -450,6 +520,8 @@ async def importar_lista(request: Request, usuario: Usuario = Depends(exige("con
 @rotas.post("/configuracoes/listas/{lista_id:int}/apagar", dependencies=[Depends(verificar_csrf)])
 def apagar_lista(request: Request, lista_id: int, usuario: Usuario = Depends(exige("configuracoes.alterar")),
                  db: Session = Depends(obter_db)):
+    if not autorizacao.e_master(usuario):  # white label: é da plataforma (vale para todas as ARs)
+        return _so_da_plataforma(request, "/configuracoes?aba=integracoes#listas")
     nome = bases_importadas.apagar(db, lista_id)
     if nome:
         registrar_log(db, usuario, "apagou_lista", "base", lista_id, nome, request)

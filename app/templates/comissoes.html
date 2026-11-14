@@ -74,7 +74,7 @@
   </table></div>
   {% for pr in produtos %}<form id="prod-{{ pr.id }}" method="post" action="/produtos/{{ pr.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"></form>{% endfor %}
   <form id="prod-novo" method="post" action="/produtos/0"><input type="hidden" name="csrf" value="{{ csrf }}"></form>
-  <p class="ajuda">Preços iniciais da tabela MS (outubro/2026). Informe o <b>custo</b> de cada produto para o lucro e a margem ficarem certos. Regras diferentes por parceiro: na ficha do parceiro.</p>
+  <p class="ajuda">Preços da tabela de produtos. Informe o <b>custo</b> de cada produto para o lucro e a margem ficarem certos. Regras diferentes por parceiro: na ficha do parceiro.</p>
 </div>
 {% endblock %}
 {% block scripts %}

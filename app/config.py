@@ -136,7 +136,7 @@ IMAP_SENHA = os.environ.get("IMAP_SENHA", "")
 PERFIS = {
     "admin": "Administrador",
     "gestor": "Gestor",
-    "funcionario": "Funcionário MS",
+    "funcionario": "Funcionário",
     "vendedor": "Vendedor",
     "parceiro": "Parceiro",
 }
@@ -281,16 +281,17 @@ CONFIG_PADRAO = {
     "whatsapp_sozinho_padrao": "1",
     "mostrar_vendas": "0",
     "mostrar_agenda": "0",  # Agenda (follow-ups) oculta no menu e no Dashboard (pedido da MS)  # Vendas, Vencimentos e Comissões ocultos no menu e no Dashboard (pedido da MS)
-    "empresa_nome": "MS Certificação Digital",
-    "link_parceria": "https://mscertificados.com.br",
+    # Fase 5 (white label): o que fala da empresa é de cada AR (marca.config_da_marca); a plataforma fica neutra
+    "empresa_nome": "",
+    "link_parceria": "",
     "texto_comissao": "comissão por cada certificado emitido",
     "programa_parceria": (
-        "Programa de parceria da MS Certificação Digital (Autoridade de Registro ICP-Brasil, "
-        "mscertificados.com.br): o escritório contábil indica os clientes que precisam de certificado "
-        "digital; a equipe da MS entra em contato e cuida de todo o processo (emissão e validação presencial "
-        "em Recife ou por videoconferência); o escritório recebe comissão por certificado emitido; a MS "
-        "controla os vencimentos e cuida das renovações, mantendo o escritório como parceiro."
+        "Programa de parceria da Autoridade de Registro: o escritório contábil indica os clientes que precisam "
+        "de certificado digital; a equipe da AR entra em contato e cuida de todo o processo (emissão e validação); "
+        "o escritório recebe comissão por certificado emitido; a AR controla os vencimentos e cuida das "
+        "renovações, mantendo o escritório como parceiro."
     ),
+    "plataforma_nome": "Prospecção de Parceiros",  # nome neutro da tela de entrada (só o Admin Master muda)
     "limite_diario_whatsapp": "40",
     "limite_diario_email": "80",
     "horas_entre_contatos": "20",
@@ -322,7 +323,7 @@ CONFIG_PADRAO = {
 
 # Categorias de parceiros (o administrador cria outras na tela Categorias).
 # Motivos para tirar uma empresa de uma campanha (obrigatório escolher um; fica guardado no toque e no histórico do lead)
-MOTIVOS_RETIRADA = ["Já fiz campanha", "Já entramos em contato", "Não condiz com os objetivos da MS"]
+MOTIVOS_RETIRADA = ["Já fiz campanha", "Já entramos em contato", "Não condiz com os nossos objetivos"]
 
 # CNAEs que dá para escolher na Prospecção (filtro direto na base da Receita), em grupos de atividades parecidas
 CNAES_BUSCA = {

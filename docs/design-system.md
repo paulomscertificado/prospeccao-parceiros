@@ -3,6 +3,14 @@
 Estética de SaaS B2B: limpa, corporativa, com as cores da identidade MS (azul-marinho e verde da tabela de preços).
 Tudo em `app/static/estilo.css`; cores como variáveis no `:root`.
 
+**White label (Fase 5):** essas cores são o **padrão** (a AR MS e a plataforma). A marca de cada AR (tabela
+`marcas_ar`, Configurações > Marca) troca as variáveis por um `<style>:root{...}</style>` em `base.html`, montado por
+`marca.tema`: `--azul` e família = cor principal escurecida até o branco ter contraste 4,5 (WCAG); `--verde-marca` = cor
+dos detalhes como veio; `--cta` (botões de ação e escolhas marcadas) = cor dos detalhes escurecida; `--fundo`, `--fonte`
+(lista `marca.FONTES`, do Google Fonts) e as do menu (`--menu-texto`, `--menu-rotulo`, `--menu-ativo`). O verde de
+"deu certo" (selos OK, avisos de sucesso) não muda. Sem marca própria = as cores de sempre. Logo da AR em
+`/marca/logo/<ar>/<assinatura>?v=<versão>`; sem logo, o nome curto em texto. A tela de entrada é neutra.
+
 ## Cores
 
 Identidade do **Portfólio MS 2026** (`Portfolio MS 2026.pdf`): azul-marinho, verde e branco; logotipo branco em

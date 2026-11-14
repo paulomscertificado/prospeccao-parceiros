@@ -82,6 +82,9 @@ CHAVES_DA_AR = frozenset({
     # módulos (autorizacao.MODULOS): cada AR tem os seus, mas só o Admin Master liga e desliga (Fase 3)
     "mostrar_vendas", "mostrar_agenda", "modulo_campanhas", "modulo_prospeccao", "modulo_conversas",
     "modulo_ia_comercial", "modulo_portal"})
+# Fase 5: o que fala da empresa. Sem valor próprio da AR, vem da marca dela (marca.config_da_marca), nunca da
+# plataforma: até a Fase 5 os valores da plataforma eram os textos da MS (que passaram para a AR MS, marca.garantir)
+CHAVES_DA_MARCA = frozenset({"empresa_nome", "link_parceria", "programa_parceria", "whatsapp_convite"})
 CHAVES_SO_MASTER = frozenset({"mostrar_vendas", "mostrar_agenda", "modulo_campanhas", "modulo_prospeccao",
                               "modulo_conversas", "modulo_ia_comercial", "modulo_portal"})
 
@@ -141,6 +144,10 @@ def ler_config(db: Session, chave: str) -> str:
             valores = _valores_da_ar(db, ar)
             if chave in valores:
                 return valores[chave]
+            if chave in CHAVES_DA_MARCA:
+                from . import marca
+
+                return marca.config_da_marca(db, ar, chave)
     item = db.get(Configuracao, chave)
     if item is not None:
         return item.valor
@@ -291,6 +298,9 @@ def criar_tabelas() -> None:
         migrar_status(db)
         base_receita.ajustar_base_antiga(db)
         migrar_conversas_com_nono(db)
+        from . import marca
+
+        marca.garantir(db)  # white label, Fase 5: a marca da AR MS e os textos da MS só nela
 
 
 _banco_pronto = False
@@ -309,7 +319,8 @@ def _versao_do_esquema() -> str:
 
     partes += [f"{p.codigo}:{p.padrao}" for p in CATALOGO]  # permissão nova: a nuvem dá o padrão aos papéis
     partes += ["dados:conversas-com-nono"]  # ajuste de dados novo (migrar_conversas_com_nono): roda uma vez na nuvem
-    partes += ["dados:cadencias-sem-repeticao"]  # modelos._remover_cadencias_repetidas: roda uma vez na nuvem
+    partes += ["dados:cadencias-sem-repeticao"]
+    partes += ["dados:marca-das-ars"]  # marca.garantir: a marca da AR MS e os textos da MS só nela (Fase 5)  # modelos._remover_cadencias_repetidas: roda uma vez na nuvem
     from .modelos import CADENCIAS_SDR_EXTRAS
 
     partes += [f"cadencia:{nome}" for nome, _, _ in CADENCIAS_SDR_EXTRAS]  # cadência nova: a nuvem cria na publicação

@@ -29,7 +29,7 @@
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <div class="topo-conta"><div class="icone-conta">{{ icone }}</div>
       <div class="titulo"><b>{{ minha.endereco if minha else 'Cadastrar o meu e-mail' }}</b>
-        <span class="pequeno suave">{{ ('Ligado' if minha.ativa else 'Pausado') if minha else 'Conta Google Workspace da MS' }}</span></div></div>
+        <span class="pequeno suave">{{ ('Ligado' if minha.ativa else 'Pausado') if minha else 'Conta de e-mail ' ~ marca.frase('de') }}</span></div></div>
     {% if pode('email.outro_dominio') %}
     <div class="campo"><label>Onde fica este e-mail?</label>
       <select name="provedor" id="provedor-email">
@@ -38,7 +38,7 @@
       </select></div>
     {% endif %}
     <div class="campo"><label>Seu e-mail</label><input type="email" name="endereco" required value="{{ minha.endereco if minha else '' }}" placeholder="nome@{{ 'suaempresa.com.br' if pode('email.outro_dominio') else dominio }}"></div>
-    <div class="campo"><label>Nome que aparece para o lead</label><input type="text" name="nome_remetente" maxlength="120" value="{{ minha.nome_remetente if minha else usuario.nome ~ ' | MS Certificação Digital' }}"></div>
+    <div class="campo"><label>Nome que aparece para o lead</label><input type="text" name="nome_remetente" maxlength="120" value="{{ minha.nome_remetente if minha else usuario.nome ~ ' | ' ~ quem_fala.nome }}"></div>
     {% if pode('email.outro_dominio') %}
     <div class="servidor-proprio">
       <p class="pequeno suave" style="margin:0 0 8px">Copie estes dados do painel do seu provedor de e-mail (procure por "configurar no Outlook" ou "SMTP/IMAP").</p>
@@ -85,7 +85,7 @@
       <form class="inline" method="post" action="/email/{{ minha.id }}/remover"><input type="hidden" name="csrf" value="{{ csrf }}">
         <button class="btn btn-pequeno btn-perigo" data-confirmar="Remover o seu e-mail do sistema? As campanhas dos seus leads passam a sair por outra conta liberada para você (ou esperam).">Remover</button></form>
     </div>
-    <p class="pequeno suave">O teste vai para {{ usuario.email }}. Pausada, a conta não envia: os e-mails dos seus leads esperam até ligar de novo (pela regra da MS, os disparos
+    <p class="pequeno suave">O teste vai para {{ usuario.email }}. Pausada, a conta não envia: os e-mails dos seus leads esperam até ligar de novo (pela regra do sistema, os disparos
       de cada pessoa saem só pelo e-mail dela).</p>
     {% if c %}{% set conta = c %}{% include "_compartilhar_email.html" %}{% endif %}
   </div>
@@ -98,7 +98,7 @@
   <table>{% for nome, ok, detalhe, como in dns.itens %}
     <tr><td style="width:90px"><b>{{ nome }}</b></td><td style="width:120px"><span class="selo {{ 'selo-ok' if ok else 'selo-erro' }}">{{ 'OK' if ok else 'Falta configurar' }}</span></td>
       <td class="pequeno" style="overflow-wrap:anywhere">{{ detalhe }}{% if not ok %}<div style="margin-top:4px"><b>Como resolver:</b> {{ como }}</div>{% endif %}</td></tr>{% endfor %}</table>
-  <p class="ajuda">Sem SPF, DKIM e DMARC, o Gmail e o Outlook mandam os e-mails de prospecção para o spam. Quem cuida do domínio da sua empresa (registro.br, Cloudflare, o provedor de e-mail...) faz isso em poucos minutos. Comece com poucos e-mails por dia: os limites de envio da MS valem para todas as contas juntas.</p>
+  <p class="ajuda">Sem SPF, DKIM e DMARC, o Gmail e o Outlook mandam os e-mails de prospecção para o spam. Quem cuida do domínio da sua empresa (registro.br, Cloudflare, o provedor de e-mail...) faz isso em poucos minutos. Comece com poucos e-mails por dia: os limites de envio da empresa valem para todas as contas juntas.</p>
 </div>
 {% endif %}
 
@@ -110,7 +110,7 @@
   <div class="cartao conta">
     <div class="topo-conta"><div class="icone-conta" style="{{ 'background:var(--verde)' if conta.principal }}">{{ icone }}</div>
       <div class="titulo"><b>{{ conta.nome }}</b>
-        <span class="pequeno suave">{{ conta.endereco or 'ainda não configurado' }} · {{ 'principal da MS' if conta.principal else 'de ' ~ (conta.dono or '—') }}{% if conta.dominio_livre %} · domínio próprio{% endif %}</span></div>
+        <span class="pequeno suave">{{ conta.endereco or 'ainda não configurado' }} · {{ 'principal da plataforma' if conta.principal else 'de ' ~ (conta.dono or '—') }}{% if conta.dominio_livre %} · domínio próprio{% endif %}</span></div>
       <span class="selo {{ 'selo-ok' if conta.ativa else 'selo-alerta' }}">{{ 'Ligada' if conta.ativa else ('Pausada' if not conta.principal else 'Não configurado') }}</span></div>
     <div class="pequeno suave">{% if conta.compartilhada_todos %}Liberada para toda a equipe{% elif conta.compartilhada_com %}Liberada para {{ conta.compartilhada_com|length }} pessoa(s){% else %}Não compartilhada{% endif %}
       {% if conta.le_respostas %} · a IA lê as respostas desta caixa{% endif %}{% if conta.usar %} · você pode usar{% endif %}</div>

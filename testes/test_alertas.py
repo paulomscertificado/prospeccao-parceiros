@@ -46,7 +46,7 @@ def test_ponte_parada_avisa_uma_vez_lembra_e_avisa_quando_volta(cliente, caixa, 
     assert "ligar_nuvem.bat" in caixa[0][2] and "/whatsapp" in caixa[0][2]
     assert alertas.verificar()["novos"] == 0 and len(caixa) == 1  # não repete a cada 5 minutos
     _relogio(monkeypatch, inicio + timedelta(hours=12, minutes=1))
-    assert alertas.verificar()["lembretes"] == 1 and caixa[-1][1].startswith("[Prospecção MS] ⚠️ Continua:")
+    assert alertas.verificar()["lembretes"] == 1 and caixa[-1][1].startswith("[Prospecção] ⚠️ Continua:")
     with sessao() as db:  # o computador voltou
         gravar_config(db, "wl_status", {"conectado": True, "conexoes": {},
                                         "visto_em": (inicio + timedelta(hours=12, minutes=1)).isoformat()})
@@ -132,7 +132,7 @@ def test_tela_mostra_os_avisos_e_manda_teste(cliente, caixa):
     assert "Avisos de problema por e-mail" in pagina and "admin@teste.com.br" in pagina
     r = cliente.post("/configuracoes/alertas/teste", data={"csrf": csrf_de(pagina)})
     assert "E-mail de teste enviado para admin@teste.com.br" in r.text
-    assert caixa[-1][1] == "[Prospecção MS] Teste dos avisos de problema"
+    assert caixa[-1][1] == "[Prospecção] Teste dos avisos de problema"
     with sessao() as db:  # lista própria em Configurações
         gravar_config(db, "alertas_emails", "maria@exemplo.com.br; paulo@exemplo.com.br")
         assert alertas.destinatarios(db) == ["maria@exemplo.com.br", "paulo@exemplo.com.br"]

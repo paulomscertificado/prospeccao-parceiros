@@ -1,4 +1,4 @@
-"""Tela Renovação: avisos de vencimento do certificado para os clientes da MS (planilha de renovação, app/renovacao.py)."""
+"""Tela Renovação: avisos de vencimento do certificado para os clientes da AR (planilha de renovação, app/renovacao.py)."""
 
 import json
 from collections import Counter
@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .. import autorizacao, renovacao, util
+from .. import autorizacao, marca, renovacao, util
 from ..banco import gravar_config, ler_config_int, obter_db
 from ..modelos import Certificado, Tarefa, Usuario
 from ..seguranca import exige, registrar_log, verificar_csrf
@@ -90,7 +90,8 @@ def tela_renovacao(request: Request, ver: str = "avisar", usuario: Usuario = Dep
         "limite_frios": ler_config_int(db, "limite_frios_whatsapp", 0), "situacoes": renovacao.SITUACOES,
         "situacao": lambda c, h: renovacao.situacao_na_tela(c, h, janela),
         "chave_do_contato": renovacao.chave_do_contato,
-        "tipo_curto": renovacao.tipo_curto, "url_da_arte": renovacao.URL_DA_ARTE,
+        "tipo_curto": renovacao.tipo_curto,
+        "url_da_arte": renovacao.url_da_arte(db, marca.ar_da_tela(request, usuario)),  # vazio: AR sem arte
         "artes": renovacao.situacao_das_artes(db),
         "exemplos": renovacao.exemplos_para_teste(db), "avisos_teste": renovacao.avisos_teste(db),
         "remetente": renovacao.dono(db) or usuario, "numeros": numeros,
@@ -214,7 +215,7 @@ async def configurar(request: Request, usuario: Usuario = Depends(exige("campanh
         quem_assina = db.get(Usuario, dono_id) if dono_id else usuario
         if c is not None and not _conexoes.pode_disparar(quem_assina, c):  # regra da Maria em 13/11/2026
             avisar(request, f"O número {c.nome} não é de {quem_assina.nome} nem está compartilhado com ele: pela regra "
-                            "da MS, os disparos de cada pessoa saem só pelo WhatsApp dela (ou um compartilhado com ela).",
+                            "do sistema, os disparos de cada pessoa saem só pelo WhatsApp dela (ou um compartilhado com ela).",
                    "erro")
             return voltar("/renovacao#configurar")
         gravar_config(db, "renov_conexao", conexao if c is not None else "")

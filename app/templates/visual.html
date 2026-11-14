@@ -32,7 +32,7 @@
           <code>{{ '{{cidade}}' }}</code>, <code>{{ '{{vendedor}}' }}</code>, <code>{{ '{{descadastro}}' }}</code>. Scripts são tirados (e-mail não roda script).</p></div>
       <div class="largo"><label>Imagem do WhatsApp {% if v.imagem_hash %}(trocar){% endif %}</label>
         <input type="file" name="imagem" accept="image/png,image/jpeg,image/gif,image/webp">
-        <p class="ajuda">PNG, JPG, GIF ou WebP, até {{ LIMITE_KB }} KB. Vai com o texto do toque embaixo, só para quem já conversou com a MS.</p>
+        <p class="ajuda">PNG, JPG, GIF ou WebP, até {{ LIMITE_KB }} KB. Vai com o texto do toque embaixo, só para quem já conversou {{ marca.frase('com') }}.</p>
         {% if v.imagem_hash %}<label class="marcar"><input type="checkbox" name="tirar_imagem"> Tirar a imagem do WhatsApp</label>{% endif %}</div>
     </div>
     {% if pode('templates.editar') %}<button class="btn btn-primario" style="margin-top:10px">Salvar</button>{% endif %}

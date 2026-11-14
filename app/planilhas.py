@@ -151,8 +151,10 @@ def _latin(texto: str) -> str:
     return texto.encode("latin-1", "replace").decode("latin-1")
 
 
-def gerar_pdf(titulo: str, secoes: list[tuple[str, list[str], list[list]]], subtitulo: str = "") -> bytes:
-    """secoes: [(título da seção, colunas, linhas)]. Página deitada (paisagem)."""
+def gerar_pdf(titulo: str, secoes: list[tuple[str, list[str], list[list]]], subtitulo: str = "",
+              empresa: str = "") -> bytes:
+    """secoes: [(título da seção, colunas, linhas)]. Página deitada (paisagem). empresa: a marca de quem exporta
+    (white label, Fase 5); vazio = o nome neutro do sistema."""
     from fpdf import FPDF, FontFace
 
     pdf = FPDF(orientation="L", unit="mm", format="A4")
@@ -163,7 +165,7 @@ def gerar_pdf(titulo: str, secoes: list[tuple[str, list[str], list[list]]], subt
     pdf.cell(0, 9, _latin(titulo), new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("Helvetica", "", 9)
     pdf.set_text_color(90, 100, 110)
-    pdf.cell(0, 5, _latin(subtitulo or f"MS Certificação Digital · gerado em {datetime.now():%d/%m/%Y %H:%M}"),
+    pdf.cell(0, 5, _latin(subtitulo or f"{empresa or 'Prospecção de Parceiros'} · gerado em {datetime.now():%d/%m/%Y %H:%M}"),
              new_x="LMARGIN", new_y="NEXT")
     pdf.ln(3)
     largura_util = pdf.w - pdf.l_margin - pdf.r_margin

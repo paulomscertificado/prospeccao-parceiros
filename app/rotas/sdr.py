@@ -732,7 +732,7 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
                             "saem sozinhos, cada um no seu horário (WhatsApp: um a cada 3 minutos, com os limites do número).")
         else:
             avisar(request, f"Campanha aprovada: {n} contatos programados. Os WhatsApps de cada dia aparecem aqui na "
-                            "campanha para enviar com um clique (para quem já conversou com a MS, saem sozinhos); "
+                            "campanha para enviar com um clique (para quem já conversou com a empresa, saem sozinhos); "
                             "e-mails saem pela fila.")
     elif acao == "cancelar" and camp.status in ("aguardando_aprovacao", "ativa", "gerando", "erro"):
         n = campanhas.cancelar(db, camp, usuario)
@@ -868,7 +868,7 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
             camp.conexao_id = _numero_escolhido(db, usuario, form, dono)
             if form.get("conexao_id") and not camp.conexao_id:
                 avisar(request, "Esse número não é de " + (dono.nome if dono else "quem é dono da campanha")
-                       + " nem está compartilhado com ele: pela regra da MS, os disparos de cada pessoa saem só pelo "
+                       + " nem está compartilhado com ele: pela regra do sistema, os disparos de cada pessoa saem só pelo "
                          "WhatsApp dela (ou um compartilhado com ela). A campanha ficou no automático.", "erro")
             else:
                 avisar(request, "Número da campanha atualizado.")
@@ -884,7 +884,7 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
                           cid, "WhatsApp sai sozinho depois da aprovação, também para contato frio" if ligar
                           else "Contato frio volta a esperar o clique", request)
             if not ligar:
-                avisar(request, "WhatsApp automático desligado: quem nunca conversou com a MS volta a esperar o seu clique.")
+                avisar(request, "WhatsApp automático desligado: quem nunca conversou com a empresa volta a esperar o seu clique.")
             elif camp.status == "ativa" and camp.aprovado_em:
                 avisar(request, "WhatsApp automático ligado: as mensagens desta campanha saem sozinhas, uma a cada "
                                 "3 minutos, no horário de envio e com os limites do número.")
@@ -946,8 +946,8 @@ def sugerir_categorias(request: Request, usuario: Usuario = Depends(exige("categ
     atuais = [c.nome for c in db.execute(select(Categoria)).scalars()]
     numeros = [f"{s['nome']}: {s['contatados']} contatados, resposta {s['taxa_resposta']}%, {s['parceiros']} parceiros"
                for s in dados["segmentos"]]
-    pedido = ("Sugira até 5 NOVAS categorias de empresas que poderiam ser parceiras comerciais da MS Certificação "
-              "Digital (indicando certificados digitais aos próprios clientes). Não repita as atuais: "
+    pedido = ("Sugira até 5 NOVAS categorias de empresas que poderiam ser parceiras comerciais de uma Autoridade de "
+              "Registro de certificados digitais (indicando certificados digitais aos próprios clientes). Não repita as atuais: "
               f"{', '.join(atuais)}.\nResultados até agora: {'; '.join(numeros) or 'ainda sem dados'}.\n"
               "Para cada uma: motivo (por que os clientes dela precisam de certificado), potencial, palavras_chave "
               "para achar no nome da empresa (separadas por vírgula) e estratégia de abordagem.")

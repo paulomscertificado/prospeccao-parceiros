@@ -9,7 +9,7 @@ A cada 5 minutos (rotinas.rodada) o sistema confere:
 - e-mails da fila falhando (5 ou mais na última hora);
 - número com os contatos frios pausados por pedidos de SAIR (mensagens.limite_de_frios);
 - o agendador que ficou mais de 30 minutos sem rodar (aviso quando ele volta);
-- a cópia de segurança (backup) feita no computador da MS parada há mais de 3 dias e meio.
+- a cópia de segurança (backup) feita no computador da plataforma parada há mais de 3 dias e meio.
 
 Cada problema vira UM e-mail para os administradores (ou para a lista em Configurações), um lembrete a cada 12 horas
 enquanto durar e um e-mail de "resolvido" quando volta ao normal. Também aparece no sino do sistema.
@@ -142,15 +142,15 @@ def problemas_agora(db) -> dict[str, dict]:
                         "texto": (f"Hoje {pausa} ou mais pessoas pediram para sair "
                                   f"depois de receber mensagem do número \"{nome}\". Para proteger o número contra "
                                   "bloqueio, os contatos frios dele ficam parados até amanhã (quem já conversou com a "
-                                  "MS continua recebendo).\n\nVale revisar o texto da campanha e a lista de empresas."),
+                                  "empresa continua recebendo).\n\nVale revisar o texto da campanha e a lista de empresas."),
                         "link": "/envios", "ar": ar_do_numero.get(id_conexao)}
 
     parado = relogio.nuvem_atrasada(db)  # só depois que a nuvem passou a chamar a cada minuto (plano Pro)
     if parado is not None:
         achados["relogio"] = {
-            "titulo": "Relógio da nuvem parado: o computador da MS está cobrindo",
+            "titulo": "Relógio da nuvem parado: o computador da plataforma está cobrindo",
             "texto": (f"Desde {parado:%d/%m às %H:%M} o agendador da Vercel não chama o sistema. Enquanto isso, quem faz "
-                      "as filas andarem é o computador da MS (reserva); se ele também desligar, nada sai.\n\nO que "
+                      "as filas andarem é o computador da plataforma (reserva); se ele também desligar, nada sai.\n\nO que "
                       "fazer: avisar quem cuida do sistema para conferir os Cron Jobs no painel da Vercel."),
             "link": "/configuracoes?aba=integracoes", "desde": parado.isoformat()}
 
@@ -179,7 +179,7 @@ def problemas_agora(db) -> dict[str, dict]:
         achados["backup"] = {
             "titulo": "A cópia de segurança (backup) não é feita há dias",
             "texto": (f"O último backup do banco foi em {feito:%d/%m às %H:%M}. Ele é feito todo dia, depois do "
-                      "meio-dia, pelo computador da MS (o Supabase grátis não tem backup).\n\nO que fazer: deixar o "
+                      "meio-dia, pelo computador da plataforma (o Supabase grátis não tem backup).\n\nO que fazer: deixar o "
                       "computador ligado depois do meio-dia ou dar dois cliques em fazer_backup.bat."),
             "link": "/configuracoes?aba=integracoes", "desde": feito.isoformat()}
 
@@ -212,9 +212,9 @@ def _avisar(db, assunto: str, corpo: str, link: str, ar=None, todos: bool = Fals
     saiu = False
     for destino in destinatarios(db, ar, todos):
         try:
-            email_smtp.enviar(destino, f"[Prospecção MS] {assunto}"[:200],
+            email_smtp.enviar(destino, f"[Prospecção] {assunto}"[:200],
                               f"{corpo}\n\nAbrir o sistema: {config.URL_PUBLICA}{link}\n\n"
-                              "(Aviso automático do sistema de Prospecção da MS.)", com_rodape=False)
+                              "(Aviso automático do sistema de Prospecção.)", com_rodape=False)
             saiu = True
         except email_smtp.ErroEmail as erro:
             log.warning("Aviso por e-mail não saiu para %s: %s", destino, erro)
@@ -321,7 +321,7 @@ def marcar_rodada() -> None:
                 _avisar(db, "⚠️ O agendador ficou parado e voltou agora",
                         f"Entre {ultima:%d/%m %H:%M} e {agora_:%d/%m %H:%M} ({_duracao(ultima, agora_)}) ninguém "
                         "chamou o sistema: nenhum e-mail saiu, nenhuma resposta foi lida e nenhuma campanha andou. "
-                        "Já voltou a funcionar.\n\nHoje quem chama o sistema a cada minuto é o computador da MS (e o "
+                        "Já voltou a funcionar.\n\nHoje quem chama o sistema a cada minuto é o computador da plataforma (e o "
                         "agendador da nuvem, se estiver ligado). Se o computador foi desligado, isso explica.",
                         "/envios")
             db.commit()

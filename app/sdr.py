@@ -382,12 +382,13 @@ def classificar_resposta(db, lead: Lead, texto: str) -> dict:
     ultimas = db.execute(select(Mensagem).where(Mensagem.lead_id == lead.id, Mensagem.direcao == "saida")
                          .order_by(Mensagem.criado_em.desc()).limit(2)).scalars().all()
     pedido = (
-        "Classifique a resposta de um possível parceiro a uma prospecção da MS Certificação Digital.\n"
+        "Classifique a resposta de um possível parceiro a uma prospecção de uma Autoridade de Registro de "
+        "certificados digitais.\n"
         f"Classes possíveis: {', '.join(config.CLASSES_RESPOSTA)}.\n"
         f"Use {config.CLASSE_AUTOMATICA} quando a mensagem for de robô/chatbot/URA/ausência (ex.: 'recebemos sua "
         "mensagem, aguarde', menu de opções, horário de atendimento), e não de uma pessoa.\n"
         "resumo: 1–2 frases para o time humano (só com o que a pessoa disse e o que sabemos da empresa). "
-        "pergunta_basica: se a pessoa fez uma pergunta simples (o que é a MS, como funciona, como valida), copie a "
+        "pergunta_basica: se a pessoa fez uma pergunta simples (o que é a empresa, como funciona, como valida), copie a "
         "pergunta; senão vazio. contato_indicado: se indicou outra pessoa/contato, copie; senão vazio.\n\n"
         f"EMPRESA: {lead.empresa} ({lead.categoria.nome if lead.categoria else 'sem categoria'}).\n"
         f"NOSSAS ÚLTIMAS MENSAGENS: {' | '.join(m.corpo[:400] for m in ultimas) or '-'}\n"

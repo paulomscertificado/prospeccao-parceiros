@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}Meu painel{% endblock %}
 {% block conteudo %}
-<div class="cabecalho"><div><h1>{{ p.escritorio }}</h1><div class="suave">Parceiro MS Certificação Digital desde {{ p.data_entrada|data }}</div></div>
+<div class="cabecalho"><div><h1>{{ p.escritorio }}</h1><div class="suave">Parceiro {{ marca.frase('de', nome=True) }} desde {{ p.data_entrada|data }}</div></div>
   <a class="btn btn-verde" href="/portal/indicar">+ Indicar cliente</a></div>
 <div class="grade">
   <div class="kpi"><div class="rotulo">Clientes indicados</div><div class="valor">{{ totais.indicados }}</div></div>
@@ -18,6 +18,6 @@
   <div class="cartao"><h2>Clientes da sua carteira vencendo (60 dias)</h2><table><tr><th>Cliente</th><th>Vencimento</th></tr>
     {% for c in vencendo %}<tr><td>{{ c.cliente_nome }}<div class="pequeno suave">{{ c.tipo }}</div></td><td>{{ c.data_vencimento|data }}</td></tr>
     {% else %}<tr><td colspan="2" class="vazio">Nenhum vencimento próximo.</td></tr>{% endfor %}</table>
-    <p class="ajuda">A MS entra em contato com esses clientes para renovar, e a renovação também gera comissão para você.</p></div>
+    <p class="ajuda">{{ marca.frase(maiuscula=True) }} entra em contato com esses clientes para renovar, e a renovação também gera comissão para você.</p></div>
 </div>
 {% endblock %}

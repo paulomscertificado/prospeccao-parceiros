@@ -66,7 +66,8 @@ def interpretar_pedido(db, texto: str) -> dict:
                  "estado": base.get("estado", ""), "quantidade": base.get("quantidade"), "canais": [],
                  "objetivo": "Encontrar parceiros", "justificativa": justificativa, "fonte": "regras"}
     if ia.disponivel() and texto.strip():
-        pedido = (f"Interprete o pedido de campanha de prospecção de PARCEIROS da MS Certificação Digital.\n"
+        pedido = (f"Interprete o pedido de campanha de prospecção de PARCEIROS de uma Autoridade de Registro de "
+                  f"certificados digitais.\n"
                   f"Categorias disponíveis (use só estes códigos): "
                   f"{'; '.join(f'{k} = {v}' for k, v in codigos.items())}.\n"
                   "Se o pedido falar de um público (ex.: empresas que atendem PMEs), escolha as categorias que atendem "
@@ -711,8 +712,10 @@ def enviar_teste(db, camp: Campanha, usuario: Usuario, canal: str, destino: str,
             if canal == "email":
                 from . import marca
 
-                assunto, texto = marca.aplicar(assunto, usuario), marca.aplicar(texto, usuario)
-                email_smtp.enviar(destino, f"[TESTE] {assunto or marca.da_pessoa(usuario)['nome']}",
+                # a marca da AR da campanha (o Admin Master testa por dentro da AR)
+                assunto = marca.aplicar(assunto, usuario, camp.tenant_id)
+                texto = marca.aplicar(texto, usuario, camp.tenant_id)
+                email_smtp.enviar(destino, f"[TESTE] {assunto or marca.da_pessoa(usuario, camp.tenant_id)['nome']}",
                                   f"{rotulo}\n\n{texto}", lead_id=None, conta=conta,
                                   html=visual.html_do_email(db, t, t.lead, usuario, f"{rotulo}\n\n{texto}"))
             else:
@@ -1461,7 +1464,7 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
             feito["bloqueados"] += 1
             continue
         t.resultado = (f"Enviada sozinha ({motivo_automatico(automaticas, t.campanha_id)})" if automatica
-                       else "Enviada sozinha pela IA SDR (contato já conversou com a MS)")
+                       else "Enviada sozinha pela IA SDR (contato já conversou com a empresa)")
         feito["enviados"] += 1
         _anotar_vez(db, "whatsapp", t.tenant_id)
         if config.ESPACAR_ENVIOS:

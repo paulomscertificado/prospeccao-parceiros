@@ -1,4 +1,4 @@
-"""Renovação: avisos de vencimento do certificado digital para os clientes da MS (pedido da Maria em 12/11/2026).
+"""Renovação: avisos de vencimento do certificado digital para os clientes da AR (pedido da Maria em 12/11/2026).
 
 1. A equipe exporta o "Relatório de renovação" do sistema da certificadora (Excel) e importa na tela Renovação. Cada
    linha vira um certificado (tabela certificados, origem "planilha", chave = protocolo): vencimento, tipo, razão
@@ -79,6 +79,13 @@ PADRAO = {
     "renov_ativo_desde": "",          # a campanha automática só começa nesta data (AAAA-MM-DD; "" = já)
 }
 URL_DA_ARTE = "https://mscertificados.com.br/interno/aviso-vencimento"  # quem desenha: whatsapp-leads/app/arte_aviso.py
+
+
+def url_da_arte(db, ar: int | None) -> str:
+    """A arte do aviso é a do site da MS: só a AR MS a usa (white label, Fase 5). Outra AR: só o texto (vazio)."""
+    from . import marca
+
+    return URL_DA_ARTE if marca.da_ar(db, ar or marca.ar_padrao(db))["e_ms"] else ""
 DIAS_GUARDANDO_ARTE = 10  # a cópia da arte que voltou do computador (para o e-mail) fica só uns dias
 # E-mail com a arte: a imagem primeiro (como no WhatsApp, onde o texto é a legenda) e o texto do aviso embaixo
 HTML_EMAIL_COM_ARTE = (
@@ -266,7 +273,7 @@ def garantir_cadencia(db):
     cad = db.execute(select(Cadencia).where(Cadencia.nome == CADENCIA_NOME)).scalars().first()
     if cad is None:
         cad = Cadencia(nome=CADENCIA_NOME,
-                       descricao="Avisos de vencimento do certificado digital para os clientes da MS (tela Renovação).")
+                       descricao="Avisos de vencimento do certificado digital para os clientes (tela Renovação).")
         for dia, angulo, acao in CADENCIA_PASSOS:
             cad.passos.append(PassoCadencia(dia=dia, canal="auto", acao=acao, angulo=angulo))
         db.add(cad)
@@ -986,10 +993,10 @@ def _lead_para_o_contato(db, contato: Contato, usuario: Usuario) -> tuple[Lead |
     dados = {"empresa": _nome_do_contato(contato), "responsavel": contato.responsavel[:120],
              "whatsapp": contato.whatsapp, "email": contato.email, "telefone": contato.telefone,
              "cnpj": unico.cnpj if unico is not None and not _e_pessoa(unico) else "",
-             "observacoes": "Cliente da MS: aviso de renovação do certificado digital (planilha de renovação)."}
+             "observacoes": "Cliente: aviso de renovação do certificado digital (planilha de renovação)."}
     lead, _ = criar_lead(db, dados, usuario, origem=ORIGEM_LEAD, checar_duplicado=False)
     if lead is not None:
-        lead.base_legal = "Legítimo interesse: cliente da MS (renovação do certificado)"
+        lead.base_legal = "Legítimo interesse: cliente da empresa (renovação do certificado)"
     return lead, ""
 
 
@@ -1491,6 +1498,8 @@ def arte_do_toque(db, tarefa: Tarefa | None) -> dict | None:
     lista vai no texto. Pedido da Maria em 12/11/2026, com a arte também para quem nunca conversou (risco aceito)."""
     if tarefa is None or not tarefa.certificado_id or not tarefa.campanha_id or cfg(db, "renov_arte") != "1":
         return None
+    if not url_da_arte(db, tarefa.tenant_id):  # a arte é a do site da MS: outra AR manda só o texto
+        return None
     camp = db.get(Campanha, tarefa.campanha_id)
     if camp is None or camp.tipo != TIPO_CAMPANHA:
         return None
@@ -1700,6 +1709,7 @@ def enviar_teste(db, usuario: Usuario, cert_id: int, canal: str, destino: str, a
     angulos = list(ANGULOS) if avisos == "todos" else [avisos if avisos in ANGULOS else "renov_aviso"]
     cert = contato.certificados[0]
     # a arte é de UM certificado: com vários no mesmo contato, o cliente recebe a lista no texto (o teste mostra igual)
+    com_arte = com_arte and bool(url_da_arte(db, getattr(cert, "tenant_id", None)))  # a do site da MS: só a AR MS
     dados_arte = _arte_do_certificado(cert) if com_arte and len(contato.certificados) == 1 else None
     feito = {"enviadas": 0, "erros": [], "arte": False, "remetente": remetente.nome,
              "certificados": len(contato.certificados), "arte_pedida": com_arte, "numero": "", "modo_teste": False}

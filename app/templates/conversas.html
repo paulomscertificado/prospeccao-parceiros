@@ -2,7 +2,7 @@
 {% block titulo %}Conversas{% endblock %}
 {% block conteudo %}
 <style>
-  /* Caixa de conversas no visual da MS: lista à esquerda, conversa à direita (como um WhatsApp da marca) */
+  /* Caixa de conversas no visual do sistema: lista à esquerda, conversa à direita (como um WhatsApp da marca) */
   .chat { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); height: calc(100vh - 150px); min-height: 480px;
           background: #fff; border: 1px solid var(--borda); border-radius: 14px; overflow: hidden; box-shadow: var(--sombra); }
   .chat-lista { display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--borda); min-height: 0; background: #fbfcfe; }
@@ -76,7 +76,7 @@
     .chat-mensagens { max-height: 60vh; padding: 14px; }
   }
 </style>
-<div class="cabecalho"><div><h1>Conversas</h1><div class="suave">Mensagens do WhatsApp conectado. O que você escreve aqui sai na hora pelo número da MS.</div></div>
+<div class="cabecalho"><div><h1>Conversas</h1><div class="suave">Mensagens do WhatsApp conectado. O que você escreve aqui sai na hora pelo número conectado.</div></div>
   <div><button class="btn btn-primario" id="nova">+ Nova mensagem</button></div></div>
 
 {% if not ponte %}

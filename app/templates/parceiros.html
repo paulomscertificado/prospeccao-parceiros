@@ -7,7 +7,7 @@
 {% endmacro %}
 {% block conteudo %}
 <div class="cabecalho">
-  <div><h1>Parceiros</h1><div class="suave">Escritórios que indicam clientes para a MS.</div></div>
+  <div><h1>Parceiros</h1><div class="suave">Escritórios que indicam clientes {{ marca.frase('para') }}.</div></div>
   <div class="acoes"><a class="btn" href="/exportar/parceiros.xlsx">Exportar</a><a class="btn btn-primario" href="/parceiros/0">+ Parceiro</a></div>
 </div>
 {% if parados %}<div class="aviso aviso-alerta">{{ parados|length }} parceiro{{ 's' if parados|length != 1 }} não gerou nenhuma venda nos últimos {{ dias_parado }} dias. <a href="?aba=parados">Ver quais</a></div>{% endif %}

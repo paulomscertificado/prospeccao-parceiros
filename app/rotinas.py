@@ -45,11 +45,15 @@ def responder_automaticamente(db, lead: Lead, canal: str, analise: dict, conexao
     if db.execute(select(Mensagem.id).where(Mensagem.lead_id == lead.id, Mensagem.angulo == "resposta",
                                             Mensagem.criado_em >= agora() - timedelta(hours=24)).limit(1)).first():
         return False  # a SDR responde 1 vez por dia, no máximo: nunca entra em conversa sem fim (ex.: com robô)
+    from . import marca
+
+    quem = lead.vendedor or lead.humano  # a resposta sai em nome da empresa do responsável (AR do lead)
+    texto = marca.aplicar(texto, quem, lead.tenant_id)
     try:
         if canal == "email" and lead.email and email_smtp.configurado():
             assunto = assunto.strip()
-            assunto = assunto if assunto.lower().startswith("re:") else (f"Re: {assunto}" if assunto
-                                                                          else "Re: parceria MS Certificação Digital")
+            assunto = assunto if assunto.lower().startswith("re:") else (
+                f"Re: {assunto}" if assunto else f"Re: parceria {marca.da_pessoa(quem, lead.tenant_id)['nome']}")
             id_externo = email_smtp.enviar(lead.email, assunto[:200], texto, com_rodape=False, conta=conta_email,
                                            em_resposta_a="" if em_resposta_a.startswith("sem-id:") else em_resposta_a)
         elif canal == "whatsapp" and lead.whatsapp and whatsapp_cloud.configurado():

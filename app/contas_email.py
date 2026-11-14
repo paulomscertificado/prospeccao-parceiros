@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from email.utils import formataddr, parseaddr
 
 from sqlalchemy import select
+from sqlalchemy.orm import object_session
 
 from . import autorizacao, config
 from .modelos import ContaEmail, Usuario
@@ -59,8 +60,30 @@ def credenciais(conta: ContaEmail | None) -> Credenciais:
                        conta.endereco)
 
 
+def dominio_da_equipe(db, usuario: Usuario | None) -> str:
+    """O domínio dos e-mails da equipe da AR da pessoa (Configurações > Marca; white label, Fase 5). Vazio = a AR ainda
+    não informou: vale qualquer domínio de empresa (nunca Gmail, Hotmail... pessoal)."""
+    from . import marca
+
+    return marca.da_pessoa(usuario, db=db)["dominio_email"] if usuario is not None else config.EMAIL_DOMINIO
+
+
+def dominio_ok(conta: ContaEmail | None, endereco: str) -> bool:
+    """Na hora de enviar: o e-mail é do domínio da AR do dono da conta (ou a conta tem o domínio liberado)."""
+    if conta is None or conta.principal:
+        return not config.EMAIL_DOMINIO or endereco.lower().endswith("@" + config.EMAIL_DOMINIO.lower())
+    if dominio_liberado(conta):
+        return True
+    from . import marca
+
+    if not conta.tenant_id:
+        return not config.EMAIL_DOMINIO or endereco.lower().endswith("@" + config.EMAIL_DOMINIO.lower())
+    dominio = marca.da_pessoa(None, conta.tenant_id, db=object_session(conta))["dominio_email"]
+    return not dominio or endereco.lower().endswith("@" + dominio)
+
+
 def dominio_liberado(conta: ContaEmail | None) -> bool:
-    """A conta pode enviar fora do domínio da MS: foi salva assim e o dono AINDA tem email.outro_dominio."""
+    """A conta pode enviar fora do domínio da AR: foi salva assim e o dono AINDA tem email.outro_dominio."""
     if conta is None or conta.principal or not conta.dominio_livre or not conta.dono_id:
         return False
     from sqlalchemy.orm import object_session
@@ -156,10 +179,10 @@ def para_enviar(db, quem: Usuario | None) -> ContaEmail:
         if proprio.ativa:
             return proprio
         raise SemConta(f"O e-mail de {quem.nome} está pausado na tela E-mail: os disparos dele esperam até ligar de "
-                       "novo (pela regra da MS, os disparos de cada pessoa saem só pelo e-mail dela).")
+                       "novo (pela regra do sistema, os disparos de cada pessoa saem só pelo e-mail dela).")
     if principal.dono_id == quem.id:
         return principal
-    raise SemConta(f"{quem.nome} não tem e-mail próprio cadastrado: cadastre o seu na tela E-mail. Pela regra da MS, "
+    raise SemConta(f"{quem.nome} não tem e-mail próprio cadastrado: cadastre o seu na tela E-mail. Pela regra do sistema, "
                    "os disparos de cada pessoa saem só pelo e-mail dela (não por um compartilhado nem pelo principal).")
 
 

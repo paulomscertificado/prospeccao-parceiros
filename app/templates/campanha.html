@@ -39,13 +39,13 @@
 {% if pode_whatsapp_sozinho and c.tipo not in ('empresas_novas', 'renovacao') and c.status in ('aguardando_aprovacao', 'ativa', 'pausada') %}
 <form class="cartao" id="whatsapp-sozinho" method="post" action="/campanhas/{{ c.id }}/whatsapp-sozinho"
       style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap"
-      {% if not c.whatsapp_sozinho %}data-confirmar="Ligar o WhatsApp automático? Depois da aprovação, as mensagens de WhatsApp desta campanha saem sozinhas, também para quem nunca conversou com a MS (uma a cada 3 minutos, com os limites do número)."{% endif %}>
+      {% if not c.whatsapp_sozinho %}data-confirmar="Ligar o WhatsApp automático? Depois da aprovação, as mensagens de WhatsApp desta campanha saem sozinhas, também para quem nunca conversou {{ marca.frase('com') }} (uma a cada 3 minutos, com os limites do número)."{% endif %}>
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <input type="hidden" name="ligar" value="{{ '0' if c.whatsapp_sozinho else '1' }}">
   <div style="flex:1;min-width:260px"><b>WhatsApp sai sozinho depois da aprovação</b> <span class="selo">só admin</span>
     {% if c.whatsapp_sozinho %}<span class="selo selo-ok">ligado</span>{% else %}<span class="selo">desligado</span>{% endif %}
     <p class="pequeno suave" style="margin:4px 0 0">{% if c.whatsapp_sozinho %}As mensagens de WhatsApp desta campanha saem sem o seu clique,
-      também para quem nunca conversou com a MS, como nas Empresas novas.{% else %}Desligado, quem nunca conversou com a MS
+      também para quem nunca conversou {{ marca.frase('com') }}, como nas Empresas novas.{% else %}Desligado, quem nunca conversou {{ marca.frase('com') }}
       espera o seu clique. Ligado, o WhatsApp sai sozinho, como nas Empresas novas.{% endif %}
       Travas: uma mensagem a cada 3 minutos, só no horário de envio, limites por hora e por dia, até 20 contatos frios
       por número por dia e pausa com 3 pedidos de SAIR. Toque atrasado mais de 2 dias espera o clique.</p></div>
@@ -138,7 +138,7 @@
   {% elif c.tipo in ('empresas_novas', 'renovacao') or c.whatsapp_sozinho %}<p class="pequeno suave"><b>{{ 'Campanha de Empresas novas' if c.tipo == 'empresas_novas' else 'Campanha de Renovação' if c.tipo == 'renovacao' else 'WhatsApp automático ligado' }}: depois de aprovada, os WhatsApps saem sozinhos</b>,
     cada um no seu horário, pelo <b>{{ numero_whatsapp }}</b>, um por vez, com as pausas e o limite do número. O botão só adianta o envio.</p>
   {% else %}<p class="pequeno suave">Sai pelo <b>{{ numero_whatsapp }}</b>, uma mensagem por clique, com as pausas e o limite do número.
-    Para quem já conversou com a MS, a IA SDR envia sozinha.</p>{% endif %}
+    Para quem já conversou {{ marca.frase('com') }}, a IA SDR envia sozinha.</p>{% endif %}
   {% for t in whatsapp_hoje %}
   <div style="border-top:1px solid var(--borda);padding:10px 0">
     <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">

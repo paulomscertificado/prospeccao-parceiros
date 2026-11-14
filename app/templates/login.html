@@ -3,11 +3,11 @@
 {% block publico %}
 <div class="login"><div class="conteiner">
   <div class="capa">
-    <div class="marca"><img class="logo-img" src="/static/logo-ms.png" alt="MS Certificação Digital"><span class="divisor"></span>
+    <div class="marca"><span class="logo-texto">{{ marca.titulo }}</span><span class="divisor"></span>
       <span class="rotulo-marca">Autoridade de registro<br>ICP-Brasil</span></div>
     <span class="etiqueta">Prospecção de parceiros</span>
     <h1>Entrar.</h1>
-    <p>Encontre, qualifique e acompanhe os parceiros que indicam clientes para a MS.</p>
+    <p>Encontre, qualifique e acompanhe os parceiros que indicam clientes {{ marca.frase('para') }}.</p>
   </div>
   <form class="cartao" method="post" action="/login">
     {% for tipo, texto in avisos %}<div class="aviso aviso-{{ tipo }}">{{ texto }}</div>{% endfor %}

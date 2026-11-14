@@ -138,8 +138,8 @@
         <span class="escolha-corpo">
           <span class="escolha-marca" aria-hidden="true">✓</span>
           <b>{{ nome }}</b>
-          <span class="escolha-motivo" style="-webkit-line-clamp:3">{{ info[0] }}</span>
-          {% if info[1] %}<span class="exemplo">“{{ info[1] }}”</span>{% endif %}
+          <span class="escolha-motivo" style="-webkit-line-clamp:3">{{ com_marca(info[0]) }}</span>
+          {% if info[1] %}<span class="exemplo">“{{ com_marca(info[1]) }}”</span>{% endif %}
         </span>
       </label>{% endfor %}
     </div>
