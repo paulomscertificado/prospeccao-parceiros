@@ -64,8 +64,18 @@ O modo nuvem liga sozinho quando a variável `VERCEL` existe (a Vercel cria) ou 
   `testes/test_backup_criptografado.py`. Roda sozinho 1 vez por dia, a
   partir das 12:00, pelo `dados/chamar_cron.ps1` (escondido; se falhar, tenta de novo depois de 2 h; saída em
   `dados/backups/saida.txt` e `erros.txt`). À mão: `fazer_backup.bat`. Para voltar uma cópia (emergência, APAGA o que
-  está na nuvem menos a base da Receita): `restaurar_backup.bat`, que pede para digitar SIM. Cada backup gasta ~55 MB
-  da transferência mensal do Supabase (5 GB no grátis).
+  está na nuvem menos a base da Receita): `restaurar_backup.bat`, que pede para digitar SIM. Desde 14/11/2026 as
+  conversas do WhatsApp (`mensagens_whatsapp`) ficam fora do backup: são cópia das do WhatsApp Leads (que tem o próprio
+  backup) e eram 3/4 dos ~55 MB de cada backup. A restauração não mexe nelas e, se faltarem, volta o
+  `wl_conv_ultimo_id` para a maior que ficou (`restaurar_backup._reabrir_conversas`): o WhatsApp Leads manda de novo.
+- **Tráfego do Supabase (egress, 5 GB/mês no grátis).** Em 14/11/2026 o mês estava em 7,44 GB. Medido com
+  `extensions.pg_stat_statements` (linhas devolvidas por consulta; uma consulta de linha só numa tabela larga gasta
+  mais com a descrição das colunas do que com o dado). Cortes feitos: status das mensagens da ponte e dos envios numa
+  consulta só (`api._guardar_conversas`, `sdr.aplicar_novidades_whatsapp`; eram ~2,4 milhões de consultas de uma
+  linha); lista da tela Conversas sem uma consulta por conversa (`conversas._ultimas_mensagens`); telas Conversas e
+  WhatsApp só se atualizam com a aba visível; filas de e-mail e WhatsApp trazem só os ids e carregam as tarefas em lotes
+  de 10 com o lead junto (`campanhas._em_lotes`); leitura de e-mails pergunta só pelos remetentes
+  (`rotinas._EmailsDeLeads`); backup sem as conversas. Para conferir de novo: a consulta acima ordenada por `rows`.
 - **Base da Receita na nuvem.** A tela Configurações > Integrações não importa a base na nuvem: uma importação
   inteira não cabe no limite de 500 MB junto com o resto. Ramo ou região novos entram por importação própria e
   filtrada (como os restaurantes da Região Metropolitana do Recife), feita pelo suporte.

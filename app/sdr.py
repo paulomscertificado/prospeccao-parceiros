@@ -15,7 +15,7 @@ import json
 import logging
 import re
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 
 from . import config, ia, mensagens, util
 from .banco import agora, ler_config
@@ -851,13 +851,18 @@ def aplicar_novidades_whatsapp(db, dados: dict) -> dict:
         return lead_pelo_telefone(db, telefone)
 
     situacao = {"enviada": "enviada", "erro": "falhou", "cancelada": "falhou"}
-    for envio in dados.get("envios", []):
-        msg = db.execute(select(Mensagem).where(Mensagem.modo == "whatsapp-leads",
-                                                Mensagem.id_externo == str(envio["id"]))).scalars().first()
-        novo = situacao.get(envio["status"])
-        if msg and novo and msg.status != novo:
-            msg.status, msg.erro = novo, envio.get("erro", "")[:500]
-            resultado["status"] += 1
+    # Status dos envios: UMA consulta, só com o que muda (antes era uma por envio, com a mensagem inteira, a cada
+    # troca com o computador do WhatsApp Leads: o 2º maior gasto de tráfego do Supabase, 14/11/2026).
+    envios = {str(e["id"]): e for e in dados.get("envios", [])}
+    if envios:
+        for mid, id_externo, atual in db.execute(select(Mensagem.id, Mensagem.id_externo, Mensagem.status).where(
+                Mensagem.modo == "whatsapp-leads", Mensagem.id_externo.in_(list(envios)))).all():
+            envio = envios[id_externo]
+            novo = situacao.get(envio["status"])
+            if novo and atual != novo:
+                db.execute(update(Mensagem).where(Mensagem.id == mid)
+                           .values(status=novo, erro=str(envio.get("erro") or "")[:500]))
+                resultado["status"] += 1
     for telefone in dados.get("bloqueados", []):
         lead = lead_do_telefone(telefone)
         if lead and not lead.opt_out:

@@ -116,7 +116,11 @@ function mostrar(e) {
   } else { ap.style.display = 'none'; }
 }
 mostrar({{ estado|json }});
-setInterval(async () => { try { mostrar(await (await fetch('/whatsapp/estado')).json()); } catch (e) {} }, 3000);
+// só com a aba visível: aba escondida não gasta tráfego nem deixa a ponte do WhatsApp no modo rápido
+setInterval(async () => {
+  if (document.visibilityState !== 'visible') return;
+  try { mostrar(await (await fetch('/whatsapp/estado')).json()); } catch (e) {}
+}, 3000);
 </script>
 {% endif %}
 {% endblock %}

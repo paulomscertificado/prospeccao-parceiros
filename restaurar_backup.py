@@ -13,7 +13,7 @@ import sys
 import time
 from pathlib import Path
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 
 from enviar_para_nuvem import copiar, esvaziar
 from fazer_backup import (EXTENSAO, FORA_DO_BACKUP, PASTA, SenhaErrada, copias, descriptografar,
@@ -32,11 +32,26 @@ def restaurar(arquivo: Path, destino, avisar=print, senha: str = "") -> dict[str
     origem = create_engine(f"sqlite:///{aberta.as_posix()}")
     try:
         esvaziar(destino, pular=FORA_DO_BACKUP)
-        return copiar(origem, destino, avisar=avisar, pular=FORA_DO_BACKUP)
+        contagem = copiar(origem, destino, avisar=avisar, pular=FORA_DO_BACKUP)
+        _reabrir_conversas(destino)
+        return contagem
     finally:
         origem.dispose()
         if temporaria is not None:
             temporaria.unlink(missing_ok=True)
+
+
+def _reabrir_conversas(destino) -> None:
+    """As conversas do WhatsApp não vão no backup (são cópia das do WhatsApp Leads, que tem o próprio). Se o banco
+    restaurado tem menos conversas do que a configuração diz já ter recebido, o marcador volta para a maior que ficou
+    e o WhatsApp Leads manda de novo o que falta (as repetidas são ignoradas: api._guardar_conversas)."""
+    with destino.begin() as d:
+        if not inspect(destino).has_table("mensagens_whatsapp"):
+            return
+        maior = d.execute(text("SELECT COALESCE(MAX(id_wl), 0) FROM mensagens_whatsapp")).scalar() or 0
+        atual = d.execute(text("SELECT valor FROM configuracoes WHERE chave = 'wl_conv_ultimo_id'")).scalar()
+        if atual is not None and str(atual).strip().isdigit() and int(atual) > maior:
+            d.execute(text("UPDATE configuracoes SET valor = :v WHERE chave = 'wl_conv_ultimo_id'"), {"v": str(maior)})
 
 
 def main() -> int:

@@ -40,7 +40,10 @@ ARQUIVO_SUPABASE = config.PASTA_DADOS / "supabase.txt"
 ARQUIVO_SENHA = config.PASTA_DADOS / "senha_backup.txt"
 TENTATIVA = PASTA / "ultima_tentativa.txt"
 FICAM = 14  # dias guardados (aqui e fora do computador)
-FORA_DO_BACKUP = {"base_receita", "artes_aviso"}  # base: grande e reimportável; artes: imagens de poucos dias
+# base: grande e reimportável; artes: imagens de poucos dias; conversas do WhatsApp: são cópia das do WhatsApp Leads
+# (que tem o próprio backup) e eram 3/4 do tráfego do backup no Supabase grátis (14/11/2026). Ao restaurar, o
+# WhatsApp Leads manda de novo o que faltar (restaurar_backup._reabrir_conversas).
+FORA_DO_BACKUP = {"base_receita", "artes_aviso", "mensagens_whatsapp"}
 EXTENSAO = ".cripto"
 CABECALHO = b"MS-BACKUP-1\n"
 NOME_PASTA_FORA = "Backups Prospeccao MS"

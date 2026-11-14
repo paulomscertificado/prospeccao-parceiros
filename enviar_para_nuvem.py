@@ -107,8 +107,8 @@ def copiar(origem, destino, avisar=print, pular=frozenset()) -> dict[str, int]:
             for id_, valor in valores:
                 d.execute(update(tabela).where(tabela.c.id == id_).values({coluna.name: valor}))
         if destino.dialect.name == "postgresql":  # o próximo id continua depois do maior copiado
-            for tabela in tabelas:
-                if "id" in tabela.c and contagem.get(tabela.name):
+            for tabela in tabelas:  # só id numérico tem sequência (conexoes_whatsapp usa "principal", "u3"...)
+                if "id" in tabela.c and contagem.get(tabela.name) and tabela.c.id.type.python_type is int:
                     d.execute(text(f"SELECT setval(pg_get_serial_sequence('{tabela.name}', 'id'), "
                                    f"(SELECT MAX(id) FROM {tabela.name}))"))
     return contagem

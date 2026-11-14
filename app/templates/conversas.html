@@ -301,6 +301,16 @@ el('form-nome').addEventListener('submit', async ev => {
 
 carregarLista();
 if (atual) abrir(atual, numeroAtual);
-setInterval(() => { carregarLista(); carregarConversa(false); }, 4000);
+// Atualiza só com a aba visível (aba escondida não gasta o tráfego do banco); a lista a cada 15 s, a conversa a cada 5 s
+let voltas = 0;
+setInterval(() => {
+  if (document.visibilityState !== 'visible') return;
+  voltas += 1;
+  if (voltas % 3 === 0) carregarLista();
+  carregarConversa(false);
+}, 5000);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') { carregarLista(); carregarConversa(false); }
+});
 </script>
 {% endblock %}
