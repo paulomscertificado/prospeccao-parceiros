@@ -125,7 +125,7 @@ def _caminhos(caminho: str, rota, dados) -> list[str]:
 def test_pessoa_do_grupo_certy_nunca_ve_nada_da_ar_ms(duas_ars):
     _zerar_limite()
     c = _entrar(duas_ars["certy_email"])
-    vazou, percorridas = [], 0
+    vazou, quebrou, percorridas = [], [], 0
     try:
         for modelo, rota in _rotas("GET"):
             for caminho in _caminhos(modelo, rota, duas_ars):
@@ -135,10 +135,13 @@ def test_pessoa_do_grupo_certy_nunca_ve_nada_da_ar_ms(duas_ars):
                 r = c.get(caminho, follow_redirects=False)
                 if SIGILO in r.text:
                     vazou.append((caminho, r.status_code))
+                if r.status_code >= 500:
+                    quebrou.append(caminho)
     finally:
         _zerar_limite()
     assert percorridas >= 60  # as 65 rotas GET (menos as de máquina), as com id uma vez por id da MS
     assert not vazou, f"dado da AR MS apareceu para o Grupo Certy em: {vazou}"
+    assert not quebrou, f"tela com erro para a pessoa do Grupo Certy: {quebrou}"
     assert CERTY in c.get(f"/leads/{duas_ars['lead_certy']}").text  # controle: ela vê o que é do Grupo Certy
 
 
