@@ -184,7 +184,13 @@ def _ar_nas_novas(db: Session, _contexto, _instancias) -> None:
             continue
         if tabela in SO_DA_PESSOA:
             ar = _ar_de(db, Usuario, getattr(obj, "usuario_id", None), cache)
-            obj.tenant_id = None if isinstance(ar, tuple) else (ar if ar is not None else contexto)
+            if isinstance(ar, tuple):  # Admin Master
+                # quem agiu como quem (Fase 6): o que ele faz DENTRO de uma AR fica no histórico daquela AR, marcado
+                obj.tenant_id = contexto if tabela == "logs" else None
+                if tabela == "logs" and contexto is not None:
+                    obj.detalhes = f"[Admin Master dentro da AR] {obj.detalhes or ''}"[:2000]
+            else:
+                obj.tenant_id = ar if ar is not None else contexto
             continue
         if contexto is not None:
             obj.tenant_id = contexto

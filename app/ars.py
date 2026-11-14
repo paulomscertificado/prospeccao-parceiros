@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 import logging
 
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 log = logging.getLogger(__name__)
 
@@ -255,3 +255,57 @@ def preencher_novos() -> bool:
         preencher(con, {k: v for k, v in decisoes.items() if k in PADRAO}, gravar=True)
         con.commit()
     return True
+
+
+# ---------------------------------------------------------------- Fase 6 (LGPD): exportar e apagar uma AR
+
+def _tabelas_da_ar():
+    """As tabelas com a coluna da AR, na ordem das dependências (as 36 + configurações e entradas do Admin Master)."""
+    from .banco import Base
+    from . import base_receita, bases_importadas, modelos  # noqa: F401  (registra as tabelas)
+
+    return [t for t in Base.metadata.sorted_tables if "tenant_id" in t.c]
+
+
+def exportar(origem, ar_id: int, destino) -> dict[str, int]:
+    """Copia para o banco `destino` (um SQLite novo) SÓ as linhas da AR: as tabelas dela, a própria AR, as
+    configurações e as entradas do Admin Master nela. É o que a AR recebe quando pede os dados ou sai da plataforma
+    (LGPD: a AR é a controladora dos dados). Nada da plataforma nem de outra AR vai junto."""
+    from .banco import Base
+    from .modelos import Tenant
+
+    Base.metadata.create_all(destino)
+    contagem = {}
+    with origem.connect() as o, destino.begin() as d:
+        ar = [dict(r._mapping) for r in o.execute(select(Tenant.__table__).where(Tenant.id == ar_id))]
+        if not ar:
+            raise ValueError(f"AR {ar_id} não existe")
+        d.execute(Tenant.__table__.insert(), ar)
+        for t in _tabelas_da_ar():
+            linhas = [dict(r._mapping) for r in o.execute(select(t).where(t.c.tenant_id == ar_id))]
+            if linhas:
+                d.execute(t.insert(), linhas)
+            contagem[t.name] = len(linhas)
+    return contagem
+
+
+# ligações em ciclo dentro da AR (lead ↔ busca ↔ pessoa ↔ parceiro): desfeitas antes de apagar
+CICLOS = (("leads", "busca_id"), ("leads", "parceiro_id"), ("parceiros", "lead_id"), ("usuarios", "parceiro_id"),
+          ("usuarios", "papel_id"), ("usuarios", "equipe_id"))
+
+
+def apagar(con, ar_id: int) -> dict[str, int]:
+    """Apaga TODAS as linhas da AR e a própria AR (Fase 6, LGPD). Não toca nas outras ARs nem no que é da plataforma
+    (só linhas com tenant_id = ar_id). Quem chama faz o commit (o apagar_ar.py, depois de exportar e confirmar)."""
+    for tabela, coluna in CICLOS:
+        con.execute(text(f"UPDATE {tabela} SET {coluna} = NULL WHERE tenant_id = :ar"), {"ar": ar_id})
+    # filhos antes dos pais; as tabelas do ciclo por último, nesta ordem (a ordenação automática não dá conta do ciclo)
+    fim = ("leads", "buscas", "parceiros", "usuarios")
+    tabelas = _tabelas_da_ar()
+    por_nome = {t.name: t for t in tabelas}
+    ordem = [t for t in reversed(tabelas) if t.name not in fim] + [por_nome[n] for n in fim]
+    contagem = {}
+    for t in ordem:
+        contagem[t.name] = con.execute(t.delete().where(t.c.tenant_id == ar_id)).rowcount or 0
+    con.execute(text("DELETE FROM tenants WHERE id = :ar"), {"ar": ar_id})
+    return contagem

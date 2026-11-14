@@ -12,7 +12,7 @@ O dono da plataforma e Admin Master é o Paulo Marinho (`Usuario.master`).
 | 3 | Permissões por AR e painel /master | admin de uma AR não alcança outra nem o /master | **No ar desde 14/11/2026** (painel /master, o que é da plataforma só o master muda, módulos por AR); falta promover os admins das ARs |
 | 4 | WhatsApp, e-mail e filas por AR | uma AR parada não atrasa as outras | **Fila justa e avisos por AR no ar desde 14/11/2026**; computador do WhatsApp por AR espera a decisão (próprio ou servidor central) |
 | 5 | Marca (white label) | nenhuma tela ou mensagem mostra a MS em outra AR | — |
-| 6 | Auditoria, LGPD e planos | exportar e apagar uma AR de teste sem tocar nas outras | — |
+| 6 | Auditoria, LGPD e planos | exportar e apagar uma AR de teste sem tocar nas outras | Quem agiu como quem, exportar e apagar AR prontos e ensaiados em 14/11/2026; planos e cobrança esperam a decisão |
 
 Os planos pagos são obrigatórios antes da Fase 3 (a primeira AR nova): o Hobby da Vercel não permite uso comercial
 e o banco grátis tem 500 MB.
@@ -175,3 +175,25 @@ limite e o e-mail do Grupo Certy sai na mesma rodada; quem recebe cada aviso).
 **Falta (decisão em aberto):** cada AR com o próprio computador do WhatsApp Leads ou um servidor central para todas.
 Com a resposta: tabela `instancias_whatsapp` (AR, token próprio, último sinal), a ponte (`/api/ponte/*`) identifica a
 instância pelo token e só entrega os envios dos números da AR dela, e o estado (`wl_status`) passa a ser por instância.
+
+## Fase 6: auditoria e LGPD
+
+**Quem agiu como quem** (`isolamento._ar_nas_novas`): o que o Admin Master faz DENTRO de uma AR (depois de "Entrar na
+AR") fica no histórico (`logs`) daquela AR, com o nome dele e marcado "[Admin Master dentro da AR]"; os
+administradores da AR veem em Configurações > Logs. Fora de uma AR, o histórico dele é da plataforma.
+As entradas dele nas ARs (motivo, início e fim) ficam em `acessos_master` (painel /master).
+
+**Exportar uma AR** (`exportar_ar.py`/`.bat`, `ars.exportar`): um SQLite só com as linhas da AR (as tabelas dela, a
+própria AR, as configurações e as entradas do Admin Master nela), fechado com uma senha digitada (mínimo 10
+caracteres; a mesma criptografia do backup) em `dados/exportacoes/ar_<apelido>_<data>.db.cripto`. Nada fica aberto no
+computador. A senha vai para a AR por outro caminho.
+
+**Apagar uma AR** (`apagar_ar.py`/`.bat`, `ars.apagar`): só com a exportação do mesmo dia, digitando o apelido e SIM;
+a AR MS nunca (`PROTEGIDAS`). Apaga só linhas com o `tenant_id` dela (desfaz antes as ligações em ciclo e apaga leads,
+buscas, parceiros e pessoas por último) e a própria AR; registra no histórico da plataforma.
+
+**Testes e ensaio:** `testes/test_lgpd_ar.py` (exporta só a AR; apaga sem mudar as outras nem a plataforma; travas do
+script; histórico do master dentro da AR). Ensaio no Postgres de teste (14/11/2026): AR de ensaio exportada e apagada
+(6 linhas); AR MS (189.492 linhas) e Grupo Certy (1.234) iguais antes e depois.
+
+**Falta (decisão em aberto):** planos e cobrança das ARs (cotas por plano: buscas na CNPJá, mensagens por dia).

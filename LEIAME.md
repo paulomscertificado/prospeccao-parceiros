@@ -511,6 +511,12 @@ na AR** pede o motivo (fica registrado) e, até clicar em **Sair da AR** (na fai
 marca, como o administrador dela vê; **Nova AR**; **Suspender** (as pessoas da marca não entram até reativar); e os
 **módulos de cada marca**. O administrador de uma marca não muda os papéis do sistema, os modelos de mensagem, as
 cadências e as categorias que valem para todas: ele cria os da própria marca (pode copiar de um da plataforma).
+O que o admin master faz dentro de uma marca aparece no histórico dela (Configurações > Logs), marcado como dele.
+
+**Dados de uma marca (LGPD):** para entregar os dados a uma marca, dois cliques em **exportar_ar.bat** (pede o
+apelido da marca e uma senha; o arquivo fechado fica em `dados\exportacoes`; mande a senha por outro caminho). Para
+apagar uma marca que saiu da plataforma, **apagar_ar.bat**, que só funciona depois de exportar no mesmo dia e pede para
+digitar o apelido e SIM. A AR MS nunca é apagada por ele.
 
 ### Permissões (menu Permissões, só o administrador)
 
