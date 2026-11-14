@@ -21,3 +21,9 @@ def test_le_o_endereco_do_arquivo(tmp_path):
     arquivo.write_text("# comentario\nDATABASE_URL=postgresql://u:s@h:6543/postgres\n", encoding="utf-8")
     assert bt.endereco_do_arquivo(arquivo) == "postgresql://u:s@h:6543/postgres"
     assert bt.endereco_do_arquivo(tmp_path / "nao_existe.txt") == ""
+
+
+def test_avisa_quando_colam_o_direct_connection():
+    assert bt.e_conexao_direta("postgresql://postgres:[YOUR-PASSWORD]@db.abcdefgh.supabase.co:5432/postgres")
+    assert not bt.e_conexao_direta(
+        "postgresql://postgres.abcdefgh:[YOUR-PASSWORD]@aws-0-us-east-1.pooler.supabase.com:5432/postgres")
