@@ -178,6 +178,9 @@ def usuario_logado(request: Request, db: Session = Depends(obter_db)) -> Usuario
                            "código do celular.")
     request.session["ultimo_uso"] = int(time.time())
     request.state.usuario = usuario
+    from .isolamento import ligar
+
+    ligar(db, usuario)  # white label, Fase 2: daqui em diante esta tela só enxerga a AR da pessoa
     return usuario
 
 

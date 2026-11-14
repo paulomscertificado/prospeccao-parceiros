@@ -161,9 +161,16 @@ def test_decisoes_do_master_e_dos_sem_dono(banco):
 
 
 def test_linhas_novas_so_ganham_ar_depois_da_migracao(cliente):
-    """No banco dos testes (o do sistema): antes do migrar_ar.py aplicar, a rotina de hora em hora não mexe."""
+    """Fase 2: o que o sistema cria já nasce com a AR (isolamento._ar_nas_novas). A rotina de hora em hora fica de rede
+    de segurança para linha gravada sem passar pelo sistema (aqui, SQL direto), e só depois do migrar_ar.py aplicar."""
     with sessao() as db:
+        db.add(Lead(empresa="Lead criado pelo sistema"))
+    with sessao() as db:
+        ar = db.execute(select(Lead.tenant_id).where(Lead.empresa == "Lead criado pelo sistema")).scalar()
+        assert db.get(Tenant, ar).slug == "ms"  # sem vendedor nem tela: AR MS (ars.PADRAO)
         db.add(Lead(empresa="Lead novo da rotina"))
+        db.flush()
+        db.execute(text("UPDATE leads SET tenant_id = NULL WHERE empresa = 'Lead novo da rotina'"))  # sem AR
     assert ars.preencher_novos() is False
     with sessao() as db:
         assert db.execute(select(Lead.tenant_id).where(Lead.empresa == "Lead novo da rotina")).scalar() is None

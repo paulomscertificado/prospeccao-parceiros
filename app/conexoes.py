@@ -30,9 +30,14 @@ def id_do_usuario(usuario_id: int) -> str:
 
 
 def garantir_principal(db) -> ConexaoWhatsApp:
-    c = db.get(ConexaoWhatsApp, PRINCIPAL)
+    # sem o filtro da AR (white label, Fase 2): o principal é da AR MS e existe uma vez só; numa tela de outra AR ele
+    # fica escondido, mas não pode ser criado de novo
+    sem_filtro = {"sem_filtro_de_ar": True}
+    c = db.execute(select(ConexaoWhatsApp).where(ConexaoWhatsApp.id == PRINCIPAL)
+                   .execution_options(**sem_filtro)).scalars().first()
     if c is None:
-        dono = db.execute(select(Usuario).where(Usuario.perfil == "admin").order_by(Usuario.id)).scalars().first()
+        dono = db.execute(select(Usuario).where(Usuario.perfil == "admin").order_by(Usuario.id)
+                          .execution_options(**sem_filtro)).scalars().first()
         c = ConexaoWhatsApp(id=PRINCIPAL, nome="Número principal da MS", dono_id=dono.id if dono else None)
         db.add(c)
         db.flush()

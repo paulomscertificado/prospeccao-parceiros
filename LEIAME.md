@@ -493,6 +493,12 @@ Crie usuários em **Configurações > Usuários** (o perfil padrão é Funcioná
 promove administradores e dá permissões de administração. O cadastro, a senha e o código do celular dele só ele muda; os
 dos outros administradores, só ele também. Ninguém muda o próprio papel, a própria equipe nem as próprias permissões.
 
+**Cada marca (AR) vê só o que é dela.** O sistema separa as marcas: hoje a **AR MS Certificados** e o **Grupo Certy**.
+Quem é de uma marca vê e mexe só nos leads, campanhas, tarefas, conversas, números de WhatsApp, e-mails, certificados
+e relatórios da própria marca, mesmo sendo administrador. A marca de cada pessoa vem da empresa que ela representa
+(Minha conta). O admin master vê todas as marcas. Os modelos de mensagem, as cadências e as categorias continuam
+iguais para todas.
+
 ### Permissões (menu Permissões, só o administrador)
 
 Cada perfil acima é um **papel**. No menu **Permissões** você pode:

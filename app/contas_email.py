@@ -101,11 +101,16 @@ def pode_usar(usuario: Usuario, c: ContaEmail) -> bool:
 # ---------------------------------------------------------------- Contas
 
 def garantir_principal(db) -> ContaEmail:
-    c = db.execute(select(ContaEmail).where(ContaEmail.principal.is_(True)).limit(1)).scalars().first()
+    # sem o filtro da AR (white label, Fase 2): a principal é da AR MS e existe uma vez só; numa tela de outra AR ela
+    # fica escondida, mas não pode ser criada de novo
+    sem_filtro = {"sem_filtro_de_ar": True}
+    c = db.execute(select(ContaEmail).where(ContaEmail.principal.is_(True)).limit(1)
+                   .execution_options(**sem_filtro)).scalars().first()
     if c is None or c.dono_id is None:
         # a principal é do cadastro do primeiro administrador (regra de 13/11/2026: cada pessoa dispara só pelo
         # próprio e-mail; criada antes de existir um administrador, ganha o dono depois)
-        dono = db.execute(select(Usuario).where(Usuario.perfil == "admin").order_by(Usuario.id)).scalars().first()
+        dono = db.execute(select(Usuario).where(Usuario.perfil == "admin").order_by(Usuario.id)
+                          .execution_options(**sem_filtro)).scalars().first()
         if c is None:
             c = ContaEmail(principal=True, nome="E-mail principal da MS", dono_id=dono.id if dono else None,
                            compartilhada_todos=True)

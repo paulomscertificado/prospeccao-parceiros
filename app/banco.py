@@ -192,6 +192,10 @@ def criar_tabelas() -> None:
     else:
         Base.metadata.create_all(motor)
     migrar_colunas()
+    from . import ars
+
+    with motor.begin() as con:  # white label: as ARs de hoje existem desde o início (isolamento.py)
+        ars.garantir_ars(con)
     with sessao() as db:
         if motor.dialect.name == "postgresql":
             from sqlalchemy import text
@@ -282,3 +286,5 @@ def todos(db: Session, consulta):
 
 
 __all__ = ["Base", "motor", "obter_db", "sessao", "agora", "ler_config", "gravar_config", "select"]
+
+from . import isolamento  # noqa: E402,F401  (registra o filtro e a AR das linhas novas)
