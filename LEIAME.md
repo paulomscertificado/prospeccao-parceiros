@@ -631,7 +631,9 @@ e pede para digitar SIM. Num computador novo, ele pede a senha das cópias.
 administradores quando: o computador do WhatsApp Leads para de responder (mais de 15 minutos), um número de WhatsApp
 em uso fica desconectado (mais de 15 minutos), os e-mails da fila não saem, uma rotina dá erro 3 vezes seguidas, o
 banco chega a 80% do tamanho, o backup fica dias sem ser feito ou o agendador fica parado (o aviso chega quando ele
-volta). Vem um lembrete a cada 12 horas enquanto o problema durar e outro e-mail quando volta ao normal. O aviso
+volta). Quando a nuvem passar a chamar o sistema a cada minuto (plano Pro da Vercel), também avisa se ela ficar mais
+de 10 minutos sem chamar: aí o computador da MS cobre como reserva. Quem está fazendo as filas andarem aparece em
+**Configurações > Integrações**, na linha "Relógio das filas". Vem um lembrete a cada 12 horas enquanto o problema durar e outro e-mail quando volta ao normal. O aviso
 também aparece no sino. Quem recebe: os administradores, ou a lista em **Configurações > Geral > "Avisos de
 problema · e-mails que recebem"**. Para testar: **Configurações > Integrações > Mandar e-mail de teste do aviso**.
 

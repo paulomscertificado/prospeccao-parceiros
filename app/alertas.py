@@ -20,7 +20,7 @@ from datetime import datetime, timedelta
 
 from sqlalchemy import func, select, text
 
-from . import config
+from . import config, relogio
 from .banco import agora, gravar_config, ler_config, ler_config_int, ler_config_json, sessao
 from .modelos import Mensagem, Notificacao, Usuario
 
@@ -129,6 +129,15 @@ def problemas_agora(db) -> dict[str, dict]:
                                   "bloqueio, os contatos frios dele ficam parados até amanhã (quem já conversou com a "
                                   "MS continua recebendo).\n\nVale revisar o texto da campanha e a lista de empresas."),
                         "link": "/envios"}
+
+    parado = relogio.nuvem_atrasada(db)  # só depois que a nuvem passou a chamar a cada minuto (plano Pro)
+    if parado is not None:
+        achados["relogio"] = {
+            "titulo": "Relógio da nuvem parado: o computador da MS está cobrindo",
+            "texto": (f"Desde {parado:%d/%m às %H:%M} o agendador da Vercel não chama o sistema. Enquanto isso, quem faz "
+                      "as filas andarem é o computador da MS (reserva); se ele também desligar, nada sai.\n\nO que "
+                      "fazer: avisar quem cuida do sistema para conferir os Cron Jobs no painel da Vercel."),
+            "link": "/configuracoes?aba=integracoes", "desde": parado.isoformat()}
 
     tamanho = tamanho_do_banco_mb(db)
     contratado = ler_config_int(db, "limite_banco_mb", 500)

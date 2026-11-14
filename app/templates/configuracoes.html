@@ -152,6 +152,11 @@
     {% if b.fora_do_pc %}<span class="selo selo-ok">cópia fora do computador</span>{% else %}<span class="selo selo-alerta">só no computador da MS</span>
     <span class="pequeno suave">(instale o Google Drive para computador com o e-mail da MS e a próxima cópia vai para lá)</span>{% endif %}
     {% else %}<span class="selo selo-alerta">ainda sem registro</span> <span class="pequeno suave">(o computador da MS faz todo dia depois do meio-dia)</span>{% endif %}</p>
+  {% set rl = painel_avisos.relogio %}
+  <p>Relógio das filas: {% if rl.nuvem_desde %}<b>nuvem (Vercel), a cada minuto</b> desde {{ rl.nuvem_desde.strftime('%d/%m') }}{% if rl.nuvem_em %} · última chamada {{ rl.nuvem_em.strftime('%d/%m %H:%M') }}{% endif %} ·
+    reserva do computador da MS: {% if rl.reserva_vezes %}precisou {{ rl.reserva_vezes }} {{ 'vez' if rl.reserva_vezes == 1 else 'vezes' }}, a última em {{ rl.reserva_em.strftime('%d/%m %H:%M') }}{% else %}nunca precisou{% endif %}
+    {% if rl.portao_ok %}<span class="selo selo-ok">portão da Fase 0 cumprido: 7 dias sem o computador</span>{% else %}<span class="selo selo-alerta">{{ rl.dias_sem_reserva }} de 7 dias seguidos sem o computador</span>{% endif %}
+    {% else %}<b>computador da MS</b> (Agendador do Windows, a cada minuto) <span class="pequeno suave">(no plano gratuito a Vercel só chama 1 vez por dia; com o plano Pro a nuvem assume e o computador vira reserva)</span>{% endif %}</p>
   {% if painel_avisos.ativos %}<h3>Problemas abertos agora</h3>
   <ul>{% for a in painel_avisos.ativos %}<li><b>{{ a.titulo }}</b> <span class="pequeno suave">desde {{ a.desde[8:10] }}/{{ a.desde[5:7] }} {{ a.desde[11:16] }}{{ ' · e-mail enviado' if a.avisado_em else ' · esperando confirmar' }}</span></li>{% endfor %}</ul>
   {% else %}<p><span class="selo selo-ok">Nenhum problema aberto</span></p>{% endif %}

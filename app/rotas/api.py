@@ -12,7 +12,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 from sqlalchemy import func, or_, select
 
-from .. import config, sdr, trabalhos, util
+from .. import config, relogio, sdr, trabalhos, util
 from ..rotinas import responder_automaticamente, rodada
 from ..banco import agora, gravar_config, ler_config_int, sessao
 from ..integracoes import whatsapp_cloud
@@ -81,6 +81,13 @@ def cron(request: Request):
         return JSONResponse({"erro": "Falta CRON_SECRET nas variáveis do sistema."}, status_code=503)
     if not _senha_confere(request.headers.get("authorization", "").removeprefix("Bearer ").strip(), config.CRON_SECRET):
         return JSONResponse({"erro": "senha inválida"}, status_code=403)
+    # Fase 0 (white label): com o plano Pro, o cron da Vercel chama a cada minuto e o computador da MS vira reserva
+    # (?reserva=1): ele só faz a rodada se a nuvem não chamou nos últimos minutos (app/relogio.py).
+    quem = relogio.origem(request.headers.get("user-agent", ""), request.query_params.get("reserva") == "1")
+    if quem == "nuvem":
+        relogio.registrar_nuvem()
+    elif quem == "reserva" and relogio.reserva_dispensada():
+        return {"rodada": False, "etapas": 0, "reserva": "dispensada"}
     prazo = time.monotonic() + config.SEGUNDOS_POR_RODADA
     resultado = {"rodada": False, "etapas": 0}
     if trabalhos.pegar_trava("rodada", 300):  # duas chamadas ao mesmo tempo não podem enviar o mesmo e-mail

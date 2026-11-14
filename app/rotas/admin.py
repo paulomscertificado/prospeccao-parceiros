@@ -6,7 +6,8 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from .. import alertas, autorizacao, base_receita, bases_importadas, config, ia, leads_servico, prospeccao, score, util
+from .. import (alertas, autorizacao, base_receita, bases_importadas, config, ia, leads_servico, prospeccao, relogio,
+               score, util)
 from ..banco import gravar_config, ler_config, ler_config_json, obter_db
 from ..integracoes import dns_email, email_imap, email_smtp, whatsapp_cloud, whatsapp_leads
 from ..modelos import Equipe, Lead, LogAuditoria, Papel, Parceiro, Usuario
@@ -100,7 +101,7 @@ def configuracoes(request: Request, aba: str = "geral", usuario: Usuario = Depen
         "painel_avisos": {"ativos": alertas.ativos(db), "para": alertas.destinatarios(db), "ligado": alertas.ligado(),
                    "email_ok": email_smtp.configurado(), "banco_mb": alertas.tamanho_do_banco_mb(db),
                    "banco_limite": int(float(ler_config(db, "limite_banco_mb") or 0) or 0),
-                   "backup": ler_config_json(db, "backup_ultimo", {}) or {}}
+                   "backup": ler_config_json(db, "backup_ultimo", {}) or {}, "relogio": relogio.resumo(db)}
         if aba == "integracoes" else None,
         "demo": db.execute(select(Lead.id).where(Lead.origem == "Demonstração").limit(1)).first() is not None,
         "email": _email_atual() if aba == "email" else None,

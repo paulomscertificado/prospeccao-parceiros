@@ -10,7 +10,7 @@ Planos: Vercel **Hobby** e Supabase **Free** (escolha da MS); ver "Plano grátis
 |---|---|---|
 | Banco `dados/banco.db` (SQLite) | PostgreSQL (`DATABASE_URL`) | `config.py`, `banco.py` (`preparar_banco_na_nuvem`) |
 | Chaves geradas em `dados/` | `SECRET_KEY` e `CHAVE_CRIPTOGRAFIA` obrigatórias nas variáveis | `config.py` (`FaltaConfiguracao`) |
-| Relógio interno a cada 60 s | **Agendador do Windows** (computador da MS) chama `/api/cron` a cada minuto, com `CRON_SECRET`; Vercel Cron 1 vez por dia de reserva | `vercel.json`, `rotas/api.py`, `rotinas.rodada(None)` |
+| Relógio interno a cada 60 s | Hoje: **Agendador do Windows** (computador da MS) chama `/api/cron?reserva=1` a cada minuto, com `CRON_SECRET`, e o Vercel Cron 1 vez por dia. No Pro (Fase 0): Vercel Cron a cada minuto e o computador só de reserva | `vercel.json`, `rotas/api.py`, `relogio.py`, `rotinas.rodada(None)` |
 | Linhas de execução em segundo plano | **Trabalhos em etapas** retomáveis (campanha, busca, personalização) | `trabalhos.py` |
 | Tela de e-mail grava no `.env` | Grava no banco, **criptografado**; todas as cópias releem a cada 30 s | `arquivo_env.py` |
 | Prospecção chama o WhatsApp Leads | **Ponte invertida**: o WhatsApp Leads chama a nuvem (1 min de dia, 5 min à noite) | `integracoes/whatsapp_leads.py`, `rotas/api.py`, `whatsapp-leads/app/ponte_nuvem.py` |
@@ -23,16 +23,23 @@ O modo nuvem liga sozinho quando a variável `VERCEL` existe (a Vercel cria) ou 
 ### Plano grátis (Vercel Hobby + Supabase Free)
 - **Agendador.** No Hobby a Vercel só aceita cron 1 vez por dia e o deploy **falha** com `* * * * *`
   ([documentação](https://vercel.com/docs/cron-jobs/usage-and-pricing)); por isso o `vercel.json` tem
-  `0 9 * * *` (6h de Brasília), só de reserva. Na nuvem, buscas, campanhas, fila de e-mail e respostas **só andam
+  `0 11 * * *` (8h de Brasília), só de reserva. Na nuvem, buscas, campanhas, fila de e-mail e respostas **só andam
   quando `/api/cron` é chamado**, então o computador da MS (que já fica ligado por causa do WhatsApp Leads) chama
   `GET https://SEU-SITE/api/cron` a cada minuto pelo **Agendador de Tarefas do Windows** (`dados\chamar_cron.ps1`, que
   também religa o WhatsApp Leads escondido com `iniciar.py --escondido` se ele estiver fechado), com o cabeçalho
-  `Authorization: Bearer <CRON_SECRET>`. Computador desligado = sistema parado até a reserva das 6h.
+  `Authorization: Bearer <CRON_SECRET>`. Computador desligado = sistema parado até o cron diário das 8h.
   Alternativa sem depender do computador: cron-job.org (grátis, a cada minuto, aceita cabeçalho) ou o pg_cron +
   pg_net do próprio Supabase (grátis; chama `/api/cron` com o cabeçalho; precisa ligar as extensões no projeto).
   Enquanto depender do computador, `app/alertas.py` avisa por e-mail quando o agendador volta depois de mais de
   30 minutos parado (`alertas.marcar_rodada`).
-  No Pro, volte o `vercel.json` para `* * * * *` e desligue a tarefa do Windows.
+- **Fase 0 do white label (13/11/2026): relógio na nuvem.** Com o Pro, troque o `vercel.json` para `* * * * *`. O
+  cron da Vercel se apresenta como `vercel-cron/1.0` e manda o `CRON_SECRET` sozinho; `app/relogio.py` guarda a hora
+  de cada chamada (configuração `relogio_filas`) e, depois de 3 intervalos seguidos entre 30 s e 2 minutos, marca
+  desde quando a nuvem chama a cada minuto (uma chamada repetida segundos depois não conta). **Não desligue a tarefa do Windows**: ela também faz os backups e religa o
+  WhatsApp Leads. Ela chama `/api/cron?reserva=1` (mudança em `dados\chamar_cron.ps1`, que fica fora do git), e a
+  rodada só roda se a nuvem não chamou nos últimos 3 minutos; cada vez que a reserva precisa rodar é contada.
+  Portão da Fase 0: 7 dias seguidos sem a reserva rodar (Configurações > Integrações, quadro dos avisos). Nuvem
+  parada por mais de 10 minutos vira aviso por e-mail (`alertas.problemas_agora`, chave `relogio`).
 - **Termos da Vercel.** O Hobby é para uso pessoal não comercial, e a Vercel conta como comercial qualquer site
   feito por alguém pago para isso ([fair use](https://vercel.com/docs/limits/fair-use-guidelines)). A MS
   escolheu o Hobby sabendo disso; se a Vercel pausar o projeto, a saída é passar para o Pro.
