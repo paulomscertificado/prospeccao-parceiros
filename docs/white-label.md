@@ -7,7 +7,7 @@ O dono da plataforma e Admin Master é o Paulo Marinho (`Usuario.master`).
 | Fase | O quê | Portão (só segue quando) | Situação |
 |---|---|---|---|
 | 0 | Vercel Pro, Supabase Pro, relógio das filas na nuvem, ambiente de teste | 7 dias seguidos sem a reserva do computador | Código do relógio publicado (`app/relogio.py`); planos esperando o cartão |
-| 1 | A AR entra nos dados (`tenants` + `tenant_id`) | nenhuma linha sem AR, contagens iguais, nenhuma ligação cruzando ARs | Código pronto no ramo `fase1-ar`; falta o ensaio no banco de teste |
+| 1 | A AR entra nos dados (`tenants` + `tenant_id`) | nenhuma linha sem AR, contagens iguais, nenhuma ligação cruzando ARs | **Concluída em 14/11/2026**: ensaio no banco de teste e aplicação na nuvem com a conferência OK (leads: 1.387 na AR MS, 111 no Grupo Certy); linhas novas de hora em hora |
 | 2 | Isolamento obrigatório (filtro, porteiro com AR, RLS, testes nas 178 rotas) | nenhuma rota abre registro de outra AR | — |
 | 3 | Permissões por AR e painel /master | admin de uma AR não alcança outra nem o /master | — |
 | 4 | WhatsApp, e-mail e filas por AR | uma AR parada não atrasa as outras | — |
