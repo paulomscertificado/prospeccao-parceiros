@@ -13,7 +13,7 @@ from app import autorizacao
 from app.banco import ler_config, sessao
 from app.main import app
 from app.modelos import Equipe, ExcecaoPermissao, Papel, Parceiro, PermissaoPapel, Usuario
-from app.seguranca import resumir_senha
+from app.seguranca import limite_pedidos, resumir_senha
 from conftest import csrf_de
 
 SENHA = "senhaEscalada123"
@@ -52,7 +52,21 @@ def _foto() -> dict:
         }
 
 
+def _zerar_limite_de_pedidos():
+    """As tentativas somam dezenas de pedidos: o limite por minuto (240) não pode atrapalhar os outros testes."""
+    for chave in list(limite_pedidos._eventos):
+        limite_pedidos.zerar(chave)
+
+
 def test_ninguem_abaixo_de_admin_vira_admin(cliente, csrf):
+    _zerar_limite_de_pedidos()
+    try:
+        _tentativas(cliente, csrf)
+    finally:
+        _zerar_limite_de_pedidos()
+
+
+def _tentativas(cliente, csrf):
     with sessao() as db:
         admin = db.execute(select(Usuario).where(Usuario.perfil == "admin").order_by(Usuario.id)).scalars().first()
         parceiro = Parceiro(escritorio="Escritório Escalada", vendedor_id=admin.id, status="ATIVO")
