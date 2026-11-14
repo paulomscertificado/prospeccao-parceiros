@@ -317,6 +317,9 @@ def proteger_tabelas() -> int:
     if not config.DATABASE_URL.startswith("postgres"):
         return 0
     with motor.begin() as con:
+        # várias cópias da nuvem preparam o banco juntas depois de uma publicação: REVOKE/ALTER ao mesmo tempo na mesma
+        # tabela dá "tuple concurrently updated" (um erro 500 passageiro em 14/11/2026). Uma cópia por vez.
+        con.exec_driver_sql("SELECT pg_advisory_xact_lock(724503)")
         tabelas = [t for (t,) in con.exec_driver_sql(
             "SELECT tablename FROM pg_tables WHERE schemaname = 'public'")]
         papeis = {r for (r,) in con.exec_driver_sql(
