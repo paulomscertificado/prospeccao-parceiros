@@ -10,10 +10,14 @@
 {% if aba == 'geral' %}
 <form class="cartao" method="post" action="/configuracoes/geral" style="max-width:860px">
   <input type="hidden" name="csrf" value="{{ csrf }}">
-  {% for chave, nome, tipo, valor in campos %}
-  <div class="campo"><label for="c-{{ chave }}">{{ nome }}</label>
-    {% if tipo == 'area' %}<textarea id="c-{{ chave }}" name="{{ chave }}">{{ valor }}</textarea>
-    {% else %}<input id="c-{{ chave }}" type="text" name="{{ chave }}" value="{{ valor }}">{% endif %}</div>
+  {% if sou_master %}<p class="aviso aviso-info">Você muda os valores <b>padrão da plataforma</b>: valem para as ARs que
+    não têm valor próprio. Quem é de uma AR muda só os da própria AR.</p>
+  {% else %}<p class="aviso aviso-info">Estas são as configurações da <b>sua AR</b>. As marcadas como "da plataforma" só o
+    admin master muda.</p>{% endif %}
+  {% for chave, nome, tipo, valor, editavel in campos %}
+  <div class="campo"><label for="c-{{ chave }}">{{ nome }}{% if not editavel %} <span class="selo">da plataforma</span>{% endif %}</label>
+    {% if tipo == 'area' %}<textarea id="c-{{ chave }}" name="{{ chave }}"{% if not editavel %} disabled{% endif %}>{{ valor }}</textarea>
+    {% else %}<input id="c-{{ chave }}" type="text" name="{{ chave }}" value="{{ valor }}"{% if not editavel %} disabled{% endif %}>{% endif %}</div>
   {% endfor %}
   <button class="btn btn-primario">Salvar</button>
 </form>

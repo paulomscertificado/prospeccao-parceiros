@@ -499,6 +499,11 @@ e relatórios da própria marca, mesmo sendo administrador. A marca de cada pess
 (Minha conta). O admin master vê todas as marcas. Os modelos de mensagem, as cadências e as categorias continuam
 iguais para todas.
 
+**Configurações de cada marca:** em **Configurações > Geral**, o administrador de uma marca muda só as configurações da
+própria marca (horários e limites de envio, textos da parceria, regras da IA SDR, prazos). Os campos marcados como
+**"da plataforma"** (proteção dos números de WhatsApp, avisos de problema, módulos, banco, Renovação, Empresas novas)
+só o admin master muda; o que ele muda vale para as marcas que não têm valor próprio.
+
 ### Permissões (menu Permissões, só o administrador)
 
 Cada perfil acima é um **papel**. No menu **Permissões** você pode:

@@ -187,6 +187,25 @@ def dentro_do_horario(db: Session, momento: datetime | None = None) -> bool:
     return inicio <= momento.strftime("%H:%M") < fim
 
 
+def dentro_do_horario_de_alguma_ar(db: Session) -> bool:
+    """A plataforma ou alguma AR com horário próprio está dentro do horário de envio? (white label, Fase 2 parte 2)"""
+    from .banco import usar_config_da_ar
+    from .modelos import ConfiguracaoAR
+
+    anterior = db.info.pop("ar_config", None)
+    try:
+        if dentro_do_horario(db):
+            return True
+        for ar in set(db.execute(select(ConfiguracaoAR.tenant_id).where(
+                ConfiguracaoAR.chave.in_(["horario_envio_inicio", "horario_envio_fim"]))).scalars()):
+            usar_config_da_ar(db, ar)
+            if dentro_do_horario(db):
+                return True
+        return False
+    finally:
+        usar_config_da_ar(db, anterior)
+
+
 def limite_diario(db: Session, canal: str) -> int:
     chave = {"whatsapp": "limite_diario_whatsapp", "email": "limite_diario_email"}.get(canal)
     return ler_config_int(db, chave, 0) if chave else 0

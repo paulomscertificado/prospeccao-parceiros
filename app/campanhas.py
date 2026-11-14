@@ -16,7 +16,7 @@ from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import aliased
 
 from . import base_receita, bases_importadas, cadencias, config, contas_email, email_validacao, reservas, ia, mensagens, prospeccao, sdr, trabalhos, util
-from .banco import agora, gravar_config, ler_config, ler_config_int, sessao
+from .banco import agora, algum_valor, gravar_config, ler_config, ler_config_int, sessao, usar_config_da_ar
 from .leads_servico import criar_lead, historico, limpar_campos, mudar_status, registrar_contato
 from .modelos import Cadencia, Campanha, Categoria, Lead, Tarefa, Usuario
 from .modelos import NOME_CADENCIA_SDR
@@ -778,9 +778,10 @@ def processar_fila(db, maximo: int = 25) -> dict:
     from .integracoes import email_smtp
 
     feito = {"enviados": 0, "bloqueados": 0, "erros": 0}
-    if ler_config(db, "enviar_email_automatico") != "1" or not email_smtp.configurado():
+    # white label: cada AR liga/desliga o envio e tem o próprio horário; a fila só para de vez se nenhuma quiser
+    if not algum_valor(db, "enviar_email_automatico", "1") or not email_smtp.configurado():
         return feito
-    if not mensagens.dentro_do_horario(db):
+    if not mensagens.dentro_do_horario_de_alguma_ar(db):
         return feito
     if not _vez_do_canal(db, "email"):
         return feito  # o último e-mail automático saiu há menos de 3 minutos
@@ -804,6 +805,9 @@ def processar_fila(db, maximo: int = 25) -> dict:
     for t in _em_lotes(db, db.execute(consulta).scalars().all()):
         if feito["enviados"] >= maximo:
             break
+        usar_config_da_ar(db, t.tenant_id)  # daqui em diante, as configurações da AR desta tarefa
+        if ler_config(db, "enviar_email_automatico") != "1" or not mensagens.dentro_do_horario(db):
+            continue  # esta AR desligou o envio sozinho ou está fora do horário dela
         if t.campanha_id in campanhas_no_limite:
             feito["bloqueados"] += 1
             continue
@@ -848,6 +852,7 @@ def processar_fila(db, maximo: int = 25) -> dict:
         if config.ESPACAR_ENVIOS:
             _anotar_envio(db, "email")
             break  # um por vez: o próximo sai daqui a 3 ou 4 minutos
+    usar_config_da_ar(db, None)
     return feito
 
 
@@ -1343,9 +1348,10 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
     from .integracoes import whatsapp_leads
 
     feito = {"enviados": 0, "bloqueados": 0, "erros": 0}
-    if ler_config(db, "enviar_whatsapp_automatico") != "1" or not whatsapp_leads.configurado():
+    # white label: cada AR liga/desliga o envio e tem o próprio horário; a fila só para de vez se nenhuma quiser
+    if not algum_valor(db, "enviar_whatsapp_automatico", "1") or not whatsapp_leads.configurado():
         return feito
-    if not mensagens.dentro_do_horario(db):
+    if not mensagens.dentro_do_horario_de_alguma_ar(db):
         return feito
     if not _vez_do_canal(db, "whatsapp"):
         return feito  # a última mensagem automática saiu há menos de 3 minutos
@@ -1393,6 +1399,9 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
     for t in _em_lotes(db, db.execute(consulta).scalars().all()):
         if feito["enviados"] >= maximo:
             break
+        usar_config_da_ar(db, t.tenant_id)  # daqui em diante, as configurações da AR desta tarefa
+        if ler_config(db, "enviar_whatsapp_automatico") != "1" or not mensagens.dentro_do_horario(db):
+            continue  # esta AR desligou o envio sozinho ou está fora do horário dela
         if t.campanha_id in campanhas_no_limite:
             continue
         lead = t.lead
@@ -1429,6 +1438,7 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
         if config.ESPACAR_ENVIOS:
             _anotar_envio(db, "whatsapp")
             break  # uma por vez: a próxima sai daqui a 3 ou 4 minutos
+    usar_config_da_ar(db, None)
     return feito
 
 

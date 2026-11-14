@@ -67,9 +67,75 @@ def agora() -> datetime:
 
 # ---------------------------------------------------------------- Configurações no banco
 
+# White label, Fase 2 parte 2: as configurações que cada AR tem as suas (documento do plano, "Configurações: plataforma,
+# AR ou pessoa"). Sem valor próprio, a AR usa o da plataforma. As outras chaves são da plataforma: só o Admin Master
+# muda (proteção dos números, alertas, módulos, base da Receita, estado da ponte...). Renovação e Empresas novas ficam
+# da plataforma até as decisões da CNPJá e da planilha por AR.
+CHAVES_DA_AR = frozenset({
+    "empresa_nome", "link_parceria", "texto_comissao", "programa_parceria", "limite_diario_whatsapp",
+    "limite_diario_email", "horas_entre_contatos_whatsapp", "horas_entre_contatos_email", "pular_fim_de_semana",
+    "alertas_vencimento", "dias_parceiro_parado", "dias_lead_parado", "dias_retencao_perdidos", "prioridade_canais",
+    "limite_hora_email", "limite_hora_whatsapp", "limite_diario_campanha", "limite_diario_dominio",
+    "horario_envio_inicio", "horario_envio_fim", "enviar_email_automatico", "sdr_resposta_automatica",
+    "dias_sem_resposta", "enviar_whatsapp_automatico", "whatsapp_sozinho_padrao", "whatsapp_convite",
+    "notificar_por_email", "score_pesos", "score_faixas", "receita_oculta"})
+
+
+def _ar_da_config(db: Session) -> int | None:
+    """A AR cujas configurações valem agora: a que a rotina escolheu (usar_config_da_ar) ou a da pessoa da tela."""
+    if "ar_config" in db.info:
+        return db.info["ar_config"]
+    if db.info.get("ar_ligado"):
+        ar = db.info.get("ar")
+        return ar if ar and ar > 0 else None
+    return None
+
+
+def usar_config_da_ar(db: Session, ar: int | None) -> None:
+    """Rotinas (filas, respostas): daqui em diante as configurações lidas nesta sessão são as da AR `ar` (a do registro
+    que está sendo tratado). None = volta ao normal."""
+    if ar is None:
+        db.info.pop("ar_config", None)
+    else:
+        db.info["ar_config"] = ar
+
+
+def algum_valor(db: Session, chave: str, valor: str) -> bool:
+    """A plataforma ou alguma AR usa este valor? (filas: só param de vez se nenhuma AR quer o envio)"""
+    from .modelos import ConfiguracaoAR
+
+    anterior = db.info.pop("ar_config", None)
+    try:
+        if ler_config(db, chave) == valor:
+            return True
+    finally:
+        if anterior is not None:
+            db.info["ar_config"] = anterior
+    return db.execute(select(ConfiguracaoAR.tenant_id).where(ConfiguracaoAR.chave == chave,
+                                                             ConfiguracaoAR.valor == valor).limit(1)).first() is not None
+
+
+def _valores_da_ar(db: Session, ar: int) -> dict:
+    """Os valores próprios da AR, lidos UMA vez por sessão (cada tela abre a sua): sem isso, cada leitura de
+    configuração da AR seria uma consulta a mais (tráfego do Supabase)."""
+    cache = db.info.setdefault("config_ar", {})
+    if ar not in cache:
+        from .modelos import ConfiguracaoAR
+
+        cache[ar] = dict(db.execute(select(ConfiguracaoAR.chave, ConfiguracaoAR.valor)
+                                    .where(ConfiguracaoAR.tenant_id == ar)).all())
+    return cache[ar]
+
+
 def ler_config(db: Session, chave: str) -> str:
     from .modelos import Configuracao
 
+    if chave in CHAVES_DA_AR:
+        ar = _ar_da_config(db)
+        if ar:
+            valores = _valores_da_ar(db, ar)
+            if chave in valores:
+                return valores[chave]
     item = db.get(Configuracao, chave)
     if item is not None:
         return item.valor
@@ -94,10 +160,21 @@ def ler_config_json(db: Session, chave: str, padrao):
 
 
 def gravar_config(db: Session, chave: str, valor) -> None:
-    from .modelos import Configuracao
+    from .modelos import Configuracao, ConfiguracaoAR
 
     if not isinstance(valor, str):
         valor = json.dumps(valor, ensure_ascii=False)
+    if chave in CHAVES_DA_AR:
+        ar = _ar_da_config(db)
+        if ar:  # pessoa de uma AR (ou rotina tratando um registro da AR): o valor fica só nela
+            proprio = db.get(ConfiguracaoAR, (ar, chave))
+            if proprio is None:
+                db.add(ConfiguracaoAR(tenant_id=ar, chave=chave, valor=valor))
+            else:
+                proprio.valor = valor
+            if ar in db.info.get("config_ar", {}):
+                db.info["config_ar"][ar][chave] = valor
+            return
     item = db.get(Configuracao, chave)
     if item is None:
         db.add(Configuracao(chave=chave, valor=valor))

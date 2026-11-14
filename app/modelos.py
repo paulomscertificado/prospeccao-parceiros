@@ -34,6 +34,15 @@ class Configuracao(DaAR, Base):
     valor: Mapped[str] = mapped_column(Text, default="")
 
 
+class ConfiguracaoAR(Base):
+    """Valor próprio de uma AR para uma configuração da AR (white label, Fase 2 parte 2; quais são: banco.CHAVES_DA_AR).
+    Sem linha aqui, a AR usa o valor da plataforma (configuracoes), que só o Admin Master muda."""
+    __tablename__ = "configuracoes_ar"
+    tenant_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    chave: Mapped[str] = mapped_column(String(80), primary_key=True)
+    valor: Mapped[str] = mapped_column(Text, default="")
+
+
 class Trava(Base):
     """Impede que duas cópias do sistema (na nuvem) façam a mesma coisa ao mesmo tempo. Ver app/trabalhos.py."""
     __tablename__ = "travas"

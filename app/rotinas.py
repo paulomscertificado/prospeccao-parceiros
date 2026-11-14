@@ -213,6 +213,9 @@ def _ler_caixa(conta, emails, enviados: dict, ja_processados: set[str], desde) -
                 sdr.notificar(db, lead, f"{lead.empresa} mandou um e-mail sem texto (só anexo): confira na caixa "
                                         "de e-mail", f"/leads/{lead.id}")
                 continue
+            from .banco import usar_config_da_ar
+
+            usar_config_da_ar(db, lead.tenant_id)  # white label: a resposta segue as configurações da AR do lead
             analise = sdr.processar_resposta(db, lead, item["texto"], "email", id_externo=item["message_id"])
             responder_automaticamente(db, lead, "email", analise, em_resposta_a=item["message_id"],
                                       assunto=item["assunto"], conta_email=conta)

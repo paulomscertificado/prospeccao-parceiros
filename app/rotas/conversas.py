@@ -35,10 +35,19 @@ def _nomes_escolhidos(db: Session) -> dict[str, str]:
     return {c.telefone: c.nome for c in db.execute(select(ContatoWhatsApp)).scalars() if c.nome}
 
 
-def _salvar_nome(db: Session, chave: str, nome: str, usuario: Usuario) -> None:
-    """Guarda o nome aqui e pede ao WhatsApp Leads para trocar o nome do contato lá também."""
+def _de_outra_ar(db: Session, chave: str) -> bool:
+    """O telefone já tem nome guardado por outra AR? (o nome é um por telefone até a chave ganhar a AR; white label)"""
+    return db.execute(select(ContatoWhatsApp.telefone).where(ContatoWhatsApp.telefone == chave)
+                      .execution_options(sem_filtro_de_ar=True)).first() is not None
+
+
+def _salvar_nome(db: Session, chave: str, nome: str, usuario: Usuario) -> bool:
+    """Guarda o nome aqui e pede ao WhatsApp Leads para trocar o nome do contato lá também. False = o telefone já tem
+    nome de outra AR: nada muda (nem lá, que é o mesmo computador para as ARs)."""
     nome = nome.strip()[:200]
     contato = db.get(ContatoWhatsApp, chave)
+    if contato is None and _de_outra_ar(db, chave):
+        return False
     if contato is None:
         db.add(ContatoWhatsApp(telefone=chave, nome=nome))
     else:
@@ -47,6 +56,7 @@ def _salvar_nome(db: Session, chave: str, nome: str, usuario: Usuario) -> None:
         db.add(ComandoWhatsApp(acao="renomear_contato", usuario_id=usuario.id,
                                dados=json.dumps({"telefone": "55" + chave if len(chave) in (10, 11) else chave,
                                                  "nome": nome}, ensure_ascii=False)))
+    return True
 
 
 def _numeros(db: Session, usuario: Usuario, escolhido: str = "") -> list[str]:
@@ -226,7 +236,7 @@ async def enviar(request: Request, usuario: Usuario = Depends(exige("conversas.e
     if lead:
         historico(db, lead.id, "whatsapp", f"Mensagem enviada pela tela Conversas: {texto[:300]}", usuario, canal="whatsapp")
     if str(dados.get("nome", "")).strip() and not db.get(ContatoWhatsApp, chave):
-        _salvar_nome(db, chave, str(dados["nome"]), usuario)  # nome digitado na "Nova mensagem"
+        _salvar_nome(db, chave, str(dados["nome"]), usuario)  # nome digitado na "Nova mensagem" (se for desta AR)
     db.commit()
     aviso = "" if conexoes.situacao(numero).get("conectado") else "O celular está desconectado: a mensagem sai quando conectar."
     return {"ok": True, "telefone": chave, "numero": numero, "aviso": aviso}
@@ -242,6 +252,7 @@ async def editar_nome(request: Request, usuario: Usuario = Depends(exige("conver
         return JSONResponse({"erro": "Contato sem telefone."}, status_code=400)
     if not nome:
         return JSONResponse({"erro": "Digite o nome do contato."}, status_code=400)
-    _salvar_nome(db, chave, nome, usuario)
+    if not _salvar_nome(db, chave, nome, usuario):
+        return JSONResponse({"erro": "Este telefone já tem um nome guardado por outra AR."}, status_code=409)
     db.commit()
     return {"ok": True, "nome": nome[:200]}

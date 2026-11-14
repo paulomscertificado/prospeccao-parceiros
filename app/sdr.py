@@ -868,13 +868,17 @@ def aplicar_novidades_whatsapp(db, dados: dict) -> dict:
         if lead and not lead.opt_out:
             registrar_opt_out(db, lead, None, "respondeu SAIR no WhatsApp")
             resultado["opt_out"] += 1
+    from .banco import usar_config_da_ar
+
     for recebida in dados.get("recebidas", []):
         lead = lead_do_telefone(recebida["telefone"])
         if lead is None or not recebida.get("texto"):
             continue
+        usar_config_da_ar(db, lead.tenant_id)  # white label: a resposta segue as configurações da AR do lead
         analise = processar_resposta(db, lead, recebida["texto"], "whatsapp")
         from .rotinas import responder_automaticamente
 
         responder_automaticamente(db, lead, "whatsapp", analise, conexao=recebida.get("conexao"))  # pelo mesmo número
         resultado["respostas"] += 1
+    usar_config_da_ar(db, None)
     return resultado
