@@ -18,11 +18,12 @@ import os
 import sys
 import time
 from pathlib import Path
-from urllib.parse import urlsplit
 
 PASTA_DADOS = Path(os.environ.get("PP_PASTA_DADOS") or Path(__file__).resolve().parent / "dados")
 ARQUIVOS = {"teste": PASTA_DADOS / "supabase_teste.txt", "nuvem": PASTA_DADOS / "supabase.txt"}
 SLUGS = ("ms", "grupo-certy")
+
+from salvar_banco_teste import mesmo_banco  # noqa: E402  (mesmo projeto do Supabase por qualquer porta)
 
 
 def endereco(arquivo: Path) -> str:
@@ -39,15 +40,6 @@ def endereco(arquivo: Path) -> str:
             if linha.startswith(prefixo):
                 return "postgresql+psycopg://" + linha[len(prefixo):]
     return ""
-
-
-def mesmo_banco(a: str, b: str) -> bool:
-    """Os dois endereços levam ao mesmo banco? (servidor, porta, usuário e nome do banco; a senha não conta)"""
-    if not a or not b:
-        return False
-    x, y = urlsplit(a), urlsplit(b)
-    return ((x.hostname, x.port, x.username, x.path.strip("/")) ==
-            (y.hostname, y.port, y.username, y.path.strip("/")))
 
 
 def opcoes(args: list[str]) -> tuple[str, str, dict]:
