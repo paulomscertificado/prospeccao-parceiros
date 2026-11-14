@@ -10,7 +10,7 @@ O dono da plataforma e Admin Master é o Paulo Marinho (`Usuario.master`).
 | 1 | A AR entra nos dados (`tenants` + `tenant_id`) | nenhuma linha sem AR, contagens iguais, nenhuma ligação cruzando ARs | **Concluída em 14/11/2026**: ensaio no banco de teste e aplicação na nuvem com a conferência OK (leads: 1.387 na AR MS, 111 no Grupo Certy); linhas novas de hora em hora |
 | 2 | Isolamento obrigatório (filtro, porteiro com AR, RLS, testes nas 178 rotas) | nenhuma rota abre registro de outra AR | **Parte 1 (isolamento dos dados) no ar desde 14/11/2026**; **parte 2 (configurações por AR) no ar desde 14/11/2026**; RLS, `NOT NULL` e índices adiados (ver abaixo) |
 | 3 | Permissões por AR e painel /master | admin de uma AR não alcança outra nem o /master | **No ar desde 14/11/2026** (painel /master, o que é da plataforma só o master muda, módulos por AR); admins das ARs promovidos em 14/11/2026 |
-| 4 | WhatsApp, e-mail e filas por AR | uma AR parada não atrasa as outras | **Fila justa e avisos por AR no ar desde 14/11/2026**; computador do WhatsApp por AR espera a decisão (próprio ou servidor central) |
+| 4 | WhatsApp, e-mail e filas por AR | uma AR parada não atrasa as outras | **Fila justa e avisos por AR no ar desde 14/11/2026**; WhatsApp Leads: decidido servidor central na nuvem (14/11/2026), espera a contratação |
 | 5 | Marca (white label) | nenhuma tela ou mensagem mostra a MS em outra AR | **No ar desde 14/11/2026**: um endereço para todas (tela de entrada neutra), marca de cada AR nas telas e nas mensagens; marca do Grupo Certy gravada pelo manual (falta o logo); nome e domínio da plataforma depois |
 | 6 | Auditoria, LGPD e planos | exportar e apagar uma AR de teste sem tocar nas outras | **Auditoria e LGPD no ar desde 14/11/2026** (quem agiu como quem; exportar e apagar uma AR, ensaiados no banco de teste); planos e cobrança esperam a decisão |
 
@@ -172,7 +172,7 @@ relógio e e-mails da fila vão para a plataforma (Admin Master ou a lista). O "
 **Testes:** `testes/test_fila_justa.py` (ordem da vez; limite de uma AR contando só os envios dela; o portão: AR MS no
 limite e o e-mail do Grupo Certy sai na mesma rodada; quem recebe cada aviso).
 
-**Falta (decisão em aberto):** cada AR com o próprio computador do WhatsApp Leads ou um servidor central para todas.
+**Decidido em 14/11/2026:** um servidor central **na nuvem** (máquina virtual) para todas as ARs, no lugar do computador da MS (que hoje liga o WhatsApp Leads e cai junto com ele). Guia e instalador prontos em `whatsapp-leads/docs/servidor-nuvem-passo-a-passo.md` e `whatsapp-leads/servidor/` (Hostinger VPS KVM 1, Brasil, Ubuntu 24.04, Pix ou boleto). Uma AR que quiser o próprio computador continua possível depois (a parte abaixo).
 Com a resposta: tabela `instancias_whatsapp` (AR, token próprio, último sinal), a ponte (`/api/ponte/*`) identifica a
 instância pelo token e só entrega os envios dos números da AR dela, e o estado (`wl_status`) passa a ser por instância.
 
