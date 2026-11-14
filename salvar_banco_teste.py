@@ -3,8 +3,8 @@
 O banco de teste é um projeto grátis no Supabase, separado do sistema de verdade. Nele entra uma cópia dos dados
 (copiar_para_teste.bat) para ensaiar mudanças grandes antes de fazer na nuvem (white label: docs/white-label.md).
 O endereço leva a senha do banco: ele fica só neste computador (nunca no chat nem no GitHub).
-Uso: dois cliques em salvar_banco_teste.bat; colar o endereço (Supabase > Connect > Transaction pooler) e digitar a
-senha do banco de teste.
+Uso: dois cliques em salvar_banco_teste.bat; colar o endereço (Supabase > Connect > Method: Session pooler ou
+Transaction pooler; o "Direct connection" não funciona em rede comum) e digitar a senha do banco de teste.
 """
 from __future__ import annotations
 
@@ -30,13 +30,29 @@ def endereco_do_arquivo(arquivo: Path) -> str:
     return ""
 
 
+def projeto(endereco: str) -> str:
+    """O projeto do Supabase do endereço: no pooler vem no usuário (postgres.<projeto>), na conexão direta no
+    servidor (db.<projeto>.supabase.co). Outros bancos: servidor + nome. A porta e a senha não contam (o mesmo
+    projeto tem o Session pooler na 5432 e o Transaction pooler na 6543)."""
+    u = urlsplit(endereco.strip().strip('"').strip("'").replace("+psycopg", "").replace("[YOUR-PASSWORD]", "x"))
+    usuario, servidor = u.username or "", (u.hostname or "").lower()
+    if "." in usuario:
+        return usuario.split(".", 1)[1].lower()
+    if servidor.startswith("db.") and servidor.endswith(".supabase.co"):
+        return servidor.split(".")[1]
+    return f"{servidor}/{u.path.strip('/')}"
+
+
 def mesmo_banco(a: str, b: str) -> bool:
-    """Os dois endereços levam ao mesmo banco? (servidor, porta, usuário e nome; a senha não conta)"""
-    if not a or not b:
-        return False
-    x, y = urlsplit(a.replace("+psycopg", "")), urlsplit(b.replace("+psycopg", ""))
-    return ((x.hostname, x.port, x.username, x.path.strip("/")) ==
-            (y.hostname, y.port, y.username, y.path.strip("/")))
+    """Os dois endereços levam ao mesmo banco (o mesmo projeto, por qualquer porta ou caminho)?"""
+    return bool(a and b) and projeto(a) == projeto(b)
+
+
+def e_conexao_direta(endereco: str) -> bool:
+    """O "Direct connection" do Supabase (db.<projeto>.supabase.co) só funciona em rede IPv6 no plano grátis: a
+    maioria dos computadores não entra. O certo é o pooler (servidor ...pooler.supabase.com)."""
+    servidor = urlsplit(endereco.strip().strip('"').strip("'").replace("[YOUR-PASSWORD]", "x")).hostname or ""
+    return servidor.startswith("db.") and servidor.endswith(".supabase.co")
 
 
 def montar(endereco: str, senha: str) -> str:
@@ -59,7 +75,7 @@ def conecta(endereco: str) -> str:
         texto = str(erro).lower()
         if "password" in texto or "authentication" in texto:
             return "a senha não confere"
-        return "o endereço não respondeu (confira se copiou o do Transaction pooler)"
+        return "o endereço não respondeu (confira se copiou o do Session pooler ou do Transaction pooler)"
     finally:
         motor.dispose()
 
@@ -68,7 +84,13 @@ def main() -> int:
     print("Banco de TESTE (projeto grátis no Supabase, separado do sistema de verdade)\n")
     endereco = input("Cole o endereço (começa com postgresql://) e aperte Enter:\n> ").strip()
     if not endereco.startswith(("postgres://", "postgresql://")):
-        print("\nIsso não parece o endereço do banco. No Supabase: Connect > Transaction pooler > copiar. Nada foi feito.")
+        print("\nIsso não parece o endereço do banco. No Supabase: Connect > Method: Session pooler (ou Transaction "
+              "pooler) > copiar. Nada foi feito.")
+        return 1
+    if e_conexao_direta(endereco):
+        print("\nEsse é o endereço do \"Direct connection\" (db....supabase.co), que não funciona daqui. Na janela do "
+              "Connect, troque o Method para \"Session pooler\" e copie de novo (o certo tem pooler.supabase.com). "
+              "Nada foi feito.")
         return 1
     senha = ""
     if MARCA_DA_SENHA in endereco:
