@@ -31,3 +31,12 @@ def test_avisa_quando_colam_o_direct_connection():
     assert bt.e_conexao_direta("postgresql://postgres:[YOUR-PASSWORD]@db.abcdefgh.supabase.co:5432/postgres")
     assert not bt.e_conexao_direta(
         "postgresql://postgres.abcdefgh:[YOUR-PASSWORD]@aws-0-us-east-1.pooler.supabase.com:5432/postgres")
+
+
+def test_esvaziar_um_banco_novo_sem_tabelas_nao_da_erro(tmp_path):
+    """A primeira cópia para o banco de teste: ele ainda não tem tabelas (antes dava erro no TRUNCATE vazio)."""
+    from sqlalchemy import create_engine
+
+    from enviar_para_nuvem import esvaziar
+
+    esvaziar(create_engine(f"sqlite:///{(tmp_path / 'novo.db').as_posix()}"))

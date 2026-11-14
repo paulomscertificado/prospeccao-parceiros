@@ -116,6 +116,8 @@ def copiar(origem, destino, avisar=print, pular=frozenset()) -> dict[str, int]:
 
 def esvaziar(destino, pular=frozenset()) -> None:
     tabelas = [t for t in reversed(Base.metadata.sorted_tables) if t.name not in pular and inspect(destino).has_table(t.name)]
+    if not tabelas:  # banco novo, ainda sem tabelas (ex.: o banco de teste na primeira cópia): nada a esvaziar
+        return
     with destino.begin() as d:
         if destino.dialect.name == "postgresql":
             d.execute(text("TRUNCATE " + ", ".join(t.name for t in tabelas) + " RESTART IDENTITY CASCADE"))
