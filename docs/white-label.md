@@ -234,6 +234,16 @@ script; histórico do master dentro da AR). Ensaio no Postgres de teste (14/11/2
 **Decidido em 14/11/2026:** planos e cobrança só depois da validação da plataforma ("por enquanto não vamos pensar em
 nada de cobrança ou valores"); os limites de hoje (por número, por dia e por AR) continuam valendo.
 
+**Plano de segurança, itens que faltavam (14/11/2026):** a entrada do Admin Master numa AR vale por 2 horas
+(`seguranca.PRAZO_ENTRADA_SEG`, `_prazo_da_entrada`; a faixa mostra até quando; depois fecha o `acessos_master` e
+volta para a plataforma); limite de pedidos também por pessoa (240 por minuto) e por AR (1.200), além do IP
+(`limite_pessoa`, `limite_ar`; a AR vai na sessão); registro de atividades com e-mail e telefone mascarados
+(`util.mascarar_contatos` em `registrar_log`; só inclusão, nada no sistema apaga); prazo de guarda da cópia das
+conversas (`guarda_conversas_meses`, 0 = sem prazo, só o master muda; `leads_servico.apagar_conversas_antigas` na
+rotina de hora em hora, 5.000 por vez). Decisões: a cópia continua com TODAS as conversas (a tela Conversas é a caixa
+de entrada da equipe; só 625 das 178 mil mensagens eram de leads, clientes ou parceiros) e o prazo é de 12 meses (na
+publicação saem 8.548 mensagens de 01/04/2025 a 14/11/2025, todas da AR MS). Teste: `testes/test_seguranca_lgpd.py`.
+
 **Outras decisões de 14/11/2026:** a mesma empresa pode receber mensagens de duas ARs (cada AR é independente; a
 reserva de 60 dias continua valendo entre as pessoas de uma mesma AR; o nome escolhido de um contato na tela
 Conversas é um por telefone: a segunda AR não troca nem vê o da primeira, `conversas._de_outra_ar`); a chave da

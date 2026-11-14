@@ -321,6 +321,12 @@ def _rotina_hora() -> None:
     from . import ars
 
     ars.preencher_novos()  # white label, Fase 1: linhas novas ganham a AR (só depois do migrar_ar.py aplicar)
+    from .leads_servico import apagar_conversas_antigas
+
+    with sessao() as db:  # LGPD: a cópia das conversas fica na nuvem só pelo prazo de guarda (0 = sem prazo)
+        apagadas = apagar_conversas_antigas(db)
+        if apagadas:
+            log.info("Conversas: %s mensagens antigas saíram da cópia na nuvem (prazo de guarda)", apagadas)
 
 
 def rodada(numero: int | None) -> None:

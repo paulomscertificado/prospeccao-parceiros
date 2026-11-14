@@ -10,6 +10,7 @@ Só o Admin Master (`Usuario.master`) enxerga: para qualquer outra pessoa, mesmo
 from __future__ import annotations
 
 import re
+import time
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from sqlalchemy import func, select
@@ -18,7 +19,7 @@ from sqlalchemy.orm import Session
 from .. import autorizacao
 from ..banco import agora, gravar_config, ler_config, obter_db, usar_config_da_ar
 from ..modelos import AcessoMaster, Campanha, ConexaoWhatsApp, Lead, Tenant, Usuario
-from ..seguranca import exige, registrar_log, verificar_csrf
+from ..seguranca import PRAZO_ENTRADA_SEG, exige, fechar_entradas, registrar_log, verificar_csrf
 from ..web import avisar, tela, voltar
 
 rotas = APIRouter()
@@ -36,9 +37,7 @@ def _por_ar(db: Session, consulta) -> dict:
 
 
 def _fechar_entrada(db: Session, usuario: Usuario) -> None:
-    for aberto in db.execute(select(AcessoMaster).where(AcessoMaster.usuario_id == usuario.id,
-                                                        AcessoMaster.fim.is_(None))).scalars():
-        aberto.fim = agora()
+    fechar_entradas(db, usuario)
 
 
 @rotas.get("/master")
@@ -85,9 +84,10 @@ def entrar(request: Request, tid: int, motivo: str = Form(""), usuario: Usuario 
     _fechar_entrada(db, usuario)
     db.add(AcessoMaster(usuario_id=usuario.id, tenant_id=ar.id, motivo=motivo[:300]))
     request.session["ar_entrada"], request.session["ar_entrada_nome"] = ar.id, ar.nome
+    request.session["ar_entrada_ate"] = int(time.time()) + PRAZO_ENTRADA_SEG  # por até 2 horas
     registrar_log(db, usuario, "entrou_na_ar", "tenant", ar.id, f"{ar.nome}: {motivo[:200]}", request)
     db.commit()
-    avisar(request, f"Você entrou na {ar.nome}: até sair, vê e mexe só no que é dela.")
+    avisar(request, f"Você entrou na {ar.nome}: por até 2 horas (ou até sair), vê e mexe só no que é dela.")
     return voltar("/")
 
 
@@ -96,6 +96,7 @@ def sair(request: Request, usuario: Usuario = Depends(PORTEIRO), db: Session = D
     _so_master(usuario)
     nome = request.session.pop("ar_entrada_nome", "")
     request.session.pop("ar_entrada", None)
+    request.session.pop("ar_entrada_ate", None)
     _fechar_entrada(db, usuario)
     registrar_log(db, usuario, "saiu_da_ar", "tenant", None, nome, request)
     db.commit()

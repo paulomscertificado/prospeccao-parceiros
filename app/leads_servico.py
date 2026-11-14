@@ -3,7 +3,7 @@ conversão em parceiro e política de retenção (LGPD)."""
 
 from datetime import date, timedelta
 
-from sqlalchemy import or_, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.orm import Session
 
 from . import autorizacao, config, score, util
@@ -249,6 +249,27 @@ def anonimizar(lead: Lead, manter_bloqueio: bool = False) -> None:
     lead.anonimizado = True
     if not manter_bloqueio:
         lead.chave_cnpj = lead.chave_dominio = lead.chave_telefone = lead.chave_whatsapp = lead.chave_email = ""
+
+
+def apagar_conversas_antigas(db: Session, lote: int = 5000) -> int:
+    """LGPD (decisão de 14/11/2026): tira da cópia na nuvem as conversas do WhatsApp mais antigas que o prazo de guarda
+    (configuração guarda_conversas_meses; 0 = sem prazo). As originais ficam nos celulares e no WhatsApp Leads. Um lote
+    por vez (a rotina de hora em hora chama de novo); vale para todas as ARs."""
+    from .modelos import MensagemWhatsApp
+    from .seguranca import registrar_log
+
+    meses = ler_config_int(db, "guarda_conversas_meses", 0)
+    if meses <= 0:
+        return 0
+    limite = agora() - timedelta(days=round(meses * 30.44))
+    velhas = (select(MensagemWhatsApp.id).where(MensagemWhatsApp.criado_em < limite).limit(lote)
+              .execution_options(sem_filtro_de_ar=True))
+    apagadas = db.execute(delete(MensagemWhatsApp).where(MensagemWhatsApp.id.in_(velhas.scalar_subquery()))
+                          .execution_options(sem_filtro_de_ar=True)).rowcount or 0
+    if apagadas:
+        registrar_log(db, None, "apagou_conversas_antigas", "mensagens_whatsapp", None,
+                      f"{apagadas} mensagens com mais de {meses} meses saíram da cópia na nuvem (prazo de guarda)")
+    return apagadas
 
 
 def aplicar_retencao(db: Session) -> int:

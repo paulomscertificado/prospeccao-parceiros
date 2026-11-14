@@ -103,6 +103,10 @@ class Limitador:
 limite_login = Limitador(maximo=5, janela_seg=15 * 60)      # 5 senhas erradas a cada 15 min
 limite_pedidos = Limitador(maximo=240, janela_seg=60)       # pedidos de alteração por minuto, por IP
 limite_api = Limitador(maximo=120, janela_seg=60)           # webhooks e API
+# white label (plano de segurança): além do IP, por pessoa e por AR (escritórios inteiros podem sair pelo mesmo IP)
+limite_pessoa = Limitador(maximo=240, janela_seg=60)        # pedidos de alteração por minuto, por pessoa
+limite_ar = Limitador(maximo=1200, janela_seg=60)           # pedidos de alteração por minuto, por AR
+PRAZO_ENTRADA_SEG = 2 * 60 * 60  # o Admin Master fica dentro de uma AR por até 2 horas (depois entra de novo)
 
 
 def ip_de(request: Request) -> str:
@@ -144,6 +148,11 @@ async def verificar_csrf(request: Request):
         raise SemPermissao("O formulário expirou. Recarregue a página e tente de novo.")
     if not limite_pedidos.registrar(ip_de(request)):
         raise SemPermissao("Muitas ações em pouco tempo. Espere um minuto e tente de novo.")
+    pessoa, ar = request.session.get("usuario_id"), request.session.get("ar")
+    if pessoa and not limite_pessoa.registrar(f"u{pessoa}"):
+        raise SemPermissao("Muitas ações em pouco tempo. Espere um minuto e tente de novo.")
+    if ar and not limite_ar.registrar(f"ar{ar}"):
+        raise SemPermissao("Muitas ações da sua empresa ao mesmo tempo. Espere um minuto e tente de novo.")
 
 
 def entrar(request: Request, usuario: Usuario):
@@ -155,6 +164,7 @@ def entrar(request: Request, usuario: Usuario):
         "ultimo_uso": int(time.time()),
         "csrf": secrets.token_urlsafe(32),
         "2fa": True,
+        "ar": usuario.tenant_id,  # limite de pedidos por AR (verificar_csrf)
     })
 
 
@@ -185,11 +195,44 @@ def usuario_logado(request: Request, db: Session = Depends(obter_db)) -> Usuario
             raise PrecisaLogin("O acesso da sua AR está suspenso. Fale com o administrador da plataforma.")
     request.session["ultimo_uso"] = int(time.time())
     request.state.usuario = usuario
+    if usuario.master and request.session.get("ar_entrada"):
+        _prazo_da_entrada(request, db, usuario)
     from .isolamento import ligar
 
     # white label: daqui em diante esta tela só enxerga a AR da pessoa (Admin Master: a AR em que entrou, ou todas)
     ligar(db, usuario, request.session.get("ar_entrada") if usuario.master else None)
     return usuario
+
+
+def fechar_entradas(db: Session, usuario: Usuario) -> None:
+    """Fecha as entradas abertas do Admin Master nas ARs (acessos_master.fim)."""
+    from .banco import agora
+    from .modelos import AcessoMaster
+
+    for aberto in db.execute(select(AcessoMaster).where(AcessoMaster.usuario_id == usuario.id,
+                                                        AcessoMaster.fim.is_(None))).scalars():
+        aberto.fim = agora()
+
+
+def _prazo_da_entrada(request: Request, db: Session, usuario: Usuario) -> None:
+    """A entrada do Admin Master numa AR vale por PRAZO_ENTRADA_SEG; depois ele volta para a plataforma e precisa
+    entrar de novo (com outro motivo). Entrada de antes do prazo existir ganha o prazo a partir de agora."""
+    ate = request.session.get("ar_entrada_ate")
+    if not ate:
+        request.session["ar_entrada_ate"] = int(time.time()) + PRAZO_ENTRADA_SEG
+        return
+    if time.time() <= ate:
+        return
+    nome = request.session.pop("ar_entrada_nome", "") or "AR"
+    request.session.pop("ar_entrada", None)
+    request.session.pop("ar_entrada_ate", None)
+    fechar_entradas(db, usuario)
+    registrar_log(db, usuario, "saiu_da_ar", "tenant", None, f"{nome} (prazo de 2 horas)", request)
+    db.commit()
+    avisos = request.session.get("avisos", [])
+    avisos.append(["alerta", f"Sua entrada na {nome} terminou (prazo de 2 horas). Para continuar, entre de novo pelo "
+                             "Painel master."])
+    request.session["avisos"] = avisos[-5:]
 
 
 def exige(*permissoes: str):
@@ -210,10 +253,14 @@ def ve_tudo(usuario: Usuario, permissao: str = "leads.ver") -> bool:
 
 def registrar_log(db: Session, usuario: Usuario | None, acao: str, entidade: str = "",
                   entidade_id: int | None = None, detalhes: str = "", request: Request | None = None):
+    """Grava uma linha no registro de atividades (só inclusão: nada no sistema apaga). E-mails e telefones do texto livre
+    saem mascarados (util.mascarar_contatos)."""
+    from .util import mascarar_contatos
+
     db.add(LogAuditoria(
         usuario_id=usuario.id if usuario else None,
         usuario_nome=usuario.nome if usuario else "sistema",
-        acao=acao, entidade=entidade, entidade_id=entidade_id, detalhes=detalhes[:2000],
+        acao=acao, entidade=entidade, entidade_id=entidade_id, detalhes=mascarar_contatos(detalhes)[:2000],
         ip=ip_de(request) if request else "", criado_em=agora(),
     ))
 

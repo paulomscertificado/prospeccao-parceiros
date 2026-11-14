@@ -87,6 +87,12 @@ Geral > "Mostrar Vendas, Vencimentos e Comissões" = 1 > Salvar.
 - Se a pessoa pedir para sair, clique em **Pediu para sair / Registrar opt-out**: ela nunca mais entra em campanha.
 - Cada lead guarda **de onde veio** (fonte) e a **base legal**. Pedido de exclusão: ficha do lead → **Excluir dados (LGPD)**.
 - O sistema **não inventa dados**: se a fonte não traz telefone ou e-mail, o lead fica sem.
+- **Cópia das conversas do WhatsApp (tela Conversas):** guarda todas as conversas dos números conectados, por um
+  **prazo de guarda** (Configurações > Geral, campo "LGPD · meses que a cópia das conversas fica na nuvem"; só o admin
+  master muda). As mais antigas saem da cópia sozinhas, de hora em hora; as originais continuam nos celulares e no
+  WhatsApp Leads.
+- O **registro de atividades** (Configurações > Logs) mostra e-mails e telefones mascarados (ex.: ma***@empresa.com.br,
+  (81) *****-8888) e ninguém apaga o que está nele.
 
 ## 4. IA SDR (prospecção de parceiros)
 
@@ -507,8 +513,9 @@ própria marca (horários e limites de envio, textos da parceria, regras da IA S
 só o admin master muda; o que ele muda vale para as marcas que não têm valor próprio.
 
 **Painel master** (link "Painel master", só para o admin master): mostra as marcas com os números de cada uma; **Entrar
-na AR** pede o motivo (fica registrado) e, até clicar em **Sair da AR** (na faixa amarela do topo), mostra só aquela
-marca, como o administrador dela vê; **Nova AR**; **Suspender** (as pessoas da marca não entram até reativar); e os
+na AR** pede o motivo (fica registrado) e, até clicar em **Sair da AR** (na faixa amarela do topo) ou por até
+**2 horas** (depois volta sozinho para a plataforma; para continuar, entre de novo), mostra só aquela marca, como o
+administrador dela vê; **Nova AR**; **Suspender** (as pessoas da marca não entram até reativar); e os
 **módulos de cada marca**. O administrador de uma marca não muda os papéis do sistema, os modelos de mensagem, as
 cadências e as categorias que valem para todas: ele cria os da própria marca (pode copiar de um da plataforma).
 O que o admin master faz dentro de uma marca aparece no histórico dela (Configurações > Logs), marcado como dele.

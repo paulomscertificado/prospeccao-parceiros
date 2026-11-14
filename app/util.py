@@ -291,3 +291,19 @@ def primeiro_nome(nome: str) -> str:
 
 def taxa(parte, total) -> float:
     return round(100.0 * parte / total, 1) if total else 0.0
+
+
+# ---------------------------------------------------------------- Registro de atividades (LGPD)
+_EMAIL_NO_TEXTO = re.compile(r"\b([A-Za-z0-9._%+-]{1,64})@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,})\b")
+# telefone de 10 a 13 dígitos, com ou sem 55, DDD entre parênteses, espaço ou hífen (não pega CNPJ nem datas)
+_TELEFONE_NO_TEXTO = re.compile(r"(?<![\d/.])(?:\+?55[\s-]?)?\(?(\d{2})\)?[\s-]?(9?\d{4})[\s-]?(\d{4})(?![\d/.])")
+
+
+def mascarar_contatos(texto: str) -> str:
+    """E-mails e telefones mascarados no texto livre do registro de atividades (plano de segurança, LGPD): o registro
+    mostra o que aconteceu sem espalhar contato de ninguém. "maria@empresa.com.br" vira "ma***@empresa.com.br" e
+    "(81) 99999-8888" vira "(81) *****-8888"."""
+    if not texto:
+        return texto
+    texto = _EMAIL_NO_TEXTO.sub(lambda m: m.group(1)[:2] + "***@" + m.group(2), texto)
+    return _TELEFONE_NO_TEXTO.sub(lambda m: f"({m.group(1)}) *****-{m.group(3)}", texto)

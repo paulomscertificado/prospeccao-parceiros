@@ -58,7 +58,7 @@
   </nav>
   <main class="conteudo">
     {% if ar_entrada_nome %}<form method="post" action="/master/sair" class="aviso aviso-alerta" style="display:flex;gap:12px;align-items:center">
-      <input type="hidden" name="csrf" value="{{ csrf }}"><span>Você está dentro da <b>{{ ar_entrada_nome }}</b>: vê e mexe só no que é dela.</span>
+      <input type="hidden" name="csrf" value="{{ csrf }}"><span>Você está dentro da <b>{{ ar_entrada_nome }}</b>: vê e mexe só no que é dela{% if ar_entrada_ate %} (até as {{ hora_de(ar_entrada_ate) }}){% endif %}.</span>
       <button class="btn">Sair da AR</button></form>{% endif %}
     {% for tipo, texto in avisos %}<div class="aviso aviso-{{ tipo }}">{{ texto }}</div>{% endfor %}
     {% block conteudo %}{% endblock %}

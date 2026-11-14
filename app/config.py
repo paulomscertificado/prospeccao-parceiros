@@ -300,6 +300,9 @@ CONFIG_PADRAO = {
     "dias_parceiro_parado": "30",
     "dias_lead_parado": "7",
     "dias_retencao_perdidos": "365",
+    # LGPD (decisão de 14/11/2026): meses que a CÓPIA das conversas do WhatsApp fica na nuvem; 0 = sem prazo. As
+    # originais ficam nos celulares e no WhatsApp Leads. Só o Admin Master muda (vale para todas as ARs).
+    "guarda_conversas_meses": "0",
     "custo_mensal_prospeccao": "0",
     # IA SDR
     "prioridade_canais": "whatsapp,email,linkedin",

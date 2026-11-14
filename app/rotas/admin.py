@@ -59,6 +59,8 @@ CAMPOS_GERAIS = [
     ("alertas_emails", "Avisos de problema · e-mails que recebem (separados por vírgula; vazio = os administradores)",
      "texto"),
     ("limite_banco_mb", "Avisos de problema · tamanho do banco contratado em MB (o aviso sai em 80%)", "numero"),
+    ("guarda_conversas_meses", "LGPD · meses que a cópia das conversas do WhatsApp fica na nuvem (0 = sem prazo; as "
+     "originais continuam nos celulares e no WhatsApp Leads)", "numero"),
 ]
 
 

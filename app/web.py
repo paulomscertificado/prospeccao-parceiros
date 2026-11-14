@@ -1,7 +1,7 @@
 """Apoio às telas: modelos HTML (Jinja2), avisos ("flash") e respostas comuns."""
 
 import json
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 from fastapi import Request
@@ -115,6 +115,8 @@ def tela(request: Request, nome: str, contexto: dict | None = None, status_code:
         "request": request,
         "usuario": usuario,
         "ar_entrada_nome": request.session.get("ar_entrada_nome", "") if usuario and usuario.master else "",
+        "ar_entrada_ate": request.session.get("ar_entrada_ate") if usuario and usuario.master else None,
+        "hora_de": lambda segundos: datetime.fromtimestamp(segundos).strftime("%H:%M"),
         "avisos_novos": avisos_novos,
         "wl": wl,
         "csrf": token_csrf(request),
