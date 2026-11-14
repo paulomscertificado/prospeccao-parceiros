@@ -82,6 +82,10 @@ async def salvar_papel(request: Request, pid: int, usuario: Usuario = Depends(GE
         avisar(request, "O papel Administrador tem sempre acesso a tudo (assim o sistema nunca fica sem quem cuide dele).",
                "alerta")
         return voltar(destino)
+    if not autorizacao.e_master(usuario) and autorizacao.papel_de(db, usuario) is not None \
+            and autorizacao.papel_de(db, usuario).id == papel.id:
+        avisar(request, "Você não pode mudar as permissões do seu próprio papel. Peça ao admin master.", "erro")
+        return voltar(destino)
     form = await request.form()
     nome = str(form.get("nome", "")).strip()
     if nome and not papel.sistema:
@@ -98,6 +102,11 @@ async def salvar_papel(request: Request, pid: int, usuario: Usuario = Depends(GE
         escolhas.append((p.codigo, valor if p.com_escopo else autorizacao.TUDO))
     antes = {r.permissao: r.escopo for r in db.execute(
         select(PermissaoPapel).where(PermissaoPapel.papel_id == papel.id)).scalars()}
+    novas_de_admin = [c for c, _ in escolhas if c in autorizacao.SENSIVEIS and c not in antes]
+    if novas_de_admin and not autorizacao.e_master(usuario):
+        avisar(request, "Só o admin master põe poderes de administração (criar usuários, mudar permissões ou "
+                        "configurações) num papel.", "erro")
+        return voltar(destino)
     db.execute(delete(PermissaoPapel).where(PermissaoPapel.papel_id == papel.id))
     for codigo, escopo in escolhas:
         db.add(PermissaoPapel(papel_id=papel.id, permissao=codigo, escopo=escopo))
@@ -123,6 +132,9 @@ def novo_papel(request: Request, nome: str = Form(...), copiar_de: str = Form(..
     codigo, n = f"p_{base or 'papel'}"[:36], 2
     while db.execute(select(Papel.id).where(Papel.codigo == codigo)).first():
         codigo, n = f"p_{base}"[:33] + f"_{n}", n + 1
+    if (motivo := autorizacao.motivo_para_nao_dar_papel(db, usuario, modelo)):
+        avisar(request, motivo, "erro")
+        return voltar(DESTINO)
     papel = Papel(codigo=codigo, nome=nome, base=modelo.base, sistema=False,
                   descricao=f"Criado a partir de {modelo.nome}", permissoes_conhecidas=modelo.permissoes_conhecidas)
     db.add(papel)
@@ -173,6 +185,16 @@ def nova_excecao(request: Request, usuario_id: int = Form(...), permissao: str =
         avisar(request, "Essa permissão não pode ser negada por exceção (o sistema ficaria sem quem cuide das "
                         "permissões). Troque o papel da pessoa, se for o caso.", "erro")
         return voltar(destino)
+    if alvo.id == usuario.id:
+        avisar(request, "Você não pode mudar as suas próprias permissões. Peça ao admin master.", "erro")
+        return voltar(destino)
+    if motivo := autorizacao.motivo_para_nao_alterar(db, usuario, alvo):
+        avisar(request, motivo, "erro")
+        return voltar(destino)
+    if efeito == "permitir" and permissao in autorizacao.SENSIVEIS and not autorizacao.e_master(usuario):
+        avisar(request, "Só o admin master dá poderes de administração (criar usuários, mudar permissões ou "
+                        "configurações).", "erro")
+        return voltar(destino)
     escopo = escopo if (p.com_escopo and efeito == "permitir" and escopo in ESCOPOS) else ""
     data_fim = util.para_data(ate) if ate else None
     db.execute(delete(ExcecaoPermissao).where(ExcecaoPermissao.usuario_id == alvo.id,
@@ -193,8 +215,14 @@ def remover_excecao(request: Request, eid: int, usuario: Usuario = Depends(GEREN
     e = db.get(ExcecaoPermissao, eid)
     if e is None:
         raise HTTPException(404)
-    registrar_log(db, usuario, "removeu_excecao", "usuario", e.usuario_id, f"{e.efeito.upper()} {e.permissao}", request)
     destino = f"{DESTINO}?aba=usuarios&pessoa={e.usuario_id}"
+    if e.usuario_id == usuario.id and not autorizacao.e_master(usuario):
+        avisar(request, "Você não pode mudar as suas próprias permissões. Peça ao admin master.", "erro")
+        return voltar(destino)
+    if motivo := autorizacao.motivo_para_nao_alterar(db, usuario, db.get(Usuario, e.usuario_id)):
+        avisar(request, motivo, "erro")
+        return voltar(destino)
+    registrar_log(db, usuario, "removeu_excecao", "usuario", e.usuario_id, f"{e.efeito.upper()} {e.permissao}", request)
     db.delete(e)
     db.commit()
     avisar(request, "Exceção removida: vale de novo o que o papel da pessoa permite.")

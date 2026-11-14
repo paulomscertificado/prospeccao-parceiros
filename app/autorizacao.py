@@ -175,8 +175,10 @@ def permitidas_no_perfil(perfil: str, p: Permissao) -> bool:
 
 def preparar(db: Session) -> None:
     """Cria os 5 papéis do sistema e dá aos papéis as permissões novas do catálogo (com o padrão do perfil base).
-    Nunca mexe no que o administrador já escolheu."""
+    Nunca mexe no que o administrador já escolheu. Garante um admin master."""
     from . import config
+
+    garantir_master(db)
 
     existentes = {p.codigo: p for p in db.execute(select(Papel)).scalars()}
     for codigo in PERFIS_BASE:
@@ -197,6 +199,84 @@ def preparar(db: Session) -> None:
                 db.add(PermissaoPapel(papel_id=papel.id, permissao=p.codigo, escopo=escopo))
         papel.permissoes_conhecidas = ",".join(sorted(conhecidas | {p.codigo for p in novas}))
     db.flush()
+
+
+# ---------------------------------------------------------------- Admin master e travas contra escalada
+# Pedido da Maria em 13/11/2026 ("Sim, corrigir"): ninguém toma a conta do admin master (Paulo Marinho), só ele
+# cria ou promove administradores e ninguém dá a alguém (ou a si mesmo) um poder que não tem. Vale no servidor, em
+# Configurações > Usuários, em Permissões e no compartilhamento de WhatsApp/e-mail (o menu só esconde por conforto).
+
+def garantir_master(db: Session) -> None:
+    """Sem admin master ativo: o administrador ativo mais antigo vira o master (no sistema da MS, o Paulo Marinho)."""
+    if db.execute(select(Usuario.id).where(Usuario.master.is_(True), Usuario.ativo.is_(True))).first():
+        return
+    primeiro = db.execute(select(Usuario).where(Usuario.perfil == "admin", Usuario.ativo.is_(True))
+                          .order_by(Usuario.id)).scalars().first()
+    if primeiro is not None:
+        primeiro.master = True
+        db.flush()
+
+
+def e_master(usuario: Usuario | None) -> bool:
+    return bool(usuario is not None and usuario.ativo and getattr(usuario, "master", False))
+
+
+def papel_da_poder_de_admin(db: Session, papel: Papel | None) -> bool:
+    """O papel é o de administrador ou tem alguma permissão de administração (SENSIVEIS)."""
+    if papel is None:
+        return False
+    if papel.base == "admin":
+        return True
+    return db.execute(select(PermissaoPapel.id).where(PermissaoPapel.papel_id == papel.id,
+                                                      PermissaoPapel.permissao.in_(SENSIVEIS))).first() is not None
+
+
+def tem_poder_de_admin(db: Session, usuario: Usuario) -> bool:
+    """A pessoa é administradora (ou master) ou tem, pelo papel ou por exceção, um poder de administração."""
+    if getattr(usuario, "master", False) or usuario.perfil == "admin":
+        return True
+    efet = _calcular(db, usuario)[0]
+    return any(p in efet for p in SENSIVEIS)
+
+
+def motivo_para_nao_alterar(db: Session, quem: Usuario, alvo: Usuario | None) -> str:
+    """Por que `quem` não pode alterar o cadastro, a senha, o 2FA ou as permissões de `alvo` ("" = pode). O master só é
+    alterado por ele mesmo; quem tem poder de administrador, só pelo master (ou por si mesmo)."""
+    if alvo is None or alvo.id == quem.id or e_master(quem):
+        return ""
+    if getattr(alvo, "master", False):
+        return "Só o próprio admin master altera o cadastro, a senha, o código do celular e as permissões dele."
+    if tem_poder_de_admin(db, alvo):
+        return ("Só o admin master altera o cadastro, a senha, o código do celular e as permissões de um administrador "
+                "(ou de quem tem poderes de administração).")
+    return ""
+
+
+def motivo_para_nao_dar_papel(db: Session, quem: Usuario, papel: Papel | None) -> str:
+    """Ninguém dá um poder que não tem: só o master dá o papel de administrador ou um papel com poderes de
+    administração ("" = pode)."""
+    if papel is not None and papel_da_poder_de_admin(db, papel) and not e_master(quem):
+        return ("Só o admin master dá o papel de administrador (ou um papel com poderes de administração, como criar "
+                "usuários ou mudar permissões).")
+    return ""
+
+
+def motivo_para_nao_compartilhar(db: Session, quem: Usuario, dono_id: int | None, antes_todos: bool,
+                                 antes_ids: list[int], todos: bool, ids: list[int]) -> str:
+    """Compartilhar o WhatsApp/e-mail de outra pessoa (gestor, administrador): não pode se incluir, nem liberar para
+    toda a equipe (que inclui quem compartilha), nem mexer no de um administrador ou do master. O dono da conta e o
+    master podem tudo ("" = pode)."""
+    if dono_id == quem.id or e_master(quem):
+        return ""
+    dono = db.get(Usuario, dono_id) if dono_id else None
+    if dono is not None and tem_poder_de_admin(db, dono):
+        return "Só o próprio dono (ou o admin master) compartilha o WhatsApp ou o e-mail de um administrador."
+    if quem.id in ids and quem.id not in antes_ids:
+        return ("Você não pode compartilhar com você mesmo o WhatsApp ou o e-mail de outra pessoa: peça ao dono "
+                "(cada usuário dispara só pelo que é dele ou foi compartilhado por quem é dono).")
+    if todos and not antes_todos:
+        return "Só o dono (ou o admin master) libera o WhatsApp ou o e-mail dele para toda a equipe."
+    return ""
 
 
 # ---------------------------------------------------------------- Cálculo das permissões de uma pessoa

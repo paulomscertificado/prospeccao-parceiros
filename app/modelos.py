@@ -188,6 +188,9 @@ class Usuario(Base):
     senha_hash: Mapped[str] = mapped_column(String(200))
     perfil: Mapped[str] = mapped_column(String(20), default="vendedor")
     ativo: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Admin master (dono da plataforma, hoje o Paulo Marinho): só ele cria/promove administradores e ninguém mexe no
+    # cadastro dele (pedido da Maria em 13/11/2026; ver autorizacao.motivo_para_nao_alterar)
+    master: Mapped[bool] = mapped_column(Boolean, default=False)
     parceiro_id: Mapped[int | None] = mapped_column(ForeignKey("parceiros.id"), nullable=True)
     versao_sessao: Mapped[int] = mapped_column(Integer, default=1)  # muda ao trocar a senha: derruba sessões antigas
     # Agenda para reuniões marcadas pela IA SDR (ex.: "seg-sex 09:00-12:00,14:00-18:00")

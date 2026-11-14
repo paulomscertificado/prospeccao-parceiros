@@ -489,6 +489,10 @@ só se sabe quando a devolução chega, e aí o sistema tira o e-mail sozinho.
 
 Crie usuários em **Configurações > Usuários** (o perfil padrão é Funcionário MS).
 
+**Admin master:** quem criou o sistema (na MS, o **Paulo Marinho**) aparece com o selo **admin master**. Só ele cria ou
+promove administradores e dá permissões de administração. O cadastro, a senha e o código do celular dele só ele muda; os
+dos outros administradores, só ele também. Ninguém muda o próprio papel, a própria equipe nem as próprias permissões.
+
 ### Permissões (menu Permissões, só o administrador)
 
 Cada perfil acima é um **papel**. No menu **Permissões** você pode:
@@ -535,7 +539,8 @@ sem número, as mensagens esperam e a pessoa recebe um aviso para conectar. Em *
 próprio número e dos números compartilhados com ele.
 **Compartilhar um número:** no cartão do número, **Compartilhar este número** → "Toda a equipe" ou escolha as
 pessoas. O dono do número, o administrador e o gestor escolhem com quem compartilhar; só o dono e o administrador
-conectam, pausam ou desligam.
+conectam, pausam ou desligam. Quem não é o dono não pode se incluir, não pode liberar para toda a equipe e não mexe no
+número (ou no e-mail) de um administrador: isso só o dono ou o admin master.
 
 **Cada pessoa com o seu e-mail:** no menu **E-mail**, cada um pode cadastrar o próprio e-mail @mscertificados.com.br
 (com a senha de app do Google, 16 letras) e clicar em **Enviar e-mail de teste**. Os e-mails das campanhas dos leads

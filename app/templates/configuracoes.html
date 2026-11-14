@@ -43,7 +43,9 @@
     <tr>
       <td><input form="u-{{ u.id }}" type="text" name="nome" value="{{ u.nome }}" aria-label="Nome"></td>
       <td><input form="u-{{ u.id }}" type="email" name="email" value="{{ u.email }}" aria-label="E-mail"></td>
-      <td><select form="u-{{ u.id }}" name="perfil" aria-label="Papel">{% for pa in papeis %}<option value="{{ pa.codigo }}" {{ 'selected' if (u.papel.codigo if u.papel else u.perfil) == pa.codigo }}>{{ pa.nome }}</option>{% endfor %}</select>
+      <td><select form="u-{{ u.id }}" name="perfil" aria-label="Papel">{% for pa in papeis %}{% set atual = (u.papel.codigo if u.papel else u.perfil) == pa.codigo %}{% if atual or sou_master or pa.codigo not in papeis_de_admin %}<option value="{{ pa.codigo }}" {{ 'selected' if atual }}>{{ pa.nome }}</option>{% endif %}{% endfor %}</select>
+        {% if u.master %}<div><span class="selo selo-azul">admin master</span></div>{% endif %}
+        {% if not sou_master and u.id != usuario.id and (u.master or u.perfil == 'admin') %}<div class="pequeno suave">só o admin master altera</div>{% endif %}
         <div class="pequeno"><a href="/permissoes?aba=usuarios&pessoa={{ u.id }}">exceções e acesso</a></div></td>
       <td><select form="u-{{ u.id }}" name="equipe_id" aria-label="Equipe"><option value="">—</option>{% for e in equipes %}<option value="{{ e.id }}" {{ 'selected' if u.equipe_id == e.id }}>{{ e.nome }}</option>{% endfor %}</select></td>
       <td><select form="u-{{ u.id }}" name="parceiro_id" aria-label="Parceiro"><option value="">—</option>{% for p in parceiros %}<option value="{{ p.id }}" {{ 'selected' if u.parceiro_id == p.id }}>{{ p.escritorio }}</option>{% endfor %}</select></td>
@@ -58,7 +60,7 @@
     <tr>
       <td><input form="u-0" type="text" name="nome" placeholder="Nome" required aria-label="Nome"></td>
       <td><input form="u-0" type="email" name="email" placeholder="email@empresa.com.br" required aria-label="E-mail"></td>
-      <td><select form="u-0" name="perfil" aria-label="Papel">{% for pa in papeis %}<option value="{{ pa.codigo }}" {{ 'selected' if pa.codigo == 'funcionario' }}>{{ pa.nome }}</option>{% endfor %}</select></td>
+      <td><select form="u-0" name="perfil" aria-label="Papel">{% for pa in papeis %}{% if sou_master or pa.codigo not in papeis_de_admin %}<option value="{{ pa.codigo }}" {{ 'selected' if pa.codigo == 'funcionario' }}>{{ pa.nome }}</option>{% endif %}{% endfor %}</select></td>
       <td><select form="u-0" name="equipe_id" aria-label="Equipe"><option value="">—</option>{% for e in equipes %}<option value="{{ e.id }}">{{ e.nome }}</option>{% endfor %}</select></td>
       <td><select form="u-0" name="parceiro_id" aria-label="Parceiro"><option value="">—</option>{% for p in parceiros %}<option value="{{ p.id }}">{{ p.escritorio }}</option>{% endfor %}</select></td>
       <td><input form="u-0" type="text" name="expediente" value="seg-sex 09:00-12:00,14:00-18:00" aria-label="Expediente" style="min-width:210px"></td>

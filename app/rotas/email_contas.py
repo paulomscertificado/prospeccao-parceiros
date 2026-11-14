@@ -231,6 +231,13 @@ async def compartilhar(request: Request, conta: int = Form(...), usuario: Usuari
         return voltar(DESTINO)
     form = await request.form()
     ids = sorted({int(i) for i in form.getlist("usuarios") if str(i).isdigit() and int(i) != c.dono_id})
+    from .. import autorizacao
+
+    if motivo := autorizacao.motivo_para_nao_compartilhar(db, usuario, c.dono_id, c.compartilhada_todos,
+                                                          contas_email.compartilhada_com(c), form.get("todos") == "on",
+                                                          ids):
+        avisar(request, motivo, "erro")
+        return voltar(DESTINO)
     c.compartilhada_todos = form.get("todos") == "on"
     c.compartilhada_com = json.dumps(ids)
     nome = str(form.get("nome", "")).strip()

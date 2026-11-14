@@ -23,6 +23,17 @@ uma mudança localizada: uma coluna `empresa_id` nos registros e mais uma condi�
 **Ordem de decisão:** módulo desligado → NEGAR do usuário → PERMITIR do usuário → papel → nega.
 
 Regras fixas de segurança:
+- **Admin master** (`Usuario.master`; pedido da Maria em 13/11/2026, depois de validar a escalada de privilégio):
+  quem fez o primeiro acesso (na MS, o Paulo Marinho; `autorizacao.garantir_master` marca o administrador ativo mais
+  antigo se faltar). Só ele cria ou promove administradores e dá papéis/permissões de administração (`SENSIVEIS`);
+  o cadastro, a senha, o 2FA e as permissões dele só ele altera; os de outro administrador (ou de quem tem poder de
+  administração), só o master (`motivo_para_nao_alterar`, `motivo_para_nao_dar_papel`). Ninguém muda o próprio papel,
+  as próprias exceções, o próprio papel em Permissões, a própria equipe nem se desativa.
+- Compartilhar WhatsApp/e-mail de outra pessoa (`motivo_para_nao_compartilhar`): quem não é o dono (nem o master)
+  não se inclui, não libera para toda a equipe e não mexe nos de administradores.
+- `testes/test_escalada_de_privilegio.py`: gestor, funcionário, vendedor e parceiro tentam virar admin (403 em tudo);
+  admin comum tenta tomar a conta do master; gestor com "Criar e editar usuários" tenta se promover; gestor tenta se
+  compartilhar o WhatsApp de um admin.
 - O papel **Administrador** tem sempre tudo e não é editável; `permissoes.gerenciar` não aceita NEGAR (ninguém tranca
   o sistema).
 - **Parceiro** só recebe permissões do portal; a equipe nunca recebe `portal.usar` (vale mesmo se alguém gravar uma

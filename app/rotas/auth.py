@@ -188,7 +188,8 @@ def primeiro_acesso(request: Request, nome: str = Form(...), email: str = Form(.
         erro = problema_na_senha(senha)
     if erro:
         return tela(request, "primeiro_acesso.html", {"erro": erro, "nome": nome, "email": email})
-    usuario = Usuario(nome=nome.strip(), email=email.strip().lower(), senha_hash=resumir_senha(senha), perfil="admin")
+    usuario = Usuario(nome=nome.strip(), email=email.strip().lower(), senha_hash=resumir_senha(senha), perfil="admin",
+                      master=True)  # quem cria o sistema é o admin master (dono da plataforma)
     db.add(usuario)
     db.flush()
     registrar_log(db, usuario, "primeiro_acesso", "usuario", usuario.id, request=request)

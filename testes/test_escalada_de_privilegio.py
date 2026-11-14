@@ -138,3 +138,156 @@ def _tentativas(cliente, csrf):
     with sessao() as db:
         equipe = db.execute(select(Equipe).where(Equipe.nome == "Equipe Controle Escalada")).scalars().one()
         db.delete(equipe)
+
+
+# ---------------------------------------------------------------- Correções de 13/11/2026 ("Sim, corrigir")
+
+def _post(c: TestClient, caminho: str, dados: dict, token: str):
+    return c.post(caminho, data={"csrf": token, **dados})
+
+
+def test_admin_comum_nao_toma_a_conta_do_master_nem_cria_admin(cliente, csrf):
+    """Risco 1: todo administrador era igual e um podia tomar a conta do outro (inclusive do Paulo Marinho). Agora o
+    admin master só é alterado por ele mesmo, e só ele cria ou promove administradores e dá poderes de administração."""
+    _zerar_limite_de_pedidos()
+    try:
+        with sessao() as db:
+            master = db.execute(select(Usuario).where(Usuario.email == "admin@teste.com.br")).scalars().one()
+            assert master.master and autorizacao.e_master(master)  # quem criou o sistema (primeiro acesso)
+            master_id = master.id
+            gestor_papel = db.execute(select(Papel).where(Papel.codigo == "gestor")).scalars().one().id
+        comum = _usuario("admin.comum@teste.com.br", "admin", "Admin Comum")
+        outro = _usuario("admin.outro@teste.com.br", "admin", "Admin Outro")
+        alvo = _usuario("vend.alvo@teste.com.br", "vendedor", "Vendedor Alvo")
+        antes = _foto()
+        c = _entrar("admin.comum@teste.com.br")
+        token = csrf_de(c.get("/minha-conta").text)
+        forte = "SenhaForte!2026tomada"
+        r = _post(c, f"/configuracoes/usuarios/{master_id}", {"nome": "Maria Admin", "email": "tomada@teste.com.br",
+                                                              "perfil": "admin", "ativo": "on", "senha": forte}, token)
+        assert "Só o próprio admin master" in r.text
+        _post(c, f"/configuracoes/usuarios/{master_id}/zerar-2fa", {}, token)
+        _post(c, f"/configuracoes/usuarios/{master_id}", {"nome": "Maria Admin", "email": "admin@teste.com.br",
+                                                          "perfil": "vendedor", "ativo": ""}, token)
+        r = _post(c, f"/configuracoes/usuarios/{outro}", {"nome": "Admin Outro", "email": "admin.outro@teste.com.br",
+                                                          "perfil": "admin", "ativo": "on", "senha": forte}, token)
+        assert "Só o admin master altera" in r.text
+        _post(c, f"/configuracoes/usuarios/{outro}/zerar-2fa", {}, token)
+        r = _post(c, "/configuracoes/usuarios/0", {"nome": "Admin Novo", "email": "admin.novo@escalada.com.br",
+                                                   "perfil": "admin", "ativo": "on", "senha": forte}, token)
+        assert "Só o admin master dá o papel de administrador" in r.text
+        _post(c, f"/configuracoes/usuarios/{alvo}", {"nome": "Vendedor Alvo", "email": "vend.alvo@teste.com.br",
+                                                     "perfil": "admin", "ativo": "on"}, token)
+        _post(c, f"/configuracoes/usuarios/{comum}", {"nome": "Admin Comum", "email": "admin.comum@teste.com.br",
+                                                      "perfil": "admin", "ativo": ""}, token)  # desativar a si mesmo
+        r = _post(c, "/permissoes/excecao", {"usuario_id": alvo, "permissao": "usuarios.gerenciar",
+                                             "efeito": "permitir"}, token)
+        assert "Só o admin master dá poderes de administração" in r.text
+        _post(c, "/permissoes/excecao", {"usuario_id": master_id, "permissao": "leads.ver", "efeito": "negar"}, token)
+        _post(c, "/permissoes/excecao", {"usuario_id": comum, "permissao": "leads.ver", "efeito": "negar"}, token)
+        r = _post(c, f"/permissoes/papel/{gestor_papel}", {f"p__{p}": "tudo" for p in PODERES_DE_ADMIN}, token)
+        assert "Só o admin master põe poderes de administração" in r.text
+        assert _foto() == antes  # nada mudou
+        # o que é dele continua podendo: cuidar de quem não é administrador
+        r = _post(c, f"/configuracoes/usuarios/{alvo}", {"nome": "Vendedor Alvo Editado",
+                                                         "email": "vend.alvo@teste.com.br", "perfil": "vendedor",
+                                                         "ativo": "on"}, token)
+        assert "Usuário salvo" in r.text
+        # e o admin master pode promover (controle); depois volta como estava
+        r = cliente.post(f"/configuracoes/usuarios/{alvo}", data={"csrf": csrf, "nome": "Vendedor Alvo",
+                                                                  "email": "vend.alvo@teste.com.br", "perfil": "admin",
+                                                                  "ativo": "on"})
+        assert "Usuário salvo" in r.text
+        with sessao() as db:
+            u = db.get(Usuario, alvo)
+            assert u.perfil == "admin"
+            u.perfil, u.ativo = "vendedor", False
+            for i in (comum, outro):
+                db.get(Usuario, i).ativo = False
+    finally:
+        _zerar_limite_de_pedidos()
+
+
+def test_quem_recebe_gerenciar_usuarios_nao_se_promove(cliente):
+    """Risco 2: um gestor que ganhou "Criar e editar usuários" podia se promover a administrador. Agora ninguém muda o
+    próprio papel, e só o admin master dá o papel de administrador."""
+    _zerar_limite_de_pedidos()
+    try:
+        gid = _usuario("gestor.delegado@teste.com.br", "gestor", "Gestor Delegado")
+        with sessao() as db:
+            db.add(ExcecaoPermissao(usuario_id=gid, permissao="usuarios.gerenciar", efeito="permitir"))
+            master_id = db.execute(select(Usuario.id).where(Usuario.email == "admin@teste.com.br")).scalar()
+        antes = _foto()
+        c = _entrar("gestor.delegado@teste.com.br")
+        token = csrf_de(c.get("/minha-conta").text)
+        for caminho, dados in [
+            (f"/configuracoes/usuarios/{gid}", {"nome": "Gestor Delegado", "email": "gestor.delegado@teste.com.br",
+                                                "perfil": "admin", "ativo": "on"}),
+            ("/configuracoes/usuarios/0", {"nome": "Admin do Gestor", "email": "admin.do.gestor@escalada.com.br",
+                                           "perfil": "admin", "ativo": "on", "senha": "SenhaForte!2026gestor"}),
+            (f"/configuracoes/usuarios/{master_id}", {"nome": "Maria Admin", "email": "tomada2@teste.com.br",
+                                                      "perfil": "admin", "ativo": "on"}),
+            (f"/configuracoes/usuarios/{master_id}/zerar-2fa", {}),
+        ]:
+            _post(c, caminho, dados, token)
+        assert _foto() == antes
+        # a delegação legítima continua: criar um vendedor
+        _post(c, "/configuracoes/usuarios/0", {"nome": "Vendedor do Gestor", "email": "vend.do.gestor@escalada.com.br",
+                                               "perfil": "vendedor", "ativo": "on", "senha": "SenhaForte!2026vend"},
+              token)
+        with sessao() as db:
+            novo = db.execute(select(Usuario).where(Usuario.email == "vend.do.gestor@escalada.com.br")).scalars().one()
+            assert novo.perfil == "vendedor"
+            novo.ativo = False
+            for e in db.execute(select(ExcecaoPermissao).where(ExcecaoPermissao.usuario_id == gid)).scalars():
+                db.delete(e)
+    finally:
+        _zerar_limite_de_pedidos()
+
+
+def test_quem_compartilha_nao_se_inclui(cliente):
+    """Risco 3: o gestor ("compartilhar o WhatsApp de qualquer pessoa") se punha no número de um administrador, via as
+    conversas e disparava por ele. Agora quem não é o dono não se inclui, não libera para toda a equipe e não mexe no
+    WhatsApp/e-mail de administradores; compartilhar entre as outras pessoas continua."""
+    import json
+
+    from app import conexoes, contas_email
+    from app.modelos import ConexaoWhatsApp, ContaEmail
+
+    _zerar_limite_de_pedidos()
+    try:
+        gid = _usuario("gestor.zap@teste.com.br", "gestor", "Gestor Zap")
+        aid = _usuario("admin.zap@teste.com.br", "admin", "Admin Zap")
+        fid = _usuario("func.zap@teste.com.br", "funcionario", "Funcionário Zap")
+        vid = _usuario("vend.zap@teste.com.br", "vendedor", "Vendedor Zap")
+        with sessao() as db:
+            for dono in (aid, fid):
+                if db.get(ConexaoWhatsApp, f"u{dono}") is None:
+                    db.add(ConexaoWhatsApp(id=f"u{dono}", nome=f"WhatsApp {dono}", dono_id=dono))
+            conta = ContaEmail(dono_id=fid, nome="E-mail do funcionário", endereco="func.zap@mscertificados.com.br")
+            db.add(conta)
+            db.flush()
+            conta_id = conta.id
+        c = _entrar("gestor.zap@teste.com.br")
+        token = csrf_de(c.get("/minha-conta").text)
+        _post(c, "/whatsapp/compartilhar", {"numero": f"u{aid}", "usuarios": [str(gid)]}, token)  # admin: se incluir
+        _post(c, "/whatsapp/compartilhar", {"numero": f"u{aid}", "usuarios": [str(vid)]}, token)  # admin: com outro
+        _post(c, "/whatsapp/compartilhar", {"numero": f"u{fid}", "usuarios": [str(gid)]}, token)  # se incluir
+        _post(c, "/whatsapp/compartilhar", {"numero": f"u{fid}", "todos": "on"}, token)          # toda a equipe
+        _post(c, "/email/compartilhar", {"conta": conta_id, "usuarios": [str(gid)]}, token)
+        with sessao() as db:
+            gestor = db.get(Usuario, gid)
+            for numero in (f"u{aid}", f"u{fid}"):
+                n = db.get(ConexaoWhatsApp, numero)
+                assert not n.compartilhada_todos and json.loads(n.compartilhada_com or "[]") == [], numero
+                assert not conexoes.pode_disparar(gestor, n)
+            assert contas_email.compartilhada_com(db.get(ContaEmail, conta_id)) == []
+        # entre as outras pessoas continua: o gestor compartilha o número do funcionário com o vendedor
+        _post(c, "/whatsapp/compartilhar", {"numero": f"u{fid}", "usuarios": [str(vid)]}, token)
+        with sessao() as db:
+            assert json.loads(db.get(ConexaoWhatsApp, f"u{fid}").compartilhada_com) == [vid]
+            for numero in (f"u{aid}", f"u{fid}"):
+                db.delete(db.get(ConexaoWhatsApp, numero))
+            db.delete(db.get(ContaEmail, conta_id))
+    finally:
+        _zerar_limite_de_pedidos()

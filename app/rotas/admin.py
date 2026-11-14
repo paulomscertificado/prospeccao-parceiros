@@ -75,6 +75,8 @@ def configuracoes(request: Request, aba: str = "geral", usuario: Usuario = Depen
         "criterios": score.CRITERIOS, "pesos": score.pesos(db), "faixas": score.faixas(db),
         "usuarios": db.execute(select(Usuario).order_by(Usuario.perfil, Usuario.nome)).scalars().all(),
         "papeis": _papeis(db), "equipes": db.execute(select(Equipe).order_by(Equipe.nome)).scalars().all(),
+        "sou_master": autorizacao.e_master(usuario),
+        "papeis_de_admin": {p.codigo for p in _papeis(db) if autorizacao.papel_da_poder_de_admin(db, p)},
         "parceiros": db.execute(select(Parceiro).order_by(Parceiro.escritorio)).scalars().all(),
         "logs": db.execute(select(LogAuditoria).order_by(LogAuditoria.id.desc()).limit(300)).scalars().all() if aba == "logs" else [],
         "integracoes": [
@@ -242,6 +244,9 @@ def zerar_2fa(request: Request, uid: int, usuario: Usuario = Depends(exige("usua
     u = db.get(Usuario, uid)
     if u is None:
         raise HTTPException(404)
+    if motivo := autorizacao.motivo_para_nao_alterar(db, usuario, u):  # o 2FA do master/admin: só o master
+        avisar(request, motivo, "erro")
+        return voltar("/configuracoes?aba=usuarios")
     dois_fatores.zerar(u)
     registrar_log(db, usuario, "zerou_2fa", "usuario", u.id, u.email, request)
     db.commit()
@@ -269,15 +274,33 @@ def salvar_usuario(request: Request, uid: int, nome: str = Form(...), email: str
         avisar(request, "Preencha nome, e-mail válido e papel.", "erro")
         return voltar(destino)
     perfil = papel.base
+    # travas contra escalada (pedido da Maria em 13/11/2026): o master e os administradores só o master altera; só o
+    # master dá o papel de administrador; ninguém muda o próprio papel, a própria equipe nem se desativa
+    if uid and (motivo := autorizacao.motivo_para_nao_alterar(db, usuario, u)):
+        avisar(request, motivo, "erro")
+        return voltar(destino)
+    papel_atual = autorizacao.papel_de(db, u) if uid else None
+    if (papel_atual is None or papel_atual.id != papel.id) and (
+            motivo := autorizacao.motivo_para_nao_dar_papel(db, usuario, papel)):
+        avisar(request, motivo, "erro")
+        return voltar(destino)
+    if uid == usuario.id:
+        if papel_atual is not None and papel_atual.id != papel.id:
+            avisar(request, "Você não pode mudar o próprio papel. Peça a quem administra o sistema.", "erro")
+            return voltar(destino)
+        if ativo != "on":
+            avisar(request, "Você não pode desativar o próprio acesso.", "erro")
+            return voltar(destino)
+        if equipe_id != "manter" and (util.para_int(equipe_id) or None) != u.equipe_id \
+                and not autorizacao.e_master(usuario):
+            avisar(request, "Você não pode mudar a própria equipe. Peça a quem administra o sistema.", "erro")
+            return voltar(destino)
     outro = db.execute(select(Usuario).where(Usuario.email == email, Usuario.id != (u.id or 0))).scalars().first()
     if outro:
         avisar(request, "Já existe um usuário com esse e-mail.", "erro")
         return voltar(destino)
     if perfil == "parceiro" and not util.para_int(parceiro_id):
         avisar(request, "Usuário do tipo Parceiro precisa estar ligado a um parceiro cadastrado.", "erro")
-        return voltar(destino)
-    if uid == usuario.id and (papel.codigo != "admin" or ativo != "on"):
-        avisar(request, "Você não pode tirar o seu próprio acesso de administrador.", "erro")
         return voltar(destino)
     if uid == 0 or senha:
         if problema := problema_na_senha(senha):
