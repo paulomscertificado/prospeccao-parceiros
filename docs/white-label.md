@@ -12,7 +12,7 @@ O dono da plataforma e Admin Master é o Paulo Marinho (`Usuario.master`).
 | 3 | Permissões por AR e painel /master | admin de uma AR não alcança outra nem o /master | **No ar desde 14/11/2026** (painel /master, o que é da plataforma só o master muda, módulos por AR); admins das ARs promovidos em 14/11/2026 |
 | 4 | WhatsApp, e-mail e filas por AR | uma AR parada não atrasa as outras | **Fila justa e avisos por AR no ar desde 14/11/2026**; WhatsApp Leads: decidido servidor central na nuvem (14/11/2026), espera a contratação |
 | 5 | Marca (white label) | nenhuma tela ou mensagem mostra a MS em outra AR | **No ar desde 14/11/2026**: um endereço para todas (tela de entrada neutra), marca de cada AR nas telas e nas mensagens; marca do Grupo Certy gravada pelo manual (falta o logo); nome e domínio da plataforma depois |
-| 6 | Auditoria, LGPD e planos | exportar e apagar uma AR de teste sem tocar nas outras | **Auditoria e LGPD no ar desde 14/11/2026** (quem agiu como quem; exportar e apagar uma AR, ensaiados no banco de teste); planos e cobrança esperam a decisão |
+| 6 | Auditoria, LGPD e planos | exportar e apagar uma AR de teste sem tocar nas outras | **Auditoria e LGPD no ar desde 14/11/2026** (quem agiu como quem; exportar e apagar uma AR, ensaiados no banco de teste); planos e cobrança depois da validação (decidido em 14/11/2026) |
 
 Os planos pagos são obrigatórios antes da Fase 3 (a primeira AR nova): o Hobby da Vercel não permite uso comercial
 e o banco grátis tem 500 MB.
@@ -149,7 +149,7 @@ modelo, cadência, categoria nem módulo da plataforma; o master entra com motiv
 entra; módulos por AR; papel de mesmo nome em duas ARs). O teste do porteiro (`test_permissoes`) voltou a enxergar as
 rotas (o FastAPI novo guarda os routers incluídos à parte).
 
-**Falta:** promover os administradores das ARs (proposta do plano: Paulo Lucas e Jefferson na AR MS, Thamires no Grupo
+**Feito em 14/11/2026:** administradores das ARs promovidos (Paulo Lucas e Jefferson na AR MS, Thamires no Grupo
 Certy; só o Admin Master dá o papel de administrador, e ele pede o código do celular na entrada).
 
 ## Fase 4: filas justas e avisos por AR
@@ -231,4 +231,10 @@ buscas, parceiros e pessoas por último) e a própria AR; registra no histórico
 script; histórico do master dentro da AR). Ensaio no Postgres de teste (14/11/2026): AR de ensaio exportada e apagada
 (6 linhas); AR MS (189.492 linhas) e Grupo Certy (1.234) iguais antes e depois.
 
-**Falta (decisão em aberto):** planos e cobrança das ARs (cotas por plano: buscas na CNPJá, mensagens por dia).
+**Decidido em 14/11/2026:** planos e cobrança só depois da validação da plataforma ("por enquanto não vamos pensar em
+nada de cobrança ou valores"); os limites de hoje (por número, por dia e por AR) continuam valendo.
+
+**Outras decisões de 14/11/2026:** a mesma empresa pode receber mensagens de duas ARs (cada AR é independente; a
+reserva de 60 dias continua valendo entre as pessoas de uma mesma AR; o nome escolhido de um contato na tela
+Conversas é um por telefone: a segunda AR não troca nem vê o da primeira, `conversas._de_outra_ar`); a chave da
+CNPJá continua da plataforma (sem preferência; rever com os planos); o caio barreto continua administrador da AR MS.
