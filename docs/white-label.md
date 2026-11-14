@@ -9,10 +9,10 @@ O dono da plataforma e Admin Master é o Paulo Marinho (`Usuario.master`).
 | 0 | Vercel Pro, Supabase Pro, relógio das filas na nuvem, ambiente de teste | 7 dias seguidos sem a reserva do computador | Código do relógio publicado (`app/relogio.py`); planos esperando o cartão |
 | 1 | A AR entra nos dados (`tenants` + `tenant_id`) | nenhuma linha sem AR, contagens iguais, nenhuma ligação cruzando ARs | **Concluída em 14/11/2026**: ensaio no banco de teste e aplicação na nuvem com a conferência OK (leads: 1.387 na AR MS, 111 no Grupo Certy); linhas novas de hora em hora |
 | 2 | Isolamento obrigatório (filtro, porteiro com AR, RLS, testes nas 178 rotas) | nenhuma rota abre registro de outra AR | **Parte 1 (isolamento dos dados) no ar desde 14/11/2026**; **parte 2 (configurações por AR) no ar desde 14/11/2026**; RLS, `NOT NULL` e índices adiados (ver abaixo) |
-| 3 | Permissões por AR e painel /master | admin de uma AR não alcança outra nem o /master | **No ar desde 14/11/2026** (painel /master, o que é da plataforma só o master muda, módulos por AR); falta promover os admins das ARs |
+| 3 | Permissões por AR e painel /master | admin de uma AR não alcança outra nem o /master | **No ar desde 14/11/2026** (painel /master, o que é da plataforma só o master muda, módulos por AR); admins das ARs promovidos em 14/11/2026 |
 | 4 | WhatsApp, e-mail e filas por AR | uma AR parada não atrasa as outras | **Fila justa e avisos por AR no ar desde 14/11/2026**; computador do WhatsApp por AR espera a decisão (próprio ou servidor central) |
 | 5 | Marca (white label) | nenhuma tela ou mensagem mostra a MS em outra AR | — |
-| 6 | Auditoria, LGPD e planos | exportar e apagar uma AR de teste sem tocar nas outras | Quem agiu como quem, exportar e apagar AR prontos e ensaiados em 14/11/2026; planos e cobrança esperam a decisão |
+| 6 | Auditoria, LGPD e planos | exportar e apagar uma AR de teste sem tocar nas outras | **Auditoria e LGPD no ar desde 14/11/2026** (quem agiu como quem; exportar e apagar uma AR, ensaiados no banco de teste); planos e cobrança esperam a decisão |
 
 Os planos pagos são obrigatórios antes da Fase 3 (a primeira AR nova): o Hobby da Vercel não permite uso comercial
 e o banco grátis tem 500 MB.
