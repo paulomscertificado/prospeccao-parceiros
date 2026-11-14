@@ -48,6 +48,10 @@ O modo nuvem liga sozinho quando a variável `VERCEL` existe (a Vercel cria) ou 
   da cópia (`select pg_size_pretty(pg_database_size('postgres'))`). Projeto parado 7 dias é pausado (com o
   agendador isso não acontece) e o plano grátis **não tem backup automático**: por isso existe o backup diário
   abaixo.
+- **Banco de teste (white label, 13/11/2026).** Projeto grátis e separado no Supabase para ensaiar mudanças grandes
+  com os dados de verdade: `salvar_banco_teste.bat` guarda o endereço em `dados/supabase_teste.txt` (troca o
+  `[YOUR-PASSWORD]` pela senha digitada, testa a entrada e recusa se for o banco da nuvem); `copiar_para_teste.bat`
+  restaura nele o backup mais novo (`restaurar_backup.restaurar`), nunca na nuvem. Ver `docs/white-label.md`.
 - **Backup diário (criptografado desde 11/2026, auditoria P0.5).** `fazer_backup.py` copia o banco da nuvem (tudo
   menos `base_receita`) para um SQLite temporário, compacta e criptografa (AES-256-GCM, chave derivada com scrypt da
   senha em `dados/senha_backup.txt`, criada no primeiro backup) em `dados/backups/nuvem_AAAA-MM-DD.db.cripto`, abre a
