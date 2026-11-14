@@ -176,11 +176,19 @@ def usuario_logado(request: Request, db: Session = Depends(obter_db)) -> Usuario
         request.session.clear()
         raise PrecisaLogin("Por segurança, entre de novo: o acesso de administrador e gestor agora pede também o "
                            "código do celular.")
+    if not usuario.master and usuario.tenant_id:  # white label, Fase 3: AR suspensa no painel /master não entra
+        from .modelos import Tenant
+
+        ar = db.get(Tenant, usuario.tenant_id)
+        if ar is not None and ar.situacao == "suspensa":
+            request.session.clear()
+            raise PrecisaLogin("O acesso da sua AR está suspenso. Fale com o administrador da plataforma.")
     request.session["ultimo_uso"] = int(time.time())
     request.state.usuario = usuario
     from .isolamento import ligar
 
-    ligar(db, usuario)  # white label, Fase 2: daqui em diante esta tela só enxerga a AR da pessoa
+    # white label: daqui em diante esta tela só enxerga a AR da pessoa (Admin Master: a AR em que entrou, ou todas)
+    ligar(db, usuario, request.session.get("ar_entrada") if usuario.master else None)
     return usuario
 
 

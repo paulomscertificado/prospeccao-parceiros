@@ -39,10 +39,11 @@ def _do_sistema(db: Session) -> bool:
     return getattr(db, "bind", None) is motor
 
 
-def ligar(db: Session, usuario) -> None:
-    """A sessão desta tela passa a enxergar só a AR do usuário."""
+def ligar(db: Session, usuario, ar_entrada: int | None = None) -> None:
+    """A sessão desta tela passa a enxergar só a AR do usuário. Admin Master: a plataforma toda, ou só a AR em que ele
+    entrou pelo painel /master (`ar_entrada`, com motivo registrado em acessos_master)."""
     if getattr(usuario, "master", False):
-        db.info["ar"] = None
+        db.info["ar"] = ar_entrada or None
     else:
         db.info["ar"] = getattr(usuario, "tenant_id", None) or SEM_AR
     db.info["ar_ligado"] = True

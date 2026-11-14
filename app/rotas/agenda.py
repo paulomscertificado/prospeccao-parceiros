@@ -62,6 +62,9 @@ async def salvar_cadencia(request: Request, cad_id: int, usuario: Usuario = Depe
     cad = db.get(Cadencia, cad_id) if cad_id else Cadencia()
     if cad is None:
         raise HTTPException(404)
+    if cad_id and not autorizacao.pode_mudar(usuario, cad):  # white label: cadência da plataforma
+        avisar(request, autorizacao.MSG_DA_PLATAFORMA, "erro")
+        return voltar(f"/cadencias/{cad_id}")
     cad.nome = str(form.get("nome", "")).strip() or "Cadência sem nome"
     cad.descricao = str(form.get("descricao", ""))
     cad.ativa = form.get("ativa") == "on"
@@ -109,6 +112,9 @@ def salvar_template(request: Request, tid: int, nome: str = Form(...), canal: st
     t = db.get(Template, tid) if tid else Template()
     if t is None:
         raise HTTPException(404)
+    if tid and not autorizacao.pode_mudar(usuario, t):  # white label: modelo da plataforma
+        avisar(request, autorizacao.MSG_DA_PLATAFORMA, "erro")
+        return voltar(f"/templates/{tid}")
     t.nome, t.canal, t.assunto, t.corpo = nome.strip(), canal, assunto.strip(), corpo.strip()
     t.nome_meta, t.ativo = nome_meta.strip(), ativo == "on"
     if not tid:

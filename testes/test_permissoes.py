@@ -119,11 +119,20 @@ def test_toda_rota_da_equipe_confere_permissao():
                "/api/ponte/midia/{mid:int}",  # imagem do visual para o WhatsApp Leads (senha da ponte)
                "/api/ponte/arte/{pid:int}",  # arte do aviso de vencimento que o WhatsApp Leads desenhou (senha da ponte)
                "/visual/arquivo/{aid:int}/{nome}"}  # imagem do e-mail: o programa de e-mail do lead precisa abrir
-    sem_porteiro = []
-    for rota in app.routes:
+    sem_porteiro, conferidas = [], 0
+
+    def todas(rotas):  # o FastAPI novo guarda os routers incluídos à parte (antes este teste não via nenhuma rota)
+        for item in rotas:
+            if type(item).__name__ == "_IncludedRouter":
+                yield from todas(item.original_router.routes)
+            else:
+                yield item
+
+    for rota in todas(app.routes):
         caminho = getattr(rota, "path", "")
         if caminho in abertas or not hasattr(rota, "dependant"):
             continue
+        conferidas += 1
         nomes = set()
 
         def juntar(d):
@@ -134,6 +143,7 @@ def test_toda_rota_da_equipe_confere_permissao():
         juntar(rota.dependant)
         if not nomes & {"_checar", "usuario_logado"}:
             sem_porteiro.append(caminho)
+    assert conferidas > 150  # as 178 rotas menos as abertas
     assert sem_porteiro == []
 
 

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from .. import (alertas, autorizacao, base_receita, bases_importadas, config, ia, leads_servico, prospeccao, relogio,
                score, util)
-from ..banco import CHAVES_DA_AR, gravar_config, ler_config, ler_config_json, obter_db
+from ..banco import CHAVES_DA_AR, CHAVES_SO_MASTER, gravar_config, ler_config, ler_config_json, obter_db
 from ..integracoes import dns_email, email_imap, email_smtp, whatsapp_cloud, whatsapp_leads
 from ..modelos import Equipe, Lead, LogAuditoria, Papel, Parceiro, Usuario
 from ..seguranca import exige, problema_na_senha, registrar_log, resumir_senha, verificar_csrf
@@ -73,8 +73,8 @@ def configuracoes(request: Request, aba: str = "geral", usuario: Usuario = Depen
     wl = whatsapp_leads.status(False)  # uma consulta só (antes eram duas a cada abertura da tela)
     return tela(request, "configuracoes.html", {
         # white label: quem é de uma AR muda só as configurações da AR (o resto é da plataforma: Admin Master)
-        "aba": aba, "campos": [(c, n, t, ler_config(db, c), autorizacao.e_master(usuario) or c in CHAVES_DA_AR)
-                               for c, n, t in CAMPOS_GERAIS],
+        "aba": aba, "campos": [(c, n, t, ler_config(db, c), autorizacao.e_master(usuario)
+                                or (c in CHAVES_DA_AR and c not in CHAVES_SO_MASTER)) for c, n, t in CAMPOS_GERAIS],
         "criterios": score.CRITERIOS, "pesos": score.pesos(db), "faixas": score.faixas(db),
         "usuarios": db.execute(select(Usuario).order_by(Usuario.perfil, Usuario.nome)).scalars().all(),
         "papeis": _papeis(db), "equipes": db.execute(select(Equipe).order_by(Equipe.nome)).scalars().all(),
@@ -117,7 +117,7 @@ async def salvar_geral(request: Request, usuario: Usuario = Depends(exige("confi
     form = await request.form()
     master = autorizacao.e_master(usuario)
     for chave, _, tipo in CAMPOS_GERAIS:
-        if chave in form and (master or chave in CHAVES_DA_AR):  # as da plataforma, só o Admin Master
+        if chave in form and (master or (chave in CHAVES_DA_AR and chave not in CHAVES_SO_MASTER)):  # da plataforma: master
             valor = str(form.get(chave)).strip()
             if tipo == "numero":
                 valor = str(util.para_float(valor)).removesuffix(".0")

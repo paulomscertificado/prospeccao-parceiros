@@ -504,6 +504,12 @@ própria marca (horários e limites de envio, textos da parceria, regras da IA S
 **"da plataforma"** (proteção dos números de WhatsApp, avisos de problema, módulos, banco, Renovação, Empresas novas)
 só o admin master muda; o que ele muda vale para as marcas que não têm valor próprio.
 
+**Painel master** (link "Painel master", só para o admin master): mostra as marcas com os números de cada uma; **Entrar
+na AR** pede o motivo (fica registrado) e, até clicar em **Sair da AR** (na faixa amarela do topo), mostra só aquela
+marca, como o administrador dela vê; **Nova AR**; **Suspender** (as pessoas da marca não entram até reativar); e os
+**módulos de cada marca**. O administrador de uma marca não muda os papéis do sistema, os modelos de mensagem, as
+cadências e as categorias que valem para todas: ele cria os da própria marca (pode copiar de um da plataforma).
+
 ### Permissões (menu Permissões, só o administrador)
 
 Cada perfil acima é um **papel**. No menu **Permissões** você pode:

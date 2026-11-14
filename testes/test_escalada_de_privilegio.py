@@ -186,7 +186,9 @@ def test_admin_comum_nao_toma_a_conta_do_master_nem_cria_admin(cliente, csrf):
         _post(c, "/permissoes/excecao", {"usuario_id": master_id, "permissao": "leads.ver", "efeito": "negar"}, token)
         _post(c, "/permissoes/excecao", {"usuario_id": comum, "permissao": "leads.ver", "efeito": "negar"}, token)
         r = _post(c, f"/permissoes/papel/{gestor_papel}", {f"p__{p}": "tudo" for p in PODERES_DE_ADMIN}, token)
-        assert "Só o admin master põe poderes de administração" in r.text
+        # papel do sistema: hoje a 1ª barreira é a do white label (modelo da plataforma, Fase 3); a de poderes de
+        # administração continua valendo para os papéis da AR
+        assert "Só o admin master põe poderes de administração" in r.text or autorizacao.MSG_DA_PLATAFORMA in r.text
         assert _foto() == antes  # nada mudou
         # o que é dele continua podendo: cuidar de quem não é administrador
         r = _post(c, f"/configuracoes/usuarios/{alvo}", {"nome": "Vendedor Alvo Editado",

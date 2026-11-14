@@ -974,6 +974,9 @@ def categorias(request: Request, usuario: Usuario = Depends(exige("categorias.ve
 
 @rotas.post("/categorias/{cid:int}", dependencies=[Depends(verificar_csrf)])
 async def salvar_categoria(request: Request, cid: int, usuario: Usuario = Depends(exige("categorias.editar")), db: Session = Depends(obter_db)):
+    if not autorizacao.e_master(usuario):  # white label: as categorias valem para todas as ARs
+        avisar(request, "As categorias de parceiros são da plataforma: só o admin master muda.", "erro")
+        return voltar("/categorias")
     form = await request.form()
     c = Categoria() if cid == 0 else db.get(Categoria, cid)
     if c is None:

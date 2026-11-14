@@ -92,6 +92,9 @@ def tela(request: Request, nome: str, contexto: dict | None = None, status_code:
         from .modelos import Notificacao
 
         with FabricaSessao() as db:
+            from .banco import usar_config_da_ar
+
+            usar_config_da_ar(db, request.session.get("ar_entrada") if usuario.master else usuario.tenant_id)
             avisos_novos = db.execute(select(func.count(Notificacao.id)).where(
                 Notificacao.usuario_id == usuario.id, Notificacao.lida.is_(False))).scalar() or 0
             mostrar_vendas = ler_config(db, "mostrar_vendas") == "1"
@@ -106,6 +109,7 @@ def tela(request: Request, nome: str, contexto: dict | None = None, status_code:
     dados = {
         "request": request,
         "usuario": usuario,
+        "ar_entrada_nome": request.session.get("ar_entrada_nome", "") if usuario and usuario.master else "",
         "avisos_novos": avisos_novos,
         "wl": wl,
         "csrf": token_csrf(request),

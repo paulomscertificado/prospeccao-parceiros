@@ -49,10 +49,14 @@
     <div class="rodape">
       <div><b>{{ usuario.nome }}</b></div>
       <div class="suave" style="color:#9fb3c8">{{ usuario.perfil_nome }}</div>
+      {% if usuario.master %}<div style="margin-top:6px"><a href="/master">Painel master</a></div>{% endif %}
       <div style="margin-top:6px"><a href="/notificacoes">Avisos{{ ' (' ~ avisos_novos ~ ')' if avisos_novos }}</a> · <a href="/minha-conta">Minha conta</a> · <a href="/sair">Sair</a></div>
     </div>
   </nav>
   <main class="conteudo">
+    {% if ar_entrada_nome %}<form method="post" action="/master/sair" class="aviso aviso-alerta" style="display:flex;gap:12px;align-items:center">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><span>Você está dentro da <b>{{ ar_entrada_nome }}</b>: vê e mexe só no que é dela.</span>
+      <button class="btn">Sair da AR</button></form>{% endif %}
     {% for tipo, texto in avisos %}<div class="aviso aviso-{{ tipo }}">{{ texto }}</div>{% endfor %}
     {% block conteudo %}{% endblock %}
   </main>

@@ -34,6 +34,17 @@ class Configuracao(DaAR, Base):
     valor: Mapped[str] = mapped_column(Text, default="")
 
 
+class AcessoMaster(Base):
+    """Quando o Admin Master entrou numa AR, por quê e até quando (white label, Fase 3; painel /master)."""
+    __tablename__ = "acessos_master"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    usuario_id: Mapped[int] = mapped_column(Integer)
+    tenant_id: Mapped[int] = mapped_column(Integer)
+    motivo: Mapped[str] = mapped_column(Text, default="")
+    inicio: Mapped[datetime] = mapped_column(DateTime, default=agora)
+    fim: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
 class ConfiguracaoAR(Base):
     """Valor próprio de uma AR para uma configuração da AR (white label, Fase 2 parte 2; quais são: banco.CHAVES_DA_AR).
     Sem linha aqui, a AR usa o valor da plataforma (configuracoes), que só o Admin Master muda."""

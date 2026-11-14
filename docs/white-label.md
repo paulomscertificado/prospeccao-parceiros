@@ -9,7 +9,7 @@ O dono da plataforma e Admin Master é o Paulo Marinho (`Usuario.master`).
 | 0 | Vercel Pro, Supabase Pro, relógio das filas na nuvem, ambiente de teste | 7 dias seguidos sem a reserva do computador | Código do relógio publicado (`app/relogio.py`); planos esperando o cartão |
 | 1 | A AR entra nos dados (`tenants` + `tenant_id`) | nenhuma linha sem AR, contagens iguais, nenhuma ligação cruzando ARs | **Concluída em 14/11/2026**: ensaio no banco de teste e aplicação na nuvem com a conferência OK (leads: 1.387 na AR MS, 111 no Grupo Certy); linhas novas de hora em hora |
 | 2 | Isolamento obrigatório (filtro, porteiro com AR, RLS, testes nas 178 rotas) | nenhuma rota abre registro de outra AR | **Parte 1 (isolamento dos dados) no ar desde 14/11/2026**; **parte 2 (configurações por AR) no ar desde 14/11/2026**; RLS, `NOT NULL` e índices adiados (ver abaixo) |
-| 3 | Permissões por AR e painel /master | admin de uma AR não alcança outra nem o /master | — |
+| 3 | Permissões por AR e painel /master | admin de uma AR não alcança outra nem o /master | Pronta e ensaiada em 14/11/2026 (painel /master, o que é da plataforma só o master muda, módulos por AR); falta promover os admins das ARs |
 | 4 | WhatsApp, e-mail e filas por AR | uma AR parada não atrasa as outras | — |
 | 5 | Marca (white label) | nenhuma tela ou mensagem mostra a MS em outra AR | — |
 | 6 | Auditoria, LGPD e planos | exportar e apagar uma AR de teste sem tocar nas outras | — |
@@ -127,3 +127,27 @@ banco; o Grupo Certy gravou 09:45 e só ele viu; AR MS e Admin Master seguiram c
   garantida no `before_flush`, conferida pelo `migrar_ar.py conferir` e preenchida de hora em hora.
 - Índices começando pela AR: com o volume de hoje as consultas filtradas já usam os índices que existem.
 - Chaves únicas por AR (`contatos_whatsapp.telefone`, `equipes.nome`, `papeis.codigo`): junto com a Fase 3.
+
+## Fase 3: permissões por AR e painel /master
+
+**Administrador de AR** = perfil `admin` que não é o Admin Master. Pelo isolamento ele já vê e mexe só na própria AR;
+desde a Fase 3 também não muda o que vale para todas as ARs: papéis do sistema, modelos de mensagem e cadências sem AR,
+categorias e módulos (`autorizacao.pode_mudar` / `da_plataforma`, mensagem `MSG_DA_PLATAFORMA`). Ele cria os próprios
+(papel novo copiando de um do sistema, modelo e cadência novos), que nascem na AR dele. Nomes que são únicos no sistema
+todo (código do papel, nome da equipe) são conferidos também nas outras ARs (`sem_filtro_de_ar`).
+
+**Painel /master** (`app/rotas/master.py`, link "Painel master" só para o Admin Master; para os outros as rotas dão
+404): lista das ARs com pessoas, leads, campanhas ativas, WhatsApps e administradores; **Entrar na AR** pede o motivo,
+grava em `acessos_master` e põe a AR na sessão (`request.session["ar_entrada"]` → `isolamento.ligar`), com faixa no
+topo e o botão "Sair da AR"; **Nova AR** (nome, apelido, CNPJ; avisa dos planos pagos); **Suspender/Reativar**
+(pessoa de AR suspensa não entra: `seguranca.usuario_logado`); **Módulos de cada AR** (as chaves de
+`autorizacao.MODULOS` estão em `banco.CHAVES_DA_AR` e em `CHAVES_SO_MASTER`: cada AR tem as suas, só o master muda; o
+menu lê as da AR da pessoa em `web.tela`).
+
+**Testes:** `testes/test_master.py` (o portão: administradora do Grupo Certy recebe 404 no /master e não muda papel,
+modelo, cadência, categoria nem módulo da plataforma; o master entra com motivo, vê só a AR e sai; AR suspensa não
+entra; módulos por AR; papel de mesmo nome em duas ARs). O teste do porteiro (`test_permissoes`) voltou a enxergar as
+rotas (o FastAPI novo guarda os routers incluídos à parte).
+
+**Falta:** promover os administradores das ARs (proposta do plano: Paulo Lucas e Jefferson na AR MS, Thamires no Grupo
+Certy; só o Admin Master dá o papel de administrador, e ele pede o código do celular na entrada).

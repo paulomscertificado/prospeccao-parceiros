@@ -483,3 +483,19 @@ def exige(*permissoes: str):
         return usuario
 
     return _checar
+
+
+# ---------------------------------------------------------------- White label, Fase 3: o que é da plataforma
+
+MSG_DA_PLATAFORMA = ("Este é um modelo da plataforma, usado por todas as ARs: só o admin master muda. Para ajustar só "
+                     "na sua AR, crie um novo (pode copiar deste).")
+
+
+def da_plataforma(obj) -> bool:
+    """Registro que vale para todas as ARs: modelo, cadência ou papel sem AR, e as categorias (que não têm AR)."""
+    return obj is not None and getattr(obj, "tenant_id", None) is None
+
+
+def pode_mudar(usuario, obj) -> bool:
+    """O que é da plataforma só o Admin Master muda; o que é da AR, quem tem a permissão da tela."""
+    return e_master(usuario) or not da_plataforma(obj)

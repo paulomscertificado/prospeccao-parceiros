@@ -78,6 +78,9 @@ async def salvar_papel(request: Request, pid: int, usuario: Usuario = Depends(GE
     if papel is None:
         raise HTTPException(404)
     destino = f"{DESTINO}?papel={papel.codigo}"
+    if not autorizacao.pode_mudar(usuario, papel):  # white label: os papéis do sistema valem para todas as ARs
+        avisar(request, autorizacao.MSG_DA_PLATAFORMA, "erro")
+        return voltar(destino)
     if papel.codigo == "admin":
         avisar(request, "O papel Administrador tem sempre acesso a tudo (assim o sistema nunca fica sem quem cuide dele).",
                "alerta")
@@ -130,7 +133,8 @@ def novo_papel(request: Request, nome: str = Form(...), copiar_de: str = Form(..
         return voltar(DESTINO)
     base = re.sub(r"[^a-z0-9]+", "_", util.chave_texto(nome)).strip("_")
     codigo, n = f"p_{base or 'papel'}"[:36], 2
-    while db.execute(select(Papel.id).where(Papel.codigo == codigo)).first():
+    # o código é único no sistema todo: confere também nas outras ARs (white label)
+    while db.execute(select(Papel.id).where(Papel.codigo == codigo).execution_options(sem_filtro_de_ar=True)).first():
         codigo, n = f"p_{base}"[:33] + f"_{n}", n + 1
     if (motivo := autorizacao.motivo_para_nao_dar_papel(db, usuario, modelo)):
         avisar(request, motivo, "erro")
@@ -154,6 +158,9 @@ def excluir_papel(request: Request, pid: int, usuario: Usuario = Depends(GERENCI
         raise HTTPException(404)
     if papel.sistema:
         avisar(request, "Os 5 papéis do sistema não podem ser excluídos.", "erro")
+        return voltar(DESTINO)
+    if not autorizacao.pode_mudar(usuario, papel):
+        avisar(request, autorizacao.MSG_DA_PLATAFORMA, "erro")
         return voltar(DESTINO)
     if db.execute(select(Usuario.id).where(Usuario.papel_id == papel.id)).first():
         avisar(request, "Ainda há usuários com este papel. Troque o papel deles em Configurações > Usuários antes.", "erro")
@@ -250,8 +257,10 @@ def salvar_equipe(request: Request, eid: int, nome: str = Form(""), excluir: str
     if not nome:
         avisar(request, "Informe o nome da equipe.", "erro")
         return voltar(destino)
-    if db.execute(select(Equipe.id).where(Equipe.nome == nome, Equipe.id != (equipe.id or 0))).first():
-        avisar(request, "Já existe uma equipe com esse nome.", "erro")
+    # o nome da equipe é único no sistema todo (até a chave ganhar a AR): procura também nas outras ARs
+    if db.execute(select(Equipe.id).where(Equipe.nome == nome, Equipe.id != (equipe.id or 0))
+                  .execution_options(sem_filtro_de_ar=True)).first():
+        avisar(request, "Já existe uma equipe com esse nome (nesta ou em outra AR). Escolha outro nome.", "erro")
         return voltar(destino)
     equipe.nome = nome
     if eid == 0:
@@ -267,6 +276,9 @@ def salvar_equipe(request: Request, eid: int, nome: str = Form(""), excluir: str
 
 @rotas.post("/permissoes/modulos", dependencies=[Depends(verificar_csrf)])
 async def salvar_modulos(request: Request, usuario: Usuario = Depends(GERENCIAR), db: Session = Depends(obter_db)):
+    if not autorizacao.e_master(usuario):  # white label: os módulos ligados valem para a plataforma toda
+        avisar(request, "Os módulos ligados são da plataforma: só o admin master muda.", "erro")
+        return voltar(DESTINO)
     form = await request.form()
     ligados = []
     for codigo, (nome, chave) in MODULOS.items():

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block titulo %}Painel master{% endblock %}
+{% block conteudo %}
+<h1>Painel master</h1>
+<p class="suave">Só você (admin master) vê esta tela. Cada AR vê e mexe só no que é dela; aqui você acompanha todas,
+  entra numa AR quando precisar (com o motivo registrado) e liga os módulos de cada uma.</p>
+
+<div class="cartao">
+  <h2>ARs da plataforma</h2>
+  <table>
+    <tr><th>AR</th><th>Situação</th><th>Pessoas</th><th>Leads</th><th>Campanhas ativas</th><th>WhatsApps</th><th>Administradores</th><th></th></tr>
+    {% for ar in ars %}
+    <tr>
+      <td><b>{{ ar.nome }}</b><div class="pequeno suave">{{ ar.slug }}{% if ar.cnpj %} · {{ ar.cnpj }}{% endif %}</div></td>
+      <td><span class="selo {{ 'selo-ok' if ar.situacao == 'ativa' else 'selo-erro' }}">{{ ar.situacao }}</span></td>
+      <td>{{ pessoas.get(ar.id, 0) }}</td><td>{{ leads.get(ar.id, 0) }}</td><td>{{ campanhas.get(ar.id, 0) }}</td>
+      <td>{{ numeros.get(ar.id, 0) }}</td>
+      <td>{{ (admins.get(ar.id) or ['ninguém ainda'])|join(', ') }}</td>
+      <td style="min-width:260px">
+        {% if dentro == ar.id %}<span class="selo selo-alerta">você está dentro</span>
+        {% else %}<form method="post" action="/master/entrar/{{ ar.id }}" class="filtros">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input name="motivo" placeholder="Motivo de entrar (fica registrado)" required minlength="5" aria-label="Motivo de entrar na {{ ar.nome }}">
+          <button class="btn">Entrar na AR</button></form>{% endif %}
+        <form method="post" action="/master/ar/{{ ar.id }}/situacao" style="margin-top:6px"
+              onsubmit="return confirm('{{ 'Suspender' if ar.situacao == 'ativa' else 'Reativar' }} a {{ ar.nome }}?{{ ' As pessoas dela não vão conseguir entrar.' if ar.situacao == 'ativa' }}')">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="acao" value="{{ 'suspender' if ar.situacao == 'ativa' else 'reativar' }}">
+          <button class="btn">{{ 'Suspender' if ar.situacao == 'ativa' else 'Reativar' }}</button></form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="cartao">
+  <h2>Módulos de cada AR</h2>
+  <p class="pequeno suave">O administrador da AR não liga nem desliga módulos: só você.</p>
+  {% for ar in ars %}
+  <form method="post" action="/master/ar/{{ ar.id }}/modulos" style="margin-bottom:10px">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <b>{{ ar.nome }}:</b>
+    {% for codigo, nome in nomes_modulos.items() %}
+    <label style="margin-right:12px"><input type="checkbox" name="m__{{ codigo }}" {{ 'checked' if modulos[ar.id][codigo] }}> {{ nome }}</label>
+    {% endfor %}
+    <button class="btn">Salvar módulos da {{ ar.nome }}</button>
+  </form>
+  {% endfor %}
+</div>
+
+<div class="cartao">
+  <h2>Nova AR</h2>
+  <p class="pequeno suave">Antes de colocar pessoas de outra empresa para usar, assine os planos pagos (Vercel Pro e
+    Supabase Pro): o plano grátis da Vercel não permite uso comercial.</p>
+  <form method="post" action="/master/ar/nova" class="filtros">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input name="nome" placeholder="Nome da AR" required aria-label="Nome da AR">
+    <input name="slug" placeholder="apelido (ex.: certifica-recife)" required pattern="[a-z0-9][a-z0-9-]{1,38}" aria-label="Apelido da AR">
+    <input name="cnpj" placeholder="CNPJ (opcional)" aria-label="CNPJ da AR">
+    <button class="btn btn-primario">Criar AR</button>
+  </form>
+</div>
+
+<div class="cartao">
+  <h2>Suas entradas nas ARs</h2>
+  {% if acessos %}<table>
+    <tr><th>AR</th><th>Motivo</th><th>Entrou</th><th>Saiu</th></tr>
+    {% for a in acessos %}<tr><td>{{ nome_ar.get(a.tenant_id, a.tenant_id) }}</td><td>{{ a.motivo }}</td>
+      <td>{{ a.inicio.strftime('%d/%m %H:%M') }}</td><td>{{ a.fim.strftime('%d/%m %H:%M') if a.fim else 'ainda dentro' }}</td></tr>{% endfor %}
+  </table>{% else %}<p class="suave">Nenhuma entrada ainda.</p>{% endif %}
+</div>
+{% endblock %}
