@@ -782,7 +782,10 @@ def test_campanha_do_piloto_com_ondas_e_a_partir_das_10h(cliente, monkeypatch):
         assert "ONDA UM LTDA" in onda1[0].mensagem and "ONDA DOIS LTDA" not in onda1[0].mensagem
         assert "ONDA DOIS LTDA" in onda2[0].mensagem and "desconsiderar" in onda2[0].mensagem
         primeira2 = min(onda2, key=lambda t: (t.data, t.hora))
-        assert (dois.data_vencimento - primeira2.data).days <= 12  # a 2ª onda começa 12 dias antes do vencimento dela
+        # a 2ª onda começa 12 dias antes do vencimento dela; se esse dia cair no fim de semana ou num feriado, no dia
+        # útil anterior (a conta antiga, "<= 12 dias", falhava nos dias em que o teste rodava e a data caía num sábado)
+        doze_dias = renovacao._dia_util_antes(dois.data_vencimento - timedelta(days=12), renovacao.dias_sem_envio(db))
+        assert primeira2.data >= doze_dias, (primeira2.data, doze_dias)
         assert renovacao.arte_do_toque(db, onda2[0])["nome"] == "ONDA DOIS LTDA"  # um certificado na onda: com arte
         # renovou o da 1ª onda: só os avisos dela param
         renovacao.mudar_situacao(db, um, "Renovado", _admin(db))
