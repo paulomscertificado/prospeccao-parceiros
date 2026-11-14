@@ -30,13 +30,22 @@ def endereco_do_arquivo(arquivo: Path) -> str:
     return ""
 
 
+def projeto(endereco: str) -> str:
+    """O projeto do Supabase do endereço: no pooler vem no usuário (postgres.<projeto>), na conexão direta no
+    servidor (db.<projeto>.supabase.co). Outros bancos: servidor + nome. A porta e a senha não contam (o mesmo
+    projeto tem o Session pooler na 5432 e o Transaction pooler na 6543)."""
+    u = urlsplit(endereco.strip().strip('"').strip("'").replace("+psycopg", "").replace("[YOUR-PASSWORD]", "x"))
+    usuario, servidor = u.username or "", (u.hostname or "").lower()
+    if "." in usuario:
+        return usuario.split(".", 1)[1].lower()
+    if servidor.startswith("db.") and servidor.endswith(".supabase.co"):
+        return servidor.split(".")[1]
+    return f"{servidor}/{u.path.strip('/')}"
+
+
 def mesmo_banco(a: str, b: str) -> bool:
-    """Os dois endereços levam ao mesmo banco? (servidor, porta, usuário e nome; a senha não conta)"""
-    if not a or not b:
-        return False
-    x, y = urlsplit(a.replace("+psycopg", "")), urlsplit(b.replace("+psycopg", ""))
-    return ((x.hostname, x.port, x.username, x.path.strip("/")) ==
-            (y.hostname, y.port, y.username, y.path.strip("/")))
+    """Os dois endereços levam ao mesmo banco (o mesmo projeto, por qualquer porta ou caminho)?"""
+    return bool(a and b) and projeto(a) == projeto(b)
 
 
 def e_conexao_direta(endereco: str) -> bool:
