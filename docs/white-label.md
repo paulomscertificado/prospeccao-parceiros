@@ -242,7 +242,7 @@ volta para a plataforma); limite de pedidos também por pessoa (240 por minuto) 
 conversas (`guarda_conversas_meses`, 0 = sem prazo, só o master muda; `leads_servico.apagar_conversas_antigas` na
 rotina de hora em hora, 5.000 por vez). Decisões: a cópia continua com TODAS as conversas (a tela Conversas é a caixa
 de entrada da equipe; só 625 das 178 mil mensagens eram de leads, clientes ou parceiros) e o prazo é de 12 meses (na
-publicação saem 8.548 mensagens de 01/04/2025 a 14/11/2025, todas da AR MS). Teste: `testes/test_seguranca_lgpd.py`.
+publicação saíram 8.548 mensagens de 01/04/2025 a 14/11/2025, todas da AR MS: ficaram 169.324). **No ar desde 14/11/2026, com o prazo de 12 meses ligado.** Teste: `testes/test_seguranca_lgpd.py`.
 
 **Outras decisões de 14/11/2026:** a mesma empresa pode receber mensagens de duas ARs (cada AR é independente; a
 reserva de 60 dias continua valendo entre as pessoas de uma mesma AR; o nome escolhido de um contato na tela
