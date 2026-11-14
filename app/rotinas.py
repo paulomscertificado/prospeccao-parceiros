@@ -293,6 +293,9 @@ def _rotina_hora() -> None:
         liberadas = reservas.liberar_vencidas(db)
         if liberadas:
             log.info("Reservas: %s empresas voltaram para a base (60 dias sem mudança)", liberadas)
+    from . import ars
+
+    ars.preencher_novos()  # white label, Fase 1: linhas novas ganham a AR (só depois do migrar_ar.py aplicar)
 
 
 def rodada(numero: int | None) -> None:

@@ -10,7 +10,25 @@ from . import config
 from .banco import Base, agora
 
 
-class Configuracao(Base):
+class DaAR:
+    """Fase 1 do white label (docs/white-label.md): a AR (tenants.id) dona da linha. Vazio = da plataforma (modelo,
+    papel do sistema, Admin Master) ou ainda sem AR. Preenchida por app/ars.py; até a Fase 2 ninguém lê."""
+    tenant_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class Tenant(Base):
+    """Uma AR (marca) da plataforma white label. Hoje: AR MS Certificados e Grupo Certy (app/ars.py)."""
+    __tablename__ = "tenants"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    slug: Mapped[str] = mapped_column(String(40), unique=True)  # "ms", "grupo-certy" (vai virar o subdomínio)
+    nome: Mapped[str] = mapped_column(String(120))
+    cnpj: Mapped[str] = mapped_column(String(20), default="")
+    situacao: Mapped[str] = mapped_column(String(20), default="ativa")  # ativa ou suspensa
+    plano: Mapped[str] = mapped_column(String(40), default="")
+    criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
+
+
+class Configuracao(DaAR, Base):
     __tablename__ = "configuracoes"
     chave: Mapped[str] = mapped_column(String(80), primary_key=True)
     valor: Mapped[str] = mapped_column(Text, default="")
@@ -23,7 +41,7 @@ class Trava(Base):
     ate: Mapped[datetime] = mapped_column(DateTime)
 
 
-class Trabalho(Base):
+class Trabalho(DaAR, Base):
     """Trabalho longo feito em etapas curtas (montar campanha, buscar empresas, personalizar com IA)."""
     __tablename__ = "trabalhos"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -38,7 +56,7 @@ class Trabalho(Base):
     atualizado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
 
 
-class PonteWhatsApp(Base):
+class PonteWhatsApp(DaAR, Base):
     """Mensagem esperando o computador com o WhatsApp Leads buscar (sistema na nuvem). Ver whatsapp_leads.py."""
     __tablename__ = "ponte_whatsapp"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -58,7 +76,7 @@ class PonteWhatsApp(Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
 
 
-class ArteAviso(Base):
+class ArteAviso(DaAR, Base):
     """A arte do aviso de vencimento (Renovação) que o computador do WhatsApp Leads desenhou para uma mensagem da ponte
     e mandou de volta: vai no e-mail do mesmo aviso. Guardada por poucos dias (renovacao.DIAS_GUARDANDO_ARTE)."""
     __tablename__ = "artes_aviso"
@@ -69,7 +87,7 @@ class ArteAviso(Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, index=True)
 
 
-class VisualCampanha(Base):
+class VisualCampanha(DaAR, Base):
     """Visual das campanhas (nov/2026): o HTML do e-mail e a imagem do WhatsApp, cadastrados em Campanhas > Visuais
     e escolhidos na campanha da IA SDR e nas Empresas novas. Ver app/visual.py."""
     __tablename__ = "visuais_campanha"
@@ -91,7 +109,7 @@ class VisualCampanha(Base):
         back_populates="visual", cascade="all, delete-orphan", order_by="ArquivoVisual.id")
 
 
-class ArquivoVisual(Base):
+class ArquivoVisual(DaAR, Base):
     """Imagem usada dentro do HTML do e-mail. Fica pública em /visual/arquivo/<id>/<nome> (o programa de e-mail do
     lead precisa conseguir abrir)."""
     __tablename__ = "visuais_arquivos"
@@ -106,7 +124,7 @@ class ArquivoVisual(Base):
     visual: Mapped[VisualCampanha] = relationship(back_populates="arquivos")
 
 
-class MensagemWhatsApp(Base):
+class MensagemWhatsApp(DaAR, Base):
     """Cópia das conversas do número conectado (todas, de qualquer contato), trazida do WhatsApp Leads pela ponte
     para a tela Conversas. Chave da conversa: telefone com DDD, sem o 55 (util.normalizar_telefone)."""
     __tablename__ = "mensagens_whatsapp"
@@ -124,7 +142,7 @@ class MensagemWhatsApp(Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, index=True)
 
 
-class ConexaoWhatsApp(Base):
+class ConexaoWhatsApp(DaAR, Base):
     """Um número de WhatsApp ligado no computador da MS: o principal ou o de um usuário. Ver app/conexoes.py."""
     __tablename__ = "conexoes_whatsapp"
     id: Mapped[str] = mapped_column(String(40), primary_key=True)  # "principal" ou "u<id do usuário>"
@@ -135,7 +153,7 @@ class ConexaoWhatsApp(Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
 
 
-class ContaEmail(Base):
+class ContaEmail(DaAR, Base):
     """Uma conta de e-mail para as campanhas: a principal da MS (dados em Configurações > E-mail) ou a de um
     usuário (dados aqui, senha criptografada). Ver app/contas_email.py."""
     __tablename__ = "contas_email"
@@ -160,7 +178,7 @@ class ContaEmail(Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
 
 
-class ContatoWhatsApp(Base):
+class ContatoWhatsApp(DaAR, Base):
     """Nome do contato escolhido na tela Conversas (vale mais que o nome que veio do WhatsApp)."""
     __tablename__ = "contatos_whatsapp"
     telefone: Mapped[str] = mapped_column(String(20), primary_key=True)  # DDD + número, sem o 55
@@ -168,7 +186,7 @@ class ContatoWhatsApp(Base):
     atualizado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
 
 
-class ComandoWhatsApp(Base):
+class ComandoWhatsApp(DaAR, Base):
     """Botão da tela WhatsApp (nuvem) esperando o computador do WhatsApp Leads executar. Ver rotas/whatsapp.py."""
     __tablename__ = "comandos_whatsapp"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -180,7 +198,7 @@ class ComandoWhatsApp(Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
 
 
-class Usuario(Base):
+class Usuario(DaAR, Base):
     __tablename__ = "usuarios"
     id: Mapped[int] = mapped_column(primary_key=True)
     nome: Mapped[str] = mapped_column(String(120))
@@ -226,7 +244,7 @@ class Usuario(Base):
         return config.PERFIS.get(self.perfil, self.perfil)
 
 
-class Equipe(Base):
+class Equipe(DaAR, Base):
     """Equipe (unidade) da empresa. Serve para o alcance "só a equipe" das permissões."""
     __tablename__ = "equipes"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -234,7 +252,7 @@ class Equipe(Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
 
 
-class Papel(Base):
+class Papel(DaAR, Base):
     """Papel (conjunto de permissões). Os 5 do sistema têm o código do perfil; os outros são criados na tela."""
     __tablename__ = "papeis"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -248,7 +266,7 @@ class Papel(Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
 
 
-class PermissaoPapel(Base):
+class PermissaoPapel(DaAR, Base):
     __tablename__ = "permissoes_papel"
     id: Mapped[int] = mapped_column(primary_key=True)
     papel_id: Mapped[int] = mapped_column(ForeignKey("papeis.id"), index=True)
@@ -256,7 +274,7 @@ class PermissaoPapel(Base):
     escopo: Mapped[str] = mapped_column(String(10), default="tudo")      # tudo | equipe | proprios
 
 
-class ExcecaoPermissao(Base):
+class ExcecaoPermissao(DaAR, Base):
     """Exceção de um usuário: PERMITIR ou NEGAR uma permissão (o NEGAR sempre vence)."""
     __tablename__ = "excecoes_permissao"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -294,7 +312,7 @@ class Categoria(Base):
         return [x.strip() for x in (getattr(self, campo) or "").split(",") if x.strip()]
 
 
-class Busca(Base):
+class Busca(DaAR, Base):
     """Uma busca de "Encontrar novos parceiros"."""
     __tablename__ = "buscas"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -321,7 +339,7 @@ class Busca(Base):
     concluido_em: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
-class Lead(Base):
+class Lead(DaAR, Base):
     __tablename__ = "leads"
     id: Mapped[int] = mapped_column(primary_key=True)
     empresa: Mapped[str] = mapped_column(String(200), index=True)
@@ -423,7 +441,7 @@ class Lead(Base):
         return self.status in config.STATUS_PERDIDO
 
 
-class Historico(Base):
+class Historico(DaAR, Base):
     """Tudo que aconteceu com um lead (também serve de registro de tratamento para a LGPD)."""
     __tablename__ = "historico"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -437,7 +455,7 @@ class Historico(Base):
     usuario: Mapped["Usuario | None"] = relationship()
 
 
-class Template(Base):
+class Template(DaAR, Base):
     __tablename__ = "templates"
     id: Mapped[int] = mapped_column(primary_key=True)
     nome: Mapped[str] = mapped_column(String(120))
@@ -452,7 +470,7 @@ class Template(Base):
     angulo: Mapped[str] = mapped_column(String(20), default="")
 
 
-class Cadencia(Base):
+class Cadencia(DaAR, Base):
     __tablename__ = "cadencias"
     id: Mapped[int] = mapped_column(primary_key=True)
     nome: Mapped[str] = mapped_column(String(120))
@@ -462,7 +480,7 @@ class Cadencia(Base):
         back_populates="cadencia", order_by="PassoCadencia.dia", cascade="all, delete-orphan")
 
 
-class PassoCadencia(Base):
+class PassoCadencia(DaAR, Base):
     __tablename__ = "passos_cadencia"
     id: Mapped[int] = mapped_column(primary_key=True)
     cadencia_id: Mapped[int] = mapped_column(ForeignKey("cadencias.id", ondelete="CASCADE"))
@@ -477,7 +495,7 @@ class PassoCadencia(Base):
     template: Mapped["Template | None"] = relationship()
 
 
-class BuscaCnpja(Base):
+class BuscaCnpja(DaAR, Base):
     """Uma consulta à API da CNPJá (Empresas novas): quando, o quê, quanto achou e a campanha que saiu dela."""
     __tablename__ = "buscas_cnpja"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -495,7 +513,7 @@ class BuscaCnpja(Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, index=True)
 
 
-class EmpresaCnpja(Base):
+class EmpresaCnpja(DaAR, Base):
     """Empresa que a API da CNPJá devolveu numa busca (a lista que o usuário confere antes/depois da campanha)."""
     __tablename__ = "buscas_cnpja_empresas"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -520,7 +538,7 @@ class EmpresaCnpja(Base):
     lead_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
-class Campanha(Base):
+class Campanha(DaAR, Base):
     __tablename__ = "campanhas"
     id: Mapped[int] = mapped_column(primary_key=True)
     nome: Mapped[str] = mapped_column(String(160))
@@ -563,7 +581,7 @@ class Campanha(Base):
     cadencia: Mapped["Cadencia | None"] = relationship()
 
 
-class Tarefa(Base):
+class Tarefa(DaAR, Base):
     """Item da agenda: passo de cadência, follow-up, reunião ou renovação."""
     __tablename__ = "tarefas"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -600,7 +618,7 @@ class Tarefa(Base):
     usuario: Mapped["Usuario | None"] = relationship()
 
 
-class Mensagem(Base):
+class Mensagem(DaAR, Base):
     """Histórico de mensagens (geradas, copiadas, enviadas). Base do limite diário e do controle de frequência."""
     __tablename__ = "mensagens"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -623,7 +641,7 @@ class Mensagem(Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, index=True)
 
 
-class Parceiro(Base):
+class Parceiro(DaAR, Base):
     __tablename__ = "parceiros"
     id: Mapped[int] = mapped_column(primary_key=True)
     escritorio: Mapped[str] = mapped_column(String(200))
@@ -648,7 +666,7 @@ class Parceiro(Base):
     vendedor: Mapped["Usuario | None"] = relationship(foreign_keys=[vendedor_id])
 
 
-class Cliente(Base):
+class Cliente(DaAR, Base):
     """Cliente final (quem compra o certificado), normalmente indicado por um parceiro."""
     __tablename__ = "clientes"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -667,7 +685,7 @@ class Cliente(Base):
     parceiro: Mapped["Parceiro | None"] = relationship()
 
 
-class Produto(Base):
+class Produto(DaAR, Base):
     __tablename__ = "produtos"
     id: Mapped[int] = mapped_column(primary_key=True)
     nome: Mapped[str] = mapped_column(String(120))
@@ -679,7 +697,7 @@ class Produto(Base):
     ativo: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
-class Venda(Base):
+class Venda(DaAR, Base):
     __tablename__ = "vendas"
     id: Mapped[int] = mapped_column(primary_key=True)
     cliente_id: Mapped[int] = mapped_column(ForeignKey("clientes.id"), index=True)
@@ -702,7 +720,7 @@ class Venda(Base):
     vendedor: Mapped["Usuario | None"] = relationship()
 
 
-class Certificado(Base):
+class Certificado(DaAR, Base):
     """Certificado emitido: base do controle de vencimentos e renovações."""
     __tablename__ = "certificados"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -738,7 +756,7 @@ class Certificado(Base):
     lead: Mapped["Lead | None"] = relationship()
 
 
-class Oportunidade(Base):
+class Oportunidade(DaAR, Base):
     """Lead que respondeu: a IA para e entrega ao time humano (handoff)."""
     __tablename__ = "oportunidades"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -762,7 +780,7 @@ class Oportunidade(Base):
     responsavel: Mapped["Usuario | None"] = relationship()
 
 
-class Notificacao(Base):
+class Notificacao(DaAR, Base):
     __tablename__ = "notificacoes"
     id: Mapped[int] = mapped_column(primary_key=True)
     usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id", ondelete="CASCADE"), index=True)
@@ -772,7 +790,7 @@ class Notificacao(Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
 
 
-class Conhecimento(Base):
+class Conhecimento(DaAR, Base):
     """Base de conhecimento: o que a IA SDR pode responder sozinha (sem negociar)."""
     __tablename__ = "base_conhecimento"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -781,7 +799,7 @@ class Conhecimento(Base):
     ativa: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
-class LogAuditoria(Base):
+class LogAuditoria(DaAR, Base):
     __tablename__ = "logs"
     id: Mapped[int] = mapped_column(primary_key=True)
     usuario_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"), nullable=True)
