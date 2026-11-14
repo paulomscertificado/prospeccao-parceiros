@@ -11,7 +11,7 @@ O dono da plataforma e Admin Master é o Paulo Marinho (`Usuario.master`).
 | 2 | Isolamento obrigatório (filtro, porteiro com AR, RLS, testes nas 178 rotas) | nenhuma rota abre registro de outra AR | **Parte 1 (isolamento dos dados) no ar desde 14/11/2026**; **parte 2 (configurações por AR) no ar desde 14/11/2026**; RLS, `NOT NULL` e índices adiados (ver abaixo) |
 | 3 | Permissões por AR e painel /master | admin de uma AR não alcança outra nem o /master | **No ar desde 14/11/2026** (painel /master, o que é da plataforma só o master muda, módulos por AR); admins das ARs promovidos em 14/11/2026 |
 | 4 | WhatsApp, e-mail e filas por AR | uma AR parada não atrasa as outras | **Fila justa e avisos por AR no ar desde 14/11/2026**; computador do WhatsApp por AR espera a decisão (próprio ou servidor central) |
-| 5 | Marca (white label) | nenhuma tela ou mensagem mostra a MS em outra AR | — |
+| 5 | Marca (white label) | nenhuma tela ou mensagem mostra a MS em outra AR | Endereço decidido em 14/11/2026: um só para todas (o da Vercel), tela de entrada neutra e a marca da AR depois de entrar; nome e domínio da plataforma depois |
 | 6 | Auditoria, LGPD e planos | exportar e apagar uma AR de teste sem tocar nas outras | **Auditoria e LGPD no ar desde 14/11/2026** (quem agiu como quem; exportar e apagar uma AR, ensaiados no banco de teste); planos e cobrança esperam a decisão |
 
 Os planos pagos são obrigatórios antes da Fase 3 (a primeira AR nova): o Hobby da Vercel não permite uso comercial
@@ -175,6 +175,18 @@ limite e o e-mail do Grupo Certy sai na mesma rodada; quem recebe cada aviso).
 **Falta (decisão em aberto):** cada AR com o próprio computador do WhatsApp Leads ou um servidor central para todas.
 Com a resposta: tabela `instancias_whatsapp` (AR, token próprio, último sinal), a ponte (`/api/ponte/*`) identifica a
 instância pelo token e só entrega os envios dos números da AR dela, e o estado (`wl_status`) passa a ser por instância.
+
+## Fase 5: marca de cada AR
+
+**Endereço (decidido em 14/11/2026):** um só para todas as ARs, o atual da Vercel (`URL_PUBLICA`). A tela de entrada
+fica neutra (sem a MS) e a marca da AR (nome, logo, cores, site) aparece depois de entrar, pela AR da pessoa. A MS
+fica igual às outras. O nome e o domínio da plataforma ficam para depois; subdomínio por AR e domínio próprio
+(`tenant_dominios`) adiados.
+**Por quê:** sem custo e sem nada para as ARs configurarem agora. Aceito: a marca só aparece depois de entrar e os
+links dos e-mails (descadastro, avisos) levam o endereço da Vercel.
+**Para mudar depois:** a Vercel aceita até 50 domínios por projeto, também no Hobby (subdomínio = registro CNAME no DNS
+do dono do domínio; vários de uma vez = `*.dominio` com a validação delegada em `_acme-challenge`). Um `.com.br` custa
+R$ 40 por ano no Registro.br (Pix ou boleto).
 
 ## Fase 6: auditoria e LGPD
 
