@@ -73,6 +73,11 @@ ENVIADAS = ["copiada", "na_fila", "enviada", "entregue", "lida"]  # na_fila: na 
 
 
 def _contar_saida(db: Session, desde: datetime, *condicoes) -> int:
+    # rotina tratando uma AR (banco.usar_config_da_ar): os limites são dela, então conta só os envios dela (white
+    # label, Fase 4: uma AR com muito volume não gasta o limite da outra). Nas telas, o filtro da AR já faz isso.
+    ar = db.info.get("ar_config")
+    if ar:
+        condicoes = (*condicoes, Mensagem.tenant_id == ar)
     return db.execute(select(func.count(Mensagem.id)).where(
         Mensagem.direcao == "saida", Mensagem.criado_em >= desde, Mensagem.status.in_(ENVIADAS), *condicoes,
     )).scalar() or 0

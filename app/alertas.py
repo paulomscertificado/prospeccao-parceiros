@@ -44,13 +44,25 @@ def ligado() -> bool:
     return config.NA_NUVEM or config.ALERTAS_LIGADOS
 
 
-def destinatarios(db) -> list[str]:
-    """Quem recebe os avisos: a lista de Configurações (alertas_emails) ou, se vazia, os administradores ativos."""
+def _admins(db, ar=None, todos: bool = False) -> list[Usuario]:
+    """Admin Master sempre; os administradores da AR do problema (ou de todas as ARs, se `todos`)."""
+    pessoas = db.execute(select(Usuario).where(Usuario.perfil == "admin", Usuario.ativo.is_(True))
+                         .order_by(Usuario.id)).scalars().all()
+    return [u for u in pessoas if u.master or todos or (ar is not None and u.tenant_id == ar)]
+
+
+def destinatarios(db, ar=None, todos: bool = False) -> list[str]:
+    """Quem recebe os avisos por e-mail (white label, Fase 4): a lista de Configurações (alertas_emails, da
+    plataforma) ou, se vazia, o Admin Master; mais os administradores da AR do problema (número desconectado,
+    pausa de frios), ou de todas as ARs quando o problema é de todas (computador do WhatsApp parado)."""
     lista = [e.strip() for e in (ler_config(db, "alertas_emails") or "").replace(";", ",").split(",") if "@" in e]
-    if lista:
-        return lista
-    return [u.email for u in db.execute(select(Usuario).where(Usuario.perfil == "admin", Usuario.ativo.is_(True))
-                                        .order_by(Usuario.id)).scalars() if u.email]
+    pessoas = _admins(db, ar, todos)
+    if not lista:
+        lista = [u.email for u in pessoas if u.master and u.email]
+    for u in pessoas:
+        if not u.master and u.email and u.email not in lista:
+            lista.append(u.email)
+    return lista
 
 
 # ---------------------------------------------------------------- O que está errado agora
@@ -98,10 +110,13 @@ def problemas_agora(db) -> dict[str, dict]:
                 + "o computador que mantém os WhatsApps conectados não fala com o sistema. Enquanto isso nenhum "
                 "WhatsApp sai nem chega, e as respostas dos leads não aparecem.\n\nO que fazer: ligar o computador, "
                 "conferir a internet e abrir o ligar_nuvem.bat do WhatsApp Leads.",
-                "link": "/whatsapp", "desde": visto.isoformat() if visto else ""}
+                "link": "/whatsapp", "desde": visto.isoformat() if visto else "", "todos": True}
         else:
             em_uso = _numeros_em_uso(db)
             nomes = _nomes_dos_numeros(db)
+            from .modelos import ConexaoWhatsApp
+
+            ar_do_numero = dict(db.execute(select(ConexaoWhatsApp.id, ConexaoWhatsApp.tenant_id)).all())
             listados = status.get("conexoes")
             if listados is None:  # versão antiga do WhatsApp Leads: um número só
                 listados = {"principal": {"conectado": status.get("conectado"), "estado": status.get("estado")}}
@@ -117,7 +132,7 @@ def problemas_agora(db) -> dict[str, dict]:
                         "texto": (f"O número \"{nome}\" está desconectado ({(dados or {}).get('estado') or 'sem conexão'}). "
                                   "As mensagens dele ficam paradas até ele voltar.\n\nO que fazer: abrir o WhatsApp > "
                                   "Meu WhatsApp no sistema e ler o QR code de novo com o celular desse número."),
-                        "link": "/whatsapp", "espera": ESPERA_NUMERO}
+                        "link": "/whatsapp", "espera": ESPERA_NUMERO, "ar": ar_do_numero.get(id_conexao)}
             pausa = ler_config_int(db, "pausa_frios_sair", 0)
             for id_conexao in sorted(em_uso) if pausa else []:
                 if mensagens.pedidos_para_sair_hoje(db, id_conexao) >= pausa:
@@ -128,7 +143,7 @@ def problemas_agora(db) -> dict[str, dict]:
                                   f"depois de receber mensagem do número \"{nome}\". Para proteger o número contra "
                                   "bloqueio, os contatos frios dele ficam parados até amanhã (quem já conversou com a "
                                   "MS continua recebendo).\n\nVale revisar o texto da campanha e a lista de empresas."),
-                        "link": "/envios"}
+                        "link": "/envios", "ar": ar_do_numero.get(id_conexao)}
 
     parado = relogio.nuvem_atrasada(db)  # só depois que a nuvem passou a chamar a cada minuto (plano Pro)
     if parado is not None:
@@ -184,17 +199,18 @@ def problemas_agora(db) -> dict[str, dict]:
 
 # ---------------------------------------------------------------- Mandar, lembrar e avisar que resolveu
 
-def _avisar(db, assunto: str, corpo: str, link: str) -> bool:
-    """E-mail para a lista + aviso no sino dos administradores. Devolve se o e-mail saiu."""
+def _avisar(db, assunto: str, corpo: str, link: str, ar=None, todos: bool = False) -> bool:
+    """E-mail + aviso no sino: Admin Master (e a lista da plataforma) e os administradores da AR do problema.
+    Devolve se o e-mail saiu."""
     from .integracoes import email_smtp
 
-    for admin in db.execute(select(Usuario).where(Usuario.perfil == "admin", Usuario.ativo.is_(True))).scalars():
+    for admin in _admins(db, ar, todos):
         db.add(Notificacao(usuario_id=admin.id, texto=assunto[:300], link=link))
     if not email_smtp.configurado():
         log.warning("Aviso sem e-mail (e-mail de envio não configurado): %s", assunto)
         return False
     saiu = False
-    for destino in destinatarios(db):
+    for destino in destinatarios(db, ar, todos):
         try:
             email_smtp.enviar(destino, f"[Prospecção MS] {assunto}"[:200],
                               f"{corpo}\n\nAbrir o sistema: {config.URL_PUBLICA}{link}\n\n"
@@ -227,14 +243,15 @@ def verificar(db=None) -> dict:
         desde = _ler_data(anterior.get("desde")) or _ler_data(p.get("desde")) or agora_
         espera = p.get("espera") or timedelta(0)
         registro = {"titulo": p["titulo"], "texto": p["texto"], "link": p["link"], "desde": desde.isoformat(),
-                    "avisado_em": anterior.get("avisado_em", "")}
+                    "avisado_em": anterior.get("avisado_em", ""), "ar": p.get("ar"), "todos": p.get("todos", False)}
         avisado = _ler_data(registro["avisado_em"])
         if avisado is None and agora_ - desde >= espera:
-            _avisar(db, f"⚠️ {p['titulo']}", p["texto"], p["link"])
+            _avisar(db, f"⚠️ {p['titulo']}", p["texto"], p["link"], p.get("ar"), p.get("todos", False))
             registro["avisado_em"] = agora_.isoformat()
             feito["novos"] += 1
         elif avisado is not None and agora_ - avisado >= REPETIR:
-            _avisar(db, f"⚠️ Continua: {p['titulo']}", f"Começou há {_duracao(desde, agora_)}.\n\n{p['texto']}", p["link"])
+            _avisar(db, f"⚠️ Continua: {p['titulo']}", f"Começou há {_duracao(desde, agora_)}.\n\n{p['texto']}", p["link"],
+                    p.get("ar"), p.get("todos", False))
             registro["avisado_em"] = agora_.isoformat()
             feito["lembretes"] += 1
         estado[chave] = registro
@@ -244,7 +261,7 @@ def verificar(db=None) -> dict:
             desde = _ler_data(anterior.get("desde")) or agora_
             _avisar(db, f"✅ Resolvido: {anterior['titulo']}",
                     f"Voltou ao normal às {agora_:%H:%M} de {agora_:%d/%m} (durou {_duracao(desde, agora_)}).",
-                    anterior.get("link", "/"))
+                    anterior.get("link", "/"), anterior.get("ar"), anterior.get("todos", False))
             feito["resolvidos"] += 1
     gravar_config(db, ESTADO, estado)
     db.commit()

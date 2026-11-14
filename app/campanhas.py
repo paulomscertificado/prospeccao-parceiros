@@ -16,7 +16,8 @@ from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import aliased
 
 from . import base_receita, bases_importadas, cadencias, config, contas_email, email_validacao, reservas, ia, mensagens, prospeccao, sdr, trabalhos, util
-from .banco import agora, algum_valor, gravar_config, ler_config, ler_config_int, sessao, usar_config_da_ar
+from .banco import (agora, algum_valor, gravar_config, ler_config, ler_config_int, ler_config_json, sessao,
+                    usar_config_da_ar)
 from .leads_servico import criar_lead, historico, limpar_campos, mudar_status, registrar_contato
 from .modelos import Cadencia, Campanha, Categoria, Lead, Tarefa, Usuario
 from .modelos import NOME_CADENCIA_SDR
@@ -761,6 +762,21 @@ def _anotar_envio(db, canal: str) -> None:
         gravar_config(db, f"proximo_envio_automatico:{canal}", proximo.isoformat(timespec="seconds"))
 
 
+def _revezar(db, canal: str, linhas) -> list[int]:
+    """Fila justa entre as ARs (white label, Fase 4): a vez vai primeiro para a AR que mandou há mais tempo; dentro
+    da AR, a ordem de sempre. A regra da Maria (um envio automático por vez, 3 a 4 minutos entre eles) continua
+    valendo para a plataforma toda: só muda QUEM tem a vez. `linhas` = (id da tarefa, AR)."""
+    ultimos = ler_config_json(db, f"revezamento:{canal}", {}) or {}
+    ordem = {id_: i for i, (id_, _ar) in enumerate(linhas)}
+    return [id_ for id_, _ar in sorted(linhas, key=lambda l: (ultimos.get(str(l[1]), ""), ordem[l[0]]))]
+
+
+def _anotar_vez(db, canal: str, ar) -> None:
+    ultimos = ler_config_json(db, f"revezamento:{canal}", {}) or {}
+    ultimos[str(ar)] = agora().isoformat(timespec="seconds")
+    gravar_config(db, f"revezamento:{canal}", ultimos)
+
+
 def _ja_na_hora(hoje: date, hora: str):
     """Filtro SQL: toques de dias anteriores ou de hoje cujo horário já chegou. Antes isso era conferido um a um
     depois da consulta, e os toques de mais tarde ocupavam as vagas da consulta (limit) à toa."""
@@ -792,7 +808,7 @@ def processar_fila(db, maximo: int = 25) -> dict:
     hora = agora().strftime("%H:%M")
     # Só o que já está na hora (filtro no banco) e uma consulta folgada: toques que esperam (responsável sem e-mail,
     # caixa pausada, campanha no limite do dia) não podem tomar as vagas e travar os das outras campanhas.
-    consulta = (select(Tarefa.id).join(Campanha, Tarefa.campanha_id == Campanha.id)
+    consulta = (select(Tarefa.id, Tarefa.tenant_id).join(Campanha, Tarefa.campanha_id == Campanha.id)
                 .where(Tarefa.status == "pendente", Tarefa.tipo == "prospeccao", Tarefa.canal == "email",
                        _ja_na_hora(date.today(), hora), Campanha.status == "ativa",
                        Campanha.aprovado_em.is_not(None),  # só campanhas aprovadas na IA SDR
@@ -802,9 +818,12 @@ def processar_fila(db, maximo: int = 25) -> dict:
     if renovacao.fora_do_horario(db):  # Renovação: só de segunda a sexta, das 10:00 às 18:00 (pedido da Maria)
         consulta = consulta.where(Campanha.tipo != renovacao.TIPO_CAMPANHA)
     campanhas_no_limite: set[int] = set()
-    for t in _em_lotes(db, db.execute(consulta).scalars().all()):
+    ars_paradas: set = set()  # AR que chegou ao limite dela nesta rodada: só ela espera (fila justa)
+    for t in _em_lotes(db, _revezar(db, "email", db.execute(consulta).all())):
         if feito["enviados"] >= maximo:
             break
+        if t.tenant_id in ars_paradas:
+            continue
         usar_config_da_ar(db, t.tenant_id)  # daqui em diante, as configurações da AR desta tarefa
         if ler_config(db, "enviar_email_automatico") != "1" or not mensagens.dentro_do_horario(db):
             continue  # esta AR desligou o envio sozinho ou está fora do horário dela
@@ -822,7 +841,8 @@ def processar_fila(db, maximo: int = 25) -> dict:
                 campanhas_no_limite.add(t.campanha_id)
                 continue  # só esta campanha chegou ao limite do dia: as outras seguem
             if "limite" in bloqueio.lower() and "domínio" not in bloqueio:
-                break  # limite do canal (dia/hora): o resto espera a próxima rodada
+                ars_paradas.add(t.tenant_id)
+                continue  # limite do canal (dia/hora) desta AR: só ela espera; as outras ARs seguem
             continue
         try:
             conta = conta_do_toque(db, t)
@@ -849,6 +869,7 @@ def processar_fila(db, maximo: int = 25) -> dict:
             _avisar_caixa_com_erro(db, t, conta, erro)
             continue  # problema nesta caixa de envio: não insiste nela agora
         feito["enviados"] += 1
+        _anotar_vez(db, "email", t.tenant_id)
         if config.ESPACAR_ENVIOS:
             _anotar_envio(db, "email")
             break  # um por vez: o próximo sai daqui a 3 ou 4 minutos
@@ -1378,7 +1399,7 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
         Mensagem.lead_id == Lead.id, Mensagem.canal == "whatsapp", Mensagem.direcao == "saida",
         Mensagem.angulo != "resposta", Mensagem.status.in_(mensagens.ENVIADAS),
         Mensagem.criado_em > agora() - timedelta(hours=horas_minimas_automatico(db))).exists())
-    consulta = (select(Tarefa.id).join(Campanha, Tarefa.campanha_id == Campanha.id)
+    consulta = (select(Tarefa.id, Tarefa.tenant_id).join(Campanha, Tarefa.campanha_id == Campanha.id)
                 .join(Lead, Tarefa.lead_id == Lead.id)
                 .where(Tarefa.status == "pendente", Tarefa.tipo == "prospeccao", Tarefa.canal == "whatsapp",
                        _ja_na_hora(hoje, hora), Campanha.status == "ativa", Campanha.aprovado_em.is_not(None),
@@ -1396,9 +1417,12 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
         consulta = consulta.where(Campanha.tipo != renovacao.TIPO_CAMPANHA)
     automaticas = campanhas_que_saem_sozinhas(db)
     campanhas_no_limite: set[int] = set()
-    for t in _em_lotes(db, db.execute(consulta).scalars().all()):
+    ars_paradas: set = set()  # AR que chegou a um limite dela nesta rodada: só ela espera (fila justa)
+    for t in _em_lotes(db, _revezar(db, "whatsapp", db.execute(consulta).all())):
         if feito["enviados"] >= maximo:
             break
+        if t.tenant_id in ars_paradas:
+            continue
         usar_config_da_ar(db, t.tenant_id)  # daqui em diante, as configurações da AR desta tarefa
         if ler_config(db, "enviar_whatsapp_automatico") != "1" or not mensagens.dentro_do_horario(db):
             continue  # esta AR desligou o envio sozinho ou está fora do horário dela
@@ -1427,14 +1451,19 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
                 feito["bloqueados"] += 1
                 campanhas_no_limite.add(t.campanha_id)
                 continue  # só esta campanha chegou ao limite do dia: as outras seguem
-            if "limite" in texto or "whatsapp leads" in texto or "desligado" in texto:
+            if "whatsapp leads" in texto or "desligado" in texto:
                 feito["bloqueados"] += 1
-                break  # limite do canal ou WhatsApp fora do ar: o resto espera a próxima rodada
+                break  # o computador do WhatsApp Leads fora do ar: vale para todas as ARs, o resto espera
+            if "limite" in texto:
+                feito["bloqueados"] += 1
+                ars_paradas.add(t.tenant_id)
+                continue  # limite desta AR: só ela espera; as outras ARs seguem (fila justa)
             feito["bloqueados"] += 1
             continue
         t.resultado = (f"Enviada sozinha ({motivo_automatico(automaticas, t.campanha_id)})" if automatica
                        else "Enviada sozinha pela IA SDR (contato já conversou com a MS)")
         feito["enviados"] += 1
+        _anotar_vez(db, "whatsapp", t.tenant_id)
         if config.ESPACAR_ENVIOS:
             _anotar_envio(db, "whatsapp")
             break  # uma por vez: a próxima sai daqui a 3 ou 4 minutos

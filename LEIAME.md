@@ -421,6 +421,8 @@ renovação novo antes, para entrarem os clientes de janeiro).
 Nas campanhas automáticas (depois da aprovação), os **e-mails** e as **mensagens de WhatsApp** que saem sozinhos
 saem **um de cada vez**, com **3 a 4 minutos** entre um e outro, sorteados a cada envio (nunca todos no mesmo
 horário). E-mail e WhatsApp têm cada um o seu intervalo. Os envios feitos por clique de uma pessoa não esperam.
+Com mais de uma marca, a vez **reveza**: o próximo envio é da marca que mandou há mais tempo, e uma marca que chegou ao
+limite dela espera sozinha, sem segurar as outras.
 
 ### Empresa reservada (travada) com quem fez a campanha
 

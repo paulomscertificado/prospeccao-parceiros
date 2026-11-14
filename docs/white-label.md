@@ -10,7 +10,7 @@ O dono da plataforma e Admin Master é o Paulo Marinho (`Usuario.master`).
 | 1 | A AR entra nos dados (`tenants` + `tenant_id`) | nenhuma linha sem AR, contagens iguais, nenhuma ligação cruzando ARs | **Concluída em 14/11/2026**: ensaio no banco de teste e aplicação na nuvem com a conferência OK (leads: 1.387 na AR MS, 111 no Grupo Certy); linhas novas de hora em hora |
 | 2 | Isolamento obrigatório (filtro, porteiro com AR, RLS, testes nas 178 rotas) | nenhuma rota abre registro de outra AR | **Parte 1 (isolamento dos dados) no ar desde 14/11/2026**; **parte 2 (configurações por AR) no ar desde 14/11/2026**; RLS, `NOT NULL` e índices adiados (ver abaixo) |
 | 3 | Permissões por AR e painel /master | admin de uma AR não alcança outra nem o /master | **No ar desde 14/11/2026** (painel /master, o que é da plataforma só o master muda, módulos por AR); falta promover os admins das ARs |
-| 4 | WhatsApp, e-mail e filas por AR | uma AR parada não atrasa as outras | — |
+| 4 | WhatsApp, e-mail e filas por AR | uma AR parada não atrasa as outras | Fila justa e avisos por AR prontos em 14/11/2026; computador do WhatsApp por AR espera a decisão (próprio ou servidor central) |
 | 5 | Marca (white label) | nenhuma tela ou mensagem mostra a MS em outra AR | — |
 | 6 | Auditoria, LGPD e planos | exportar e apagar uma AR de teste sem tocar nas outras | — |
 
@@ -151,3 +151,27 @@ rotas (o FastAPI novo guarda os routers incluídos à parte).
 
 **Falta:** promover os administradores das ARs (proposta do plano: Paulo Lucas e Jefferson na AR MS, Thamires no Grupo
 Certy; só o Admin Master dá o papel de administrador, e ele pede o código do celular na entrada).
+
+## Fase 4: filas justas e avisos por AR
+
+**Fila justa** (`campanhas._revezar` / `_anotar_vez`, configuração `revezamento:<canal>`): as filas de e-mail e de
+WhatsApp buscam os toques prontos com a AR de cada um e põem na frente os da AR que mandou há mais tempo (dentro da AR,
+a ordem de sempre). A regra da Maria continua igual para a plataforma toda: um envio automático por vez por canal, com
+3 a 4 minutos sorteados entre eles; só muda quem tem a vez.
+
+**Uma AR parada não trava as outras:** limite do dia ou da hora de uma AR (e-mail) ou limite que não é do número
+(WhatsApp) para só aquela AR naquela rodada (`ars_paradas`); só o computador do WhatsApp Leads fora do ar para tudo
+(vale para todas). Os limites de e-mail contam só os envios da AR que está sendo tratada (`mensagens._contar_saida` com
+`usar_config_da_ar`), então o volume de uma AR não gasta o limite da outra.
+
+**Avisos por AR** (`alertas._admins`, `destinatarios(db, ar, todos)`, `_avisar(..., ar, todos)`): número desconectado
+e pausa de contatos frios vão para o Admin Master (ou a lista `alertas_emails`) e para os administradores da AR dona do
+número; computador do WhatsApp parado vai para todos os administradores (afeta todas as ARs); banco, backup, rotina,
+relógio e e-mails da fila vão para a plataforma (Admin Master ou a lista). O "resolvido" segue o mesmo caminho.
+
+**Testes:** `testes/test_fila_justa.py` (ordem da vez; limite de uma AR contando só os envios dela; o portão: AR MS no
+limite e o e-mail do Grupo Certy sai na mesma rodada; quem recebe cada aviso).
+
+**Falta (decisão em aberto):** cada AR com o próprio computador do WhatsApp Leads ou um servidor central para todas.
+Com a resposta: tabela `instancias_whatsapp` (AR, token próprio, último sinal), a ponte (`/api/ponte/*`) identifica a
+instância pelo token e só entrega os envios dos números da AR dela, e o estado (`wl_status`) passa a ser por instância.
