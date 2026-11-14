@@ -46,8 +46,8 @@ senão, MS. O Admin Master fica sem AR (é da plataforma).
 | base_conhecimento, produtos | MS |
 | templates, cadencias, passos_cadencia, configuracoes | vazias = da plataforma (a cópia por AR é da Fase 2) |
 
-Decisões em aberto, com o padrão proposto (`ars.PADRAO`): leads e campanhas do Admin Master → MS; leads sem dono → MS.
-Para mudar: `--master=grupo-certy` ou `--sem-dono=grupo-certy` no `migrar_ar.py`.
+Decididas em 14/11/2026 (`ars.PADRAO`): os leads e as campanhas do Admin Master vão para a AR MS, e os leads sem dono
+também. Para outra escolha numa AR futura: `--master=` e `--sem-dono=` no `migrar_ar.py`.
 
 **Conferência** (`ars.conferir`, o portão): nenhuma linha sem AR nas tabelas obrigatórias (vazio só onde é
 permitido: Admin Master, papel do sistema) e nenhuma ligação cruzando ARs (`ars.LIGACOES`: histórico → lead, tarefa →

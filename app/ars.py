@@ -21,7 +21,7 @@ log = logging.getLogger(__name__)
 AR_MS, AR_CERTY = "ms", "grupo-certy"
 ARS_INICIAIS = {AR_MS: "AR MS Certificados", AR_CERTY: "Grupo Certy"}
 
-# Decisões em aberto no documento (13/11/2026). Enquanto não forem respondidas, valem as propostas: AR MS.
+# Decididas em 14/11/2026 ("sim, vão para AR MS; leads sem dono também"):
 PADRAO = {"do_master": AR_MS,   # os 381 leads e as 29 campanhas do Paulo Marinho (Admin Master)
           "sem_dono": AR_MS}    # os 237 leads sem vendedor (e o que não tem dono nenhum)
 
