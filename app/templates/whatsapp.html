@@ -1,6 +1,6 @@
-{% extends "base.html" %}
+{% extends "_configuracoes.html" %}
 {% block titulo %}WhatsApp{% endblock %}
-{% block conteudo %}
+{% block config %}
 <style>
   .numeros { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
   .numero { margin: 0; display: flex; flex-direction: column; gap: 10px; }
@@ -17,7 +17,7 @@
   .lista-pessoas { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 2px 10px; margin: 8px 0; }
   .vazio-numero { text-align: center; padding: 20px 10px; }
 </style>
-<div class="cabecalho"><div><h1>WhatsApp</h1><div class="suave">Cada pessoa conecta o próprio número para prospectar e conversar. O número fica ligado no computador do WhatsApp Leads.</div></div></div>
+<div class="cartao"><h2 class="subtitulo-config">WhatsApp</h2><p class="suave" style="margin:0">Cada pessoa conecta o próprio número para prospectar e conversar. O número fica ligado no computador do WhatsApp Leads.</p></div>
 
 {% if not estado.ponte %}
 <div class="cartao"><h2>Situação</h2>

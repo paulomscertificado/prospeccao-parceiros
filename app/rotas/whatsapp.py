@@ -61,7 +61,7 @@ def tela_whatsapp(request: Request, usuario: Usuario = Depends(exige("whatsapp.v
     estado = _estado(db, usuario)
     equipe_ = [{"id": u.id, "nome": u.nome} for u in db.execute(
         select(Usuario).where(Usuario.perfil != "parceiro", Usuario.ativo.is_(True)).order_by(Usuario.nome)).scalars()]
-    return tela(request, "whatsapp.html", {"estado": estado, "regras": estado["regras"], "equipe": equipe_,
+    return tela(request, "whatsapp.html", {"secao": "whatsapp", "estado": estado, "regras": estado["regras"], "equipe": equipe_,
                                            "url_local": config.WHATSAPP_LEADS_URL + "/whatsapp"})
 
 

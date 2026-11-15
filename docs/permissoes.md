@@ -93,8 +93,9 @@ próprio e-mail em outro domínio/servidor (ver `docs/configuracao.md`); é conf
 ## Tela (Configurações > Pessoas e acesso, `permissoes.gerenciar`)
 
 Desde 15/11/2026 as telas de Permissões ficam dentro das Configurações (moldura `templates/_configuracoes.html`, menu de
-seções à esquerda; cada rota passa `secao`). No menu lateral do sistema, "Permissões" só aparece para quem não vê as
-Configurações (`web.tela`). Papéis: grupos de permissões que abrem e fecham (`.grupo-permissao`). Exceções: a lista de
+seções à esquerda; cada rota passa `secao`). No menu lateral do sistema, "Permissões" e "WhatsApp" só aparecem
+para quem não vê as Configurações (`web.DENTRO_DAS_CONFIGURACOES`); para essa pessoa a moldura mostra só a tela, sem o
+menu das Configurações (`self.config()` em `_configuracoes.html`). Papéis: grupos de permissões que abrem e fecham (`.grupo-permissao`). Exceções: a lista de
 pessoas separada por marca (`permissoes._pessoas_por_ar`). Configurações > Usuários: um quadro por marca
 (`admin._grupos_de_usuarios`); a pessoa nova criada pelo Admin Master fora das ARs vai para a marca do quadro (`ar`),
 e equipe, parceiro e papel precisam ser da mesma marca (`salvar_usuario`). Teste: `testes/test_usuarios_por_marca.py`.

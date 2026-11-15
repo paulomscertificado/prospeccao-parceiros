@@ -38,7 +38,8 @@ no navegador, de qualquer lugar: não precisa do `iniciar.bat`. O passo a passo 
   WhatsApp Leads).
   As conversas antigas (até 1 ano) chegam quando o celular é conectado pelo QR code. Para puxar de novo: menu
   WhatsApp > Desligar este número > Conectar com QR code.
-- Menu **WhatsApp**: a mesma tela do WhatsApp Leads, dentro do site. Mostra se o celular está conectado e
+- **WhatsApp** (em **Configurações > Comunicação**; quem não vê as Configurações, como os vendedores, acha no menu
+  lateral): a mesma tela do WhatsApp Leads, dentro do site. Mostra se o celular está conectado e
   tem os botões **Conectar com QR code**, **Usar modo teste**, **Pausar**, **Desligar** e as **regras de envio**.
   O QR code aparece ali mesmo, para ler com o celular. Os botões levam alguns segundos, porque quem faz a
   conexão é o computador da MS (que precisa estar ligado com o WhatsApp Leads aberto).
@@ -544,7 +545,7 @@ digitar o apelido e SIM. A AR MS nunca é apagada por ele.
 
 Em **Configurações**, um menu à esquerda separa tudo por assunto (no celular, é uma faixa que rola para o lado):
 **Empresa** (Geral, Marca, Score dos leads), **Pessoas e acesso** (Usuários, Papéis e permissões, Exceções por pessoa,
-Equipes e, para o admin master, Módulos), **Comunicação** (E-mail), **Dados e IA** (Integrações, LGPD e dados,
+Equipes e, para o admin master, Módulos), **Comunicação** (E-mail e WhatsApp), **Dados e IA** (Integrações, LGPD e dados,
 Categorias de parceiros, Base de conhecimento da IA) e **Segurança** (Registro de atividades).
 
 **Usuários separados por marca:** cada marca tem o seu quadro com as pessoas dela (nome e e-mail, papel, equipe,
@@ -594,7 +595,8 @@ saem pelo WhatsApp ou pelo e-mail de outra pessoa: o **e-mail** sai só pelo do 
 **WhatsApp**, pelo número dela ou por um que outra pessoa **compartilhou** com ela. Ser administrador não muda isso.
 Sem e-mail ou número, os disparos dela esperam e ela recebe um aviso para cadastrar.
 
-**Cada pessoa com o seu WhatsApp:** no menu **WhatsApp > Meu WhatsApp**, cada um conecta o próprio número pelo
+**Cada pessoa com o seu WhatsApp:** em **WhatsApp > Meu WhatsApp** (Configurações > Comunicação, ou o menu lateral para
+quem não vê as Configurações), cada um conecta o próprio número pelo
 QR code. A IA SDR manda os WhatsApps dos leads de cada pessoa pelo número dela (ou por um compartilhado com ela);
 sem número, as mensagens esperam e a pessoa recebe um aviso para conectar. Em **Conversas**, cada um vê só as conversas do
 próprio número e dos números compartilhados com ele.

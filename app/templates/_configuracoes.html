@@ -16,7 +16,8 @@
     ("equipes", "Equipes", "/permissoes?aba=equipes", pode_permissoes),
     ("modulos", "Módulos", "/permissoes?aba=modulos", pode_permissoes and usuario.master)]),
   ("Comunicação", [
-    ("email", "E-mail", "/configuracoes?aba=email", true)]),
+    ("email", "E-mail", "/configuracoes?aba=email", true),
+    ("whatsapp", "WhatsApp", "/whatsapp", pode('whatsapp.ver'))]),
   ("Dados e IA", [
     ("integracoes", "Integrações", "/configuracoes?aba=integracoes", true),
     ("lgpd", "LGPD e dados", "/configuracoes?aba=lgpd", true),
@@ -25,6 +26,7 @@
   ("Segurança", [
     ("logs", "Registro de atividades", "/configuracoes?aba=logs", true)]),
 ] %}
+{% if pode('configuracoes.ver') %}
 <div class="cabecalho"><div><h1>Configurações</h1>
   <div class="suave">{% if marca.plataforma %}Da plataforma: o que vale para todas as marcas (cada marca por dentro: Painel master){% else %}{{ marca.frase('de', nome=True, maiuscula=True) }}{% endif %}</div></div></div>
 <div class="config-grade">
@@ -32,10 +34,14 @@
     {% for titulo, itens in grupos_config %}
       {% set ns = namespace(algum=false) %}{% for item in itens %}{% if item[3] %}{% set ns.algum = true %}{% endif %}{% endfor %}
       {% if ns.algum %}<div class="config-grupo">{{ titulo }}</div>
-        {% for chave, nome, link, visivel in itens %}{% if visivel %}<a class="config-item {{ 'ativo' if secao == chave }}" href="{{ link }}"{% if secao == chave %} aria-current="page"{% endif %}>{{ nome }}</a>{% endif %}{% endfor %}
+        {% for chave, nome, link, visivel in itens %}{% if visivel %}<a class="config-item {{ 'ativo' if secao == chave }}" href="{{ link }}"{% if secao == chave %} aria-current="page"{% endif %}>{{ nome }}{% if chave == 'whatsapp' %} <span class="ponto {{ 'verde' if wl.conectado else ('amarelo' if wl.disponivel else 'vermelho') }}" title="WhatsApp {{ 'conectado' if wl.conectado else ('desconectado' if wl.disponivel else 'desligado') }}"></span>{% endif %}</a>{% endif %}{% endfor %}
       {% endif %}
     {% endfor %}
   </nav>
   <div class="config-conteudo">{% block config %}{% endblock %}</div>
 </div>
+{% else %}{# quem não vê as Configurações (ex.: vendedor no WhatsApp ou nas Categorias): só a tela, sem o menu delas #}
+<div class="cabecalho"><div><h1>{{ self.titulo() }}</h1></div></div>
+{{ self.config() }}
+{% endif %}
 {% endblock %}
