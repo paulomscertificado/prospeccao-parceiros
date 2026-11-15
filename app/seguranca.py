@@ -3,6 +3,7 @@ permissões por perfil e registro de auditoria (logs)."""
 
 import hashlib
 import hmac
+import json
 import secrets
 import threading
 import time
@@ -251,16 +252,47 @@ def ve_tudo(usuario: Usuario, permissao: str = "leads.ver") -> bool:
 
 # ---------------------------------------------------------------- Auditoria
 
+# o módulo de cada registro pelo tipo de coisa que mudou (tela Configurações > Registro de atividades)
+MODULOS_DO_REGISTRO = {
+    "configuracao": "Configurações", "campanha": "Campanhas", "usuario": "Usuários", "lead": "Leads",
+    "tenant": "Plataforma", "email": "E-mail", "certificado": "Certificados", "visual": "Visuais", "venda": "Vendas",
+    "papel": "Permissões", "equipe": "Permissões", "tarefa": "Agenda", "base": "Listas", "whatsapp": "WhatsApp",
+    "template": "Modelos", "relatorio": "Relatórios", "produto": "Comissões", "parceiro": "Parceiros",
+    "oportunidade": "Oportunidades", "mensagens_whatsapp": "Conversas", "fila": "Fila", "cliente": "Clientes",
+    "categoria": "Categorias", "cadencia": "Cadências"}
+
+
+def diferencas(antes: dict, depois: dict) -> dict:
+    """{campo: [antes, depois]} só do que mudou, para o registro de atividades."""
+    return {c: [antes.get(c), v] for c, v in depois.items() if str(antes.get(c, "")) != str(v if v is not None else "")}
+
+
+def _valor_do_registro(valor) -> str:
+    if valor is None:
+        return ""
+    if isinstance(valor, (dict, list)):
+        valor = json.dumps(valor, ensure_ascii=False, sort_keys=True)
+    return str(valor)[:200]
+
+
 def registrar_log(db: Session, usuario: Usuario | None, acao: str, entidade: str = "",
-                  entidade_id: int | None = None, detalhes: str = "", request: Request | None = None):
-    """Grava uma linha no registro de atividades (só inclusão: nada no sistema apaga). E-mails e telefones do texto livre
-    saem mascarados (util.mascarar_contatos)."""
+                  entidade_id: int | None = None, detalhes: str = "", request: Request | None = None,
+                  mudancas: dict | None = None, modulo: str = ""):
+    """Grava uma linha no registro de atividades (só inclusão: nada no sistema apaga), com o módulo e, quando houver,
+    o "antes e depois" (`mudancas`: {campo: [antes, depois]}, ver `diferencas`). E-mails e telefones saem mascarados
+    (util.mascarar_contatos), no texto livre e nos valores."""
     from .util import mascarar_contatos
 
+    texto_mudancas = ""
+    if mudancas:
+        limpas = {str(campo)[:60]: [mascarar_contatos(_valor_do_registro(a)), mascarar_contatos(_valor_do_registro(d))]
+                  for campo, (a, d) in mudancas.items()}
+        texto_mudancas = json.dumps(limpas, ensure_ascii=False)[:4000]
     db.add(LogAuditoria(
         usuario_id=usuario.id if usuario else None,
         usuario_nome=usuario.nome if usuario else "sistema",
         acao=acao, entidade=entidade, entidade_id=entidade_id, detalhes=mascarar_contatos(detalhes)[:2000],
+        modulo=(modulo or MODULOS_DO_REGISTRO.get(entidade, ""))[:30], mudancas=texto_mudancas,
         ip=ip_de(request) if request else "", criado_em=agora(),
     ))
 

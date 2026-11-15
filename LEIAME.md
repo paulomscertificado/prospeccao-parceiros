@@ -93,8 +93,9 @@ Geral > "Mostrar Vendas, Vencimentos e Comissões" = 1 > Salvar.
   **prazo de guarda** (Configurações > Geral, campo "LGPD · meses que a cópia das conversas fica na nuvem"; só o admin
   master muda). As mais antigas saem da cópia sozinhas, de hora em hora; as originais continuam nos celulares e no
   WhatsApp Leads.
-- O **registro de atividades** (Configurações > Logs) mostra e-mails e telefones mascarados (ex.: ma***@empresa.com.br,
-  (81) *****-8888) e ninguém apaga o que está nele.
+- O **registro de atividades** (Configurações > Logs) mostra o **módulo** e, nas mudanças de configurações, score,
+  cadastro de pessoas, marca e módulos, o **antes e depois** (ex.: limite_diario_whatsapp: 40 → 35). E-mails e telefones
+  aparecem mascarados (ex.: ma***@empresa.com.br, (81) *****-8888) e ninguém apaga o que está nele.
 
 ## 4. IA SDR (prospecção de parceiros)
 

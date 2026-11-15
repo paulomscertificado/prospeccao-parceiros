@@ -849,6 +849,10 @@ class LogAuditoria(DaAR, Base):
     entidade: Mapped[str] = mapped_column(String(40), default="")
     entidade_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     detalhes: Mapped[str] = mapped_column(Text, default="")
+    # plano de segurança: o módulo (Configurações, Usuários, Campanhas...) e o "antes e depois" das mudanças,
+    # JSON {campo: [antes, depois]} com e-mails e telefones mascarados (seguranca.registrar_log)
+    modulo: Mapped[str] = mapped_column(String(30), default="")
+    mudancas: Mapped[str] = mapped_column(Text, default="")
     ip: Mapped[str] = mapped_column(String(60), default="")
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, index=True)
 

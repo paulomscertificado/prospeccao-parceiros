@@ -11,7 +11,7 @@ from .. import (alertas, autorizacao, base_receita, bases_importadas, config, ia
 from ..banco import CHAVES_DA_AR, CHAVES_SO_MASTER, gravar_config, ler_config, ler_config_json, obter_db
 from ..integracoes import dns_email, email_imap, email_smtp, whatsapp_cloud, whatsapp_leads
 from ..modelos import Equipe, Lead, LogAuditoria, MarcaAR, Papel, Parceiro, Usuario
-from ..seguranca import exige, problema_na_senha, registrar_log, resumir_senha, verificar_csrf
+from ..seguranca import diferencas, exige, problema_na_senha, registrar_log, resumir_senha, verificar_csrf
 from ..web import avisar, tela, voltar
 
 rotas = APIRouter()
@@ -62,6 +62,22 @@ CAMPOS_GERAIS = [
     ("guarda_conversas_meses", "LGPD · meses que a cópia das conversas do WhatsApp fica na nuvem (0 = sem prazo; as "
      "originais continuam nos celulares e no WhatsApp Leads)", "numero"),
 ]
+
+
+def _cadastro_no_registro(u: Usuario) -> dict:
+    """O que o registro de atividades guarda de uma mudança no cadastro de uma pessoa (sem senha nem 2 etapas)."""
+    return {"nome": u.nome, "email": u.email, "papel": u.perfil if not u.papel_id else f"papel {u.papel_id}",
+            "ativo": "sim" if u.ativo else "não", "equipe": u.equipe_id or "", "parceiro": u.parceiro_id or "",
+            "expediente": u.expediente or ""}
+
+
+def _marca_no_registro(db: Session, ar: int) -> dict:
+    """O que o registro de atividades guarda da marca de uma AR (o logo só como "tem" ou "não tem")."""
+    linha = db.get(MarcaAR, ar)
+    campos = ("nome", "curto", "artigo", "site", "descricao", "dominio_email", "cor", "cor_detalhe", "cor_fundo", "fonte")
+    dados = {c: (getattr(linha, c) or "") if linha is not None else "" for c in campos}
+    dados["logo"] = "tem" if linha is not None and linha.logo_tipo else "não tem"
+    return dados
 
 
 def _so_da_plataforma(request: Request, destino: str):
@@ -137,8 +153,10 @@ async def salvar_marca(request: Request, usuario: Usuario = Depends(exige("confi
         if not autorizacao.e_master(usuario):
             return _so_da_plataforma(request, destino)
         nome = re.sub(r"\s+", " ", str(form.get("plataforma_nome") or "")).strip()[:60]
+        antes = {"plataforma_nome": ler_config(db, "plataforma_nome")}
         gravar_config(db, "plataforma_nome", nome or marca.PLATAFORMA)
-        registrar_log(db, usuario, "salvou_nome_da_plataforma", "configuracao", None, nome, request)
+        registrar_log(db, usuario, "salvou_nome_da_plataforma", "configuracao", None, nome, request,
+                      mudancas=diferencas(antes, {"plataforma_nome": nome or marca.PLATAFORMA}))
         db.commit()
         marca.esquecer()
         avisar(request, "Nome da plataforma salvo.")
@@ -146,9 +164,12 @@ async def salvar_marca(request: Request, usuario: Usuario = Depends(exige("confi
     arquivo = form.get("logo")
     novo_logo = await arquivo.read() if arquivo is not None and getattr(arquivo, "filename", "") else None
     campos = ("nome", "curto", "artigo", "site", "descricao", "dominio_email", "cor", "cor_detalhe", "cor_fundo", "fonte")
+    antes = _marca_no_registro(db, ar)
     problemas = marca.salvar(db, ar, {c: str(form.get(c) or "") for c in campos if c in form}, novo_logo,
                              tirar_logo=form.get("tirar_logo") == "1")
-    registrar_log(db, usuario, "salvou_marca", "tenant", ar, "; ".join(problemas)[:250], request)
+    db.flush()
+    registrar_log(db, usuario, "salvou_marca", "tenant", ar, "; ".join(problemas)[:250], request, modulo="Marca",
+                  mudancas=diferencas(antes, _marca_no_registro(db, ar)))
     db.commit()
     marca.esquecer(ar)
     for problema in problemas:
@@ -176,13 +197,17 @@ def logo_da_marca(ar: int, assinatura: str, db: Session = Depends(obter_db)):
 async def salvar_geral(request: Request, usuario: Usuario = Depends(exige("configuracoes.alterar")), db: Session = Depends(obter_db)):
     form = await request.form()
     master = autorizacao.e_master(usuario)
+    alteraveis = [c for c, _, _ in CAMPOS_GERAIS
+                  if c in form and (master or (c in CHAVES_DA_AR and c not in CHAVES_SO_MASTER))]
+    antes = {c: ler_config(db, c) for c in alteraveis}  # registro de atividades: o antes e o depois
     for chave, _, tipo in CAMPOS_GERAIS:
         if chave in form and (master or (chave in CHAVES_DA_AR and chave not in CHAVES_SO_MASTER)):  # da plataforma: master
             valor = str(form.get(chave)).strip()
             if tipo == "numero":
                 valor = str(util.para_float(valor)).removesuffix(".0")
             gravar_config(db, chave, valor)
-    registrar_log(db, usuario, "salvou_configuracoes", "configuracao", None, request=request)
+    registrar_log(db, usuario, "salvou_configuracoes", "configuracao", None, request=request,
+                  mudancas=diferencas(antes, {c: ler_config(db, c) for c in alteraveis}))
     db.commit()
     avisar(request, "Configurações salvas.")
     return voltar("/configuracoes")
@@ -191,11 +216,13 @@ async def salvar_geral(request: Request, usuario: Usuario = Depends(exige("confi
 @rotas.post("/configuracoes/score", dependencies=[Depends(verificar_csrf)])
 async def salvar_score(request: Request, usuario: Usuario = Depends(exige("configuracoes.alterar")), db: Session = Depends(obter_db)):
     form = await request.form()
+    antes = {c: ler_config(db, c) for c in ("score_pesos", "score_faixas")}
     gravar_config(db, "score_pesos", {c: int(util.para_float(form.get(f"peso_{c}", p))) for c, _, p in score.CRITERIOS})
     gravar_config(db, "score_faixas", {k: int(util.para_float(form.get(f"faixa_{k}", v))) for k, v in score.FAIXAS_PADRAO.items()})
     db.flush()
     total = score.recalcular_todos(db)
-    registrar_log(db, usuario, "alterou_score", "configuracao", None, request=request)
+    registrar_log(db, usuario, "alterou_score", "configuracao", None, request=request,
+                  mudancas=diferencas(antes, {c: ler_config(db, c) for c in ("score_pesos", "score_faixas")}))
     db.commit()
     avisar(request, f"Pesos salvos e score recalculado em {total} leads.")
     return voltar("/configuracoes?aba=score")
@@ -337,6 +364,7 @@ def salvar_usuario(request: Request, uid: int, nome: str = Form(...), email: str
     u = Usuario() if uid == 0 else db.get(Usuario, uid)
     if u is None:
         raise HTTPException(404)
+    antes = _cadastro_no_registro(u) if uid else {}  # registro de atividades: o antes e o depois
     email = email.strip().lower()
     # "perfil" no formulário = código do papel (os 5 do sistema têm o código do perfil; os criados, "p_...")
     papel = db.execute(select(Papel).where(Papel.codigo == perfil)).scalars().first()
@@ -394,7 +422,8 @@ def salvar_usuario(request: Request, uid: int, nome: str = Form(...), email: str
     if uid == 0:
         db.add(u)
     db.flush()
-    registrar_log(db, usuario, "salvou_usuario", "usuario", u.id, f"{u.email} ({papel.nome})", request)
+    registrar_log(db, usuario, "salvou_usuario", "usuario", u.id, f"{u.email} ({papel.nome})", request,
+                  mudancas=diferencas(antes, _cadastro_no_registro(u)))
     db.commit()
     avisar(request, "Usuário salvo." + (" Envie a senha para a pessoa por um canal seguro." if uid == 0 else ""))
     return voltar(destino)

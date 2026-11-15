@@ -10,9 +10,9 @@ from sqlalchemy.orm import Session
 
 from .. import autorizacao, util
 from ..autorizacao import CATALOGO, ESCOPOS, MODULOS, POR_CODIGO
-from ..banco import gravar_config, obter_db
+from ..banco import gravar_config, ler_config, obter_db
 from ..modelos import Equipe, ExcecaoPermissao, Papel, PermissaoPapel, Usuario
-from ..seguranca import exige, registrar_log, verificar_csrf
+from ..seguranca import diferencas, exige, registrar_log, verificar_csrf
 from ..web import avisar, tela, voltar
 
 rotas = APIRouter()
@@ -281,13 +281,15 @@ async def salvar_modulos(request: Request, usuario: Usuario = Depends(GERENCIAR)
         return voltar(DESTINO)
     form = await request.form()
     ligados = []
+    antes = {nome: "ligado" if ler_config(db, chave) == "1" else "desligado" for nome, chave in MODULOS.values()}
     for codigo, (nome, chave) in MODULOS.items():
         ligado = form.get(f"m__{codigo}") == "on"
         gravar_config(db, chave, "1" if ligado else "0")
         if ligado:
             ligados.append(nome)
+    depois = {nome: "ligado" if nome in ligados else "desligado" for nome, _ in MODULOS.values()}
     registrar_log(db, usuario, "salvou_modulos", "configuracao", None, "ligados: " + (", ".join(ligados) or "nenhum"),
-                  request)
+                  request, modulo="Módulos", mudancas=diferencas(antes, depois))
     db.commit()
     avisar(request, "Módulos salvos. O que foi desligado some do menu e fica bloqueado para todos.")
     return voltar(f"{DESTINO}?aba=modulos")

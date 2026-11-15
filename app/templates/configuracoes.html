@@ -349,9 +349,10 @@ document.getElementById('form-lista')?.addEventListener('submit', ev => {
 
 {% elif aba == 'logs' %}
 <div class="cartao" style="padding:0"><div class="tabela-rolagem"><table>
-  <tr><th>Quando</th><th>Usuário</th><th>Ação</th><th>Registro</th><th>Detalhes</th><th>IP</th></tr>
-  {% for l in logs %}<tr><td class="nowrap">{{ l.criado_em|datahora }}</td><td>{{ l.usuario_nome }}</td><td>{{ l.acao }}</td><td>{{ l.entidade }}{{ ' #' ~ l.entidade_id if l.entidade_id }}</td><td class="pequeno">{{ l.detalhes }}</td><td class="pequeno">{{ l.ip }}</td></tr>
-  {% else %}<tr><td colspan="6" class="vazio">Sem registros.</td></tr>{% endfor %}
+  <tr><th>Quando</th><th>Usuário</th><th>Módulo</th><th>Ação</th><th>Registro</th><th>Detalhes</th><th>IP</th></tr>
+  {% for l in logs %}<tr><td class="nowrap">{{ l.criado_em|datahora }}</td><td>{{ l.usuario_nome }}</td><td>{{ l.modulo }}</td><td>{{ l.acao }}</td><td>{{ l.entidade }}{{ ' #' ~ l.entidade_id if l.entidade_id }}</td>
+    <td class="pequeno">{{ l.detalhes }}{% for campo, antes, depois in l.mudancas|mudancas %}<div><b>{{ campo }}</b>: {{ antes or '(vazio)' }} → {{ depois or '(vazio)' }}</div>{% endfor %}</td><td class="pequeno">{{ l.ip }}</td></tr>
+  {% else %}<tr><td colspan="7" class="vazio">Sem registros.</td></tr>{% endfor %}
 </table></div></div>
 {% endif %}
 {% endblock %}

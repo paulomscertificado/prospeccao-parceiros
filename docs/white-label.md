@@ -238,7 +238,10 @@ nada de cobrança ou valores"); os limites de hoje (por número, por dia e por A
 (`seguranca.PRAZO_ENTRADA_SEG`, `_prazo_da_entrada`; a faixa mostra até quando; depois fecha o `acessos_master` e
 volta para a plataforma); limite de pedidos também por pessoa (240 por minuto) e por AR (1.200), além do IP
 (`limite_pessoa`, `limite_ar`; a AR vai na sessão); registro de atividades com e-mail e telefone mascarados
-(`util.mascarar_contatos` em `registrar_log`; só inclusão, nada no sistema apaga); prazo de guarda da cópia das
+(`util.mascarar_contatos` em `registrar_log`; só inclusão, nada no sistema apaga) e, desde 15/11/2026, com o
+módulo (`LogAuditoria.modulo`, pelo tipo de registro: `seguranca.MODULOS_DO_REGISTRO`) e o "antes e depois" das
+mudanças (`LogAuditoria.mudancas`, JSON; `seguranca.diferencas`) nas Configurações > Geral e Score, no cadastro das
+pessoas, na Marca e nos módulos (teste `testes/test_registro_mudancas.py`); prazo de guarda da cópia das
 conversas (`guarda_conversas_meses`, 0 = sem prazo, só o master muda; `leads_servico.apagar_conversas_antigas` na
 rotina de hora em hora, 5.000 por vez). Decisões: a cópia continua com TODAS as conversas (a tela Conversas é a caixa
 de entrada da equipe; só 625 das 178 mil mensagens eram de leads, clientes ou parceiros) e o prazo é de 12 meses (na

@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from .. import autorizacao
 from ..banco import agora, gravar_config, ler_config, obter_db, usar_config_da_ar
 from ..modelos import AcessoMaster, Campanha, ConexaoWhatsApp, Lead, Tenant, Usuario
-from ..seguranca import PRAZO_ENTRADA_SEG, exige, fechar_entradas, registrar_log, verificar_csrf
+from ..seguranca import PRAZO_ENTRADA_SEG, diferencas, exige, fechar_entradas, registrar_log, verificar_csrf
 from ..web import avisar, tela, voltar
 
 rotas = APIRouter()
@@ -152,13 +152,17 @@ async def modulos_da_ar(request: Request, tid: int, usuario: Usuario = Depends(P
     anterior = db.info.pop("ar_config", None)
     usar_config_da_ar(db, ar.id)
     ligados = []
+    antes = {nome: "ligado" if ler_config(db, chave) == "1" else "desligado"
+             for nome, chave in autorizacao.MODULOS.values()}
     for codigo, (nome, chave) in autorizacao.MODULOS.items():
         ligado = form.get(f"m__{codigo}") == "on"
         gravar_config(db, chave, "1" if ligado else "0")
         if ligado:
             ligados.append(nome)
     usar_config_da_ar(db, anterior)
-    registrar_log(db, usuario, "salvou_modulos_da_ar", "tenant", ar.id, ", ".join(ligados)[:200], request)
+    depois = {nome: "ligado" if nome in ligados else "desligado" for nome, _ in autorizacao.MODULOS.values()}
+    registrar_log(db, usuario, "salvou_modulos_da_ar", "tenant", ar.id, ", ".join(ligados)[:200], request,
+                  modulo="Módulos", mudancas=diferencas(antes, depois))
     db.commit()
     avisar(request, f"Módulos da {ar.nome} salvos.")
     return voltar("/master")

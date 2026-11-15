@@ -26,6 +26,19 @@ f["insta"] = util.link_instagram
 f["whats"] = util.link_whatsapp
 f["json"] = lambda v: Markup(json.dumps(v, ensure_ascii=False, default=str).replace("</", "<\\/"))
 f["primeiro_nome"] = util.primeiro_nome
+
+
+def _lista_de_mudancas(texto: str) -> list:
+    """O "antes e depois" do registro de atividades (JSON {campo: [antes, depois]}) para a tela."""
+    if not texto:
+        return []
+    try:
+        return [(campo, antes, depois) for campo, (antes, depois) in json.loads(texto).items()]
+    except (ValueError, TypeError):
+        return []
+
+
+f["mudancas"] = _lista_de_mudancas
 modelos_html.env.globals.update(config=config, CANAIS=config.CANAIS, PERFIS=config.PERFIS)
 
 # Cada item aparece só para quem tem a permissão (e com o módulo ligado). A proteção de verdade é a da rota.
