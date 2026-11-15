@@ -16,7 +16,8 @@
     ("equipes", "Equipes", "/permissoes?aba=equipes", pode_permissoes),
     ("modulos", "Módulos", "/permissoes?aba=modulos", pode_permissoes and usuario.master)]),
   ("Comunicação", [
-    ("email", "E-mail", "/configuracoes?aba=email", true),
+    ("contas_email", "Contas de e-mail", "/email", pode('email.ver')),
+    ("email", "Domínio do e-mail", "/configuracoes?aba=email", true),
     ("whatsapp", "WhatsApp", "/whatsapp", pode('whatsapp.ver'))]),
   ("Dados e IA", [
     ("integracoes", "Integrações", "/configuracoes?aba=integracoes", true),

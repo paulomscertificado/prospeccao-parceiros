@@ -545,7 +545,7 @@ digitar o apelido e SIM. A AR MS nunca é apagada por ele.
 
 Em **Configurações**, um menu à esquerda separa tudo por assunto (no celular, é uma faixa que rola para o lado):
 **Empresa** (Geral, Marca, Score dos leads), **Pessoas e acesso** (Usuários, Papéis e permissões, Exceções por pessoa,
-Equipes e, para o admin master, Módulos), **Comunicação** (E-mail e WhatsApp), **Dados e IA** (Integrações, LGPD e dados,
+Equipes e, para o admin master, Módulos), **Comunicação** (Contas de e-mail, Domínio do e-mail e WhatsApp), **Dados e IA** (Integrações, LGPD e dados,
 Categorias de parceiros, Base de conhecimento da IA) e **Segurança** (Registro de atividades).
 
 **Usuários separados por marca:** cada marca tem o seu quadro com as pessoas dela (nome e e-mail, papel, equipe,
@@ -591,7 +591,7 @@ sua linha em Configurações > Usuários: no próximo login você lê um QR code
 acesso: `redefinir_senha.bat` (escolha "sistema na internet") cria uma senha nova e desliga o código do celular.
 
 **Regra da MS: cada usuário tem o seu disparo** (pedido da Maria em 13/11/2026). Os disparos de uma pessoa nunca
-saem pelo WhatsApp ou pelo e-mail de outra pessoa: o **e-mail** sai só pelo do cadastro dela (tela **E-mail**); o
+saem pelo WhatsApp ou pelo e-mail de outra pessoa: o **e-mail** sai só pelo do cadastro dela (**Contas de e-mail**); o
 **WhatsApp**, pelo número dela ou por um que outra pessoa **compartilhou** com ela. Ser administrador não muda isso.
 Sem e-mail ou número, os disparos dela esperam e ela recebe um aviso para cadastrar.
 
@@ -605,7 +605,8 @@ pessoas. O dono do número, o administrador e o gestor escolhem com quem compart
 conectam, pausam ou desligam. Quem não é o dono não pode se incluir, não pode liberar para toda a equipe e não mexe no
 número (ou no e-mail) de um administrador: isso só o dono ou o admin master.
 
-**Cada pessoa com o seu e-mail:** no menu **E-mail**, cada um pode cadastrar o próprio e-mail @mscertificados.com.br
+**Cada pessoa com o seu e-mail:** em **Contas de e-mail** (Configurações > Comunicação, ou o item **E-mail** do menu
+lateral para quem não vê as Configurações), cada um pode cadastrar o próprio e-mail @mscertificados.com.br
 (com a senha de app do Google, 16 letras) e clicar em **Enviar e-mail de teste**. Os e-mails das campanhas dos leads
 de cada pessoa saem pelo e-mail dela, e as respostas chegam na caixa dela (a IA SDR lê todas as caixas marcadas).
 Sem e-mail próprio cadastrado, os e-mails dos leads dela **esperam** (não saem por uma conta compartilhada nem pelo
@@ -613,7 +614,7 @@ Sem e-mail próprio cadastrado, os e-mails dos leads dela **esperam** (não saem
 valendo para a MS inteira.
 
 **Gestor com o domínio da própria empresa:** o gestor (e o administrador) pode cadastrar um e-mail de outro domínio,
-por exemplo joao@contabiljoao.com.br. No menu **E-mail**:
+por exemplo joao@contabiljoao.com.br. Em **Contas de e-mail**:
 1. Em **Onde fica este e-mail?**, escolha **Google Workspace** ou **Outro provedor** (Microsoft 365, Hostinger,
    Locaweb, servidor próprio...).
 2. Outro provedor: copie do painel do provedor o **servidor de envio (SMTP)** e a porta (quase sempre 587 ou 465) e

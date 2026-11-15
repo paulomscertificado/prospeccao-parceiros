@@ -53,7 +53,7 @@ PERMISSAO_DO_MENU = {
     "/portal": "portal.usar", "/portal/indicar": "portal.usar", "/portal/clientes": "portal.usar",
     "/portal/vencimentos": "portal.usar",
 }
-DENTRO_DAS_CONFIGURACOES = {"/permissoes", "/whatsapp"}  # no menu lateral só para quem não vê as Configurações
+DENTRO_DAS_CONFIGURACOES = {"/permissoes", "/whatsapp", "/email"}  # no menu lateral só para quem não vê as Configurações
 MENU_EQUIPE = [
     ("/", "Dashboard", "grafico"),
     ("/campanhas", "IA SDR (campanhas)", "megafone"),
@@ -135,7 +135,7 @@ def tela(request: Request, nome: str, contexto: dict | None = None, status_code:
         "wl": wl,
         "csrf": token_csrf(request),
         "avisos": request.session.pop("avisos", []),
-        # Permissões e WhatsApp ficam dentro de Configurações; no menu lateral só para quem não vê as Configurações
+        # Permissões, WhatsApp e E-mail ficam dentro de Configurações; no menu lateral só para quem não vê as Configurações
         "menu": [m for m in menu if PERMISSAO_DO_MENU[m[0]] in permissoes
                  and not (m[0] in DENTRO_DAS_CONFIGURACOES and "configuracoes.ver" in permissoes)] if usuario else [],
         # nas telas: {% if pode('leads.atribuir') %} (só esconde o botão; a rota confere de novo)

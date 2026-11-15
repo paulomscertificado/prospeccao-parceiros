@@ -51,7 +51,7 @@ def tela_email(request: Request, usuario: Usuario = Depends(exige("email.ver")),
     dominio = contas_email.dominio_da_equipe(db, usuario)  # o da marca da AR (white label, Fase 5)
     dns = (dns_email.verificar(dominio_minha) if dominio_minha and dominio_minha != config.EMAIL_DOMINIO.lower()
            else None)  # o domínio do e-mail principal é conferido em Configurações > E-mail
-    return tela(request, "email_contas.html", {"contas": contas, "equipe": equipe_, "dominio": dominio or "suaempresa.com.br",
+    return tela(request, "email_contas.html", {"secao": "contas_email", "contas": contas, "equipe": equipe_, "dominio": dominio or "suaempresa.com.br",
                                                "quem_fala": marca.da_pessoa(usuario, db=db),
                                                "minha": minha, "por_onde": por_onde, "dns": dns,
                                                "dominio_minha": dominio_minha,

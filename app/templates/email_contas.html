@@ -1,6 +1,6 @@
-{% extends "base.html" %}
+{% extends "_configuracoes.html" %}
 {% block titulo %}E-mail{% endblock %}
-{% block conteudo %}
+{% block config %}
 <style>
   .contas { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
   .conta { margin: 0; display: flex; flex-direction: column; gap: 10px; }
@@ -19,7 +19,7 @@
   @media (max-width: 420px) { .contas { grid-template-columns: 1fr; } }
 </style>
 {% set icone %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM22 6l-10 7L2 6"/></svg>{% endset %}
-<div class="cabecalho"><div><h1>E-mail</h1><div class="suave">Cada pessoa pode cadastrar o próprio e-mail @{{ dominio }} para as campanhas{% if pode('email.outro_dominio') %} (você também pode usar o e-mail do domínio da sua empresa, com o servidor de e-mail dela){% endif %}. As respostas dos leads chegam na caixa de quem enviou.</div></div></div>
+<div class="cartao"><h2 class="subtitulo-config">Contas de e-mail</h2><p class="suave" style="margin:0">Cada pessoa pode cadastrar o próprio e-mail @{{ dominio }} para as campanhas{% if pode('email.outro_dominio') %} (você também pode usar o e-mail do domínio da sua empresa, com o servidor de e-mail dela){% endif %}. As respostas dos leads chegam na caixa de quem enviou.</p></div>
 
 {% if por_onde %}<div class="aviso aviso-info">Os e-mails das campanhas dos seus leads saem por <b>{{ por_onde }}</b>.</div>{% endif %}
 

@@ -57,7 +57,7 @@
       <input id="m-site" type="text" name="site" maxlength="120" value="{{ l.site if l }}" placeholder="suaempresa.com.br"></div>
     <div class="campo"><label for="m-dominio">Domínio do e-mail da equipe</label>
       <input id="m-dominio" type="text" name="dominio_email" maxlength="120" value="{{ l.dominio_email if l }}" placeholder="suaempresa.com.br">
-      <p class="ajuda">Cada pessoa cadastra o e-mail @este domínio na tela E-mail.</p></div>
+      <p class="ajuda">Cada pessoa cadastra o e-mail @este domínio em Contas de e-mail.</p></div>
   </div>
   <h3>Cores e fonte</h3>
   <div class="grade-3">
@@ -217,8 +217,8 @@
 
 {% elif aba == 'email' %}
 {% if not marca.plataforma %}
-<div class="cartao" style="max-width:760px"><h2>E-mail da equipe</h2>
-  <p>Cada pessoa cadastra o próprio e-mail na tela <a href="/email">E-mail</a>: os disparos dela saem só por ele (regra do sistema).</p>
+<div class="cartao" style="max-width:760px"><h2>Domínio do e-mail</h2>
+  <p>Cada pessoa cadastra o próprio e-mail em <a href="/email">Contas de e-mail</a>: os disparos dela saem só por ele (regra do sistema).</p>
   {% if marca.dominio_email %}<p>Os e-mails da equipe são do domínio <b>@{{ marca.dominio_email }}</b> (aba <a href="?aba=marca">Marca</a>).</p>
   {% else %}<p class="aviso aviso-alerta">Falta informar o domínio de e-mail da sua empresa na aba <a href="?aba=marca">Marca</a>.</p>{% endif %}
 </div>
@@ -227,7 +227,7 @@
 <form class="cartao" method="post" action="/configuracoes/email">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <h2>E-mail de envio das campanhas</h2>
-  <p class="pequeno suave">Este é o e-mail <b>principal da plataforma</b>. Cada pessoa também pode cadastrar o próprio e-mail, e você escolhe com quem cada conta é compartilhada na tela <a href="/email">E-mail</a>.</p>
+  <p class="pequeno suave">Este é o e-mail <b>principal da plataforma</b>. Cada pessoa também pode cadastrar o próprio e-mail, e você escolhe com quem cada conta é compartilhada na tela <a href="/email">Contas de e-mail</a>.</p>
   <p class="suave">As campanhas saem deste e-mail. Ele precisa ser do domínio <b>@{{ email.dominio }}</b>.</p>
   <div class="campo"><label for="e-end">E-mail de envio</label><input id="e-end" type="email" name="endereco" value="{{ email.endereco }}" placeholder="parcerias@{{ email.dominio }}" required></div>
   <div class="campo"><label for="e-login">Conta que faz o login no Google (opcional)</label><input id="e-login" type="email" name="usuario_login" value="{{ email.usuario_login }}" placeholder="vazio = o próprio e-mail de envio">

@@ -47,7 +47,7 @@
       <span class="rotulo-marca">Parceiros<br>Prospecção B2B</span></div>
     {% for link, nome, icone in menu %}
       <a class="item {{ 'ativo' if (caminho == link or (link not in ['/', '/portal'] and caminho.startswith(link))
-            or (link == '/configuracoes' and caminho.startswith(('/permissoes', '/categorias', '/conhecimento', '/whatsapp')))) }}" href="{{ link }}">
+            or (link == '/configuracoes' and caminho.startswith(('/permissoes', '/categorias', '/conhecimento', '/whatsapp', '/email')))) }}" href="{{ link }}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ ICONES[icone] }}"/></svg>{{ nome }}{% if link == '/oportunidades' and avisos_novos %}<span class="contador">{{ avisos_novos }}</span>{% endif %}{% if link == '/whatsapp' %}<span class="ponto {{ 'verde' if wl.conectado else ('amarelo' if wl.disponivel else 'vermelho') }}" style="margin-left:auto" title="WhatsApp {{ 'conectado' if wl.conectado else ('aguardando QR code' if wl.estado_codigo == 'aguardando_qr' else ('desconectado' if wl.disponivel else 'desligado')) }}"></span>{% endif %}</a>
     {% endfor %}
     <div class="rodape">

@@ -90,7 +90,7 @@ def enviar(para: str, assunto: str, corpo: str, responder_para: str = "", com_ro
     c = contas_email.credenciais(conta)
     if not principal:
         if not c.host or not c.endereco or not c.senha:
-            raise ErroEmail(f"A conta {c.rotulo} está incompleta: falta a senha de app (tela E-mail).")
+            raise ErroEmail(f"A conta {c.rotulo} está incompleta: falta a senha de app (Contas de e-mail).")
         if not contas_email.dominio_ok(conta, c.endereco):  # o domínio da AR do dono (white label, Fase 5)
             raise ErroEmail(f"O remetente precisa ser um e-mail do domínio da empresa (está {c.endereco}). "
                             "Outro domínio só para quem tem a permissão \"Enviar pelo próprio domínio\".")
@@ -125,7 +125,7 @@ def enviar(para: str, assunto: str, corpo: str, responder_para: str = "", com_ro
                                    disposition="inline")
     usuario = c.login or remetente
     google = "gmail" in c.host or "google" in c.host
-    onde = "Configurações > E-mail" if principal else "a tela E-mail"
+    onde = "Configurações > Domínio do e-mail" if principal else "Contas de e-mail"
     try:
         logado = False
         if c.porta == 465:

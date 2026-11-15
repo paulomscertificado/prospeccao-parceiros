@@ -178,11 +178,11 @@ def para_enviar(db, quem: Usuario | None) -> ContaEmail:
     if proprio is not None:
         if proprio.ativa:
             return proprio
-        raise SemConta(f"O e-mail de {quem.nome} está pausado na tela E-mail: os disparos dele esperam até ligar de "
+        raise SemConta(f"O e-mail de {quem.nome} está pausado em Contas de e-mail: os disparos dele esperam até ligar de "
                        "novo (pela regra do sistema, os disparos de cada pessoa saem só pelo e-mail dela).")
     if principal.dono_id == quem.id:
         return principal
-    raise SemConta(f"{quem.nome} não tem e-mail próprio cadastrado: cadastre o seu na tela E-mail. Pela regra do sistema, "
+    raise SemConta(f"{quem.nome} não tem e-mail próprio cadastrado: cadastre o seu em Contas de e-mail. Pela regra do sistema, "
                    "os disparos de cada pessoa saem só pelo e-mail dela (não por um compartilhado nem pelo principal).")
 
 
