@@ -374,6 +374,9 @@ def vencimento_status(request: Request, cid: int, status: str = Form(...), usuar
 async def vencimentos_importar(request: Request, arquivo: UploadFile = File(...), usuario: Usuario = Depends(exige("vencimentos.importar")),
                                db: Session = Depends(obter_db)):
     conteudo = await arquivo.read()
+    if len(conteudo) > 10 * 1024 * 1024:  # plano de segurança: todo envio de arquivo tem limite de tamanho
+        avisar(request, "Arquivo grande demais (máximo 10 MB). Divida em partes.", "erro")
+        return voltar("/vencimentos")
     try:
         linhas = planilhas.ler_linhas(arquivo.filename, conteudo)
     except planilhas.ErroPlanilha as erro:

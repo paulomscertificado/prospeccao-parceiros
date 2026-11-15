@@ -85,6 +85,8 @@ Geral > "Mostrar Vendas, Vencimentos e Comissões" = 1 > Salvar.
 - Depois que alguém da equipe assume o lead, e nas mensagens de parceiros, a IA não responde nem muda a etapa:
   só avisa quem cuida.
 - Se a pessoa pedir para sair, clique em **Pediu para sair / Registrar opt-out**: ela nunca mais entra em campanha.
+  Quem responde **SAIR no WhatsApp** sai das campanhas de **todas as marcas** (o WhatsApp Leads bloqueia o número
+  para todos); o descadastro pelo link do e-mail vale para a marca que mandou.
 - Cada lead guarda **de onde veio** (fonte) e a **base legal**. Pedido de exclusão: ficha do lead → **Excluir dados (LGPD)**.
 - O sistema **não inventa dados**: se a fonte não traz telefone ou e-mail, o lead fica sem.
 - **Cópia das conversas do WhatsApp (tela Conversas):** guarda todas as conversas dos números conectados, por um

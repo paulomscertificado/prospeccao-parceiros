@@ -248,3 +248,8 @@ publicação saíram 8.548 mensagens de 01/04/2025 a 14/11/2025, todas da AR MS:
 reserva de 60 dias continua valendo entre as pessoas de uma mesma AR; o nome escolhido de um contato na tela
 Conversas é um por telefone: a segunda AR não troca nem vê o da primeira, `conversas._de_outra_ar`); a chave da
 CNPJá continua da plataforma (sem preferência; rever com os planos); o caio barreto continua administrador da AR MS.
+Por causa disso (15/11/2026): cada resposta é da AR que recebeu. WhatsApp: o lead da AR do número que recebeu
+(`sdr.ar_da_conexao`, `lead_pelo_telefone(..., ar)`); e-mail: o lead do e-mail nosso respondido, senão o da AR da
+caixa que recebeu (`rotinas.lead_da_resposta`). O SAIR no WhatsApp vale para TODAS as ARs (`leads_pelo_telefone`): o
+WhatsApp Leads é um só e a lista de bloqueio dele não diz qual número recebeu o pedido. Descadastro por e-mail
+continua por lead (AR). Teste: `testes/test_respostas_por_ar.py`.

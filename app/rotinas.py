@@ -192,15 +192,27 @@ class _EmailsDeLeads:
         return self._sabidos[email]
 
 
+def lead_da_resposta(db, conta, item: dict, enviados: dict) -> Lead | None:
+    """O lead de uma resposta por e-mail. Primeiro o do e-mail nosso que ela responde (In-Reply-To/References: vale
+    também para um colega do lead que responde de outro endereço); senão, o lead com esse e-mail na AR da caixa que
+    recebeu (white label: duas ARs podem chamar a mesma empresa e cada resposta é da AR que recebeu)."""
+    lead_id = next((enviados[i] for i in item.get("responde_a", []) if i in enviados), None)
+    lead = db.get(Lead, lead_id) if lead_id else None
+    if lead is not None:
+        return lead
+    consulta = select(Lead).where(Lead.chave_email == item["de"])
+    ar = getattr(conta, "tenant_id", None)
+    if ar:
+        consulta = consulta.where(Lead.tenant_id == ar)
+    return db.execute(consulta.limit(1)).scalars().first()
+
+
 def _ler_caixa(conta, emails, enviados: dict, ja_processados: set[str], desde) -> int:
     total = 0
     for item in email_imap.ler_respostas(emails, set(enviados), ja_processados, desde, conta=conta):
         ja_processados.add(item["message_id"])  # o mesmo e-mail em duas caixas é tratado uma vez só
         with sessao() as db:
-            lead = db.execute(select(Lead).where(Lead.chave_email == item["de"])).scalars().first()
-            if lead is None:
-                lead_id = next((enviados[i] for i in item["responde_a"] if i in enviados), None)
-                lead = db.get(Lead, lead_id) if lead_id else None
+            lead = lead_da_resposta(db, conta, item, enviados)
             if not lead:
                 continue
             from . import email_validacao

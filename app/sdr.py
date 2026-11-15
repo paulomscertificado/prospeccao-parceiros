@@ -834,12 +834,33 @@ def variantes_do_telefone(telefone: str) -> set[str]:
     return candidatos
 
 
-def lead_pelo_telefone(db, telefone: str) -> Lead | None:
+def leads_pelo_telefone(db, telefone: str, ar: int | None = None, limite: int | None = None) -> list[Lead]:
+    """Os leads com este telefone (WhatsApp ou fixo). `ar`: só os daquela AR (white label: duas ARs podem chamar a
+    mesma empresa, decisão de 14/11/2026, e cada resposta é da AR que recebeu)."""
     candidatos = variantes_do_telefone(telefone)
     if not candidatos:
+        return []
+    consulta = select(Lead).where(Lead.chave_whatsapp.in_(candidatos) | Lead.chave_telefone.in_(candidatos))
+    if ar:
+        consulta = consulta.where(Lead.tenant_id == ar)
+    if limite:
+        consulta = consulta.limit(limite)
+    return list(db.execute(consulta).scalars())
+
+
+def lead_pelo_telefone(db, telefone: str, ar: int | None = None) -> Lead | None:
+    achados = leads_pelo_telefone(db, telefone, ar, limite=1)
+    return achados[0] if achados else None
+
+
+def ar_da_conexao(db, conexao: str | None) -> int | None:
+    """A AR do número do WhatsApp Leads que recebeu a mensagem (vazio: não se sabe)."""
+    if not conexao:
         return None
-    return db.execute(select(Lead).where(Lead.chave_whatsapp.in_(candidatos) | Lead.chave_telefone.in_(candidatos))
-                      .limit(1)).scalars().first()
+    from .modelos import ConexaoWhatsApp
+
+    return db.execute(select(ConexaoWhatsApp.tenant_id).where(ConexaoWhatsApp.id == conexao)
+                      .execution_options(sem_filtro_de_ar=True)).scalar()
 
 
 def aplicar_novidades_whatsapp(db, dados: dict) -> dict:
@@ -848,8 +869,13 @@ def aplicar_novidades_whatsapp(db, dados: dict) -> dict:
 
     resultado = {"respostas": 0, "status": 0, "opt_out": 0}
 
-    def lead_do_telefone(telefone: str) -> Lead | None:
-        return lead_pelo_telefone(db, telefone)
+    ars_das_conexoes: dict = {}
+
+    def lead_do_telefone(telefone: str, conexao: str | None = None) -> Lead | None:
+        """O lead da AR do número que recebeu a mensagem (número sem AR conhecida: o primeiro que achar)."""
+        if conexao not in ars_das_conexoes:
+            ars_das_conexoes[conexao] = ar_da_conexao(db, conexao)
+        return lead_pelo_telefone(db, telefone, ars_das_conexoes[conexao])
 
     situacao = {"enviada": "enviada", "erro": "falhou", "cancelada": "falhou"}
     # Status dos envios: UMA consulta, só com o que muda (antes era uma por envio, com a mensagem inteira, a cada
@@ -865,14 +891,16 @@ def aplicar_novidades_whatsapp(db, dados: dict) -> dict:
                            .values(status=novo, erro=str(envio.get("erro") or "")[:500]))
                 resultado["status"] += 1
     for telefone in dados.get("bloqueados", []):
-        lead = lead_do_telefone(telefone)
-        if lead and not lead.opt_out:
-            registrar_opt_out(db, lead, None, "respondeu SAIR no WhatsApp")
-            resultado["opt_out"] += 1
+        # SAIR no WhatsApp vale para todas as ARs: o WhatsApp Leads é um só e já bloqueia o número para todos os
+        # números conectados (a lista de bloqueio dele não diz qual número recebeu o SAIR)
+        for lead in leads_pelo_telefone(db, telefone):
+            if not lead.opt_out:
+                registrar_opt_out(db, lead, None, "respondeu SAIR no WhatsApp")
+                resultado["opt_out"] += 1
     from .banco import usar_config_da_ar
 
     for recebida in dados.get("recebidas", []):
-        lead = lead_do_telefone(recebida["telefone"])
+        lead = lead_do_telefone(recebida["telefone"], recebida.get("conexao"))
         if lead is None or not recebida.get("texto"):
             continue
         usar_config_da_ar(db, lead.tenant_id)  # white label: a resposta segue as configurações da AR do lead
