@@ -10,7 +10,7 @@ from .. import (alertas, autorizacao, base_receita, bases_importadas, config, ia
                relogio, score, util)
 from ..banco import CHAVES_DA_AR, CHAVES_SO_MASTER, gravar_config, ler_config, ler_config_json, obter_db
 from ..integracoes import dns_email, email_imap, email_smtp, whatsapp_cloud, whatsapp_leads
-from ..modelos import Equipe, Lead, LogAuditoria, MarcaAR, Papel, Parceiro, Usuario
+from ..modelos import Equipe, Lead, LogAuditoria, MarcaAR, Papel, Parceiro, Tenant, Usuario
 from ..seguranca import diferencas, exige, problema_na_senha, registrar_log, resumir_senha, verificar_csrf
 from ..web import avisar, tela, voltar
 
@@ -92,6 +92,30 @@ def _papeis(db: Session) -> list[Papel]:
     return sorted(db.execute(select(Papel)).scalars(), key=lambda p: (ordem.get(p.codigo, 9), p.nome))
 
 
+def _grupos_de_usuarios(db: Session, request: Request, usuario: Usuario) -> list[dict]:
+    """Configurações > Usuários separados por marca (AR). O Admin Master fora das ARs vê todas (e a plataforma, onde fica
+    ele); quem é de uma AR (e o master dentro dela) vê só a sua. Equipes, parceiros e papéis de cada quadro são os
+    daquela AR (ou os da plataforma)."""
+    pessoas = db.execute(select(Usuario).order_by(Usuario.ativo.desc(), Usuario.nome)).scalars().all()
+    equipes = db.execute(select(Equipe).order_by(Equipe.nome)).scalars().all()
+    parceiros = db.execute(select(Parceiro).order_by(Parceiro.escritorio)).scalars().all()
+    papeis = _papeis(db)
+    ar_tela = marca.ar_da_tela(request, usuario)
+    consulta = select(Tenant.id, Tenant.nome).order_by(Tenant.id)
+    ars = db.execute(consulta.where(Tenant.id == ar_tela) if ar_tela else consulta).all()
+    grupos = [{"ar": ar, "nome": nome, "pode_criar": True,
+               "pessoas": [u for u in pessoas if u.tenant_id == ar],
+               "equipes": [e for e in equipes if e.tenant_id in (ar, None)],
+               "parceiros": [p for p in parceiros if p.tenant_id == ar],
+               "papeis": [p for p in papeis if p.tenant_id in (ar, None)]} for ar, nome in ars]
+    da_plataforma = [u for u in pessoas if u.tenant_id is None] if not ar_tela else []
+    if da_plataforma:
+        grupos.append({"ar": None, "nome": "Plataforma", "pode_criar": False, "pessoas": da_plataforma,
+                       "equipes": [e for e in equipes if e.tenant_id is None], "parceiros": [],
+                       "papeis": [p for p in papeis if p.tenant_id is None]})
+    return grupos
+
+
 @rotas.get("/configuracoes")
 def configuracoes(request: Request, aba: str = "geral", usuario: Usuario = Depends(exige("configuracoes.ver")), db: Session = Depends(obter_db)):
     wl = whatsapp_leads.status(False)  # uma consulta só (antes eram duas a cada abertura da tela)
@@ -99,7 +123,9 @@ def configuracoes(request: Request, aba: str = "geral", usuario: Usuario = Depen
     dominio_dns = (marca.da_ar(db, ar_tela)["dominio_email"] if ar_tela else config.EMAIL_DOMINIO) if aba == "email" else ""
     return tela(request, "configuracoes.html", {
         # white label: quem é de uma AR muda só as configurações da AR (o resto é da plataforma: Admin Master)
-        "aba": aba, "campos": [(c, n, t, ler_config(db, c), autorizacao.e_master(usuario)
+        "aba": aba, "secao": aba,
+        "grupos_usuarios": _grupos_de_usuarios(db, request, usuario) if aba == "usuarios" else [],
+        "campos": [(c, n, t, ler_config(db, c), autorizacao.e_master(usuario)
                                 or (c in CHAVES_DA_AR and c not in CHAVES_SO_MASTER)) for c, n, t in CAMPOS_GERAIS],
         "criterios": score.CRITERIOS, "pesos": score.pesos(db), "faixas": score.faixas(db),
         "usuarios": db.execute(select(Usuario).order_by(Usuario.perfil, Usuario.nome)).scalars().all(),
@@ -359,6 +385,7 @@ def zerar_2fa(request: Request, uid: int, usuario: Usuario = Depends(exige("usua
 def salvar_usuario(request: Request, uid: int, nome: str = Form(...), email: str = Form(...), perfil: str = Form(...),
                    senha: str = Form(""), parceiro_id: str = Form(""), ativo: str = Form(""),
                    expediente: str = Form(""), duracao_reuniao: str = Form(""), equipe_id: str = Form("manter"),
+                   ar: str = Form(""),
                    usuario: Usuario = Depends(exige("usuarios.gerenciar")), db: Session = Depends(obter_db)):
     destino = "/configuracoes?aba=usuarios"
     u = Usuario() if uid == 0 else db.get(Usuario, uid)
@@ -419,6 +446,26 @@ def salvar_usuario(request: Request, uid: int, nome: str = Form(...), email: str
             return voltar(destino)
         u.expediente = expediente.strip()
     u.duracao_reuniao = util.para_int(duracao_reuniao) or u.duracao_reuniao or 30
+    # white label: a marca da pessoa. Nova pessoa criada pelo Admin Master fora das ARs vai para a marca do quadro em
+    # que ele clicou; quem é de uma AR (ou o master dentro dela) cria na própria (isolamento._ar_nas_novas)
+    ar_da_tela = marca.ar_da_tela(request, usuario)
+    if uid == 0 and not ar_da_tela and autorizacao.e_master(usuario):
+        escolhida = util.para_int(ar)
+        if not escolhida or db.get(Tenant, escolhida) is None:
+            avisar(request, "Escolha em qual marca a pessoa nova trabalha (o botão \"+ Nova pessoa\" do quadro dela).",
+                   "erro")
+            return voltar(destino)
+        u.tenant_id = escolhida
+    ar_da_pessoa = u.tenant_id if u.tenant_id else ar_da_tela
+    if ar_da_pessoa:  # equipe, parceiro e papel da mesma marca da pessoa (ou da plataforma)
+        de_outra = [nome for nome, obj in (("A equipe", db.get(Equipe, u.equipe_id) if u.equipe_id else None),
+                                           ("O parceiro", db.get(Parceiro, u.parceiro_id) if u.parceiro_id else None),
+                                           ("O papel", papel))
+                    if obj is not None and obj.tenant_id not in (None, ar_da_pessoa)]
+        if de_outra:
+            db.rollback()
+            avisar(request, f"{de_outra[0]} escolhido é de outra marca. Escolha um da mesma marca da pessoa.", "erro")
+            return voltar(destino)
     if uid == 0:
         db.add(u)
     db.flush()

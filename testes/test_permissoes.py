@@ -322,4 +322,9 @@ def test_tela_de_permissoes_abre_em_todas_as_abas(cliente):
     for aba in ("papeis", "usuarios", "equipes", "modulos"):
         assert cliente.get(f"/permissoes?aba={aba}").status_code == 200
     assert cliente.get("/permissoes?papel=vendedor").status_code == 200
-    assert 'href="/permissoes"' in cliente.get("/").text
+    menu = cliente.get("/").text
+    assert 'href="/permissoes"' not in menu and 'href="/configuracoes"' in menu  # Permissões fica dentro de Configurações
+    configuracoes = cliente.get("/configuracoes?aba=usuarios").text
+    assert 'href="/permissoes?aba=papeis"' in configuracoes and "Exceções por pessoa" in configuracoes
+    pagina = cliente.get("/permissoes?aba=equipes").text
+    assert 'class="config-item ativo" href="/permissoes?aba=equipes"' in pagina  # o item certo marcado no menu

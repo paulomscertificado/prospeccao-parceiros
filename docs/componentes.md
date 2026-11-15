@@ -37,7 +37,7 @@ prospeccao-parceiros/
 │   │   └── email_imap.py      leitura das respostas dos leads (IMAP)
 │   ├── rotas/
 │   │   ├── auth.py        login, primeiro acesso, troca de senha
-│   │   ├── permissoes.py  tela Permissões: papéis, exceções por usuário, acesso real, equipes e módulos
+│   │   ├── permissoes.py  Configurações > Pessoas e acesso: papéis, exceções por usuário, acesso real, equipes e módulos
 │   │   ├── painel.py      dashboard, relatórios, exportações, IA Comercial
 │   │   ├── leads.py       leads, pipeline, ficha, mensagens, importação, prospecção
 │   │   ├── agenda.py      cadências, templates, agenda, personalização de campanha com IA

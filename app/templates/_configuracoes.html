@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{# Moldura de todas as telas de Configurações: menu das seções à esquerda (no celular, uma faixa que rola) e o
+   conteúdo à direita. Cada rota passa `secao` (qual item fica marcado). As telas de Permissões, Categorias e Base de
+   conhecimento também usam esta moldura: no menu lateral do sistema fica só "Configurações". #}
+{% block conteudo %}
+{% set pode_permissoes = pode('permissoes.gerenciar') %}
+{% set grupos_config = [
+  ("Empresa", [
+    ("geral", "Geral", "/configuracoes?aba=geral", true),
+    ("marca", "Marca", "/configuracoes?aba=marca", true),
+    ("score", "Score dos leads", "/configuracoes?aba=score", true)]),
+  ("Pessoas e acesso", [
+    ("usuarios", "Usuários", "/configuracoes?aba=usuarios", true),
+    ("papeis", "Papéis e permissões", "/permissoes?aba=papeis", pode_permissoes),
+    ("excecoes", "Exceções por pessoa", "/permissoes?aba=usuarios", pode_permissoes),
+    ("equipes", "Equipes", "/permissoes?aba=equipes", pode_permissoes),
+    ("modulos", "Módulos", "/permissoes?aba=modulos", pode_permissoes and usuario.master)]),
+  ("Comunicação", [
+    ("email", "E-mail", "/configuracoes?aba=email", true)]),
+  ("Dados e IA", [
+    ("integracoes", "Integrações", "/configuracoes?aba=integracoes", true),
+    ("lgpd", "LGPD e dados", "/configuracoes?aba=lgpd", true),
+    ("categorias", "Categorias de parceiros", "/categorias", pode('categorias.ver')),
+    ("conhecimento", "Base de conhecimento da IA", "/conhecimento", pode('conhecimento.ver'))]),
+  ("Segurança", [
+    ("logs", "Registro de atividades", "/configuracoes?aba=logs", true)]),
+] %}
+<div class="cabecalho"><div><h1>Configurações</h1>
+  <div class="suave">{% if marca.plataforma %}Da plataforma: o que vale para todas as marcas (cada marca por dentro: Painel master){% else %}{{ marca.frase('de', nome=True, maiuscula=True) }}{% endif %}</div></div></div>
+<div class="config-grade">
+  <nav class="config-menu" aria-label="Seções das Configurações">
+    {% for titulo, itens in grupos_config %}
+      {% set ns = namespace(algum=false) %}{% for item in itens %}{% if item[3] %}{% set ns.algum = true %}{% endif %}{% endfor %}
+      {% if ns.algum %}<div class="config-grupo">{{ titulo }}</div>
+        {% for chave, nome, link, visivel in itens %}{% if visivel %}<a class="config-item {{ 'ativo' if secao == chave }}" href="{{ link }}"{% if secao == chave %} aria-current="page"{% endif %}>{{ nome }}</a>{% endif %}{% endfor %}
+      {% endif %}
+    {% endfor %}
+  </nav>
+  <div class="config-conteudo">{% block config %}{% endblock %}</div>
+</div>
+{% endblock %}

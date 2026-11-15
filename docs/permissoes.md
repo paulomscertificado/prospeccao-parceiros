@@ -90,7 +90,14 @@ próprio e-mail em outro domínio/servidor (ver `docs/configuracao.md`); é conf
 - `POST /leads/{id}/agendar`: marcava reunião em lead de outro vendedor.
 - Módulos Vendas e Agenda desligados só sumiam do menu; agora a rota também fica bloqueada.
 
-## Tela (menu Permissões, `permissoes.gerenciar`)
+## Tela (Configurações > Pessoas e acesso, `permissoes.gerenciar`)
+
+Desde 15/11/2026 as telas de Permissões ficam dentro das Configurações (moldura `templates/_configuracoes.html`, menu de
+seções à esquerda; cada rota passa `secao`). No menu lateral do sistema, "Permissões" só aparece para quem não vê as
+Configurações (`web.tela`). Papéis: grupos de permissões que abrem e fecham (`.grupo-permissao`). Exceções: a lista de
+pessoas separada por marca (`permissoes._pessoas_por_ar`). Configurações > Usuários: um quadro por marca
+(`admin._grupos_de_usuarios`); a pessoa nova criada pelo Admin Master fora das ARs vai para a marca do quadro (`ar`),
+e equipe, parceiro e papel precisam ser da mesma marca (`salvar_usuario`). Teste: `testes/test_usuarios_por_marca.py`.
 
 - `GET /permissoes?aba=papeis&papel=<codigo>` · `POST /permissoes/papel/{id}` (campos `p__<permissao>` = alcance ou
   `tudo`) · `POST /permissoes/papel/novo` (`nome`, `copiar_de`) · `POST /permissoes/papel/{id}/excluir`

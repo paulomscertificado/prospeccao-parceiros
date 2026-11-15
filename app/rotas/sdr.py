@@ -964,7 +964,7 @@ def sugerir_categorias(request: Request, usuario: Usuario = Depends(exige("categ
 def categorias(request: Request, usuario: Usuario = Depends(exige("categorias.ver")), db: Session = Depends(obter_db)):
     from .. import base_receita
 
-    return tela(request, "categorias.html", {
+    return tela(request, "categorias.html", {"secao": "categorias",
         "categorias": db.execute(select(Categoria).order_by(Categoria.prioridade)).scalars().all(),
         "contagem": base_receita.contar(db), "nova": request.query_params.get("nova", ""),
         "motivo_novo": request.query_params.get("motivo", ""), "palavras_novas": request.query_params.get("palavras", ""),
@@ -1015,7 +1015,7 @@ async def salvar_categoria(request: Request, cid: int, usuario: Usuario = Depend
 
 @rotas.get("/conhecimento")
 def conhecimento(request: Request, usuario: Usuario = Depends(exige("conhecimento.ver")), db: Session = Depends(obter_db)):
-    return tela(request, "conhecimento.html", {"itens": db.execute(select(Conhecimento).order_by(Conhecimento.id)).scalars().all()})
+    return tela(request, "conhecimento.html", {"secao": "conhecimento", "itens": db.execute(select(Conhecimento).order_by(Conhecimento.id)).scalars().all()})
 
 
 @rotas.post("/conhecimento/{kid:int}", dependencies=[Depends(verificar_csrf)])

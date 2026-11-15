@@ -540,15 +540,29 @@ apelido da marca e uma senha; o arquivo fechado fica em `dados\exportacoes`; man
 apagar uma marca que saiu da plataforma, **apagar_ar.bat**, que só funciona depois de exportar no mesmo dia e pede para
 digitar o apelido e SIM. A AR MS nunca é apagada por ele.
 
-### Permissões (menu Permissões, só o administrador)
+### Configurações organizadas por assunto
 
-Cada perfil acima é um **papel**. No menu **Permissões** você pode:
+Em **Configurações**, um menu à esquerda separa tudo por assunto (no celular, é uma faixa que rola para o lado):
+**Empresa** (Geral, Marca, Score dos leads), **Pessoas e acesso** (Usuários, Papéis e permissões, Exceções por pessoa,
+Equipes e, para o admin master, Módulos), **Comunicação** (E-mail), **Dados e IA** (Integrações, LGPD e dados,
+Categorias de parceiros, Base de conhecimento da IA) e **Segurança** (Registro de atividades).
 
-1. **Papéis:** ver e mudar o que cada papel pode fazer. Em cada item escolha **Não**, **Só os próprios** (só o que é
-   da pessoa), **Só a equipe** ou **Tudo**. Clique em **Salvar permissões do papel**. O Administrador tem sempre tudo.
+**Usuários separados por marca:** cada marca tem o seu quadro com as pessoas dela (nome e e-mail, papel, equipe,
+situação). **Editar** abre os campos da pessoa logo abaixo da linha; **+ Nova pessoa** cria a pessoa já na marca do
+quadro (equipe, parceiro e papel precisam ser da mesma marca). A busca no topo acha a pessoa pelo nome ou e-mail. O
+admin master vê todas as marcas (e a plataforma); o administrador de uma marca vê só a dele.
+
+### Permissões (Configurações > Pessoas e acesso, só o administrador)
+
+Cada perfil acima é um **papel**. Em **Configurações > Papéis e permissões** (e nos itens ao lado dele) você pode:
+
+1. **Papéis:** ver e mudar o que cada papel pode fazer. As permissões ficam em grupos que abrem e fecham (Painel,
+   Leads, IA SDR...), cada um mostrando quantas estão liberadas. Em cada item escolha **Não**, **Só os próprios** (só
+   o que é da pessoa), **Só a equipe** ou **Tudo**. Clique em **Salvar permissões do papel**. O Administrador tem
+   sempre tudo.
 2. **Novo papel:** clique em **+ Novo papel**, dê um nome (ex.: "Vendedor sênior"), escolha de qual papel copiar e
    ajuste. Depois escolha esse papel para a pessoa em Configurações > Usuários.
-3. **Exceções e acesso real:** escolha uma pessoa para dar uma exceção só para ela:
+3. **Exceções por pessoa:** escolha uma pessoa (a lista separa as marcas) para dar uma exceção só para ela:
    - **PERMITIR** libera algo que o papel não dá (ex.: cobrir as férias de alguém, até uma data);
    - **NEGAR** tira algo do papel (ex.: não exportar planilhas). O NEGAR sempre vence.
    Ao lado aparece o **acesso real** da pessoa: o que ela consegue fazer agora e por quê.
@@ -608,7 +622,7 @@ por exemplo joao@contabiljoao.com.br. No menu **E-mail**:
    "Falta configurar" traz o passo a passo; quem cuida do domínio faz isso em poucos minutos.
 
 Gmail, Hotmail e Yahoo pessoais não são aceitos (caem no spam e a conta pode ser bloqueada). Outras pessoas só podem
-usar outro domínio se o administrador der a permissão **"Enviar pelo próprio domínio"** na tela Permissões; tirando a
+usar outro domínio se o administrador der a permissão **"Enviar pelo próprio domínio"** em Configurações > Exceções por pessoa; tirando a
 permissão, a conta para de enviar na hora.
 
 ## 6. Problemas comuns

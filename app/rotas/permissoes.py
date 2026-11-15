@@ -31,6 +31,16 @@ def _grupos(permissoes) -> list[tuple[str, list]]:
     return [(g, list(itens)) for g, itens in groupby(permissoes, key=lambda p: p.grupo)]
 
 
+def _pessoas_por_ar(db: Session, usuarios: list[Usuario]) -> list[tuple[str, list[Usuario]]]:
+    """As pessoas separadas por marca (AR), para escolher de quem ver as exceções; a plataforma (Admin Master) no fim."""
+    from ..modelos import Tenant
+
+    nomes = dict(db.execute(select(Tenant.id, Tenant.nome).order_by(Tenant.id)).all())
+    grupos = [(nome, [u for u in usuarios if u.tenant_id == ar]) for ar, nome in nomes.items()]
+    grupos.append(("Plataforma", [u for u in usuarios if u.tenant_id not in nomes]))
+    return [(nome, pessoas) for nome, pessoas in grupos if pessoas]
+
+
 @rotas.get("/permissoes")
 def tela_permissoes(request: Request, aba: str = "papeis", papel: str = "", pessoa: int | None = None,
                     usuario: Usuario = Depends(GERENCIAR), db: Session = Depends(obter_db)):
@@ -46,12 +56,14 @@ def tela_permissoes(request: Request, aba: str = "papeis", papel: str = "", pess
     por_perfil = dict(db.execute(select(Usuario.perfil, func.count()).where(Usuario.papel_id.is_(None))
                                  .group_by(Usuario.perfil)).all())
     return tela(request, "permissoes.html", {
+        # dentro das Configurações (moldura _configuracoes.html): qual item do menu fica marcado
+        "secao": {"usuarios": "excecoes", "equipes": "equipes", "modulos": "modulos"}.get(aba, "papeis"),
         "aba": aba, "papeis": papeis, "papel": escolhido, "do_papel": do_papel,
         "grupos": _grupos([p for p in CATALOGO if escolhido is None
                            or autorizacao.permitidas_no_perfil(escolhido.base, p)]),
         "todas": CATALOGO, "todas_por_codigo": POR_CODIGO, "escopos": ESCOPOS, "modulos_info": MODULOS,
         "modulos": autorizacao.modulos_ligados(db),
-        "usuarios": usuarios, "alvo": alvo,
+        "usuarios": usuarios, "alvo": alvo, "pessoas_por_ar": _pessoas_por_ar(db, usuarios),
         "papel_do_alvo": autorizacao.papel_de(db, alvo) if alvo else None,
         "acesso": _grupos_explicados(db, alvo) if alvo else [],
         "excecoes": list(db.execute(select(ExcecaoPermissao).where(ExcecaoPermissao.usuario_id == alvo.id)

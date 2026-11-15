@@ -96,7 +96,7 @@ endereço, login e senha de app criptografada (Google Workspace: smtp.gmail.com:
   gratuito (`util.PROVEDORES_GRATUITOS`) é recusado; servidor tem de ser um nome público (nada de localhost, IP
   interno, `.local`).
 - `ContaEmail.dominio_livre` marca a conta; `contas_email.dominio_liberado` confere **a cada envio** se o dono
-  ainda tem a permissão (NEGAR na tela Permissões bloqueia na hora).
+  ainda tem a permissão (NEGAR em Configurações > Exceções por pessoa bloqueia na hora).
 - A tela confere o DNS do domínio da conta (`dns_email.verificar`): reconhece Google e Microsoft 365 pelo MX (SPF com
   o include certo; DKIM `google` ou `selector1/2`) e, nos outros, procura o DKIM nos seletores mais comuns
   (`dns_email.SELETORES_DKIM`).

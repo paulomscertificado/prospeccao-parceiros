@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "_configuracoes.html" %}
 {% block titulo %}Categorias de parceiros{% endblock %}
 {% macro formulario(c, novo=False) %}
 <form method="post" action="/categorias/{{ c.id if not novo else 0 }}" class="campos" style="margin:8px 0 4px">
@@ -18,8 +18,8 @@
   {% if pode('categorias.editar') %}<div><button class="btn btn-primario">Salvar</button></div>{% endif %}
 </form>
 {% endmacro %}
-{% block conteudo %}
-<div class="cabecalho"><div><h1>Categorias de parceiros</h1><div class="suave">Definem onde a IA procura (atividades da Receita) e como aborda cada tipo de empresa.</div></div>
+{% block config %}
+<div class="cartao topo-grupo"><div><h2 class="subtitulo-config">Categorias de parceiros</h2><div class="suave">Definem onde a IA procura (atividades da Receita) e como aborda cada tipo de empresa.</div></div>
   <a class="btn" href="/inteligencia#novas">Ver oportunidades por categoria</a></div>
 <div class="cartao" style="padding:0"><div class="tabela-rolagem"><table>
   <tr><th>Categoria</th><th class="num">Prioridade</th><th class="num">Aderência</th><th>Recorrente</th><th>CNAEs</th><th class="num">Empresas na base</th><th></th></tr>

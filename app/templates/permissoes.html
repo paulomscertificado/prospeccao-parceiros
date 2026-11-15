@@ -1,12 +1,9 @@
-{% extends "base.html" %}
+{% extends "_configuracoes.html" %}
 {% block titulo %}Permissões{% endblock %}
-{% block conteudo %}
-<div class="cabecalho"><div><h1>Permissões</h1>
-  <div class="suave">Quem pode fazer o quê. Vale nesta ordem: módulo desligado → NEGAR da pessoa → PERMITIR da pessoa → papel → não pode.</div></div>
-  <a class="btn" href="/configuracoes?aba=usuarios">Usuários</a></div>
-<div class="abas">
-  {% for c, n in [("papeis","Papéis"),("usuarios","Exceções e acesso real"),("equipes","Equipes"),("modulos","Módulos")] %}<a class="{{ 'ativa' if aba == c }}" href="?aba={{ c }}">{{ n }}</a>{% endfor %}
-</div>
+{% block config %}
+{% set titulos = {'papeis': 'Papéis e permissões', 'usuarios': 'Exceções por pessoa', 'equipes': 'Equipes', 'modulos': 'Módulos'} %}
+<div class="cartao"><h2 class="subtitulo-config">{{ titulos.get(aba, 'Permissões') }}</h2>
+  <p class="suave" style="margin:0">Quem pode fazer o quê. Vale nesta ordem: módulo desligado → NEGAR da pessoa → PERMITIR da pessoa → papel → não pode.</p></div>
 
 {% if aba == 'papeis' %}
 <div class="cartao">
@@ -29,18 +26,30 @@
   {% if papel.codigo == 'admin' %}<div class="aviso aviso-info">O Administrador tem sempre acesso a tudo. Para limitar alguém, use outro papel ou uma exceção.</div>{% endif %}
   {% if papel.codigo == 'parceiro' %}<p class="pequeno suave">O parceiro só usa o portal (vê apenas a carteira do próprio escritório).</p>{% endif %}
   <p class="pequeno suave">"Só os próprios" = registros em que a pessoa é a responsável. "Só a equipe" = de quem é da mesma equipe (sem equipe, vale como só os próprios). Mudanças valem no próximo clique da pessoa.</p>
-  <div class="tabela-rolagem"><table>
+  <div class="grupo-btn" style="margin:6px 0 4px"><button type="button" class="btn btn-pequeno" data-grupos="abrir">Abrir todos os grupos</button>
+    <button type="button" class="btn btn-pequeno" data-grupos="fechar">Fechar todos</button></div>
+  {% for grupo, itens in grupos %}{% set liberadas = itens|selectattr('codigo', 'in', do_papel)|list|length %}
+  <details class="grupo-permissao" {{ 'open' if loop.first }}>
+    <summary><span class="etiqueta">{{ grupo }}</span>
+      <span class="pequeno suave">{{ 'todas liberadas' if papel.codigo == 'admin' else (liberadas ~ ' de ' ~ (itens|length) ~ ' liberadas') }}</span></summary>
+    <div class="tabela-rolagem"><table>
     <tr><th>Permissão</th><th>Código</th><th>Pode?</th></tr>
-    {% for grupo, itens in grupos %}
-    <tr><td colspan="3"><span class="etiqueta">{{ grupo }}</span></td></tr>
     {% for p in itens %}{% set atual = do_papel.get(p.codigo, '') %}
     <tr><td>{{ p.nome }}{% if p.modulo %} <span class="pequeno suave">· módulo {{ modulos_info[p.modulo][0] }}</span>{% endif %}</td>
       <td class="pequeno"><code>{{ p.codigo }}</code></td>
       <td>{% if p.com_escopo %}<select name="p__{{ p.codigo }}" aria-label="{{ p.nome }}" {{ 'disabled' if papel.codigo == 'admin' }}>
           <option value="">Não</option>{% for c, n in escopos.items() %}<option value="{{ c }}" {{ 'selected' if atual == c }}>{{ n }}</option>{% endfor %}</select>
         {% else %}<label class="marcar"><input type="checkbox" name="p__{{ p.codigo }}" value="tudo" {{ 'checked' if atual }} {{ 'disabled' if papel.codigo == 'admin' }}> Sim</label>{% endif %}</td></tr>
-    {% endfor %}{% endfor %}
-  </table></div>
+    {% endfor %}
+    </table></div>
+  </details>{% endfor %}
+  <script>
+    document.querySelectorAll('[data-grupos]').forEach(function (botao) {
+      botao.addEventListener('click', function () {
+        document.querySelectorAll('.grupo-permissao').forEach(function (g) { g.open = botao.dataset.grupos === 'abrir'; });
+      });
+    });
+  </script>
   {% if papel.codigo != 'admin' %}<div style="margin-top:12px" class="grupo-btn"><button class="btn btn-primario">Salvar permissões do papel</button></div>{% endif %}
 </form>
 {% if not papel.sistema %}
@@ -51,7 +60,7 @@
 {% elif aba == 'usuarios' %}
 <div class="cartao">
   <form method="get" class="grupo-btn"><input type="hidden" name="aba" value="usuarios">
-    <select name="pessoa" aria-label="Pessoa" onchange="this.form.submit()"><option value="">Escolha a pessoa…</option>{% for u in usuarios %}<option value="{{ u.id }}" {{ 'selected' if alvo and alvo.id == u.id }}>{{ u.nome }} · {{ u.perfil_nome }}{{ '' if u.ativo else ' (inativo)' }}</option>{% endfor %}</select>
+    <select name="pessoa" aria-label="Pessoa" onchange="this.form.submit()"><option value="">Escolha a pessoa…</option>{% for nome_ar, pessoas in pessoas_por_ar %}<optgroup label="{{ nome_ar }}">{% for u in pessoas %}<option value="{{ u.id }}" {{ 'selected' if alvo and alvo.id == u.id }}>{{ u.nome }} · {{ u.perfil_nome }}{{ '' if u.ativo else ' (inativo)' }}</option>{% endfor %}</optgroup>{% endfor %}</select>
     <button class="btn">Ver</button></form>
 </div>
 {% if alvo %}

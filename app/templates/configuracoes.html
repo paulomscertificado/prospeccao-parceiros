@@ -1,12 +1,6 @@
-{% extends "base.html" %}
+{% extends "_configuracoes.html" %}
 {% block titulo %}Configurações{% endblock %}
-{% block conteudo %}
-<div class="cabecalho"><h1>Configurações</h1>
-  <div class="acoes"><a class="btn" href="/categorias">Categorias de parceiros</a><a class="btn" href="/conhecimento">Base de conhecimento da IA</a></div></div>
-<div class="abas">
-  {% for c, n in [("geral","Geral"),("marca","Marca"),("score","Score"),("usuarios","Usuários"),("email","E-mail"),("integracoes","Integrações"),("lgpd","LGPD e dados"),("logs","Registro de atividades")] %}<a class="{{ 'ativa' if aba == c }}" href="?aba={{ c }}">{{ n }}</a>{% endfor %}
-</div>
-
+{% block config %}
 {% if aba == 'geral' %}
 <form class="cartao" method="post" action="/configuracoes/geral" style="max-width:860px">
   <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -122,45 +116,104 @@
 </form>
 
 {% elif aba == 'usuarios' %}
-<div class="cartao"><h2>Usuários</h2>
-  <p class="suave">Administrador: acesso total · Gestor: equipe e indicadores · Funcionário e Vendedor: só os próprios dados · Parceiro: só a própria carteira (portal). O que cada papel pode fazer, papéis novos, exceções por pessoa e equipes: <a href="/permissoes">Permissões</a>.</p>
-  <p class="pequeno suave">🔐 Administrador e gestor entram com a senha e o código de 6 números de um app no celular (verificação em 2 etapas). Se a pessoa perder o celular, clique em "zerar" na linha dela.</p>
-  <div class="tabela-rolagem"><table>
-    <tr><th>Nome</th><th>E-mail</th><th>Papel</th><th>Equipe</th><th>Parceiro</th><th>Expediente (reuniões)</th><th>Ativo</th><th>Nova senha</th><th></th></tr>
-    {% for u in usuarios %}
-    <tr>
-      <td><input form="u-{{ u.id }}" type="text" name="nome" value="{{ u.nome }}" aria-label="Nome"></td>
-      <td><input form="u-{{ u.id }}" type="email" name="email" value="{{ u.email }}" aria-label="E-mail"></td>
-      <td><select form="u-{{ u.id }}" name="perfil" aria-label="Papel">{% for pa in papeis %}{% set atual = (u.papel.codigo if u.papel else u.perfil) == pa.codigo %}{% if atual or sou_master or pa.codigo not in papeis_de_admin %}<option value="{{ pa.codigo }}" {{ 'selected' if atual }}>{{ pa.nome }}</option>{% endif %}{% endfor %}</select>
-        {% if u.master %}<div><span class="selo selo-azul">admin master</span></div>{% endif %}
-        {% if not sou_master and u.id != usuario.id and (u.master or u.perfil == 'admin') %}<div class="pequeno suave">só o admin master altera</div>{% endif %}
-        <div class="pequeno"><a href="/permissoes?aba=usuarios&pessoa={{ u.id }}">exceções e acesso</a></div></td>
-      <td><select form="u-{{ u.id }}" name="equipe_id" aria-label="Equipe"><option value="">—</option>{% for e in equipes %}<option value="{{ e.id }}" {{ 'selected' if u.equipe_id == e.id }}>{{ e.nome }}</option>{% endfor %}</select></td>
-      <td><select form="u-{{ u.id }}" name="parceiro_id" aria-label="Parceiro"><option value="">—</option>{% for p in parceiros %}<option value="{{ p.id }}" {{ 'selected' if u.parceiro_id == p.id }}>{{ p.escritorio }}</option>{% endfor %}</select></td>
-      <td><input form="u-{{ u.id }}" type="text" name="expediente" value="{{ u.expediente }}" aria-label="Expediente" style="min-width:210px">
-        <input form="u-{{ u.id }}" type="number" name="duracao_reuniao" value="{{ u.duracao_reuniao }}" aria-label="Duração da reunião (min)" style="width:70px" title="minutos por reunião"></td>
-      <td><input form="u-{{ u.id }}" type="checkbox" name="ativo" {{ 'checked' if u.ativo }} aria-label="Ativo"></td>
-      <td><input form="u-{{ u.id }}" type="password" name="senha" placeholder="(manter)" autocomplete="new-password" aria-label="Nova senha"></td>
-      <td><button form="u-{{ u.id }}" class="btn btn-pequeno">Salvar</button><div class="pequeno suave">{{ 'último acesso ' ~ (u.ultimo_login|datahora) if u.ultimo_login else 'nunca entrou' }}</div>
-        {% if u.totp_ativo %}<div class="pequeno">🔐 código do celular ativo · <button form="z-{{ u.id }}" class="link-botao" data-confirmar="Zerar a verificação em 2 etapas de {{ u.nome }}? Use quando a pessoa perdeu ou trocou de celular: no próximo login ela lê um QR code novo.">zerar</button></div>
-        {% elif u.perfil in ('admin', 'gestor') %}<div class="pequeno suave">🔐 configura o código no próximo login</div>{% endif %}</td>
-    </tr>{% endfor %}
-    <tr>
-      <td><input form="u-0" type="text" name="nome" placeholder="Nome" required aria-label="Nome"></td>
-      <td><input form="u-0" type="email" name="email" placeholder="email@empresa.com.br" required aria-label="E-mail"></td>
-      <td><select form="u-0" name="perfil" aria-label="Papel">{% for pa in papeis %}{% if sou_master or pa.codigo not in papeis_de_admin %}<option value="{{ pa.codigo }}" {{ 'selected' if pa.codigo == 'funcionario' }}>{{ pa.nome }}</option>{% endif %}{% endfor %}</select></td>
-      <td><select form="u-0" name="equipe_id" aria-label="Equipe"><option value="">—</option>{% for e in equipes %}<option value="{{ e.id }}">{{ e.nome }}</option>{% endfor %}</select></td>
-      <td><select form="u-0" name="parceiro_id" aria-label="Parceiro"><option value="">—</option>{% for p in parceiros %}<option value="{{ p.id }}">{{ p.escritorio }}</option>{% endfor %}</select></td>
-      <td><input form="u-0" type="text" name="expediente" value="seg-sex 09:00-12:00,14:00-18:00" aria-label="Expediente" style="min-width:210px"></td>
-      <td><input form="u-0" type="checkbox" name="ativo" checked aria-label="Ativo"></td>
-      <td><input form="u-0" type="password" name="senha" placeholder="Senha inicial" required autocomplete="new-password" aria-label="Senha"></td>
-      <td><button form="u-0" class="btn btn-pequeno btn-primario">Criar</button></td>
-    </tr>
-  </table></div>
-  {% for u in usuarios %}<form id="u-{{ u.id }}" method="post" action="/configuracoes/usuarios/{{ u.id }}"><input type="hidden" name="csrf" value="{{ csrf }}"></form>
-  <form id="z-{{ u.id }}" method="post" action="/configuracoes/usuarios/{{ u.id }}/zerar-2fa"><input type="hidden" name="csrf" value="{{ csrf }}"></form>{% endfor %}
-  <form id="u-0" method="post" action="/configuracoes/usuarios/0"><input type="hidden" name="csrf" value="{{ csrf }}"></form>
+{% macro opcoes_de_papel(papeis_do_grupo, u=none) %}{% for pa in papeis_do_grupo %}{% set atual = u and (u.papel.codigo if u.papel else u.perfil) == pa.codigo %}{% if atual or sou_master or pa.codigo not in papeis_de_admin %}<option value="{{ pa.codigo }}" {{ 'selected' if atual or (not u and pa.codigo == 'funcionario') }}>{{ pa.nome }}</option>{% endif %}{% endfor %}{% endmacro %}
+{% macro opcoes_de_equipe(equipes_do_grupo, u=none) %}<option value="">—</option>{% for e in equipes_do_grupo %}<option value="{{ e.id }}" {{ 'selected' if u and u.equipe_id == e.id }}>{{ e.nome }}</option>{% endfor %}{% endmacro %}
+{% macro opcoes_de_parceiro(parceiros_do_grupo, u=none) %}<option value="">—</option>{% for p in parceiros_do_grupo %}<option value="{{ p.id }}" {{ 'selected' if u and u.parceiro_id == p.id }}>{{ p.escritorio }}</option>{% endfor %}{% endmacro %}
+<div class="cartao">
+  <div class="topo-grupo"><h2 class="subtitulo-config">Usuários</h2>
+    <input type="search" class="busca-usuarios" id="busca-usuarios" placeholder="Buscar por nome ou e-mail" aria-label="Buscar pessoa por nome ou e-mail"></div>
+  <p class="suave" style="margin:8px 0 4px">Cada marca tem as suas pessoas. Administrador: acesso total · Gestor: equipe e
+    indicadores · Funcionário e Vendedor: só os próprios dados · Parceiro: só a própria carteira (portal).{% if pode('permissoes.gerenciar') %}
+    O que cada papel pode fazer: <a href="/permissoes?aba=papeis">Papéis e permissões</a>.{% endif %}</p>
+  <p class="pequeno suave" style="margin:0">🔐 Administrador e gestor entram com a senha e o código de 6 números de um app no
+    celular (verificação em 2 etapas). Se a pessoa perder o celular, abra "Editar" na linha dela e clique em "Zerar o código do celular".</p>
 </div>
+{% for g in grupos_usuarios %}{% set chave = g.ar if g.ar else 'plataforma' %}
+<section class="cartao grupo-usuarios">
+  <div class="topo-grupo">
+    <div><h2>{{ g.nome }}</h2>
+      <div class="pequeno suave">{{ g.pessoas|length }} {{ 'pessoa' if g.pessoas|length == 1 else 'pessoas' }} ·
+        {{ g.pessoas|selectattr('ativo')|list|length }} {{ 'ativa' if (g.pessoas|selectattr('ativo')|list|length) == 1 else 'ativas' }}{% if not g.ar %} · quem administra a plataforma{% endif %}</div></div>
+    {% if g.pode_criar and pode('usuarios.gerenciar') %}<button type="button" class="btn btn-primario btn-pequeno" data-abrir="nova-{{ chave }}">+ Nova pessoa</button>{% endif %}
+  </div>
+  {% if g.pode_criar and pode('usuarios.gerenciar') %}
+  <form id="nova-{{ chave }}" class="edicao-usuario cartao" method="post" action="/configuracoes/usuarios/0" hidden style="margin:12px 0 0">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ar" value="{{ g.ar or '' }}">
+    <input type="hidden" name="ativo" value="on">
+    <h3 style="margin-top:0">Nova pessoa · {{ g.nome }}</h3>
+    <div class="campos">
+      <div><label>Nome</label><input type="text" name="nome" required></div>
+      <div><label>E-mail</label><input type="email" name="email" placeholder="email@empresa.com.br" required></div>
+      <div><label>Papel</label><select name="perfil">{{ opcoes_de_papel(g.papeis) }}</select></div>
+      <div><label>Equipe</label><select name="equipe_id">{{ opcoes_de_equipe(g.equipes) }}</select></div>
+      <div><label>Parceiro (só para o papel Parceiro)</label><select name="parceiro_id">{{ opcoes_de_parceiro(g.parceiros) }}</select></div>
+      <div><label>Expediente (reuniões)</label><input type="text" name="expediente" value="seg-sex 09:00-12:00,14:00-18:00"></div>
+      <div><label>Minutos por reunião</label><input type="number" name="duracao_reuniao" value="30"></div>
+      <div><label>Senha inicial</label><input type="password" name="senha" required autocomplete="new-password"></div>
+    </div>
+    <button class="btn btn-primario">Criar</button> <button type="button" class="btn" data-abrir="nova-{{ chave }}">Cancelar</button>
+    <p class="ajuda">Envie a senha para a pessoa por um canal seguro. No primeiro acesso, administrador e gestor configuram o código do celular.</p>
+  </form>{% endif %}
+  <div class="tabela-rolagem"><table class="lista-usuarios">
+    <tr><th>Pessoa</th><th>Papel</th><th>Equipe</th><th>Situação</th><th></th></tr>
+    {% for u in g.pessoas %}
+    <tr class="linha-usuario" data-busca="{{ (u.nome ~ ' ' ~ u.email)|lower }}">
+      <td class="pessoa"><b>{{ u.nome }}{% if u.master %} <span class="selo selo-azul">admin master</span>{% endif %}</b><span class="pequeno suave">{{ u.email }}</span></td>
+      <td>{{ u.papel.nome if u.papel else PERFIS.get(u.perfil, u.perfil) }}</td>
+      <td>{{ (g.equipes|selectattr('id', 'equalto', u.equipe_id)|map(attribute='nome')|first) or '—' }}</td>
+      <td>{% if u.ativo %}<span class="selo selo-ok">ativo</span>{% else %}<span class="selo">inativo</span>{% endif %}{% if u.totp_ativo %} <span title="código do celular ativo">🔐</span>{% endif %}
+        <div class="pequeno suave">{{ 'último acesso ' ~ (u.ultimo_login|datahora) if u.ultimo_login else 'nunca entrou' }}</div></td>
+      <td class="nowrap">{% if pode('usuarios.gerenciar') %}<button type="button" class="btn btn-pequeno" data-abrir="editar-{{ u.id }}">Editar</button>{% endif %}</td>
+    </tr>
+    {% if pode('usuarios.gerenciar') %}
+    <tr id="editar-{{ u.id }}" class="edicao-usuario" data-busca="{{ (u.nome ~ ' ' ~ u.email)|lower }}" hidden><td colspan="5">
+      <form method="post" action="/configuracoes/usuarios/{{ u.id }}">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <div class="campos">
+          <div><label>Nome</label><input type="text" name="nome" value="{{ u.nome }}" required></div>
+          <div><label>E-mail</label><input type="email" name="email" value="{{ u.email }}" required></div>
+          <div><label>Papel</label><select name="perfil">{{ opcoes_de_papel(g.papeis, u) }}</select></div>
+          <div><label>Equipe</label><select name="equipe_id">{{ opcoes_de_equipe(g.equipes, u) }}</select></div>
+          <div><label>Parceiro (só para o papel Parceiro)</label><select name="parceiro_id">{{ opcoes_de_parceiro(g.parceiros, u) }}</select></div>
+          <div><label>Expediente (reuniões)</label><input type="text" name="expediente" value="{{ u.expediente }}"></div>
+          <div><label>Minutos por reunião</label><input type="number" name="duracao_reuniao" value="{{ u.duracao_reuniao }}"></div>
+          <div><label>Nova senha</label><input type="password" name="senha" placeholder="(manter a atual)" autocomplete="new-password"></div>
+        </div>
+        <label class="marcar"><input type="checkbox" name="ativo" {{ 'checked' if u.ativo }}> Acesso ativo</label>
+        {% if not sou_master and u.id != usuario.id and (u.master or u.perfil == 'admin') %}<p class="pequeno suave">Administradores só o admin master altera.</p>{% endif %}
+        <div class="grupo-btn" style="margin-top:8px"><button class="btn btn-primario btn-pequeno">Salvar</button>
+          <button type="button" class="btn btn-pequeno" data-abrir="editar-{{ u.id }}">Fechar</button>
+          {% if pode('permissoes.gerenciar') %}<a class="btn btn-pequeno" href="/permissoes?aba=usuarios&pessoa={{ u.id }}">Exceções e acesso real</a>{% endif %}</div>
+      </form>
+      {% if u.totp_ativo %}<form method="post" action="/configuracoes/usuarios/{{ u.id }}/zerar-2fa" style="margin-top:8px">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn btn-pequeno btn-perigo" data-confirmar="Zerar a verificação em 2 etapas de {{ u.nome }}? Use quando a pessoa perdeu ou trocou de celular: no próximo login ela lê um QR code novo.">Zerar o código do celular</button></form>
+      {% elif u.perfil in ('admin', 'gestor') %}<p class="pequeno suave">🔐 Configura o código do celular no próximo login.</p>{% endif %}
+    </td></tr>{% endif %}
+    {% else %}<tr><td colspan="5" class="vazio">Nenhuma pessoa nesta marca ainda.</td></tr>{% endfor %}
+  </table></div>
+</section>
+{% endfor %}
+<script>
+  // abrir e fechar o "Editar" e o "+ Nova pessoa"
+  document.querySelectorAll('[data-abrir]').forEach(function (botao) {
+    botao.addEventListener('click', function () {
+      var alvo = document.getElementById(botao.dataset.abrir);
+      if (alvo) { alvo.hidden = !alvo.hidden; if (!alvo.hidden) { var campo = alvo.querySelector('input:not([type=hidden])'); if (campo) campo.focus(); } }
+    });
+  });
+  // busca por nome ou e-mail (esconde as linhas que não batem)
+  var busca = document.getElementById('busca-usuarios');
+  if (busca) busca.addEventListener('input', function () {
+    var termo = busca.value.trim().toLowerCase();
+    document.querySelectorAll('.linha-usuario').forEach(function (linha) {
+      var bate = !termo || linha.dataset.busca.indexOf(termo) >= 0;
+      linha.hidden = !bate;
+      var edicao = linha.nextElementSibling;
+      if (edicao && edicao.classList.contains('edicao-usuario') && !bate) edicao.hidden = true;
+    });
+  });
+</script>
 
 {% elif aba == 'email' %}
 {% if not marca.plataforma %}

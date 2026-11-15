@@ -354,3 +354,42 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--foco); bord
 .quantas-empresas { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
 .quantas-empresas .chip { padding: 6px 12px; font-size: .9rem; }
 .escolha-corpo .pequeno { font-weight: 400; }
+
+/* ---------- Configurações: menu das seções à esquerda (_configuracoes.html) ---------- */
+.config-grade { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 20px; align-items: start; }
+.config-menu { position: sticky; top: 16px; display: flex; flex-direction: column; gap: 2px; background: var(--cartao);
+               border: 1px solid var(--borda); border-radius: 12px; padding: 10px; box-shadow: var(--sombra); }
+.config-grupo { font-family: var(--fonte-mono); font-size: .62rem; letter-spacing: .12em; text-transform: uppercase;
+                color: var(--suave); padding: 12px 10px 4px; }
+.config-grupo:first-child { padding-top: 4px; }
+.config-item { display: block; padding: 7px 10px; border-radius: 8px; color: var(--texto); font-size: .88rem; }
+.config-item:hover { background: var(--azul-claro); text-decoration: none; }
+.config-item.ativo { background: var(--azul-claro); color: var(--azul); font-weight: 600;
+                     box-shadow: inset 3px 0 0 var(--verde-marca); }
+.config-conteudo { min-width: 0; }
+.config-conteudo > .cartao:first-child, .config-conteudo > .grade-2:first-child { margin-top: 0; }
+.subtitulo-config { margin: 0 0 4px; }
+@media (max-width: 900px) {
+  .config-grade { grid-template-columns: 1fr; gap: 12px; }
+  .config-menu { position: static; flex-direction: row; overflow-x: auto; padding: 6px; }
+  .config-grupo { display: none; }
+  .config-item { white-space: nowrap; }
+}
+
+/* Usuários separados por marca (Configurações > Usuários) */
+.topo-grupo { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.topo-grupo h2 { margin: 0; }
+.lista-usuarios td { vertical-align: middle; }
+.lista-usuarios .pessoa b { display: block; }
+.edicao-usuario > td { background: var(--fundo); }
+.edicao-usuario .campos { margin: 6px 0 10px; }
+.busca-usuarios { max-width: 320px; }
+
+/* Papéis e permissões: grupos que abrem e fecham */
+.grupo-permissao { border: 1px solid var(--borda); border-radius: 10px; margin: 8px 0; background: var(--cartao); }
+.grupo-permissao > summary { cursor: pointer; list-style: none; padding: 10px 12px; display: flex; align-items: center;
+                             gap: 10px; }
+.grupo-permissao > summary::-webkit-details-marker { display: none; }
+.grupo-permissao > summary::after { content: "▸"; margin-left: auto; color: var(--suave); }
+.grupo-permissao[open] > summary::after { content: "▾"; }
+.grupo-permissao[open] > summary { border-bottom: 1px solid var(--borda); }
