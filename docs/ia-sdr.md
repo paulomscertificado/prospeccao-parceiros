@@ -131,7 +131,7 @@ automático de ângulos/CTAs, fila em Redis para volumes acima de milhares de en
 
 `campanhas.enviar_teste` (ação `/campanhas/{id}/testar`): a pessoa escolhe a campanha (`campanha_teste`, qualquer uma que ela pode ver, aguardando/ativa/pausada), o canal (`canal_teste` = whatsapp ou email) e o destino dela; vão os toques daquele canal de 1 a 5 empresas (só o primeiro ou todos), com "[TESTE]". A tela mostra quantas mensagens de cada canal a campanha tem (`mensagens_para_teste`). Não grava `Mensagem` nos leads, não conta nos limites, não muda a campanha; fica só no log (`testou_campanha`).
 
-Canal: a IA não faz ligações. Com WhatsApp permitido, o celular informado à Receita vira o WhatsApp do lead (`celular_do_lead`). Empresas só com telefone fixo também entram (depois das que têm canal): a cadência cria passos de WhatsApp sem número, os ids vão para `Campanha.so_fixo` e a campanha mostra o cartão "Pesquisar WhatsApp" (links de busca + campo para salvar, ação `whatsapp-lead`). `cadencias.aplicar` nunca cria ligação/LinkedIn em campanha da IA, e `aprovar` cancela ligações de campanhas antigas.
+Canal: a IA não faz ligações. Com WhatsApp permitido, o celular informado à Receita vira o WhatsApp do lead (`celular_do_lead`), com o 9 da frente (`util.celular`: a Receita e a CNPJá guardam quase todos os celulares no formato antigo, sem o 9; até 16/11/2026 só valia celular já com o 9, e nenhuma empresa da lista da CNPJá saía com WhatsApp). Empresas só com telefone fixo também entram (depois das que têm canal): a cadência cria passos de WhatsApp sem número, os ids vão para `Campanha.so_fixo` e a campanha mostra o cartão "Pesquisar WhatsApp" (links de busca + campo para salvar, ação `whatsapp-lead`). `cadencias.aplicar` nunca cria ligação/LinkedIn em campanha da IA, e `aprovar` cancela ligações de campanhas antigas.
 
 Dois modelos: cada toque da campanha da IA guarda o texto de WhatsApp e o de e-mail (`Tarefa.mensagem_whatsapp`, `mensagem_email`, `assunto_email`); `mensagem`/`assunto` são os do canal escolhido. Na campanha os dois aparecem lado a lado e editáveis; a ação `trocar-canal` passa o toque para o outro canal.
 
@@ -372,7 +372,17 @@ empresas, com as MESMAS colunas da `base_receita`, para reaproveitar `base_recei
 - Escolha da base: Nova campanha (`base`, "Todas as cidades do estado" = `cidade` vazia, só para lista),
   `/api/contagem?base=`, e "Encontrar novos parceiros" (cada lista vira uma fonte `lista:<id>`).
 - `receita_oculta` (config) esconde a base da Receita das telas (`bases_importadas.opcoes`/`escolher`).
-- Testes: `testes/test_bases_importadas.py`.
+- **Celular** (16/11/2026): `base_receita.buscar` devolve `telefone` e `celular` com o 9 da frente (`util.celular`,
+  primeiro celular entre o telefone principal e o secundário). Na campanha com WhatsApp, `celular` vira o WhatsApp do
+  lead (`_buscar_candidatos`). Em 16/11/2026 a lista da CNPJá tinha 19,9 mil das 35,6 mil empresas com celular, todos
+  sem o 9, e a base da Receita 461 mil assim (36 com o 9).
+- **Empresa repetida** (16/11/2026, `campanhas._completar_com_a_base`): a empresa achada na base que já estava
+  cadastrada pelo **CNPJ** continua com o mesmo cadastro, mas ganha da base os campos vazios (`preencher(...,
+  so_vazios=True)`: nada é apagado nem trocado), o celular como WhatsApp (campanha com WhatsApp) ou numa nota das
+  observações, e, se a base é uma lista, a origem da lista no lugar de uma origem "Prospecção: ..." (cadastro manual,
+  indicação e planilha ficam). Tudo anotado no histórico do lead ("Empresa achada de novo na ..."). Achada pelo
+  telefone, e-mail ou site pode ser outra empresa (o mesmo contador): não é mexida. Empresa de outra AR também não.
+- Testes: `testes/test_bases_importadas.py` e `testes/test_celular_da_base.py`.
 
 ## Revisão geral das filas e da busca diária (nov/2026)
 

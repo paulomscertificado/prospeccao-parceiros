@@ -134,7 +134,9 @@ def test_campanha_de_whatsapp_leva_quem_so_tem_fixo_para_o_time_pesquisar(client
     _zipar(tmp_path, "Municipios.zip", [["2531", "RECIFE"]])
     celular = _estab("76000001", "CONTABIL COM CELULAR", "c@celular-teste.com.br", "CENTRO")
     celular[22] = "998765432"  # 81 + 9 dígitos = celular
-    _zipar(tmp_path, "Estabelecimentos0.zip", [celular, _estab("76000002", "CONTABIL SO FIXO", "f@fixo-teste.com.br", "CENTRO")])
+    fixo = _estab("76000002", "CONTABIL SO FIXO", "f@fixo-teste.com.br", "CENTRO")
+    fixo[22] = "32769010"  # fixo de verdade (começa com 3); 76000002 seria um celular antigo, sem o 9
+    _zipar(tmp_path, "Estabelecimentos0.zip", [celular, fixo])
     base_receita.importar_pasta(str(tmp_path))
 
     def pesquisar(db, lead, usar_ia=True):

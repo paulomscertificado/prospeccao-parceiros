@@ -460,21 +460,28 @@ def buscar(db, cidade: str, uf: str, limite: int, categorias: list[str] | None =
                 -(bool(e.email) + bool(e.telefone) + bool(e.telefone2)), e.inicio_atividade or datetime.max.date())
 
     linhas = sorted(linhas, key=ordem)
-    resultados = []
-    for e in linhas[: limite * 3]:
-        celular = next((t for t in (e.telefone, e.telefone2) if len(t) == 11 and t[2] == "9"), "")
-        resultados.append({
-            "empresa": e.nome_fantasia or e.razao_social or f"Empresa CNPJ {util.formatar_cnpj(e.cnpj)}",
-            "cnpj": e.cnpj, "telefone": e.telefone or e.telefone2,
-            "whatsapp": "",  # celular informado à Receita não garante WhatsApp: o vendedor confirma
-            "email": e.email, "endereco": ", ".join(x for x in (e.endereco, e.bairro, e.cep) if x),
-            "cidade": e.municipio, "estado": e.uf, "porte": e.porte, "categoria": e.categoria or "outros",
-            # Responsável e regime vêm do quadro de sócios e do Simples (dados públicos da Receita)
-            "responsavel": e.socio_admin, "cargo": e.socio_cargo, "regime": e.regime,
-            "multiplos_socios": (e.socios_qtd or 0) > 1,
-            "observacoes": (f"Celular informado à Receita: {util.formatar_telefone(celular)} (confirmar se é WhatsApp). "
-                            if celular else "") + (f"Em atividade desde {e.inicio_atividade:%Y}." if e.inicio_atividade else ""),
-            "fonte_url": f"https://brasilapi.com.br/api/cnpj/v1/{e.cnpj}",
-            "origem": origem,
-        })
-    return resultados
+    return [dados_da_empresa(e, origem) for e in linhas[: limite * 3]]
+
+
+def dados_da_empresa(e, origem: str = "Prospecção: base da Receita Federal") -> dict:
+    """Empresa da base (EmpresaReceita ou EmpresaBase de uma lista) → dados do lead, mais o "celular" (que não é campo
+    do lead: a campanha com WhatsApp o usa como WhatsApp, ver campanhas._buscar_candidatos)."""
+    # A Receita guarda o celular sem o 9 da frente: (81) 9888-7777 é o (81) 99888-7777 de hoje (util.celular).
+    # Antes só valia celular já com o 9, e nenhuma empresa das listas da CNPJá tinha (pedido da Maria, 16/11/2026).
+    celular = util.celular(e.telefone, e.telefone2)
+    return {
+        "empresa": e.nome_fantasia or e.razao_social or f"Empresa CNPJ {util.formatar_cnpj(e.cnpj)}",
+        "cnpj": e.cnpj,
+        "telefone": util.com_nono_digito(e.telefone) or e.telefone or util.com_nono_digito(e.telefone2) or e.telefone2,
+        "whatsapp": "",  # celular informado à Receita não garante WhatsApp: o vendedor confirma
+        "celular": celular,
+        "email": e.email, "endereco": ", ".join(x for x in (e.endereco, e.bairro, e.cep) if x),
+        "cidade": e.municipio, "estado": e.uf, "porte": e.porte, "categoria": e.categoria or "outros",
+        # Responsável e regime vêm do quadro de sócios e do Simples (dados públicos da Receita)
+        "responsavel": e.socio_admin, "cargo": e.socio_cargo, "regime": e.regime,
+        "multiplos_socios": (e.socios_qtd or 0) > 1,
+        "observacoes": (f"Celular informado à Receita: {util.formatar_telefone(celular)} (confirmar se é WhatsApp). "
+                        if celular else "") + (f"Em atividade desde {e.inicio_atividade:%Y}." if e.inicio_atividade else ""),
+        "fonte_url": f"https://brasilapi.com.br/api/cnpj/v1/{e.cnpj}",
+        "origem": origem,
+    }

@@ -18,7 +18,7 @@ from sqlalchemy.orm import aliased
 from . import base_receita, bases_importadas, cadencias, config, contas_email, email_validacao, reservas, ia, mensagens, prospeccao, sdr, trabalhos, util
 from .banco import (agora, algum_valor, gravar_config, ler_config, ler_config_int, ler_config_json, sessao,
                     usar_config_da_ar)
-from .leads_servico import criar_lead, historico, limpar_campos, mudar_status, registrar_contato
+from .leads_servico import criar_lead, historico, limpar_campos, mudar_status, preencher, registrar_contato
 from .modelos import Cadencia, Campanha, Categoria, Lead, Tarefa, Usuario
 from .modelos import NOME_CADENCIA_SDR
 
@@ -158,12 +158,48 @@ MAXIMO_BUSCA = 4000  # empresas olhadas por segmento, no máximo, para completar
 
 
 def celular_do_lead(lead: Lead) -> str:
-    """Um celular (DDD + 9 + 8 dígitos) do telefone do lead ou do anotado da Receita nas observações."""
-    for numero in [lead.telefone or ""] + re.findall(r"\(?\d{2}\)?\s?9\d{4}-?\d{4}", lead.observacoes or ""):
-        digitos = util.so_digitos(numero)
-        if len(digitos) == 11 and digitos[2] == "9":
-            return digitos
-    return ""
+    """Um celular (DDD + 9 + 8 dígitos) do telefone do lead ou do anotado da Receita nas observações. Celular no
+    formato antigo, sem o 9 (como a Receita guarda), ganha o 9 (util.celular)."""
+    return util.celular(lead.telefone, *re.findall(r"\(?\d{2}\)?\s?9\d{4}-?\d{4}", lead.observacoes or ""))
+
+
+NOMES_DOS_CAMPOS = {"empresa": "nome", "cnpj": "CNPJ", "telefone": "telefone", "whatsapp": "WhatsApp",
+                    "email": "e-mail", "endereco": "endereço", "cidade": "cidade", "estado": "estado",
+                    "porte": "porte", "regime": "regime", "responsavel": "responsável", "cargo": "cargo",
+                    "multiplos_socios": "vários sócios", "observacoes": "observações", "fonte_url": "fonte"}
+
+
+def _completar_com_a_base(db, lead: Lead, dados: dict, celular: str, origem: str, camp: Campanha, nome_base: str,
+                          usuario, whatsapp: bool, inicio: str = "") -> None:
+    """Empresa que já estava cadastrada e foi achada de novo na base da campanha (pedido da Maria em 16/11/2026: as
+    empresas da lista dela apareciam com a origem "base da Receita", de uma busca antiga). Ganha os dados que faltam
+    (só campos vazios: nada é apagado nem trocado), o celular da base como WhatsApp (campanha com WhatsApp) e, se a
+    base é uma lista importada, a origem da lista no lugar da antiga, que fica no histórico. Origem que não veio de
+    uma base ("Cadastro manual", indicação, planilha...) fica. Empresa de outra AR não é mexida."""
+    if lead.tenant_id and camp.tenant_id and lead.tenant_id != camp.tenant_id:
+        return
+    completados = preencher(lead, dados, so_vazios=True)
+    if celular and whatsapp and not lead.whatsapp:
+        lead.whatsapp = celular
+        completados.append("whatsapp")
+    conhecidos = {util.com_nono_digito(lead.telefone or ""), util.com_nono_digito(lead.whatsapp or "")}
+    if celular and celular not in conhecidos and util.formatar_telefone(celular) not in (lead.observacoes or ""):
+        nota = f"Celular informado à Receita: {util.formatar_telefone(celular)} (confirmar se é WhatsApp)."
+        lead.observacoes = f"{lead.observacoes.rstrip()}\n{nota}" if (lead.observacoes or "").strip() else nota
+        completados.append("observacoes")
+    antiga = lead.origem or ""
+    if bases_importadas.e_lista(camp.base or "") and origem != antiga and (not antiga or antiga.startswith("Prospecção:")):
+        lead.origem = origem
+    if completados:
+        limpar_campos(lead)  # formata e recalcula as chaves (telefone, WhatsApp, e-mail)
+    partes = []
+    if lead.origem != antiga:
+        partes.append(f"origem trocada de \"{antiga or 'sem origem'}\" para \"{lead.origem}\"")
+    if completados:
+        partes.append("dados completados: " + ", ".join(NOMES_DOS_CAMPOS.get(c, c) for c in dict.fromkeys(completados)))
+    if partes:
+        inicio = inicio or f"Empresa achada de novo na {nome_base} pela campanha \"{camp.nome}\""
+        historico(db, lead.id, "sistema", f"{inicio}: {'; '.join(partes)}.", usuario)
 
 
 def tem_canal(lead: Lead, canais: list[str]) -> bool:
@@ -201,6 +237,7 @@ def _buscar_candidatos(campanha_id: int) -> list[int]:
                         continue  # já olhada na volta anterior
                     vistos.add(dados["cnpj"])
                     origem = dados.pop("origem")
+                    celular = dados.pop("celular", "")
                     dados.pop("categoria", None)
                     lead, motivo = criar_lead(db, dados, usuario, origem=origem)
                     if not lead or lead.id in candidatos:
@@ -211,10 +248,14 @@ def _buscar_candidatos(campanha_id: int) -> list[int]:
                         continue  # travada com outro usuário (60 dias ou até ele liberar)
                     if motivo and (lead.opt_out or lead.perdido or lead.etapa >= 1 or lead.automacao_pausada):
                         continue  # já cadastrado e já trabalhado: não entra de novo
+                    if motivo == "CNPJ":  # já estava cadastrada: ganha da base o que falta (e a origem, se for lista).
+                        # Achada pelo telefone/e-mail/site pode ser outra empresa (o mesmo contador): não mistura.
+                        _completar_com_a_base(db, lead, dados, celular, origem, camp, nome_base, usuario,
+                                              whatsapp="whatsapp" in canais)
                     if lead.categoria_id is None and cod in cats:
                         lead.categoria = cats[cod]
                     if "whatsapp" in canais and not lead.whatsapp:
-                        lead.whatsapp = celular_do_lead(lead)
+                        lead.whatsapp = celular or celular_do_lead(lead)  # o celular da base, com o 9 da frente
                         limpar_campos(lead)  # formata e recalcula a chave: sem ela, a resposta não acha a empresa
                     if "email" in canais and lead.email:
                         email_validacao.utilizavel(db, lead)  # domínio sem e-mail: já entra sem esse canal

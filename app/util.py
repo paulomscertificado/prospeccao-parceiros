@@ -87,6 +87,17 @@ def com_nono_digito(telefone: str) -> str:
     return d
 
 
+def celular(*telefones) -> str:
+    """O primeiro celular entre os telefones, só dígitos e com o 9 da frente (DDD + 9 + 8 dígitos); vazio se só houver
+    fixo. A Receita (e a CNPJá, que copia dela) guarda quase todos os celulares no formato antigo, sem o 9: em
+    16/11/2026 eram 461 mil assim na base da Receita contra 36 com o 9, e nenhum com o 9 na lista da CNPJá."""
+    for telefone in telefones:
+        d = com_nono_digito(telefone or "")
+        if len(d) == 11 and d[2] == "9":
+            return d
+    return ""
+
+
 def formatar_telefone(telefone: str) -> str:
     d = normalizar_telefone(telefone)
     if len(d) == 11:

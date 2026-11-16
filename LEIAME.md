@@ -269,6 +269,13 @@ separada da Receita. Exemplo: "contabilidades e adm cond PE & MG".
   **`importar_lista.bat`** e confirme o nome.
 - **Esconder a base da Receita:** no mesmo lugar, botão "Esconder a base da Receita". Os usuários passam a ver só as
   listas. Nada é apagado e dá para mostrar de novo.
+- **Celular:** a Receita e a CNPJá guardam o celular sem o 9 da frente (ex.: (81) 9888-7777). O sistema coloca o 9
+  ((81) 99888-7777) e, na campanha com WhatsApp, usa esse número como o WhatsApp da empresa. Celular informado à
+  Receita nem sempre tem WhatsApp: se a mensagem não chegar, confira o número.
+- **Empresa que já estava cadastrada:** a campanha usa o mesmo cadastro (não duplica). Se a empresa veio de outra
+  busca (ex.: a base da Receita), ela passa a mostrar a lista em **Origem do lead** e ganha da lista o que faltava
+  (celular, e-mail, endereço...). O que já estava preenchido não muda, e o histórico da empresa conta o que mudou.
+  Empresa cadastrada à mão ou por indicação continua com a origem dela.
 
 ### Empresa que cada usuário representa
 
