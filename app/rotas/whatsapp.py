@@ -110,7 +110,10 @@ async def salvar_oficial(request: Request, usuario: Usuario = Depends(exige("wha
     try:
         r = whatsapp_oficial.testar(db, conta)
         db.commit()
-        avisar(request, f"Salvo e conectado: {r['numero']} ({r['nome']}), limite {r['limite']} por dia.")
+        avisar(request, f"Salvo e conectado: {r['numero']} ({r['nome']}), limite {r['limite']} por dia."
+                        + (" O app foi ligado à conta do WhatsApp (as respostas chegam pelo webhook)." if r["app_ligado"] else ""))
+        if r["avisos"]:
+            avisar(request, " ".join(r["avisos"]), "alerta")
     except whatsapp_cloud.ErroWhatsApp as erro:
         avisar(request, f"Salvo, mas o teste de conexão falhou: {erro}", "alerta")
     return voltar("/whatsapp#oficial")
@@ -127,6 +130,8 @@ async def testar_oficial(request: Request, usuario: Usuario = Depends(exige("wha
         r = whatsapp_oficial.testar(db, conta)
         db.commit()
         avisar(request, f"Conectado: {r['numero']} ({r['nome']}), qualidade {r['qualidade']}, limite {r['limite']} por dia.")
+        if r["avisos"]:
+            avisar(request, " ".join(r["avisos"]), "alerta")
     except whatsapp_cloud.ErroWhatsApp as erro:
         avisar(request, f"O teste de conexão falhou: {erro}", "erro")
     return voltar("/whatsapp#oficial")

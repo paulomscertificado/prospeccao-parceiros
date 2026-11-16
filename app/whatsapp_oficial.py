@@ -57,8 +57,6 @@ def salvar(db, conta: ContaWhatsAppOficial | None, dados: dict) -> tuple[ContaWh
     if not numero_id:
         problemas.append("Preencha a Identificação do número de telefone (só números, como aparece no Gerenciador "
                          "do WhatsApp).")
-    if not waba_id:
-        problemas.append("Preencha o ID da conta do WhatsApp Business (só números).")
     if not novo_token and not (conta and conta.token_cripto):
         problemas.append("Cole o token permanente do usuário do sistema.")
     if novo_token and (len(novo_token) < 30 or " " in novo_token):
@@ -97,14 +95,34 @@ QUALIDADE = {"GREEN": "Alta", "YELLOW": "Média", "RED": "Baixa", "UNKNOWN": "Ai
 
 
 def testar(db, conta: ContaWhatsAppOficial) -> dict:
-    """Pergunta à Meta pelo número (teste de conexão) e guarda o resultado para a tela."""
+    """Pergunta à Meta pelo número (teste de conexão), descobre o ID da conta do WhatsApp Business pelo token se ele não
+    foi preenchido, liga o app à conta (para o webhook receber as respostas) e guarda o resultado para a tela.
+    `avisos`: o que não deu certo, sem impedir o resto (ex.: a conta não foi achada pelo token)."""
     dados = whatsapp_cloud.consultar_numero(conta.phone_number_id, token(conta))
     limite = str(dados.get("whatsapp_business_manager_messaging_limit") or "")
     resultado = {"numero": dados.get("display_phone_number", ""), "nome": dados.get("verified_name", ""),
                  "qualidade": QUALIDADE.get(str(dados.get("quality_rating") or "").upper(),
                                             dados.get("quality_rating") or "—"),
                  "limite": limite.replace("TIER_", "").replace("UNLIMITED", "ilimitado") or "—",
-                 "nome_aprovado": dados.get("name_status", "")}
+                 "nome_aprovado": dados.get("name_status", ""), "app_ligado": False, "avisos": []}
+    avisos = resultado["avisos"]
+    if not conta.waba_id:
+        try:
+            ids = whatsapp_cloud.contas_do_token(token(conta))
+        except whatsapp_cloud.ErroWhatsApp:
+            ids = []
+        if len(ids) == 1:
+            conta.waba_id = ids[0]
+        elif ids:
+            avisos.append("O token alcança mais de uma conta do WhatsApp Business: preencha o ID da conta na tela.")
+        else:
+            avisos.append("Não consegui descobrir o ID da conta do WhatsApp Business pelo token: preencha na tela "
+                          "(Configurações do negócio > Contas > Contas do WhatsApp).")
+    if conta.waba_id:
+        try:
+            resultado["app_ligado"] = whatsapp_cloud.inscrever_app(conta.waba_id, token(conta))
+        except whatsapp_cloud.ErroWhatsApp as erro:
+            avisos.append(f"Não consegui ligar o app à conta do WhatsApp (as respostas não chegam até isso): {erro}")
     conta.numero = str(resultado["numero"])[:30]
     conta.situacao, conta.testado_em = json.dumps(resultado, ensure_ascii=False), agora()
     return resultado

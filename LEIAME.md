@@ -510,15 +510,16 @@ mensagens (entregue, lida). As campanhas continuam saindo pelos números do QR c
 
 Como ligar (o administrador da AR; o Admin Master, dentro da AR):
 1. **Meta for Developers** (developers.facebook.com/apps) > **Criar app** (Empresa) > adicione o produto
-   **WhatsApp** e ligue ao portfólio da empresa.
+   **WhatsApp** e ligue ao portfólio da empresa. Não precisa usar o "Início rápido" do app (ele cria um número de
+   teste): o sistema liga o app à conta do WhatsApp sozinho quando você salvar o token.
 2. **Configurações do negócio** > Usuários > **Usuários do sistema** > Adicionar (Admin) > atribua o app e a conta do
    WhatsApp > **Gerar token** (validade "Nunca", permissões `whatsapp_business_messaging` e
    `whatsapp_business_management`). **Não mande o token para ninguém**: ele vai só na tela do sistema.
-3. No sistema: **Configurações > WhatsApp > API oficial da Meta**. Preencha o ID da conta do WhatsApp Business, a
-   Identificação do número de telefone (Gerenciador do WhatsApp > Números de telefone > clique no número), o token e
+3. No sistema: **Configurações > WhatsApp > API oficial da Meta**. Preencha a Identificação do número de telefone
+   (Gerenciador do WhatsApp > Números de telefone > clique no número), o token e
    a chave secreta do app (Meta for Developers > seu app > Configurações do app > Básico) e clique em
-   **Salvar e testar**. O token e a chave ficam guardados protegidos e não aparecem mais na tela; para trocar, cole
-   de novo.
+   **Salvar e testar**. O ID da conta do WhatsApp Business pode ficar em branco: o sistema descobre pelo token. O
+   token e a chave ficam guardados protegidos e não aparecem mais na tela; para trocar, cole de novo.
 4. **Webhook**: no Meta for Developers > seu app > WhatsApp > Configuração, cole a **URL de retorno** e o **token de
    verificação** que aparecem na tela do sistema e assine o campo **messages**.
 5. **Enviar teste**: digite o seu celular e clique em **Enviar teste**. Chega o modelo de exemplo da Meta

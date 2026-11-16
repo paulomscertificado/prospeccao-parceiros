@@ -92,7 +92,9 @@
   {% set s = oficial_situacao %}
   {% if oficial and s %}
   <div class="aviso aviso-ok">Conectado: <b>{{ s.numero }}</b> ({{ s.nome }}) · qualidade: {{ s.qualidade }} · limite: {{ s.limite }}
-    conversas iniciadas pela empresa por dia{% if oficial.testado_em %} <span class="pequeno">(testado em {{ oficial.testado_em|datahora }})</span>{% endif %}</div>
+    conversas iniciadas pela empresa por dia{% if oficial.testado_em %} <span class="pequeno">(testado em {{ oficial.testado_em|datahora }})</span>{% endif %}
+    <br>{{ 'App ligado à conta do WhatsApp: as respostas chegam pelo webhook.' if s.app_ligado else 'O app ainda não está ligado à conta do WhatsApp: as respostas não chegam (clique em Testar conexão).' }}</div>
+  {% for aviso in s.avisos or [] %}<div class="aviso aviso-alerta">{{ aviso }}</div>{% endfor %}
   {% elif oficial %}
   <div class="aviso aviso-alerta">Dados salvos, mas a conexão ainda não foi confirmada: clique em <b>Testar conexão</b>.</div>
   {% endif %}
@@ -100,7 +102,8 @@
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <div class="campos">
       <div><label>Nome (para a equipe)</label><input type="text" name="nome" maxlength="120" value="{{ oficial.nome if oficial else '' }}" placeholder="Nome da empresa no WhatsApp"></div>
-      <div><label>ID da conta do WhatsApp Business</label><input type="text" inputmode="numeric" name="waba_id" value="{{ oficial.waba_id if oficial else '' }}"></div>
+      <div><label>ID da conta do WhatsApp Business</label><input type="text" inputmode="numeric" name="waba_id" value="{{ oficial.waba_id if oficial else '' }}" placeholder="Em branco: o sistema descobre pelo token">
+        <p class="ajuda">Pode deixar em branco: o sistema acha pelo token.</p></div>
       <div><label>Identificação do número de telefone</label><input type="text" inputmode="numeric" name="phone_number_id" value="{{ oficial.phone_number_id if oficial else '' }}">
         <p class="ajuda">Gerenciador do WhatsApp &gt; Números de telefone &gt; clique no número.</p></div>
       <div class="largo"><label>Token permanente (usuário do sistema)</label>

@@ -43,7 +43,12 @@ app WhatsApp Business: provavelmente coexistência, o app continua no celular), 
   `whatsapp.gerenciar_todos`; o Admin Master configura dentro da AR ("Entrar na AR"). Rotas:
   `POST /whatsapp/oficial` (salvar e testar), `/whatsapp/oficial/testar`, `/whatsapp/oficial/teste` (um modelo
   aprovado para um número da equipe; padrão `hello_world`/`en_US`, o de exemplo da Meta), `/whatsapp/oficial/remover`.
-  Token/chave em branco ao salvar = continuam os de antes.
+  Token/chave em branco ao salvar = continuam os de antes. O ID da conta do WhatsApp Business pode ficar em branco:
+  ao testar, o sistema descobre pelo token (`whatsapp_cloud.contas_do_token`: permissões granulares do
+  `debug_token`) e **liga o app à conta** (`whatsapp_cloud.inscrever_app`, `POST /{waba}/subscribed_apps`; sem isso o
+  webhook não recebe as respostas da conta). É o que o "Início rápido" do app faria; ele cria um número de teste e,
+  para a MS, foi travado pela Meta em 16/11/2026 ("impedido temporariamente"): não é preciso usá-lo. A situação
+  guarda `app_ligado` e os `avisos` (mostrados na tela).
 - **Cliente da Meta**: `integracoes/whatsapp_cloud.py` — `consultar_numero` (campos `display_phone_number`,
   `verified_name`, `quality_rating`, `whatsapp_business_manager_messaging_limit`, `name_status`), `enviar_modelo`,
   `enviar_texto_por`, `numeros_do_webhook`, `ler_webhook` (com o `phone_number_id` de cada item), `assinatura_confere`.
@@ -62,13 +67,14 @@ app WhatsApp Business: provavelmente coexistência, o app continua no celular), 
 ## Passo a passo na Meta (o que a AR faz)
 
 1. Meta for Developers (<https://developers.facebook.com/apps>) > Criar app (Empresa) > adicionar o produto
-   **WhatsApp** e ligar ao portfólio da empresa.
+   **WhatsApp** e ligar ao portfólio da empresa. Não precisa concluir o "Início rápido" (número de teste). Na MS:
+   app "MS API off" (ID 1838539180819325), em modo de desenvolvimento.
 2. Configurações do negócio > Usuários > **Usuários do sistema** > adicionar (Admin) > atribuir o app e a conta do
    WhatsApp (controle total) > **Gerar token**: o app, validade "Nunca", permissões `whatsapp_business_messaging` e
    `whatsapp_business_management`.
-3. No sistema: Configurações > WhatsApp > API oficial da Meta: ID da conta do WhatsApp Business, Identificação do
-   número de telefone, token e chave secreta do app (Meta for Developers > app > Configurações do app > Básico) >
-   **Salvar e testar**.
+3. No sistema: Configurações > WhatsApp > API oficial da Meta: Identificação do número de telefone, token e chave
+   secreta do app (Meta for Developers > app > Configurações do app > Básico); o ID da conta do WhatsApp Business é
+   opcional > **Salvar e testar** (liga o app à conta).
 4. Webhook: Meta for Developers > app > WhatsApp > Configuração: URL de retorno e token de verificação mostrados na
    tela do sistema; assinar o campo `messages`.
 5. **Enviar teste** para o próprio celular. Forma de pagamento na conta do WhatsApp para os modelos pagos.

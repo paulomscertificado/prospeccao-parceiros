@@ -59,6 +59,12 @@ def _meta_falsa(monkeypatch) -> list:
 
     def pedir(metodo, url, **kw):
         chamadas.append((metodo, url, kw))
+        if url.endswith("/debug_token"):  # o token alcança uma conta do WhatsApp Business
+            return _Resposta({"data": {"granular_scopes": [
+                {"scope": "whatsapp_business_management", "target_ids": ["998877"]},
+                {"scope": "whatsapp_business_messaging", "target_ids": ["998877"]}]}})
+        if url.endswith("/subscribed_apps"):
+            return _Resposta({"success": True})
         if metodo == "GET":
             return _Resposta({"display_phone_number": "+55 81 8343-0717", "verified_name": "Empresa Oficial Teste",
                               "quality_rating": "GREEN", "whatsapp_business_manager_messaging_limit": "TIER_2K",
@@ -82,22 +88,25 @@ def test_tela_guarda_as_chaves_protegidas_testa_e_manda_o_teste(cliente, monkeyp
     c = _entrar(EMAIL_MS)
     tela = c.get("/whatsapp").text
     assert "API oficial da Meta" in tela and "Salvar e testar" in tela
-    r = c.post("/whatsapp/oficial", data={"csrf": csrf_de(tela), "nome": "Empresa Oficial", "waba_id": "998877",
+    # o ID da conta do WhatsApp Business em branco: o sistema descobre pelo token e liga o app à conta
+    r = c.post("/whatsapp/oficial", data={"csrf": csrf_de(tela), "nome": "Empresa Oficial", "waba_id": "",
                                           "phone_number_id": NUMERO_ID, "token": TOKEN, "segredo": SEGREDO})
-    assert r.status_code == 200 and "Salvo e conectado" in r.text, r.text[:500]
+    assert r.status_code == 200 and "Salvo e conectado" in r.text and "O app foi ligado" in r.text, r.text[:500]
     with sessao() as db:
         conta = db.execute(select(ContaWhatsAppOficial).where(ContaWhatsAppOficial.phone_number_id == NUMERO_ID)).scalar_one()
         assert TOKEN not in conta.token_cripto and descriptografar(conta.token_cripto) == TOKEN
         assert descriptografar(conta.segredo_cripto) == SEGREDO and len(conta.verificacao) >= 20
-        assert conta.numero == "+55 81 8343-0717" and conta.tenant_id == ar
+        assert conta.numero == "+55 81 8343-0717" and conta.tenant_id == ar and conta.waba_id == "998877"
         verificacao = conta.verificacao
+    inscricao = [(m, u) for m, u, _ in chamadas if u.endswith("/subscribed_apps")]
+    assert inscricao == [("POST", "https://graph.facebook.com/v27.0/998877/subscribed_apps")]
     metodo, url, kw = chamadas[0]  # o teste de conexão pergunta pelo número, com o token da conta
     assert metodo == "GET" and url.endswith(f"/v27.0/{NUMERO_ID}") and "quality_rating" in kw["params"]["fields"]
     assert kw["headers"]["Authorization"] == f"Bearer {TOKEN}"
     tela = c.get("/whatsapp").text
     assert TOKEN not in tela and SEGREDO not in tela  # as chaves nunca voltam para a tela
     assert verificacao in tela and "/api/webhooks/whatsapp" in tela and "Guardado ✓" in tela
-    assert "qualidade: Alta" in tela and "limite: 2K" in tela
+    assert "qualidade: Alta" in tela and "limite: 2K" in tela and "App ligado à conta do WhatsApp" in tela
     # salvar de novo com o token em branco mantém o token guardado
     c.post("/whatsapp/oficial", data={"csrf": csrf_de(tela), "nome": "Empresa Oficial 2", "waba_id": "998877",
                                       "phone_number_id": NUMERO_ID, "token": "", "segredo": ""})

@@ -67,6 +67,24 @@ def consultar_numero(phone_number_id: str, token: str, versao: str | None = None
     return _pedir("GET", phone_number_id, token, versao, params={"fields": CAMPOS_DO_NUMERO})
 
 
+def contas_do_token(token: str, versao: str | None = None) -> list[str]:
+    """IDs das contas do WhatsApp Business que o token alcança (as permissões granulares do próprio token): assim a
+    pessoa não precisa procurar o ID da conta na Meta."""
+    dados = _pedir("GET", "debug_token", token, versao, params={"input_token": token})
+    ids: list[str] = []
+    for escopo in (dados.get("data") or {}).get("granular_scopes") or []:
+        if escopo.get("scope") in ("whatsapp_business_management", "whatsapp_business_messaging"):
+            ids += [str(i) for i in escopo.get("target_ids") or [] if str(i) not in ids]
+    return ids
+
+
+def inscrever_app(waba_id: str, token: str, versao: str | None = None) -> bool:
+    """Liga o app do token à conta do WhatsApp Business (o que o "Início rápido" da Meta faria): sem isso, as
+    respostas e a situação das mensagens da conta não chegam ao webhook do app."""
+    dados = _pedir("POST", f"{waba_id}/subscribed_apps", token, versao)
+    return bool(dados.get("success", True))
+
+
 def enviar_modelo(phone_number_id: str, token: str, telefone: str, nome_modelo: str, idioma: str = "pt_BR",
                   parametros: list[str] | None = None, versao: str | None = None) -> str:
     """Envia um modelo aprovado. Devolve o id da mensagem na Meta (wamid)."""
