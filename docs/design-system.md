@@ -10,6 +10,10 @@ dos detalhes como veio; `--cta` (botões de ação e escolhas marcadas) = cor do
 (lista `marca.FONTES`, do Google Fonts) e as do menu (`--menu-texto`, `--menu-rotulo`, `--menu-ativo`). O verde de
 "deu certo" (selos OK, avisos de sucesso) não muda. Sem marca própria = as cores de sempre. Logo da AR em
 `/marca/logo/<ar>/<assinatura>?v=<versão>`; sem logo, o nome curto em texto. A tela de entrada é neutra.
+Alto do menu (`templates/_marca_menu.html`): logo quase quadrado (como o da MS) ao lado do traço e de "Parceiros /
+Prospecção B2B"; logo largo (largura/altura >= 1,8, ex.: Grupo Certy) sozinho na linha de cima, até 44 px de altura e
+a largura do menu, com "Parceiros · Prospecção B2B" numa linha embaixo (`.marca-larga`). O logo vai sobre a cor do
+menu: branco e com fundo transparente (Configurações > Marca > "Tirar o fundo liso do logo").
 
 ## Cores
 

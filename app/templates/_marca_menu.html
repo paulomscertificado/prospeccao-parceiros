@@ -1,0 +1,9 @@
+{# O logo (ou o nome) no alto do menu: base.html e a prévia "Como fica" em Configurações > Marca (variável `m`).
+   Logo largo (marca.LOGO_LARGO, ex.: Grupo Certy) fica sozinho na linha de cima, na largura do menu, com o rótulo
+   embaixo; os outros ficam lado a lado com o traço e o rótulo, como o da MS. #}
+<div class="marca{{ ' marca-larga' if m.logo_largo }}">
+  {%- if m.logo_url %}<img class="logo-img" src="{{ m.logo_url }}" alt="{{ m.nome }}">
+  {%- else %}<span class="logo-texto">{{ m.titulo if m.plataforma else m.curto }}</span>{% endif %}
+  {%- if m.logo_largo %}<span class="rotulo-marca">Parceiros · Prospecção B2B</span>
+  {%- else %}<span class="divisor"></span><span class="rotulo-marca">Parceiros<br>Prospecção B2B</span>{% endif -%}
+</div>

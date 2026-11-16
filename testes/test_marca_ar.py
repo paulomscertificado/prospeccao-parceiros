@@ -5,6 +5,7 @@ as telas (GET sem parâmetro, as abas das Configurações e a ficha de um lead d
 ou o logo da MS; as mensagens montadas para alguém do Grupo Certy também não. Antes de entrar, a tela é neutra.
 """
 import base64
+import io
 import re
 
 import pytest
@@ -14,7 +15,7 @@ from sqlalchemy import select
 from app import marca
 from app.banco import ler_config, sessao, usar_config_da_ar
 from app.main import app
-from app.modelos import ConfiguracaoAR, Lead, Template, Tenant, Usuario
+from app.modelos import ConfiguracaoAR, Lead, LogAuditoria, MarcaAR, Template, Tenant, Usuario
 from app.seguranca import limite_pedidos, resumir_senha
 from conftest import SENHA, csrf_de
 
@@ -169,6 +170,91 @@ def test_a_administradora_muda_a_marca_e_o_logo(certy):
         assert marca.salvar(db, certy["ar"], {}, tirar_logo=True) == []
     marca.esquecer()
 
+
+def _imagem(largura, altura, fundo, desenho, caixa, formato="PNG") -> bytes:
+    from PIL import Image
+
+    imagem = Image.new("RGB", (largura, altura), fundo)
+    imagem.paste(desenho, caixa)
+    arquivo = io.BytesIO()
+    imagem.save(arquivo, formato)
+    return arquivo.getvalue()
+
+
+def _endereco_do_logo(pagina: str) -> str:
+    return re.search(r'src="(/marca/logo/\d+/[0-9a-f]{16}\?v=\d+)"', pagina).group(1)
+
+
+def test_tirar_o_fundo_liso_do_logo():
+    """Como o JPG do Grupo Certy: logo branco num fundo cinza-claro, que no menu aparecia como um retângulo."""
+    from PIL import Image
+
+    png = marca.tirar_fundo_do_logo(_imagem(300, 60, (247, 247, 247), (255, 255, 255), (20, 10, 280, 50)))
+    imagem = Image.open(io.BytesIO(png))
+    assert imagem.format == "PNG" and imagem.mode == "RGBA"
+    assert imagem.size == (262, 42)  # as sobras em volta foram cortadas (1 px de folga)
+    assert imagem.getpixel((0, 0))[3] == 0  # o que era fundo ficou transparente
+    assert imagem.getpixel((131, 21)) == (255, 255, 255, 255)  # o desenho continua branco e inteiro
+    assert marca.tirar_fundo_do_logo(png) == png  # de novo: nada muda
+    assert marca.proporcao_do_logo(png) == pytest.approx(262 / 42, abs=0.01)
+    # o JPG de verdade tem manchinhas perto do fundo: também somem
+    jpg = Image.open(io.BytesIO(marca.tirar_fundo_do_logo(
+        _imagem(300, 60, (247, 247, 247), (255, 255, 255), (20, 10, 280, 50), "JPEG"))))
+    assert jpg.getpixel((0, 0))[3] == 0 and jpg.size[0] < 270 and jpg.getpixel((131, 21))[3] > 200
+    # logo escuro em fundo branco: o desenho fica, sem contorno branco
+    escuro = Image.open(io.BytesIO(marca.tirar_fundo_do_logo(_imagem(100, 40, (255, 255, 255), (0, 0, 0), (10, 10, 90, 30)))))
+    assert escuro.getpixel((40, 10)) == (0, 0, 0, 255) and escuro.getpixel((0, 0))[3] == 0
+    # sem fundo liso (bordas de várias cores, como uma foto) ou arquivo que não abre: fica como veio
+    degrade = io.BytesIO()
+    Image.linear_gradient("L").convert("RGB").save(degrade, "PNG")
+    assert marca.tirar_fundo_do_logo(degrade.getvalue()) is None
+    assert marca.tirar_fundo_do_logo(b"\x89PNG\r\n\x1a\nnao e imagem") is None
+    assert marca.proporcao_do_logo(b"nao e imagem") is None
+
+
+def test_logo_largo_fica_sozinho_no_alto_do_menu_e_o_fundo_sai_pela_tela(certy):
+    c = _entrar(certy["email"])
+    csrf = csrf_de(c.get("/configuracoes?aba=marca").text)
+    jpg = _imagem(300, 61, (247, 247, 247), (255, 255, 255), (10, 8, 290, 52), "JPEG")
+    try:
+        c.post("/configuracoes/marca", data={"csrf": csrf}, files={"logo": ("logo.jpg", jpg, "image/jpeg")})
+        pagina = c.get("/").text
+        assert 'class="marca marca-larga"' in pagina and "Parceiros · Prospecção B2B" in pagina
+        assert 'rel="icon"' not in pagina  # largo vira um risquinho na aba do navegador
+        assert c.get(_endereco_do_logo(pagina)).headers["content-type"] == "image/jpeg"  # sem marcar: como veio
+        # sem arquivo novo, "Tirar o fundo liso do logo" trata o logo de agora
+        r = c.post("/configuracoes/marca", data={"csrf": csrf, "tirar_fundo": "1"})
+        assert "Marca salva" in r.text and 'class="marca marca-larga"' in r.text  # a prévia "Como fica" também
+        logo = c.get(_endereco_do_logo(c.get("/").text))
+        from PIL import Image
+
+        assert logo.headers["content-type"] == "image/png"
+        assert Image.open(io.BytesIO(logo.content)).getpixel((0, 0))[3] == 0
+        with sessao() as db:
+            registro = db.execute(select(LogAuditoria).where(LogAuditoria.acao == "salvou_marca")
+                                  .order_by(LogAuditoria.id.desc())).scalars().first()
+            assert "tirou o fundo do logo" in registro.detalhes
+        # logo quase quadrado (como o da MS): lado a lado com o traço e o rótulo, e vira o ícone da aba
+        quadrado = _imagem(40, 34, (255, 255, 255), (0, 0, 0), (5, 5, 35, 29))
+        c.post("/configuracoes/marca", data={"csrf": csrf}, files={"logo": ("logo.png", quadrado, "image/png")})
+        pagina = c.get("/").text
+        assert '<div class="marca">' in pagina and 'class="divisor"' in pagina and 'rel="icon"' in pagina
+    finally:
+        with sessao() as db:
+            assert marca.salvar(db, certy["ar"], {}, tirar_logo=True) == []
+            assert marca.salvar(db, certy["ar"], {}, tirar_fundo=True) == [
+                "Não há logo para tirar o fundo: escolha o arquivo do logo."]
+        marca.esquecer()
+
+
+def test_logos_de_antes_ganham_a_medida_na_publicacao():
+    with sessao() as db:
+        ms = db.execute(select(Tenant.id).where(Tenant.slug == "ms")).scalar()
+        db.get(MarcaAR, ms).logo_proporcao = None
+        db.flush()
+        marca.garantir(db)
+        assert db.get(MarcaAR, ms).logo_proporcao == pytest.approx(351 / 306, abs=0.01)  # o da MS: quase quadrado
+    marca.esquecer()
 
 def test_o_que_e_da_plataforma_so_o_admin_master_muda(certy, cliente):
     c = _entrar(certy["email"])

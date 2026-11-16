@@ -287,6 +287,10 @@ h2 { font-weight: 700; letter-spacing: -.01em; }
 .marca .divisor { width: 1px; align-self: stretch; background: rgba(219, 230, 240, .25); }
 .marca .rotulo-marca { font-family: var(--fonte-mono); font-size: .62rem; letter-spacing: .14em; line-height: 1.5;
                        text-transform: uppercase; color: var(--menu-rotulo); }
+/* Logo largo (ex.: Grupo Certy, marca.LOGO_LARGO): sozinho na linha de cima, na largura do menu; rótulo embaixo */
+.marca.marca-larga { flex-direction: column; align-items: flex-start; gap: 9px; }
+.marca.marca-larga .logo-img { height: auto; max-height: 44px; max-width: 100%; }
+.marca.marca-larga .rotulo-marca { letter-spacing: .1em; white-space: nowrap; }
 .menu a.item:hover { background: rgba(255, 255, 255, .06); }
 .menu a.item.ativo { background: var(--menu-ativo); color: #fff; box-shadow: inset 3px 0 0 var(--verde-marca); }
 .menu a.item.ativo svg { color: var(--verde-marca); opacity: 1; }

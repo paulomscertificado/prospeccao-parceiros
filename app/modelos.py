@@ -72,6 +72,8 @@ class MarcaAR(Base):
     fonte: Mapped[str] = mapped_column(String(40), default="")  # uma de marca.FONTES; vazio = Inter
     logo: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True, deferred=True)  # para fundo colorido
     logo_tipo: Mapped[str] = mapped_column(String(20), default="")  # image/png...; vazio = sem logo
+    # largura/altura do logo: largo (marca.LOGO_LARGO) fica sozinho na linha de cima do menu; vazio = ainda não medido
+    logo_proporcao: Mapped[float | None] = mapped_column(Float, nullable=True)
     atualizado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, onupdate=agora)
 
 

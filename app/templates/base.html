@@ -33,18 +33,17 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
   {% if marca.fonte_url %}<link rel="stylesheet" href="{{ marca.fonte_url }}">{% endif %}
-  <link rel="stylesheet" href="/static/estilo.css?v=12">
+  <link rel="stylesheet" href="/static/estilo.css?v=13">
   {# white label, Fase 5: cores e fonte da marca da AR (app/marca.py, tema; só #RRGGBB e fontes da lista) #}
   {% if marca.css %}<style>:root { {{ marca.css|safe }} }</style>{% endif %}
-  {% if marca.logo_url %}<link rel="icon" href="{{ marca.logo_url }}">{% endif %}
+  {% if marca.logo_url and not marca.logo_largo %}<link rel="icon" href="{{ marca.logo_url }}">{% endif %}{# largo vira um risquinho na aba #}
 </head>
 <body>
 {% if usuario %}
 <div class="topo-celular"><button id="abrir-menu" aria-label="Abrir menu">☰</button>{% if marca.logo_url %}<img src="{{ marca.logo_url }}" alt="{{ marca.nome }}">{% else %}<b>{{ marca.titulo if marca.plataforma else marca.curto }}</b>{% endif %}<b>Parceiros</b></div>
 <div class="estrutura">
   <nav class="menu">
-    <div class="marca">{% if marca.logo_url %}<img class="logo-img" src="{{ marca.logo_url }}" alt="{{ marca.nome }}">{% else %}<span class="logo-texto">{{ marca.titulo if marca.plataforma else marca.curto }}</span>{% endif %}<span class="divisor"></span>
-      <span class="rotulo-marca">Parceiros<br>Prospecção B2B</span></div>
+    {% with m = marca %}{% include "_marca_menu.html" %}{% endwith %}
     {% for link, nome, icone in menu %}
       <a class="item {{ 'ativo' if (caminho == link or (link not in ['/', '/portal'] and caminho.startswith(link))
             or (link == '/configuracoes' and caminho.startswith(('/permissoes', '/categorias', '/conhecimento', '/whatsapp', '/email')))) }}" href="{{ link }}">

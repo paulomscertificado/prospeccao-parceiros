@@ -191,11 +191,13 @@ async def salvar_marca(request: Request, usuario: Usuario = Depends(exige("confi
     novo_logo = await arquivo.read() if arquivo is not None and getattr(arquivo, "filename", "") else None
     campos = ("nome", "curto", "artigo", "site", "descricao", "dominio_email", "cor", "cor_detalhe", "cor_fundo", "fonte")
     antes = _marca_no_registro(db, ar)
+    tirar_fundo = form.get("tirar_fundo") == "1"
     problemas = marca.salvar(db, ar, {c: str(form.get(c) or "") for c in campos if c in form}, novo_logo,
-                             tirar_logo=form.get("tirar_logo") == "1")
+                             tirar_logo=form.get("tirar_logo") == "1", tirar_fundo=tirar_fundo)
     db.flush()
-    registrar_log(db, usuario, "salvou_marca", "tenant", ar, "; ".join(problemas)[:250], request, modulo="Marca",
-                  mudancas=diferencas(antes, _marca_no_registro(db, ar)))
+    feito = (["logo novo"] if novo_logo else []) + (["tirou o fundo do logo"] if tirar_fundo else [])
+    registrar_log(db, usuario, "salvou_marca", "tenant", ar, "; ".join(feito + problemas)[:250], request,
+                  modulo="Marca", mudancas=diferencas(antes, _marca_no_registro(db, ar)))
     db.commit()
     marca.esquecer(ar)
     for problema in problemas:

@@ -8,6 +8,8 @@ httpx==0.28.1
 anthropic==2.1.0
 openpyxl==3.1.5
 fpdf2==2.8.9
+# imagens: tirar o fundo do logo da marca (já vinha com o fpdf2)
+Pillow==13.0.0
 python-dotenv==1.2.4
 cryptography==50.0.2
 # QR code da verificação em 2 etapas

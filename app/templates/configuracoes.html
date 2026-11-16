@@ -75,6 +75,11 @@
   <p class="pequeno suave">Para fundo colorido (o menu): de preferência a versão branca, em PNG com fundo transparente.
     {{ tipos_logo }}, até 300 KB.</p>
   <input type="file" name="logo" accept="image/png,image/jpeg,image/webp" aria-label="Arquivo do logo">
+  <label class="marcar" style="margin-top:6px"><input type="checkbox" name="tirar_fundo" value="1"> Tirar o fundo liso do logo (fica transparente)</label>
+  <p class="ajuda" style="margin-top:2px">Para o logo claro que veio num fundo branco ou cinza (JPG): o fundo some e o
+    logo fica direto na cor do menu. Vale para o arquivo escolhido acima ou, sem arquivo, para o logo de agora. Logo
+    escuro ou colorido em fundo branco pode sumir no menu: veja em "Como fica" e, se não gostar, envie o arquivo de novo
+    sem marcar.</p>
   {% if m.logo_url %}<label class="marcar" style="margin-top:6px"><input type="checkbox" name="tirar_logo" value="1"> Tirar o logo (as telas mostram o nome curto)</label>{% endif %}
   <p class="ajuda">Botões e títulos usam a cor principal um pouco mais escura quando a original não dá leitura com
     letra branca (acessibilidade). Os detalhes usam a cor original.</p>
@@ -83,8 +88,7 @@
 <div>
   <div class="cartao"><h2>Como fica</h2>
     <div class="menu" style="position:static;height:auto;width:100%;border-radius:12px;padding:16px 12px">
-      <div class="marca">{% if m.logo_url %}<img class="logo-img" src="{{ m.logo_url }}" alt="{{ m.nome }}">{% else %}<span class="logo-texto">{{ m.curto }}</span>{% endif %}<span class="divisor"></span>
-        <span class="rotulo-marca">Parceiros<br>Prospecção B2B</span></div>
+      {% include "_marca_menu.html" %}
       <a class="item ativo" href="#" onclick="return false">Dashboard</a><a class="item" href="#" onclick="return false">Leads</a></div>
     <p style="margin-top:12px"><span class="etiqueta">{{ m.curto }}</span></p>
     <p><button type="button" class="btn btn-primario">Botão principal</button> <button type="button" class="btn btn-verde">Aprovar</button></p>

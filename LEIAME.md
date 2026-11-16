@@ -529,7 +529,11 @@ neutra (sem o nome de nenhuma marca); depois de entrar, cada pessoa vê o **nome
 marca**, e as mensagens dela saem em nome da marca. Quem muda: o administrador da marca, em **Configurações > Marca**
 (nome nas mensagens, nome curto nas telas, "a" ou "o" antes do nome, apresentação curta, site, domínio do e-mail da
 equipe, cor principal, cor dos detalhes, cor do fundo, fonte e logo). O logo vai no menu colorido: de preferência a
-versão branca, em PNG com fundo transparente, até 300 KB. Botões e títulos usam a cor principal um pouco mais escura
+versão branca, em PNG com fundo transparente, até 300 KB. Se o logo veio num fundo branco ou cinza (JPG) e aparece
+como um retângulo no menu, marque **"Tirar o fundo liso do logo"** e salve (com o arquivo novo ou, sem arquivo, para o
+logo de agora): o fundo some e o logo fica direto na cor do menu. Logo escuro ou colorido pode sumir no menu sem o fundo:
+confira em "Como fica" e, se não gostar, envie o arquivo de novo sem marcar. Logo comprido (como o do Grupo Certy) fica
+sozinho no alto do menu, na largura dele. Botões e títulos usam a cor principal um pouco mais escura
 quando a original não dá leitura com letra branca. Depois de salvar, as outras pessoas veem a mudança em até 5 minutos.
 O admin master muda o **nome neutro da plataforma** (tela de entrada) em Configurações > Marca, fora das marcas.
 O e-mail de cada pessoa precisa ser do **domínio da marca** dela (Configurações > Marca); o e-mail principal, as

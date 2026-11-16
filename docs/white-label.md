@@ -11,7 +11,7 @@ O dono da plataforma e Admin Master é o Paulo Marinho (`Usuario.master`).
 | 2 | Isolamento obrigatório (filtro, porteiro com AR, RLS, testes nas 178 rotas) | nenhuma rota abre registro de outra AR | **Parte 1 (isolamento dos dados) no ar desde 14/11/2026**; **parte 2 (configurações por AR) no ar desde 14/11/2026**; RLS, `NOT NULL` e índices adiados (ver abaixo) |
 | 3 | Permissões por AR e painel /master | admin de uma AR não alcança outra nem o /master | **No ar desde 14/11/2026** (painel /master, o que é da plataforma só o master muda, módulos por AR); admins das ARs promovidos em 14/11/2026 |
 | 4 | WhatsApp, e-mail e filas por AR | uma AR parada não atrasa as outras | **Fila justa e avisos por AR no ar desde 14/11/2026**; WhatsApp Leads: decidido servidor central na nuvem (14/11/2026), espera a contratação |
-| 5 | Marca (white label) | nenhuma tela ou mensagem mostra a MS em outra AR | **No ar desde 14/11/2026**: um endereço para todas (tela de entrada neutra), marca de cada AR nas telas e nas mensagens; marca do Grupo Certy gravada pelo manual (falta o logo); nome e domínio da plataforma depois |
+| 5 | Marca (white label) | nenhuma tela ou mensagem mostra a MS em outra AR | **No ar desde 14/11/2026**: um endereço para todas (tela de entrada neutra), marca de cada AR nas telas e nas mensagens; marca do Grupo Certy gravada pelo manual, logo sem o fundo desde 16/11/2026; nome e domínio da plataforma depois |
 | 6 | Auditoria, LGPD e planos | exportar e apagar uma AR de teste sem tocar nas outras | **Auditoria e LGPD no ar desde 14/11/2026** (quem agiu como quem; exportar e apagar uma AR, ensaiados no banco de teste); planos e cobrança depois da validação (decidido em 14/11/2026) |
 
 Os planos pagos são obrigatórios antes da Fase 3 (a primeira AR nova): o Hobby da Vercel não permite uso comercial
@@ -188,9 +188,18 @@ links dos e-mails (descadastro, avisos) levam o endereço da Vercel.
 nas telas, artigo ("a MS", "o Grupo Certy"), apresentação, site, domínio do e-mail da equipe, cores (principal,
 detalhes, fundo), fonte (lista `FONTES`) e logo (PNG/JPG/WebP até 300 KB; SVG não, pode levar código). As telas
 recebem `marca` (`web.tela`): `{{ marca.curto }}`, `{{ marca.frase('com') }}` ("com a MS", "com o Grupo Certy"),
-`{{ marca.logo_url }}`, `{{ marca.css }}`. Antes de entrar e para o Admin Master fora das ARs: a plataforma
+`{{ marca.logo_url }}`, `{{ marca.logo_largo }}`, `{{ marca.css }}`. Antes de entrar e para o Admin Master fora das ARs: a plataforma
 (`plataforma_nome`, "sua empresa" nas frases). A marca fica na memória 5 minutos (tráfego do Supabase); o logo, no
 navegador, por uma semana (o endereço muda com a versão).
+**Logo no menu** (16/11/2026, o JPG do Grupo Certy: logo branco num fundo cinza-claro, cortado no menu): o bloco do
+alto do menu é `templates/_marca_menu.html` (menu e prévia "Como fica"). Logo largo (`marcas_ar.logo_proporcao` =
+largura/altura >= `marca.LOGO_LARGO` 1,8, medida ao salvar e, para os de antes, em `marca.garantir`) fica sozinho na
+linha de cima, na largura do menu, com "Parceiros · Prospecção B2B" embaixo, e não vira ícone da aba; os outros ficam
+lado a lado com o traço e o rótulo, como o da MS. A caixa "Tirar o fundo liso do logo" (`marca.tirar_fundo_do_logo`,
+Pillow, que já vinha com o fpdf2) vale para o arquivo novo ou, sem arquivo, para o logo de agora: o fundo é a cor das
+bordas da imagem (90% delas perto de uma cor só, senão fica como veio), vira transparente por "cor para transparência"
+(a borda do desenho fica meio transparente, sem contorno da cor antiga; diferenças de até 3 tons contam como fundo,
+por causa do JPG), as sobras em volta são cortadas, imagem acima de 240 px de altura diminui, e sai PNG.
 **Mensagens:** os modelos continuam escritos com o nome da MS e `marca.aplicar` troca pela empresa de quem envia: a
 "empresa que eu represento" (Minha conta) ou, sem ela, a marca da AR (Admin Master: a AR MS). O que é só da MS
 (validação em Recife, a arte do aviso de vencimento do site da MS, o WhatsApp do convite) sai para as outras.

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import io
 import re
 import time
 from contextlib import contextmanager
@@ -36,6 +37,10 @@ DESCRICAO_PADRAO = "Autoridade de Registro ICP-Brasil"
 FONTES = ("Inter", "Montserrat", "Poppins", "Roboto", "Open Sans", "Lato", "Nunito", "Raleway", "Work Sans")
 TIPOS_LOGO = {"image/png": "PNG", "image/jpeg": "JPG", "image/webp": "WebP"}  # SVG não: pode levar código
 LIMITE_LOGO = 300_000  # 300 KB: o logo aparece em toda tela
+LOGO_LARGO = 1.8  # largura/altura: daqui para cima o logo fica sozinho na linha de cima do menu (Grupo Certy: 4,9)
+ALTURA_LOGO_TRATADO = 240  # px: o menu mostra até 44 px de altura; mais que isso só pesa (tráfego do Supabase)
+MAXIMO_PIXELS = 25_000_000  # imagem maior que isso (em pixels) nem é aberta para tirar o fundo
+RUIDO_DO_FUNDO = 3  # tons de diferença do fundo que ainda contam como fundo (manchinhas do JPG)
 VALIDADE = 300  # segundos que a marca fica na memória (muda pouco; Configurações > Marca limpa na hora)
 COR = re.compile(r"^#[0-9a-fA-F]{6}$")
 DOMINIO = re.compile(r"^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$")
@@ -174,6 +179,83 @@ def problema_no_logo(dados: bytes) -> str:
     return ""
 
 
+def proporcao_do_logo(dados: bytes) -> float | None:
+    """Largura/altura do logo (só lê o cabeçalho da imagem). None = não deu para ler."""
+    try:
+        from PIL import Image
+
+        with Image.open(io.BytesIO(dados)) as imagem:
+            largura, altura = imagem.size
+    except Exception:  # noqa: BLE001  (arquivo que diz ser imagem mas não abre)
+        return None
+    return round(largura / altura, 3) if largura and altura else None
+
+
+def _tabela_de_transparencia(fundo: int) -> list[float]:
+    """Para cada tom (0 a 255) de um canal: quanto ele é logo (1) e quanto é fundo (0), pela distância até o tom do
+    fundo nesse canal ("cor para transparência"). As manchinhas do JPG perto do fundo (RUIDO_DO_FUNDO) contam como fundo."""
+    tabela = []
+    for tom in range(256):
+        faixa, diferenca = (255 - fundo, tom - fundo) if tom > fundo else (fundo, fundo - tom)
+        if faixa <= RUIDO_DO_FUNDO or diferenca <= RUIDO_DO_FUNDO:
+            tabela.append(0.0)
+        else:
+            tabela.append(min(1.0, (diferenca - RUIDO_DO_FUNDO) / (faixa - RUIDO_DO_FUNDO)))
+    return tabela
+
+
+def tirar_fundo_do_logo(dados: bytes) -> bytes | None:
+    """O fundo liso do logo vira transparente e as sobras em volta são cortadas (PNG). Feito para o logo claro que veio
+    num fundo branco ou cinza (o JPG do Grupo Certy: logo branco em cinza-claro aparecia como um retângulo no menu).
+    O fundo é a cor das bordas da imagem; a borda do desenho fica meio transparente, sem contorno da cor antiga.
+    Logo já transparente: só corta as sobras. None = não achou um fundo liso (bordas de várias cores) ou não sobrou
+    nada do desenho: o logo fica como veio."""
+    from PIL import Image
+
+    try:
+        with Image.open(io.BytesIO(dados)) as aberta:
+            if aberta.width * aberta.height > MAXIMO_PIXELS:
+                return None
+            imagem = aberta.convert("RGBA")
+    except Exception:  # noqa: BLE001
+        return None
+    if imagem.height > ALTURA_LOGO_TRATADO:
+        imagem = imagem.resize((max(1, round(imagem.width * ALTURA_LOGO_TRATADO / imagem.height)), ALTURA_LOGO_TRATADO),
+                               Image.LANCZOS)
+    largura, altura = imagem.size
+    pontos = imagem.load()
+    borda = [pontos[x, y] for x in range(largura) for y in {0, altura - 1}]
+    borda += [pontos[x, y] for y in range(1, altura - 1) for x in {0, largura - 1}]
+    if sum(1 for p in borda if p[3] < 16) < 0.9 * len(borda):  # ainda não é transparente: procura o fundo liso
+        opacos = [p for p in borda if p[3] >= 240]
+        if not opacos:
+            return None
+        fundo = tuple(sorted(p[canal] for p in opacos)[len(opacos) // 2] for canal in range(3))
+        parecidos = sum(1 for p in opacos if max(abs(p[c] - fundo[c]) for c in range(3)) <= 12)
+        if parecidos < 0.9 * len(borda):
+            return None
+        tabelas = [_tabela_de_transparencia(tom) for tom in fundo]
+        crus = imagem.tobytes()
+        saida = bytearray(len(crus))
+        for i in range(0, len(crus), 4):
+            r, g, b, a = crus[i], crus[i + 1], crus[i + 2], crus[i + 3]
+            quanto = max(tabelas[0][r], tabelas[1][g], tabelas[2][b])
+            if quanto <= 0 or a == 0:
+                continue  # fundo: fica transparente (zeros)
+            for c, tom in enumerate((r, g, b)):  # tira a cor do fundo que se misturou na borda do desenho
+                saida[i + c] = max(0, min(255, round(fundo[c] + (tom - fundo[c]) / quanto)))
+            saida[i + 3] = round(quanto * a)
+        imagem = Image.frombytes("RGBA", (largura, altura), bytes(saida))
+    caixa = imagem.getchannel("A").point(lambda v: 255 if v > 8 else 0).getbbox()
+    if caixa is None:
+        return None
+    esquerda, topo, direita, baixo = caixa  # 1 px de folga: a borda suave do desenho não é cortada
+    imagem = imagem.crop((max(0, esquerda - 1), max(0, topo - 1), min(largura, direita + 1), min(altura, baixo + 1)))
+    arquivo = io.BytesIO()
+    imagem.save(arquivo, "PNG", optimize=True)
+    return arquivo.getvalue()
+
+
 # ---------------------------------------------------------------- a marca de uma AR e a da plataforma
 @contextmanager
 def _sessao(db=None, usuario=None):
@@ -207,6 +289,7 @@ def _montar(ar: int, slug: str, nome_ar: str, linha: MarcaAR | None) -> dict:
          "cor_fundo": valor("cor_fundo"), "fonte": valor("fonte"), "titulo": f"{curto} Parceiros",
          "logo_url": (endereco_do_logo(ar, int(linha.atualizado_em.timestamp()))
                       if linha is not None and linha.logo_tipo and linha.atualizado_em else "")}
+    m["logo_largo"] = bool(m["logo_url"] and (linha.logo_proporcao or 0) >= LOGO_LARGO)
     m["css"] = tema(m["cor"], m["cor_detalhe"], m["cor_fundo"], m["fonte"])
     m["fonte_url"] = endereco_da_fonte(m["fonte"])
     return _com_frase(m)
@@ -224,7 +307,8 @@ def da_plataforma(db=None) -> dict:
         nome = (ler_config(db, "plataforma_nome") or "").strip() or PLATAFORMA
     m = _com_frase({"ar": None, "slug": "", "e_ms": False, "plataforma": True, "nome": nome, "curto": "sua empresa",
                     "artigo": "a", "site": "", "descricao": "", "dominio_email": "", "cor": "", "cor_detalhe": "",
-                    "cor_fundo": "", "fonte": "", "titulo": nome, "logo_url": "", "css": "", "fonte_url": ""})
+                    "cor_fundo": "", "fonte": "", "titulo": nome, "logo_url": "", "logo_largo": False, "css": "",
+                    "fonte_url": ""})
     if db is not None:
         _guardadas["plataforma"] = (time.monotonic() + VALIDADE, m)
     return m
@@ -369,8 +453,27 @@ def _limpar_site(valor: str) -> str:
     return v.rstrip("/")
 
 
-def salvar(db, ar: int, dados: dict, novo_logo: bytes | None = None, tirar_logo: bool = False) -> list[str]:
-    """Grava a marca da AR `ar`. Devolve os problemas encontrados (vazio = gravou tudo)."""
+def _gravar_logo(linha: MarcaAR, dados: bytes, tirar_fundo: bool) -> list[str]:
+    from .visual import tipo_da_imagem
+
+    problemas = []
+    if tirar_fundo:
+        tratado = tirar_fundo_do_logo(dados)
+        if tratado is None:
+            problemas.append("O logo não tem um fundo liso (de uma cor só) para tirar: ficou como veio.")
+        elif len(tratado) > LIMITE_LOGO:
+            problemas.append(f"Sem o fundo, o logo ficou com {len(tratado) // 1000} KB (limite {LIMITE_LOGO // 1000} KB): "
+                             "ficou como veio. Envie uma imagem menor.")
+        else:
+            dados = tratado
+    linha.logo, linha.logo_tipo, linha.logo_proporcao = dados, tipo_da_imagem(dados), proporcao_do_logo(dados)
+    return problemas
+
+
+def salvar(db, ar: int, dados: dict, novo_logo: bytes | None = None, tirar_logo: bool = False,
+           tirar_fundo: bool = False) -> list[str]:
+    """Grava a marca da AR `ar`. Devolve os problemas encontrados (vazio = gravou tudo). `tirar_fundo`: o fundo liso
+    do logo novo (ou, sem arquivo novo, do logo de agora) vira transparente (`tirar_fundo_do_logo`)."""
     problemas = []
     linha = db.get(MarcaAR, ar)
     if linha is None:
@@ -405,11 +508,14 @@ def salvar(db, ar: int, dados: dict, novo_logo: bytes | None = None, tirar_logo:
         if problema:
             problemas.append(problema)
         else:
-            from .visual import tipo_da_imagem
-
-            linha.logo, linha.logo_tipo = novo_logo, tipo_da_imagem(novo_logo)
+            problemas += _gravar_logo(linha, novo_logo, tirar_fundo)
     elif tirar_logo:
-        linha.logo, linha.logo_tipo = None, ""
+        linha.logo, linha.logo_tipo, linha.logo_proporcao = None, "", None
+    elif tirar_fundo:
+        if linha.logo_tipo and linha.logo:
+            problemas += _gravar_logo(linha, linha.logo, True)
+        else:
+            problemas.append("Não há logo para tirar o fundo: escolha o arquivo do logo.")
     from .banco import agora
 
     linha.atualizado_em = agora()  # muda o endereço do logo: o navegador busca o novo
@@ -445,7 +551,8 @@ def garantir(db) -> None:
             logo_ms = arquivo.read_bytes() if arquivo.exists() else None
             db.add(MarcaAR(tenant_id=ms, nome=MS["nome"], curto="MS", artigo="a", site=MS["site"],
                            descricao=MS["descricao"], dominio_email=config.EMAIL_DOMINIO, logo=logo_ms,
-                           logo_tipo="image/png" if logo_ms else ""))
+                           logo_tipo="image/png" if logo_ms else "",
+                           logo_proporcao=proporcao_do_logo(logo_ms) if logo_ms else None))
         for chave in sorted(CHAVES_DA_MARCA - {"empresa_nome"}):  # o nome sai da marca (aba Marca), sem cópia
             if db.get(ConfiguracaoAR, (ms, chave)) is None:
                 da_plataforma_ = db.get(Configuracao, chave)
@@ -459,4 +566,6 @@ def garantir(db) -> None:
     for cad in db.execute(select(Cadencia).where(Cadencia.tenant_id.is_(None),
                                                  Cadencia.descricao.like("%WhatsApp da MS%"))).scalars():
         cad.descricao = cad.descricao.replace("WhatsApp da MS", "WhatsApp da empresa")  # cadência que todas as ARs veem
+    for linha in db.execute(select(MarcaAR).where(MarcaAR.logo_tipo != "", MarcaAR.logo_proporcao.is_(None))).scalars():
+        linha.logo_proporcao = proporcao_do_logo(linha.logo or b"")  # logos de antes da medida (uma vez só)
     esquecer()
