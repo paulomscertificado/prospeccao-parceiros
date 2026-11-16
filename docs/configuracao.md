@@ -44,7 +44,10 @@ Para automação total, use a API oficial (abaixo) com contatos que autorizaram 
 (abre o WhatsApp Web/aplicativo com o texto pronto; o vendedor revisa e envia). O sistema registra o envio,
 respeita opt-out, limite diário e intervalo mínimo.
 
-**API oficial (WhatsApp Cloud API, da Meta):**
+**API oficial (WhatsApp Cloud API, da Meta):** desde 16/11/2026, cada AR configura o próprio número na tela
+**Configurações > WhatsApp > API oficial da Meta** (chaves guardadas criptografadas no banco, teste de conexão,
+mensagem de teste e webhook): ver [whatsapp-oficial.md](whatsapp-oficial.md). A forma antiga abaixo (variáveis no
+`.env`, um número só) continua valendo para o botão **Enviar pela API** da ficha do lead.
 1. Em <https://developers.facebook.com/> crie um app do tipo "Empresa" e adicione o produto **WhatsApp**.
 2. Cadastre e verifique o número da empresa e a conta do WhatsApp Business.
 3. Crie um **token permanente** (usuário do sistema no Gerenciador de Negócios, permissão `whatsapp_business_messaging`).

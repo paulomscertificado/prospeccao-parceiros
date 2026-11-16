@@ -501,6 +501,32 @@ Muitos e-mails da base da Receita estão desatualizados. O sistema tira esses en
 Obs.: a conferência do domínio não descobre se uma caixa específica existe (ex.: `fulano@hotmail.com`). Isso
 só se sabe quando a devolução chega, e aí o sistema tira o e-mail sozinho.
 
+### API oficial do WhatsApp (Meta)
+
+O número oficial da empresa na Meta (Plataforma do WhatsApp Business) não tem o risco de bloqueio do QR code, mas a
+Meta cobra por mensagem e a primeira mensagem para cada contato precisa ser um **modelo aprovado** por ela. Hoje o
+sistema guarda as chaves, testa a conexão, manda uma mensagem de teste e recebe as respostas, o SAIR e a situação das
+mensagens (entregue, lida). As campanhas continuam saindo pelos números do QR code até os modelos ficarem prontos.
+
+Como ligar (o administrador da AR; o Admin Master, dentro da AR):
+1. **Meta for Developers** (developers.facebook.com/apps) > **Criar app** (Empresa) > adicione o produto
+   **WhatsApp** e ligue ao portfólio da empresa.
+2. **Configurações do negócio** > Usuários > **Usuários do sistema** > Adicionar (Admin) > atribua o app e a conta do
+   WhatsApp > **Gerar token** (validade "Nunca", permissões `whatsapp_business_messaging` e
+   `whatsapp_business_management`). **Não mande o token para ninguém**: ele vai só na tela do sistema.
+3. No sistema: **Configurações > WhatsApp > API oficial da Meta**. Preencha o ID da conta do WhatsApp Business, a
+   Identificação do número de telefone (Gerenciador do WhatsApp > Números de telefone > clique no número), o token e
+   a chave secreta do app (Meta for Developers > seu app > Configurações do app > Básico) e clique em
+   **Salvar e testar**. O token e a chave ficam guardados protegidos e não aparecem mais na tela; para trocar, cole
+   de novo.
+4. **Webhook**: no Meta for Developers > seu app > WhatsApp > Configuração, cole a **URL de retorno** e o **token de
+   verificação** que aparecem na tela do sistema e assine o campo **messages**.
+5. **Enviar teste**: digite o seu celular e clique em **Enviar teste**. Chega o modelo de exemplo da Meta
+   ("hello_world", em inglês). Cada envio é cobrado pela Meta; cadastre a forma de pagamento na conta do WhatsApp.
+
+Quem responder ao número oficial: a resposta aparece no lead (para os próximos toques e avisa a equipe) e quem
+mandar SAIR deixa de receber mensagens. Por enquanto, responda pelo app WhatsApp Business do celular.
+
 ## 5. Perfis de acesso
 
 | Perfil | Vê |

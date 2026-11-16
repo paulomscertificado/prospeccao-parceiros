@@ -12,9 +12,9 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 from sqlalchemy import func, or_, select, update
 
-from .. import config, relogio, sdr, trabalhos, util
+from .. import config, mensagens, relogio, sdr, trabalhos, util, whatsapp_oficial
 from ..rotinas import responder_automaticamente, rodada
-from ..banco import agora, gravar_config, ler_config_int, sessao
+from ..banco import agora, gravar_config, ler_config_int, sessao, usar_config_da_ar
 from ..integracoes import whatsapp_cloud
 from ..modelos import ComandoWhatsApp, Lead, Mensagem, MensagemWhatsApp, PonteWhatsApp
 from ..seguranca import ip_de, limite_api
@@ -30,40 +30,76 @@ def saude():
 
 @rotas.get("/webhooks/whatsapp")
 def webhook_verificar(request: Request):
+    """Verificação do webhook pela Meta: o token tem de ser o de uma conta oficial (Configurações > WhatsApp > API
+    oficial da Meta, um por AR) ou o da variável WHATSAPP_VERIFY_TOKEN (forma antiga)."""
     p = request.query_params
-    if (p.get("hub.mode") == "subscribe" and config.WHATSAPP_VERIFY_TOKEN
-            and p.get("hub.verify_token") == config.WHATSAPP_VERIFY_TOKEN):
-        return PlainTextResponse(p.get("hub.challenge", ""))
+    recebido = p.get("hub.verify_token") or ""
+    if p.get("hub.mode") == "subscribe" and recebido:
+        validos = {config.WHATSAPP_VERIFY_TOKEN} - {""}
+        with sessao() as db:
+            validos |= {c.verificacao for c in whatsapp_oficial.contas_do_webhook(db) if c.verificacao}
+        if any(hmac.compare_digest(recebido.encode(), v.encode()) for v in validos):
+            return PlainTextResponse(p.get("hub.challenge", ""))
     return PlainTextResponse("token inválido", status_code=403)
 
 
 @rotas.post("/webhooks/whatsapp")
 async def webhook_receber(request: Request):
+    """Respostas, SAIR e situação das mensagens da API oficial. Cada AR tem o seu número (contas_whatsapp_oficial):
+    a assinatura é conferida com a chave secreta do app da conta do número que recebeu, e a resposta vai para o lead da
+    AR desse número (como no WhatsApp Leads: "a resposta é da AR que recebeu"). SAIR vale para todas as ARs."""
     if not limite_api.registrar(ip_de(request)):
         return JSONResponse({"erro": "muitos pedidos"}, status_code=429)
     corpo = await request.body()
-    if not whatsapp_cloud.assinatura_valida(corpo, request.headers.get("x-hub-signature-256", "")):
-        return JSONResponse({"erro": "assinatura inválida"}, status_code=403)
+    assinatura = request.headers.get("x-hub-signature-256", "")
     try:
         dados = json.loads(corpo)
     except json.JSONDecodeError:
-        return JSONResponse({"erro": "json inválido"}, status_code=400)
-    recebidas, status = whatsapp_cloud.ler_webhook(dados)
+        dados = None
     with sessao() as db:
+        contas = {c.phone_number_id: c for c in whatsapp_oficial.contas_do_webhook(
+            db, whatsapp_cloud.numeros_do_webhook(dados) if isinstance(dados, dict) else set())}
+        segredos = [whatsapp_oficial.segredo(c) for c in contas.values()] + [config.WHATSAPP_APP_SECRET]
+        if not any(whatsapp_cloud.assinatura_confere(corpo, assinatura, s) for s in segredos if s):
+            return JSONResponse({"erro": "assinatura inválida"}, status_code=403)
+        if not isinstance(dados, dict):
+            return JSONResponse({"erro": "json inválido"}, status_code=400)
+        recebidas, status = whatsapp_cloud.ler_webhook(dados)
+        situacoes = {"sent": "enviada", "delivered": "entregue", "read": "lida", "failed": "falhou"}
         for s in status:
-            msg = db.execute(select(Mensagem).where(Mensagem.id_externo == s["id"])).scalars().first()
-            if msg and s["status"] in ("delivered", "read", "failed"):
-                msg.status = {"delivered": "entregue", "read": "lida", "failed": "falhou"}[s["status"]]
+            msg = db.execute(select(Mensagem).where(Mensagem.id_externo == s["id"])
+                             .execution_options(sem_filtro_de_ar=True)).scalars().first()
+            if msg and s["status"] in situacoes and msg.status != "lida":
+                msg.status = situacoes[s["status"]]
+                if s["status"] == "failed" and s.get("erro"):
+                    msg.erro = s["erro"]
         for r in recebidas:
             telefone = util.normalizar_telefone(r["de"])
             if not telefone:
                 continue
-            lead = db.execute(select(Lead).where(or_(Lead.chave_whatsapp == telefone, Lead.chave_telefone == telefone))
-                              .limit(1)).scalars().first()
-            if not lead:
+            conta = contas.get(r.get("numero_id", ""))
+            if conta is None:  # forma antiga (variáveis WHATSAPP_*): número único, responde sozinho
+                lead = db.execute(select(Lead).where(or_(Lead.chave_whatsapp == telefone, Lead.chave_telefone == telefone))
+                                  .limit(1)).scalars().first()
+                if lead:
+                    analise = sdr.processar_resposta(db, lead, r["texto"], "whatsapp")
+                    responder_automaticamente(db, lead, "whatsapp", analise)
                 continue
-            analise = sdr.processar_resposta(db, lead, r["texto"], "whatsapp")
-            responder_automaticamente(db, lead, "whatsapp", analise)  # API oficial: número único da Meta
+            if mensagens.pede_opt_out(r["texto"]):
+                from ..leads_servico import registrar_opt_out
+
+                for lead in sdr.leads_pelo_telefone(db, telefone):  # SAIR vale para todas as ARs
+                    if not lead.opt_out:
+                        registrar_opt_out(db, lead, None, "respondeu SAIR no WhatsApp oficial")
+                continue
+            lead = sdr.lead_pelo_telefone(db, telefone, conta.tenant_id)
+            if lead is None:
+                continue
+            usar_config_da_ar(db, lead.tenant_id)
+            # Etapa 1: a resposta entra na IA SDR (classifica, para os próximos toques, avisa a equipe), mas nada é
+            # respondido sozinho por este número: a equipe responde pelo app WhatsApp Business do celular
+            sdr.processar_resposta(db, lead, r["texto"], "whatsapp")
+        usar_config_da_ar(db, None)
     return {"ok": True}
 
 

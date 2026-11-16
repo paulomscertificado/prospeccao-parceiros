@@ -196,6 +196,23 @@ class ConexaoWhatsApp(DaAR, Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
 
 
+class ContaWhatsAppOficial(DaAR, Base):
+    """Número da API oficial do WhatsApp (Plataforma do WhatsApp Business, da Meta) de uma AR (app/whatsapp_oficial.py;
+    pedido da Maria em 16/11/2026). O token e a chave secreta do app ficam criptografados e nunca voltam para a tela."""
+    __tablename__ = "contas_whatsapp_oficial"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nome: Mapped[str] = mapped_column(String(120), default="")
+    waba_id: Mapped[str] = mapped_column(String(40), default="")  # ID da conta do WhatsApp Business
+    phone_number_id: Mapped[str] = mapped_column(String(40), default="", index=True)  # Identificação do número
+    numero: Mapped[str] = mapped_column(String(30), default="")  # como a Meta mostra (+55 81 ...), do último teste
+    token_cripto: Mapped[str] = mapped_column(Text, default="")  # token permanente do usuário do sistema
+    segredo_cripto: Mapped[str] = mapped_column(Text, default="")  # chave secreta do app (confere o webhook)
+    verificacao: Mapped[str] = mapped_column(String(64), default="")  # token de verificação do webhook (gerado aqui)
+    situacao: Mapped[str] = mapped_column(Text, default="")  # JSON do último teste de conexão
+    testado_em: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
+
+
 class ContaEmail(DaAR, Base):
     """Uma conta de e-mail para as campanhas: a principal da MS (dados em Configurações > E-mail) ou a de um
     usuário (dados aqui, senha criptografada). Ver app/contas_email.py."""

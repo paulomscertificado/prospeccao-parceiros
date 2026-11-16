@@ -78,6 +78,64 @@
 </form>
 {% endif %}
 {% endif %}
+
+{% if pode('whatsapp.gerenciar_todos') %}
+<div class="cartao" id="oficial">
+  <h2>API oficial da Meta (WhatsApp Business)</h2>
+  <p class="pequeno suave" style="margin-top:0">O número oficial da empresa na Meta: sem o risco de bloqueio do QR code, cobrado por mensagem pela
+    Meta e com a primeira mensagem para cada contato sempre num <b>modelo aprovado</b> por ela. Nesta etapa o sistema guarda as chaves,
+    testa a conexão, manda uma mensagem de teste e recebe as respostas, o SAIR e a situação das mensagens. As campanhas
+    continuam saindo pelos números do QR code até os modelos ficarem prontos.</p>
+  {% if not oficial_ar %}
+  <div class="aviso aviso-info">Entre numa AR (painel do Admin Master) para configurar o número oficial dela.</div>
+  {% else %}
+  {% set s = oficial_situacao %}
+  {% if oficial and s %}
+  <div class="aviso aviso-ok">Conectado: <b>{{ s.numero }}</b> ({{ s.nome }}) · qualidade: {{ s.qualidade }} · limite: {{ s.limite }}
+    conversas iniciadas pela empresa por dia{% if oficial.testado_em %} <span class="pequeno">(testado em {{ oficial.testado_em|datahora }})</span>{% endif %}</div>
+  {% elif oficial %}
+  <div class="aviso aviso-alerta">Dados salvos, mas a conexão ainda não foi confirmada: clique em <b>Testar conexão</b>.</div>
+  {% endif %}
+  <form method="post" action="/whatsapp/oficial" autocomplete="off">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="campos">
+      <div><label>Nome (para a equipe)</label><input type="text" name="nome" maxlength="120" value="{{ oficial.nome if oficial else '' }}" placeholder="Nome da empresa no WhatsApp"></div>
+      <div><label>ID da conta do WhatsApp Business</label><input type="text" inputmode="numeric" name="waba_id" value="{{ oficial.waba_id if oficial else '' }}"></div>
+      <div><label>Identificação do número de telefone</label><input type="text" inputmode="numeric" name="phone_number_id" value="{{ oficial.phone_number_id if oficial else '' }}">
+        <p class="ajuda">Gerenciador do WhatsApp &gt; Números de telefone &gt; clique no número.</p></div>
+      <div class="largo"><label>Token permanente (usuário do sistema)</label>
+        <input type="password" name="token" autocomplete="new-password" placeholder="{{ 'Guardado ✓ — deixe em branco para manter' if oficial and oficial.token_cripto else 'Cole aqui o token' }}">
+        <p class="ajuda">Configurações do negócio &gt; Usuários do sistema &gt; Gerar token (permissões whatsapp_business_messaging e
+          whatsapp_business_management, validade "Nunca"). Fica guardado protegido e não aparece mais na tela.</p></div>
+      <div class="largo"><label>Chave secreta do app (App Secret)</label>
+        <input type="password" name="segredo" autocomplete="new-password" placeholder="{{ 'Guardada ✓ — deixe em branco para manter' if oficial and oficial.segredo_cripto else 'Cole aqui a chave secreta do app' }}">
+        <p class="ajuda">Meta for Developers &gt; seu app &gt; Configurações do app &gt; Básico. Serve para conferir que o que chega pelo webhook veio mesmo da Meta.</p></div>
+    </div>
+    <button class="btn btn-primario">Salvar e testar</button>
+  </form>
+  {% if oficial %}
+  <h3 style="margin:18px 0 6px">Webhook: respostas, SAIR e situação das mensagens</h3>
+  <p class="pequeno" style="margin:0 0 8px">No Meta for Developers &gt; seu app &gt; WhatsApp &gt; Configuração, em <b>Webhook</b>, cole:</p>
+  <div class="campos">
+    <div class="largo"><label>URL de retorno</label><input type="text" readonly value="{{ webhook_url }}" onclick="this.select()"></div>
+    <div class="largo"><label>Token de verificação</label><input type="text" readonly value="{{ oficial.verificacao }}" onclick="this.select()"></div>
+  </div>
+  <p class="pequeno suave">Depois de verificar, assine o campo <b>messages</b>.{% if not oficial.segredo_cripto %} <b>Falta a chave secreta do app</b>: sem ela o sistema recusa o que chega pelo webhook.{% endif %}</p>
+  <div class="grupo-btn" style="margin-top:12px;align-items:flex-end;flex-wrap:wrap">
+    <form class="inline" method="post" action="/whatsapp/oficial/testar"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">Testar conexão</button></form>
+    <form class="inline" method="post" action="/whatsapp/oficial/teste" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div><label class="pequeno">Mandar um teste para (com DDD)</label><input type="text" inputmode="tel" name="telefone" placeholder="(81) 99999-0000" style="width:160px"></div>
+      <div><label class="pequeno">Modelo aprovado</label><input type="text" name="modelo" placeholder="hello_world" style="width:150px"></div>
+      <div><label class="pequeno">Idioma</label><input type="text" name="idioma" placeholder="en_US" style="width:80px"></div>
+      <button class="btn btn-verde">Enviar teste</button></form>
+    <form class="inline" method="post" action="/whatsapp/oficial/remover" data-confirmar="Remover a API oficial deste sistema? As chaves são apagadas daqui; nada muda na conta da Meta."><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-perigo btn-pequeno">Remover</button></form>
+  </div>
+  <p class="pequeno suave">O teste usa o modelo de exemplo que a Meta cria em toda conta (hello_world, em inglês), a não ser que você escreva o nome de outro modelo aprovado. Cada envio é cobrado pela Meta.</p>
+  {% endif %}
+  {% endif %}
+</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}

@@ -66,10 +66,12 @@ Vendedor só vê os próprios leads e tarefas (404 nos dos outros).
 
 ## Webhook do WhatsApp Cloud API
 
-- `GET /api/webhooks/whatsapp` — verificação (`hub.mode`, `hub.verify_token`, `hub.challenge`).
-- `POST /api/webhooks/whatsapp` — exige `X-Hub-Signature-256` válido (`WHATSAPP_APP_SECRET`).
-  Mensagem recebida de um telefone conhecido → registra resposta (status "Respondeu", cancela a cadência);
-  texto "SAIR/PARAR/CANCELAR..." → opt-out. Status `delivered/read/failed` atualizam a mensagem enviada.
+- `GET /api/webhooks/whatsapp` — verificação (`hub.mode`, `hub.verify_token`, `hub.challenge`): o token de qualquer
+  conta oficial (Configurações > WhatsApp > API oficial da Meta, um por AR) ou `WHATSAPP_VERIFY_TOKEN`.
+- `POST /api/webhooks/whatsapp` — exige `X-Hub-Signature-256` válido com a chave secreta da conta do
+  `phone_number_id` do evento (ou `WHATSAPP_APP_SECRET`). Mensagem recebida → vai para o lead da AR do número que
+  recebeu (status "Respondeu", cancela a cadência); "SAIR/PARAR/CANCELAR..." → opt-out em todas as ARs. Status
+  `sent/delivered/read/failed` atualizam a mensagem enviada. Detalhes em [whatsapp-oficial.md](whatsapp-oficial.md).
 
 ## Variáveis dos templates
 

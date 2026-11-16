@@ -13,9 +13,9 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import autorizacao, config, conexoes
+from .. import autorizacao, config, conexoes, marca, whatsapp_oficial
 from ..banco import agora, gravar_config, obter_db
-from ..integracoes import whatsapp_leads
+from ..integracoes import whatsapp_cloud, whatsapp_leads
 from ..modelos import ComandoWhatsApp, ConexaoWhatsApp, Usuario
 from ..seguranca import exige, registrar_log, verificar_csrf
 from ..web import avisar, tela, voltar
@@ -56,13 +56,117 @@ def _estado(db: Session, usuario: Usuario) -> dict:
             "regras": base.get("regras") or {}}
 
 
+def _endereco_do_webhook(request: Request) -> str:
+    """Endereço público do webhook, para colar no painel da Meta (na Vercel o pedido chega por um proxy https)."""
+    esquema = request.headers.get("x-forwarded-proto") or request.url.scheme
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc
+    return f"{esquema}://{host}/api/webhooks/whatsapp"
+
+
 @rotas.get("/whatsapp")
 def tela_whatsapp(request: Request, usuario: Usuario = Depends(exige("whatsapp.ver")), db: Session = Depends(obter_db)):
     estado = _estado(db, usuario)
     equipe_ = [{"id": u.id, "nome": u.nome} for u in db.execute(
         select(Usuario).where(Usuario.perfil != "parceiro", Usuario.ativo.is_(True)).order_by(Usuario.nome)).scalars()]
+    # API oficial da Meta (app/whatsapp_oficial.py): um número por AR; o Admin Master configura dentro da AR
+    ar_oficial = marca.ar_da_tela(request, usuario) if autorizacao.pode(usuario, "whatsapp.gerenciar_todos") else None
+    oficial = whatsapp_oficial.da_ar(db) if ar_oficial else None
     return tela(request, "whatsapp.html", {"secao": "whatsapp", "estado": estado, "regras": estado["regras"], "equipe": equipe_,
-                                           "url_local": config.WHATSAPP_LEADS_URL + "/whatsapp"})
+                                           "url_local": config.WHATSAPP_LEADS_URL + "/whatsapp",
+                                           "oficial_ar": ar_oficial, "oficial": oficial,
+                                           "oficial_situacao": whatsapp_oficial.situacao(oficial),
+                                           "webhook_url": _endereco_do_webhook(request)})
+
+
+def _conta_oficial_da_tela(request: Request, usuario: Usuario, db: Session, precisa_existir: bool = True):
+    """A conta oficial da AR da tela, ou o motivo de não dar (Admin Master fora de uma AR; nada cadastrado)."""
+    if marca.ar_da_tela(request, usuario) is None:
+        return None, "Entre numa AR (painel do Admin Master) para configurar o número oficial dela."
+    conta = whatsapp_oficial.da_ar(db)
+    if conta is None and precisa_existir:
+        return None, "Salve primeiro os dados da API oficial."
+    return conta, ""
+
+
+@rotas.post("/whatsapp/oficial", dependencies=[Depends(verificar_csrf)])
+async def salvar_oficial(request: Request, usuario: Usuario = Depends(exige("whatsapp.gerenciar_todos")),
+                         db: Session = Depends(obter_db)):
+    conta, motivo = _conta_oficial_da_tela(request, usuario, db, precisa_existir=False)
+    if motivo:
+        avisar(request, motivo, "erro")
+        return voltar("/whatsapp#oficial")
+    form = await request.form()
+    dados = {c: str(form.get(c, "")) for c in ("nome", "waba_id", "phone_number_id", "token", "segredo")}
+    conta, problemas = whatsapp_oficial.salvar(db, conta, dados)
+    if problemas:
+        db.rollback()
+        avisar(request, " ".join(problemas), "erro")
+        return voltar("/whatsapp#oficial")
+    novidades = [x for x, campo in (("token novo", "token"), ("chave secreta nova", "segredo")) if dados[campo].strip()]
+    registrar_log(db, usuario, "salvou_whatsapp_oficial", "whatsapp_oficial", conta.id,
+                  f"número {conta.phone_number_id}" + (f" ({', '.join(novidades)})" if novidades else ""), request,
+                  modulo="WhatsApp")
+    db.commit()
+    try:
+        r = whatsapp_oficial.testar(db, conta)
+        db.commit()
+        avisar(request, f"Salvo e conectado: {r['numero']} ({r['nome']}), limite {r['limite']} por dia.")
+    except whatsapp_cloud.ErroWhatsApp as erro:
+        avisar(request, f"Salvo, mas o teste de conexão falhou: {erro}", "alerta")
+    return voltar("/whatsapp#oficial")
+
+
+@rotas.post("/whatsapp/oficial/testar", dependencies=[Depends(verificar_csrf)])
+async def testar_oficial(request: Request, usuario: Usuario = Depends(exige("whatsapp.gerenciar_todos")),
+                         db: Session = Depends(obter_db)):
+    conta, motivo = _conta_oficial_da_tela(request, usuario, db)
+    if motivo:
+        avisar(request, motivo, "erro")
+        return voltar("/whatsapp#oficial")
+    try:
+        r = whatsapp_oficial.testar(db, conta)
+        db.commit()
+        avisar(request, f"Conectado: {r['numero']} ({r['nome']}), qualidade {r['qualidade']}, limite {r['limite']} por dia.")
+    except whatsapp_cloud.ErroWhatsApp as erro:
+        avisar(request, f"O teste de conexão falhou: {erro}", "erro")
+    return voltar("/whatsapp#oficial")
+
+
+@rotas.post("/whatsapp/oficial/teste", dependencies=[Depends(verificar_csrf)])
+async def mensagem_de_teste_oficial(request: Request, usuario: Usuario = Depends(exige("whatsapp.gerenciar_todos")),
+                                    db: Session = Depends(obter_db)):
+    """Manda UM modelo aprovado para um número da própria equipe (prova que o envio pela API funciona)."""
+    conta, motivo = _conta_oficial_da_tela(request, usuario, db)
+    if motivo:
+        avisar(request, motivo, "erro")
+        return voltar("/whatsapp#oficial")
+    form = await request.form()
+    telefone = str(form.get("telefone", "")).strip()
+    try:
+        wamid = whatsapp_oficial.enviar_teste(conta, telefone, str(form.get("modelo", "")), str(form.get("idioma", "")))
+    except whatsapp_cloud.ErroWhatsApp as erro:
+        avisar(request, f"O teste não saiu: {erro}", "erro")
+        return voltar("/whatsapp#oficial")
+    registrar_log(db, usuario, "teste_whatsapp_oficial", "whatsapp_oficial", conta.id,
+                  f"mensagem de teste para {telefone} ({wamid[:40]})", request, modulo="WhatsApp")
+    db.commit()
+    avisar(request, "Mensagem de teste enviada pela API oficial. Ela chega em alguns segundos no WhatsApp desse número.")
+    return voltar("/whatsapp#oficial")
+
+
+@rotas.post("/whatsapp/oficial/remover", dependencies=[Depends(verificar_csrf)])
+async def remover_oficial(request: Request, usuario: Usuario = Depends(exige("whatsapp.gerenciar_todos")),
+                          db: Session = Depends(obter_db)):
+    conta, motivo = _conta_oficial_da_tela(request, usuario, db)
+    if motivo:
+        avisar(request, motivo, "erro")
+        return voltar("/whatsapp#oficial")
+    registrar_log(db, usuario, "removeu_whatsapp_oficial", "whatsapp_oficial", conta.id,
+                  f"número {conta.phone_number_id} (as chaves foram apagadas do sistema)", request, modulo="WhatsApp")
+    db.delete(conta)
+    db.commit()
+    avisar(request, "API oficial removida do sistema. Nada mudou na conta da Meta.")
+    return voltar("/whatsapp#oficial")
 
 
 @rotas.get("/whatsapp/estado")

@@ -105,7 +105,7 @@ WHATSAPP_TOKEN = os.environ.get("WHATSAPP_TOKEN", "")
 WHATSAPP_PHONE_NUMBER_ID = os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "")
 WHATSAPP_VERIFY_TOKEN = os.environ.get("WHATSAPP_VERIFY_TOKEN", "")
 WHATSAPP_APP_SECRET = os.environ.get("WHATSAPP_APP_SECRET", "")
-WHATSAPP_API_VERSAO = os.environ.get("WHATSAPP_API_VERSAO", "v21.0")
+WHATSAPP_API_VERSAO = os.environ.get("WHATSAPP_API_VERSAO", "v27.0")  # a da documentação da Meta em nov/2026
 
 SMTP_HOST = os.environ.get("SMTP_HOST", "")
 SMTP_PORTA = int(os.environ.get("SMTP_PORTA", "587"))
