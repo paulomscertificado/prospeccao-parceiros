@@ -426,6 +426,10 @@ renovação novo antes, para entrarem os clientes de janeiro).
   com "[TESTE]" no começo, assinado por quem assina as campanhas de renovação e pelo WhatsApp/e-mail dele. Nenhum
   cliente recebe nada e nenhuma campanha muda. A arte do teste de e-mail vem da arte que o computador desenhou no teste
   de WhatsApp do mesmo cliente: mande primeiro o teste no WhatsApp e, 1 minuto depois, o de e-mail.
+- **Achar um cliente:** no quadro **Certificados da planilha**, digite no campo de pesquisa (ao lado do título) uma
+  parte do nome do cliente ou do responsável, o CNPJ/CPF, o telefone ou o e-mail e clique em **Buscar**. A busca olha
+  **todas as abas** (inclusive renovados, cancelados e vencidos), não liga para acento nem para maiúsculas e aceita o
+  número com ou sem pontos e traços. Os botões da linha funcionam ali mesmo, e **Limpar a busca** volta para a aba.
 - **Renovou?** Na lista de certificados, clique em **Renovado** (ou **Não vai renovar**): os avisos que ainda não
   saíram param (WhatsApp e e-mail). **Reabrir** desfaz.
 - **Parar os avisos de um cliente** sem dizer se renovou: botão vermelho **Cancelar avisos** na linha dele. Os avisos

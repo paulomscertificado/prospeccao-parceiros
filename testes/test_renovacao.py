@@ -1231,3 +1231,49 @@ def test_botoes_de_cancelar_na_tela_renovacao(cliente, csrf):
         assert db.get(Campanha, cid).status == "cancelada"
         _limpar(db)
         db.commit()
+
+
+def test_campo_de_pesquisa_acha_o_certificado_em_todas_as_abas(cliente, csrf):
+    """Pedido da Maria em 16/11/2026: campo de pesquisa na lista de certificados, para o time achar a empresa."""
+    with sessao() as db:
+        _limpar(db)
+    conteudo = _planilha([
+        _linha(10, "9400001", "e-CNPJ A1 12 meses", "POUSADA BUSCA SUNSET LTDA", "03394252000130", "LEONARDO BUSCA",
+               "11122233344", "leonardo@buscasunset.com.br", "81994250755"),
+        _linha(20, "9400002", "e-CPF A3 36 meses", "", "", "ANA BUSCA SPINOLA", "05445145484",
+               "ana@buscaspinola.com.br", "83991049239"),
+        _linha(40, "9400003", "e-CNPJ A1 12 meses", "PMI BUSCA CORRETAGEM LTDA", "31367588000140", "PEDRO BUSCA",
+               "22233344455", "pp@pmibusca.com.br", "81999879807"),
+    ])
+    r = cliente.post("/renovacao/importar", data={"csrf": csrf},
+                     files={"arquivo": ("RELATORIO DE RENOVACAO.xlsx", conteudo,
+                                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    assert r.status_code == 200 and "3 certificados novos" in r.text, r.text[:400]
+    with sessao() as db:
+        pmi = db.execute(select(Certificado).where(Certificado.protocolo == "9400003")).scalar_one().id
+    # o botão da lista volta para a mesma pesquisa (e o renovado sai da aba "Vencem em", mas a pesquisa ainda acha)
+    r = cliente.post(f"/renovacao/certificado/{pmi}/situacao",
+                     data={"csrf": csrf, "situacao": "Renovado", "ver": "avisar", "q": "pmi busca"})
+    assert r.status_code == 200 and "q=pmi+busca" in str(r.url)
+    nomes = ("POUSADA BUSCA SUNSET", "ANA BUSCA SPINOLA", "PMI BUSCA CORRETAGEM")
+
+    def achados(q):
+        pagina = cliente.get("/renovacao", params={"q": q}).text
+        lista = pagina.split('id="certificados"')[1].split("Campanhas de renovação")[0]
+        return {n for n in nomes if n in lista}, lista
+
+    assert achados("sunset")[0] == {"POUSADA BUSCA SUNSET"}
+    assert achados("Sunset pousada")[0] == {"POUSADA BUSCA SUNSET"}  # palavras em qualquer ordem
+    assert achados("busca spínola")[0] == {"ANA BUSCA SPINOLA"}  # sem diferença de acento e maiúscula
+    assert achados("03.394.252")[0] == {"POUSADA BUSCA SUNSET"}  # parte do CNPJ, com pontos
+    assert achados("05445145484")[0] == {"ANA BUSCA SPINOLA"}  # CPF sem pontos
+    assert achados("(81) 99987-9807")[0] == {"PMI BUSCA CORRETAGEM"}  # telefone; já renovado, em outra aba
+    assert achados("pp@pmibusca")[0] == {"PMI BUSCA CORRETAGEM"}  # e-mail
+    achou, lista = achados("busca")
+    assert achou == set(nomes) and "3 certificados encontrados" in lista and "Limpar a busca" in lista
+    achou, lista = achados("nao existe xyz")
+    assert not achou and "Nenhum certificado encontrado" in lista
+    sem_busca = cliente.get("/renovacao").text.split('id="certificados"')[1].split("Campanhas de renovação")[0]
+    assert "PMI BUSCA CORRETAGEM" not in sem_busca and "POUSADA BUSCA SUNSET" in sem_busca  # aba de sempre
+    with sessao() as db:
+        _limpar(db)

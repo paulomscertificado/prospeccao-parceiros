@@ -189,8 +189,16 @@
 {% endif %}
 
 <div class="cartao" id="certificados">
-  <h2>Certificados da planilha</h2>
-  <nav class="abas" aria-label="Filtro dos certificados">{% for chave, nome in filtros.items() %}<a href="/renovacao?ver={{ chave }}#certificados" class="{{ 'ativa' if ver == chave }}">{{ nome }}</a>{% endfor %}</nav>
+  <div class="topo-certificados">
+    <h2>Certificados da planilha</h2>
+    <form class="busca-certificados" method="get" action="/renovacao#certificados" role="search">
+      <input type="hidden" name="ver" value="{{ ver }}">
+      <input type="search" name="q" value="{{ busca }}" placeholder="Buscar cliente, CNPJ/CPF, telefone ou e-mail" aria-label="Buscar certificado por cliente, CNPJ/CPF, responsável, telefone ou e-mail">
+      <button class="btn">Buscar</button>
+    </form>
+  </div>
+  <nav class="abas" aria-label="Filtro dos certificados">{% for chave, nome in filtros.items() %}<a href="/renovacao?ver={{ chave }}#certificados" class="{{ 'ativa' if ver == chave and not busca }}">{{ nome }}</a>{% endfor %}</nav>
+  {% if busca %}<p class="resultado-busca">{{ total_lista }} {{ 'certificado encontrado' if total_lista == 1 else 'certificados encontrados' }} para “<b>{{ busca }}</b>”, em todas as abas. <a href="/renovacao?ver={{ ver }}#certificados">Limpar a busca</a></p>{% endif %}
   {% if lista %}
   <div class="tabela-rolagem"><table>
     <tr><th>Vence em</th><th>Cliente</th><th>Certificado</th><th>Responsável e contato</th><th>Parceiro</th><th>Situação</th>{% if pode('campanhas.gerenciar') %}<th></th>{% endif %}</tr>
@@ -205,15 +213,16 @@
       <td><span class="selo {{ s[0] }}">{{ s[1] }}</span>{% if c.campanha_id %}<div class="pequeno"><a href="/campanhas/{{ c.campanha_id }}">ver campanha</a></div>{% endif %}</td>
       {% if pode('campanhas.gerenciar') %}<td style="white-space:nowrap;vertical-align:top">
         {% if c.status == 'Ativo' and c.data_vencimento >= hoje %}
-        <form class="inline" style="display:block;margin:0 0 4px" method="post" action="/renovacao/certificado/{{ c.id }}/situacao"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ver" value="{{ ver }}"><input type="hidden" name="situacao" value="Renovado"><button class="btn btn-pequeno">Renovado</button></form>
-        <form class="inline" style="display:block;margin:0 0 4px" method="post" action="/renovacao/certificado/{{ c.id }}/situacao" data-confirmar="Marcar que {{ c.cliente_nome }} não vai renovar? Os avisos que ainda não saíram param."><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ver" value="{{ ver }}"><input type="hidden" name="situacao" value="Não renovará"><button class="btn btn-pequeno">Não vai renovar</button></form>
-        <form class="inline" style="display:block;margin:0 0 4px" method="post" action="/renovacao/certificado/{{ c.id }}/situacao" data-confirmar="Cancelar os avisos de {{ c.cliente_nome }}? Os avisos deste certificado que ainda não saíram param (WhatsApp e e-mail). Dá para reabrir depois."><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ver" value="{{ ver }}"><input type="hidden" name="situacao" value="Avisos cancelados"><button class="btn btn-pequeno btn-perigo">Cancelar avisos</button></form>
+        <form class="inline" style="display:block;margin:0 0 4px" method="post" action="/renovacao/certificado/{{ c.id }}/situacao"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ver" value="{{ ver }}">{% if busca %}<input type="hidden" name="q" value="{{ busca }}">{% endif %}<input type="hidden" name="situacao" value="Renovado"><button class="btn btn-pequeno">Renovado</button></form>
+        <form class="inline" style="display:block;margin:0 0 4px" method="post" action="/renovacao/certificado/{{ c.id }}/situacao" data-confirmar="Marcar que {{ c.cliente_nome }} não vai renovar? Os avisos que ainda não saíram param."><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ver" value="{{ ver }}">{% if busca %}<input type="hidden" name="q" value="{{ busca }}">{% endif %}<input type="hidden" name="situacao" value="Não renovará"><button class="btn btn-pequeno">Não vai renovar</button></form>
+        <form class="inline" style="display:block;margin:0 0 4px" method="post" action="/renovacao/certificado/{{ c.id }}/situacao" data-confirmar="Cancelar os avisos de {{ c.cliente_nome }}? Os avisos deste certificado que ainda não saíram param (WhatsApp e e-mail). Dá para reabrir depois."><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ver" value="{{ ver }}">{% if busca %}<input type="hidden" name="q" value="{{ busca }}">{% endif %}<input type="hidden" name="situacao" value="Avisos cancelados"><button class="btn btn-pequeno btn-perigo">Cancelar avisos</button></form>
         {% elif c.status in ('Renovado', 'Não renovará', 'Avisos cancelados') or (c.status == 'Ativo' and c.fora_motivo) %}
-        <form class="inline" style="display:block;margin:0 0 4px" method="post" action="/renovacao/certificado/{{ c.id }}/situacao"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ver" value="{{ ver }}"><input type="hidden" name="situacao" value="Ativo"><button class="btn btn-pequeno">Reabrir</button></form>
+        <form class="inline" style="display:block;margin:0 0 4px" method="post" action="/renovacao/certificado/{{ c.id }}/situacao"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="ver" value="{{ ver }}">{% if busca %}<input type="hidden" name="q" value="{{ busca }}">{% endif %}<input type="hidden" name="situacao" value="Ativo"><button class="btn btn-pequeno">Reabrir</button></form>
         {% endif %}</td>{% endif %}</tr>
     {% endfor %}
   </table></div>
   {% if total_lista > lista|length %}<p class="pequeno suave">Mostrando {{ lista|length }} de {{ total_lista }}.</p>{% endif %}
+  {% elif busca %}<p class="suave">Nenhum certificado encontrado. Confira a escrita ou procure só por uma parte (ex.: um nome, ou o CNPJ sem pontos).</p>
   {% else %}<p class="suave">{{ 'Nenhum certificado ainda. Importe a planilha de renovação no passo 1.' if not kpis.base and ver == 'avisar' else 'Nenhum certificado neste filtro.' }}</p>{% endif %}
 </div>
 

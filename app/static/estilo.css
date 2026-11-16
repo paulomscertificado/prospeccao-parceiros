@@ -169,6 +169,14 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #9cc1e6; border-c
 .abas a.ativa { color: var(--azul); border-color: var(--azul); }
 .abas a:hover { text-decoration: none; color: var(--azul); }
 
+/* Renovação: campo de pesquisa ao lado do título da lista de certificados (embaixo dele, no celular) */
+.topo-certificados { display: flex; justify-content: space-between; align-items: center; gap: 8px 16px; flex-wrap: wrap; margin-bottom: 12px; }
+.topo-certificados h2 { margin: 0; }
+.busca-certificados { display: flex; gap: 8px; flex: 0 1 420px; }
+.busca-certificados input[type=search] { flex: 1; min-width: 0; }
+.resultado-busca { margin: -6px 0 12px; font-size: .9rem; }
+@media (max-width: 760px) { .busca-certificados { flex: 1 1 100%; } }
+
 /* ---------- Kanban ---------- */
 .kanban { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 12px; align-items: flex-start; }
 .coluna { flex: 0 0 250px; background: #eaeef3; border-radius: var(--raio); padding: 10px; max-height: calc(100vh - 170px); display: flex; flex-direction: column; }

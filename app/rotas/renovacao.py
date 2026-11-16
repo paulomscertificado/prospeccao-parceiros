@@ -1,8 +1,10 @@
 """Tela Renovação: avisos de vencimento do certificado para os clientes da AR (planilha de renovação, app/renovacao.py)."""
 
 import json
+import re
 from collections import Counter
 from datetime import date, timedelta
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from sqlalchemy import func, select
@@ -44,11 +46,34 @@ def _no_filtro(ver: str, c: Certificado, hoje: date, janela: int = renovacao.JAN
     return c.status == "Vencido" or (c.status == "Ativo" and c.data_vencimento < hoje)
 
 
+def _na_busca(c: Certificado, busca: str) -> bool:
+    """Campo de pesquisa da lista de certificados (pedido da Maria em 16/11/2026: o time achar a empresa rápido), em
+    todas as abas. Só números (CNPJ, CPF, telefone, protocolo; com ou sem pontos e traços, 3 ou mais): procura nos
+    números. Com letras: cada palavra, sem acento e sem diferença de maiúscula, em algum campo (cliente, responsável,
+    e-mail, certificado, parceiro, protocolo, CNPJ/CPF)."""
+    digitos = util.so_digitos(busca)
+    if digitos and not re.search(r"[^\d\s().+/-]", busca):
+        return len(digitos) >= 3 and any(digitos in util.so_digitos(x) for x in (c.cnpj, c.whatsapp, c.telefone,
+                                                                                 c.protocolo))
+    texto = util.chave_texto(" ".join(x or "" for x in (c.cliente_nome, c.responsavel, c.email, c.tipo,
+                                                        c.parceiro_nome, c.protocolo, c.cnpj)))
+    return all(p in texto for p in util.chave_texto(busca).split())
+
+
+def _endereco_da_lista(ver: str, busca: str = "") -> str:
+    """Volta para a lista de certificados na mesma aba e com a mesma pesquisa."""
+    params = {"ver": ver} if ver in FILTROS else {}
+    if busca:
+        params["q"] = busca
+    return "/renovacao" + (f"?{urlencode(params)}" if params else "") + "#certificados"
+
+
 @rotas.get("/renovacao")
-def tela_renovacao(request: Request, ver: str = "avisar", usuario: Usuario = Depends(exige("campanhas.ver")),
+def tela_renovacao(request: Request, ver: str = "avisar", q: str = "", usuario: Usuario = Depends(exige("campanhas.ver")),
                    db: Session = Depends(obter_db)):
     hoje = date.today()
     ver = ver if ver in FILTROS else "avisar"
+    busca = q.strip()[:80]
     dias = renovacao.dias_aviso(db)
     janela = dias[0]
     filtros = {**FILTROS, "avisar": f"Vencem em {janela} dias"}
@@ -63,7 +88,8 @@ def tela_renovacao(request: Request, ver: str = "avisar", usuario: Usuario = Dep
         "sem_contato": sum(1 for c in abertos if not renovacao.chave_do_contato(c)),
         "renovados": sum(1 for c in todos if c.status == "Renovado"),
     }
-    lista = sorted((c for c in todos if _no_filtro(ver, c, hoje)), key=lambda c: (c.data_vencimento, c.cliente_nome))
+    no_filtro = (lambda c: _na_busca(c, busca)) if busca else (lambda c: _no_filtro(ver, c, hoje))
+    lista = sorted((c for c in todos if no_filtro(c)), key=lambda c: (c.data_vencimento, c.cliente_nome))
     por_contato = Counter(renovacao.chave_do_contato(c) for c in abertos)
     campanhas = renovacao.campanhas_recentes(db)
     contagem = dict(db.execute(select(Tarefa.campanha_id, func.count(func.distinct(Tarefa.lead_id)))
@@ -84,7 +110,7 @@ def tela_renovacao(request: Request, ver: str = "avisar", usuario: Usuario = Dep
         "cfg": {c: renovacao.cfg(db, c) for c in renovacao.PADRAO}, "mensagens": renovacao.mensagens(db),
         "angulos": renovacao.nomes_dos_avisos(dias), "dias_aviso": dias, "janela": janela,
         "quantidades": renovacao.QUANTIDADES,
-        "kpis": kpis, "fora": fora, "filtros": filtros, "ver": ver, "lista": lista[:LIMITE_LISTA],
+        "kpis": kpis, "fora": fora, "filtros": filtros, "ver": ver, "busca": busca, "lista": lista[:LIMITE_LISTA],
         "total_lista": len(lista), "por_contato": por_contato, "hoje": hoje, "campanhas": campanhas,
         "contatos_por_campanha": contagem, "usuarios": usuarios, "dono": renovacao.dono(db),
         "limite_frios": ler_config_int(db, "limite_frios_whatsapp", 0), "situacoes": renovacao.SITUACOES,
@@ -348,5 +374,4 @@ async def mudar_situacao(request: Request, cid: int, usuario: Usuario = Depends(
     db.commit()
     avisar(request, f"{cert.cliente_nome}: {renovacao.SITUACOES[situacao].lower()}."
                     + (f" {cancelados} avisos que ainda não tinham saído foram cancelados." if cancelados else ""))
-    ver = str(form.get("ver", ""))
-    return voltar(f"/renovacao?ver={ver}#certificados" if ver in FILTROS else "/renovacao#certificados")
+    return voltar(_endereco_da_lista(str(form.get("ver", "")), str(form.get("q", "")).strip()[:80]))
