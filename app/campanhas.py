@@ -229,7 +229,9 @@ def _buscar_candidatos(campanha_id: int) -> list[int]:
         for cod in cods:
             achados, vistos, limite_busca = 0, set(), por_categoria
             while achados < por_categoria:
-                resultados = bases_importadas.buscar(db, base, camp.cidade, camp.estado, limite_busca, [cod])
+                # campanha com WhatsApp: quem tem celular na base vem primeiro (pedido da Maria em 16/11/2026)
+                resultados = bases_importadas.buscar(db, base, camp.cidade, camp.estado, limite_busca, [cod],
+                                                     preferir_celular="whatsapp" in canais)
                 for dados in resultados:
                     if achados >= por_categoria:
                         break
@@ -325,8 +327,10 @@ def etapa_gerar(campanha_id: int, _usuario_id, estado: dict, prazo: float) -> bo
                     l.whatsapp = celular_do_lead(l)  # celular informado à Receita: a campanha tenta o WhatsApp nele
                     limpar_campos(l)  # formata e recalcula a chave: sem ela, a resposta não acha a empresa
             # Quem já tem WhatsApp/e-mail vem primeiro; quem só tem telefone fixo entra também (WhatsApp sem número:
-            # o time pesquisa o contato na internet e cadastra na própria campanha).
-            elegiveis.sort(key=lambda l: (not tem_canal(l, canais), -l.score, l.id))
+            # o time pesquisa o contato na internet e cadastra na própria campanha). Na campanha com WhatsApp, quem
+            # tem o número vem antes de quem só tem e-mail (pedido da Maria em 16/11/2026).
+            elegiveis.sort(key=lambda l: (not tem_canal(l, canais), "whatsapp" in canais and not l.whatsapp,
+                                          -l.score, l.id))
             quantidade_c = max(1, db.get(Campanha, campanha_id).quantidade or 50)
             estado["so_fixo"] = [l.id for l in elegiveis[:quantidade_c] if not tem_canal(l, canais)]
             quantidade = max(1, db.get(Campanha, campanha_id).quantidade or 50)

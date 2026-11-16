@@ -376,6 +376,12 @@ empresas, com as MESMAS colunas da `base_receita`, para reaproveitar `base_recei
   primeiro celular entre o telefone principal e o secundário). Na campanha com WhatsApp, `celular` vira o WhatsApp do
   lead (`_buscar_candidatos`). Em 16/11/2026 a lista da CNPJá tinha 19,9 mil das 35,6 mil empresas com celular, todos
   sem o 9, e a base da Receita 461 mil assim (36 com o 9).
+  Campanha com WhatsApp escolhe primeiro quem tem celular (pedido da Maria, 16/11/2026): `_buscar_candidatos` chama
+  `bases_importadas.buscar(..., preferir_celular=True)`; `base_receita.buscar` ordena o recorte do banco por
+  `_tem_celular` (`case` no ORDER BY, antes do `.limit`; mesma regra de `util.celular`, SQLite e Postgres) e, na
+  `ordem`, quem tem celular vem logo depois do critério do nome. Na fase "pesquisar", `elegiveis` põe quem tem WhatsApp
+  antes de quem só tem e-mail. Antes, como toda empresa da lista tem e-mail, cerca de 1/3 (PE) a 1/2 (MG) das
+  escolhidas saía sem WhatsApp. "Encontrar novos parceiros" continua na ordem de sempre.
 - **Empresa repetida** (16/11/2026, `campanhas._completar_com_a_base`): a empresa achada na base que já estava
   cadastrada pelo **CNPJ** continua com o mesmo cadastro, mas ganha da base os campos vazios (`preencher(...,
   so_vazios=True)`: nada é apagado nem trocado), o celular como WhatsApp (campanha com WhatsApp) ou numa nota das

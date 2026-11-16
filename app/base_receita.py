@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from sqlalchemy import Date, DateTime, Integer, String, delete, func, insert, select, text
+from sqlalchemy import Date, DateTime, Integer, String, and_, case, delete, func, insert, or_, select, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from . import util
@@ -412,12 +412,26 @@ def contar(db, uf: str = "", cidade: str = "", modelo=None, filtro=None, so_matr
         return {}
 
 
+def _tem_celular(M):
+    """Condição do banco: a empresa tem celular no telefone principal ou no secundário, com ou sem o 9 da frente
+    (10 dígitos com o 3º de 6 a 9, ou 11 dígitos com o 3º = 9; a mesma regra de util.celular). Vale no SQLite e no
+    Postgres (as bases guardam o telefone só com os dígitos)."""
+    def celular(coluna):
+        terceiro = func.substr(coluna, 3, 1)
+        return or_(and_(func.length(coluna) == 10, terceiro.in_(("6", "7", "8", "9"))),
+                   and_(func.length(coluna) == 11, terceiro == "9"))
+
+    return or_(celular(M.telefone), celular(M.telefone2))
+
+
 def buscar(db, cidade: str, uf: str, limite: int, categorias: list[str] | None = None,
            so_matriz: bool = True, cnaes: list[str] | None = None, modelo=None, filtro=None,
-           origem: str = "Prospecção: base da Receita Federal") -> list[dict]:
+           origem: str = "Prospecção: base da Receita Federal", preferir_celular: bool = False) -> list[dict]:
     """Empresas da cidade (das categorias pedidas): primeiro as que têm no nome as palavras da categoria
     (ex.: "condom" em administradoras), depois as com mais contatos e as mais antigas.
-    Sem cidade: o estado inteiro. modelo/filtro/origem: outra base (listas importadas, ver app/bases_importadas.py)."""
+    Sem cidade: o estado inteiro. modelo/filtro/origem: outra base (listas importadas, ver app/bases_importadas.py).
+    preferir_celular (campanha com WhatsApp, pedido da Maria em 16/11/2026): depois do nome, quem tem celular vem
+    primeiro, já no recorte que o banco devolve."""
     from .modelos import Categoria
 
     M = modelo or EmpresaReceita
@@ -443,9 +457,9 @@ def buscar(db, cidade: str, uf: str, limite: int, categorias: list[str] | None =
         consulta = consulta.where(M.categoria.in_(categorias))
     if so_matriz:
         consulta = consulta.where(M.matriz == 1)
+    if preferir_celular:  # o recorte do banco (o .limit abaixo) já traz primeiro quem tem celular
+        consulta = consulta.order_by(case((_tem_celular(M), 0), else_=1))
     if palavras:
-        from sqlalchemy import or_
-
         filtro = or_(*[M.nome_fantasia.ilike(f"%{p}%") for p in palavras],
                      *[M.razao_social.ilike(f"%{p}%") for p in palavras])
         primeiro = db.execute(consulta.where(filtro).limit(max(limite * 10, 100))).scalars().all()
@@ -457,6 +471,7 @@ def buscar(db, cidade: str, uf: str, limite: int, categorias: list[str] | None =
     def ordem(e):
         nome = util.chave_texto(f"{e.nome_fantasia} {e.razao_social}")
         return (0 if any(p in nome for p in palavras) else 1,
+                0 if preferir_celular and util.celular(e.telefone, e.telefone2) else 1,
                 -(bool(e.email) + bool(e.telefone) + bool(e.telefone2)), e.inicio_atividade or datetime.max.date())
 
     linhas = sorted(linhas, key=ordem)

@@ -140,15 +140,17 @@ def disponivel(db, base: str) -> bool:
 
 
 def buscar(db, base: str, cidade: str, uf: str, limite: int, categorias: list[str] | None = None,
-           cnaes: list[str] | None = None) -> list[dict]:
-    """Mesma busca (e mesma ordem) da base da Receita, na base escolhida."""
+           cnaes: list[str] | None = None, preferir_celular: bool = False) -> list[dict]:
+    """Mesma busca (e mesma ordem) da base da Receita, na base escolhida. preferir_celular: quem tem celular primeiro
+    (campanha com WhatsApp, ver base_receita.buscar)."""
     lista_id = _id_lista(base)
     if lista_id is None:
-        return base_receita.buscar(db, cidade, uf, limite, categorias, cnaes=cnaes)
+        return base_receita.buscar(db, cidade, uf, limite, categorias, cnaes=cnaes, preferir_celular=preferir_celular)
     b = db.get(BaseDados, lista_id)
     return base_receita.buscar(db, cidade, uf, limite, categorias, so_matriz=False, cnaes=cnaes, modelo=EmpresaBase,
                                filtro=EmpresaBase.base_id == lista_id,
-                               origem=f"Prospecção: lista {b.nome if b else lista_id} ({b.origem if b else 'importada'})")
+                               origem=f"Prospecção: lista {b.nome if b else lista_id} ({b.origem if b else 'importada'})",
+                               preferir_celular=preferir_celular)
 
 
 def contar(db, base: str, uf: str = "", cidade: str = "") -> dict[str, int]:

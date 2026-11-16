@@ -117,3 +117,66 @@ def test_campanha_da_lista_leva_o_celular_e_completa_a_empresa_repetida(cliente,
         camp.status = "cancelada"  # não deixa as tarefas na fila dos outros testes
         for t in db.execute(select(Tarefa).where(Tarefa.campanha_id == cid)).scalars():
             t.status = "cancelada"
+
+
+def _planilha_preferencia() -> bytes:
+    """3 contabilidades de PE: a de só fixo tem mais contatos (2 fixos e e-mail), então vinha primeiro pela ordem antiga."""
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    est = wb.active
+    est.title = "Estabelecimentos"
+    est.append([None, "Estabelecimentos"])
+    est.append(CAB_ESTAB)
+    contabil = 6920601
+    est.append(_com_tel2(_estab("83000001000101", "SO FIXO LTDA", "Contabil Somente Fixos", "Ativa", "Recife", "PE", contabil,
+                                "a@so-fixo-preferencia-teste.com.br", tel="8134772001"), "8134772002"))
+    est.append(_estab("83000002000102", "CELULAR UM LTDA", "Contabil Celular Um", "Ativa", "Recife", "PE", contabil,
+                      "b@celular-um-preferencia-teste.com.br", tel="8196772001"))
+    est.append(_estab("83000003000103", "CELULAR DOIS LTDA", "Contabil Celular Dois", "Ativa", "Recife", "PE", contabil,
+                      "c@celular-dois-preferencia-teste.com.br", tel="8196772002"))
+    soc = wb.create_sheet("Sócios")
+    soc.append([None, "Sócios e Administradores"])
+    soc.append(CAB_SOCIOS)
+    saida = io.BytesIO()
+    wb.save(saida)
+    return saida.getvalue()
+
+
+def test_campanha_com_whatsapp_escolhe_primeiro_quem_tem_celular(cliente, monkeypatch):
+    """Pedido da Maria em 16/11/2026: na campanha com WhatsApp, as empresas com celular na base vêm primeiro."""
+    with sessao() as db:
+        resumo = bases_importadas.importar(db, "Lista preferencia celular", _planilha_preferencia(), "preferencia.xlsx")
+        db.commit()
+    base = f"lista:{resumo['base_id']}"
+    with sessao() as db:  # a busca na base: sem a preferência, a de só fixo (mais contatos) vem primeiro
+        assert bases_importadas.buscar(db, base, "", "PE", 1, ["contabil"])[0]["empresa"] == "Contabil Somente Fixos"
+        primeiras = bases_importadas.buscar(db, base, "", "PE", 1, ["contabil"], preferir_celular=True)
+        assert [d["empresa"] for d in primeiras][:2] == ["Contabil Celular Um", "Contabil Celular Dois"]
+        assert primeiras[-1]["empresa"] == "Contabil Somente Fixos" and not primeiras[-1]["celular"]
+
+    def pesquisar(db, lead, usar_ia=True):
+        from app import score
+
+        lead.pesquisado_em = lead.criado_em
+        score.atualizar(db, lead)
+
+    monkeypatch.setattr(pesquisa, "pesquisar_lead", pesquisar)
+    with sessao() as db:
+        admin = db.execute(select(Usuario).where(Usuario.perfil == "admin")).scalars().first()
+        camp = Campanha(nome="Preferencia celular", categorias="contabil", cidade="", estado="PE", quantidade=2,
+                        canais="whatsapp,email", status="gerando", usuario_id=admin.id, base=base)
+        db.add(camp)
+        db.flush()
+        cid = camp.id
+    campanhas.gerar(cid)
+    with sessao() as db:
+        camp = db.get(Campanha, cid)
+        assert camp.status == "aguardando_aprovacao", camp.erro
+        leads = {t.lead.empresa: t.lead for t in db.execute(select(Tarefa).where(Tarefa.campanha_id == cid)).scalars()}
+        assert set(leads) == {"Contabil Celular Um", "Contabil Celular Dois"}  # a de só fixo fica de fora
+        assert leads["Contabil Celular Um"].whatsapp == "(81) 99677-2001"
+        assert leads["Contabil Celular Dois"].whatsapp == "(81) 99677-2002"
+        camp.status = "cancelada"  # não deixa as tarefas na fila dos outros testes
+        for t in db.execute(select(Tarefa).where(Tarefa.campanha_id == cid)).scalars():
+            t.status = "cancelada"
