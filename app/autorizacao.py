@@ -62,7 +62,8 @@ CATALOGO = [
     Permissao("leads.liberar_contato", "Leads", "Desfazer opt-out (contato autorizou de novo)", padrao="G"),
     Permissao("prospeccao.buscar", "Leads", "Buscar empresas (Prospecção)", True, "prospeccao", padrao="E"),
 
-    Permissao("oportunidades.ver", "IA SDR", "Ver e assumir oportunidades", True, padrao="E"),
+    # Sem alcance desde 16/11/2026 (pedido da Maria): a equipe toda vê e atende todas as respostas da AR
+    Permissao("oportunidades.ver", "IA SDR", "Ver e atender as oportunidades (todas: a equipe toda vê)", padrao="E"),
     Permissao("oportunidades.respostas", "IA SDR", "Ver todas as respostas recebidas", padrao="G"),
     Permissao("campanhas.ver", "IA SDR", "Ver campanhas", True, "campanhas", "E"),
     Permissao("campanhas.criar", "IA SDR", "Criar campanhas", modulo="campanhas", padrao="E"),

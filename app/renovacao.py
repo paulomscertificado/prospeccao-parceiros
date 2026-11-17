@@ -1429,6 +1429,14 @@ def antes_de_excluir(db, camp: Campanha) -> None:
             c.fora_motivo = f"já recebeu aviso na campanha excluída \"{camp.nome}\""[:160]
 
 
+def ativos_do_lead(db, lead: Lead) -> list[Certificado]:
+    """Certificados da planilha ainda ativos do contato deste lead (os que receberam aviso por ele), do que vence
+    primeiro ao último. Usado no descarte "Já renovou" da tela Oportunidades."""
+    return db.execute(select(Certificado).where(Certificado.lead_id == lead.id, Certificado.origem == ORIGEM,
+                                                Certificado.status == "Ativo")
+                      .order_by(Certificado.data_vencimento, Certificado.id)).scalars().all()
+
+
 def mudar_situacao(db, cert: Certificado, situacao: str, usuario: Usuario | None) -> int:
     """Renovado / Não renovará / Avisos cancelados: os avisos que ainda não saíram param, WhatsApp e e-mail (se o contato
     tiver outro certificado na mesma onda, os avisos continuam por ele). Ativo (Reabrir): volta para a fila se a

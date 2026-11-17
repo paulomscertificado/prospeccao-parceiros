@@ -6,6 +6,7 @@ a oportunidade ao time humano.
 - classificar_resposta / processar_resposta: entende a resposta (15 classes) e decide o que fazer.
 - Interesse → PARA a automação, cria OPORTUNIDADE, avisa o responsável (handoff).
 - assumir_lead: o humano assume e toda automação daquele lead para na hora.
+- marcar_atendida: alguém da equipe atendeu a resposta (sem virar dono do lead; a equipe toda vê as oportunidades).
 
 Limites da IA (prompt + conferência depois): não negocia preço nem comissão, não dá desconto,
 não promete exclusividade, não aceita condições, não fecha parceria. Nesses casos: humano.
@@ -659,22 +660,45 @@ def notificar(db, lead: Lead, texto: str, link: str) -> None:
 
 # ---------------------------------------------------------------- Handoff humano
 
-def assumir_lead(db, lead: Lead, usuario: Usuario) -> None:
-    """O humano assume: toda automação deste lead para imediatamente."""
+def _equipe_cuida(db, lead: Lead, usuario: Usuario, motivo: str, resultado: str) -> tuple[int, int]:
+    """Uma pessoa da equipe cuida da resposta: a automação do lead para na hora (tarefas automáticas e rascunhos
+    cancelados), o lead passa para "Humano assumiu" (as próximas mensagens dele não passam pela IA) e as oportunidades
+    dele saem das Novas (status "assumida", que a tela chama de Atendida, por esta pessoa).
+    Devolve (tarefas canceladas, oportunidades que saíram das Novas)."""
     lead.automacao_pausada = True
-    lead.humano_id = usuario.id
-    if lead.vendedor_id is None:
-        lead.vendedor_id = usuario.id
-    canceladas = cancelar_tarefas_de_prospeccao(db, lead.id, f"{usuario.nome} assumiu o lead")
+    canceladas = cancelar_tarefas_de_prospeccao(db, lead.id, motivo)
     for t in db.execute(select(Tarefa).where(Tarefa.lead_id == lead.id, Tarefa.status == "rascunho")).scalars():
-        t.status, t.concluida_em, t.resultado = "cancelada", agora(), "Lead assumido por humano"
+        t.status, t.concluida_em, t.resultado = "cancelada", agora(), resultado
     if lead.etapa < 4 and not lead.perdido:
         mudar_status(db, lead, "Humano assumiu", usuario)
+    oportunidades = 0
     for op in db.execute(select(Oportunidade).where(Oportunidade.lead_id == lead.id,
                                                     Oportunidade.status == "nova")).scalars():
         op.status, op.responsavel_id, op.assumida_em = "assumida", usuario.id, agora()
+        oportunidades += 1
+    return canceladas, oportunidades
+
+
+def assumir_lead(db, lead: Lead, usuario: Usuario) -> None:
+    """O humano assume (botão "Assumir lead" da ficha e reunião marcada): vira o responsável pelo lead e toda
+    automação deste lead para imediatamente."""
+    lead.humano_id = usuario.id
+    if lead.vendedor_id is None:
+        lead.vendedor_id = usuario.id
+    canceladas, _ = _equipe_cuida(db, lead, usuario, f"{usuario.nome} assumiu o lead", "Lead assumido por humano")
     historico(db, lead.id, "sistema", f"{usuario.nome} assumiu o lead. Automação parada ({canceladas} tarefas "
                                       f"automáticas canceladas).", usuario)
+
+
+def marcar_atendida(db, lead: Lead, usuario: Usuario) -> int:
+    """Botão "Marcar como atendido" (Oportunidades e Painel). Pedido da Maria em 16/11/2026: a resposta é da equipe
+    toda, ninguém "assume" o lead; quem atendeu o cliente tira a resposta das Novas e o responsável pelo lead continua
+    o mesmo. Devolve quantas oportunidades saíram das Novas."""
+    canceladas, oportunidades = _equipe_cuida(db, lead, usuario, f"{usuario.nome} atendeu o lead",
+                                              "Lead atendido pela equipe")
+    historico(db, lead.id, "sistema", f"{usuario.nome} marcou a resposta como atendida. Automação parada "
+                                      f"({canceladas} tarefas automáticas canceladas).", usuario)
+    return oportunidades
 
 
 def resumo_handoff(db, lead: Lead) -> dict:

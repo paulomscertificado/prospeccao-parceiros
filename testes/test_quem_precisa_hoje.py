@@ -56,7 +56,7 @@ def test_painel_mostra_quem_precisa_de_mim_hoje(cliente):
     pagina = cliente.get("/").text
     assert "Quem precisa de mim hoje" in pagina
     trecho = pagina[pagina.index("Quem precisa de mim hoje"):pagina.index('action="/campanhas/nova"')]
-    for esperado in ("Hoje Quente Contabil Ltda", "fora do prazo há", "Assumir", "Respostas para analisar",
+    for esperado in ("Hoje Quente Contabil Ltda", "fora do prazo há", "Marcar como atendido", "Respostas para analisar",
                      "Hoje Esfriando Contabil Ltda", "sem movimento há", "Reunião de apresentação", "atrasada há 1 dia"):
         assert esperado in trecho, esperado
     with sessao() as db:  # não deixa cartões nas telas dos outros testes

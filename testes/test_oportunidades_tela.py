@@ -1,4 +1,4 @@
-"""Tela Oportunidades (nov/2026): abas Novas / Assumidas / Descartadas / Todas as respostas, filtros com contagem,
+"""Tela Oportunidades (nov/2026): abas Novas / Atendidas / Descartadas / Todas as respostas, filtros com contagem,
 quentes primeiro em cada dia, tempo de espera, descartar as mostradas e "Voltar para Novas"."""
 
 import re
@@ -50,8 +50,8 @@ def test_abas_ordem_espera_e_filtros(cliente):
     assert "Tela Op Quente Ltda" in pagina and "Tela Op Morna Ltda" in pagina
     assert pagina.index("Tela Op Quente Ltda") < pagina.index("Tela Op Morna Ltda")
     assert "Tela Op Assumida Ltda" not in pagina and "Tela Op Descartada Ltda" not in pagina
-    assert "esperando há" in pagina and "Novas para assumir" in pagina and "Hoje" in pagina
-    for aba in ("🔥 Novas", "✅ Assumidas", "🗑️ Descartadas", "💬 Todas as respostas"):
+    assert "esperando há" in pagina and "Esperando atendimento" in pagina and "Hoje" in pagina
+    for aba in ("🔥 Novas", "✅ Atendidas", "🗑️ Descartadas", "💬 Todas as respostas"):
         assert aba in pagina, aba
 
     so_quentes = cliente.get("/oportunidades?busca=tela op&temperatura=quente").text
@@ -59,10 +59,11 @@ def test_abas_ordem_espera_e_filtros(cliente):
     assert "Descartar as 1 mostradas" in so_quentes  # com filtro aparece o descartar de uma vez
     assert "mostradas" not in cliente.get("/oportunidades").text  # sem filtro, não (evita descartar tudo sem querer)
 
-    assumidas = cliente.get("/oportunidades?ver=assumidas&busca=tela op").text
-    assert "Tela Op Assumida Ltda" in assumidas and "Tela Op Quente Ltda" not in assumidas
-    assert "Assumida por Maria Admin · 2 h depois da resposta" in assumidas
-    assert "Tela Op Assumida Ltda" in cliente.get("/oportunidades?ver=tratadas&busca=tela op").text  # endereço antigo
+    atendidas = cliente.get("/oportunidades?ver=atendidas&busca=tela op").text
+    assert "Tela Op Assumida Ltda" in atendidas and "Tela Op Quente Ltda" not in atendidas
+    assert "Atendida por Maria Admin · 2 h depois da resposta" in atendidas
+    for antigo in ("tratadas", "assumidas"):  # endereços antigos
+        assert "Tela Op Assumida Ltda" in cliente.get(f"/oportunidades?ver={antigo}&busca=tela op").text
 
     descartadas = cliente.get("/oportunidades?ver=descartadas&busca=tela op").text
     assert "Tela Op Descartada Ltda" in descartadas and "Voltar para Novas" in descartadas
@@ -140,7 +141,8 @@ def test_todas_as_respostas_filtra_por_tipo_e_canal(cliente):
     assert kpi == re.search(r'Últimos 7 dias <span class="n">(\d+)<', pagina).group(1)
 
 
-def test_vendedor_ve_so_as_dele_e_nao_ve_todas_as_respostas(cliente):
+def test_vendedor_ve_as_da_equipe_toda_mas_nao_ve_todas_as_respostas(cliente):
+    """Desde 16/11/2026 a equipe toda vê e trata as respostas da AR (antes cada um via só as dos leads dele)."""
     with sessao() as db:
         vend = db.execute(select(Usuario).where(Usuario.email == "vend.op@teste.com.br")).scalars().first()
         if not vend:
@@ -154,13 +156,12 @@ def test_vendedor_ve_so_as_dele_e_nao_ve_todas_as_respostas(cliente):
     c = TestClient(app)
     c.post("/login", data={"csrf": csrf_de(c.get("/login").text), "email": "vend.op@teste.com.br", "senha": SENHA})
     pagina = c.get("/oportunidades?busca=vend op").text
-    assert "Vend Op Minha Ltda" in pagina and "Vend Op Alheia Ltda" not in pagina
+    assert "Vend Op Minha Ltda" in pagina and "Vend Op Alheia Ltda" in pagina
     assert "Todas as respostas" not in pagina
     assert "Todas as respostas dos contatos" not in c.get("/oportunidades?ver=respostas").text  # volta para Novas
     csrf = csrf_de(pagina)
-    assert c.post(f"/oportunidades/{alheia}/descartar", data={"csrf": csrf, "motivo": "Outro"}).status_code == 404
     c.post("/oportunidades/descartar-varias", data={"csrf": csrf, "ids": f"{minha},{alheia}", "motivo": "Outro"})
     with sessao() as db:
         assert db.get(Oportunidade, minha).status == "descartada"
-        assert db.get(Oportunidade, alheia).status == "nova"  # a de outra pessoa não é mexida
-        db.get(Oportunidade, alheia).status = "descartada"  # não deixa cartão na tela dos outros testes
+        assert db.get(Oportunidade, alheia).status == "descartada"  # a de outra pessoa da equipe também
+    assert c.post("/oportunidades/999999/descartar", data={"csrf": csrf, "motivo": "Outro"}).status_code == 404

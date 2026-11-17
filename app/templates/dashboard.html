@@ -30,15 +30,15 @@
   {% if not h.total %}<p class="suave" style="margin:4px 0 0">Tudo em dia: nenhuma resposta esperando, nenhuma tarefa atrasada e nenhum lead esfriando.</p>{% endif %}
 
   {% if h.quentes %}
-  <h3>🔥 Respostas quentes esperando alguém assumir <span class="pequeno suave">· prazo: 2 horas úteis</span></h3>
+  <h3>🔥 Respostas quentes esperando atendimento <span class="pequeno suave">· a equipe toda vê · prazo: 2 horas úteis</span></h3>
   {% for q in h.quentes[:8] %}{% set o = q.o %}
   <div class="linha-hoje">
-    <div><a href="/leads/{{ o.lead.id }}"><b>{{ o.lead.empresa }}</b></a>
+    <div>{% if o.lead_id in h.abre_lead %}<a href="/leads/{{ o.lead.id }}"><b>{{ o.lead.empresa }}</b></a>{% else %}<b>{{ o.lead.empresa }}</b>{% endif %}
       <div class="pequeno suave">{{ o.classificacao or 'quente' }} · respondeu há {{ q.espera }}</div></div>
     <div>{% if q.atrasada %}<span class="selo selo-erro">fora do prazo há {{ q.passou }}</span>
-      {% else %}<span class="selo selo-alerta">assumir até {{ q.prazo.strftime('%H:%M') if q.prazo.date() == hoje else q.prazo.strftime('%d/%m %H:%M') }} · faltam {{ q.falta }}</span>{% endif %}</div>
+      {% else %}<span class="selo selo-alerta">responder até {{ q.prazo.strftime('%H:%M') if q.prazo.date() == hoje else q.prazo.strftime('%d/%m %H:%M') }} · faltam {{ q.falta }}</span>{% endif %}</div>
     <div class="grupo-btn">
-      <form class="inline" method="post" action="/leads/{{ o.lead.id }}/assumir"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar_para" value="/#hoje"><button class="btn btn-pequeno btn-verde">Assumir</button></form>
+      <form class="inline" method="post" action="/oportunidades/{{ o.id }}/atendida"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar_para" value="/#hoje"><button class="btn btn-pequeno btn-verde" title="Alguém da equipe já respondeu este cliente">✓ Marcar como atendido</button></form>
       <a class="btn btn-pequeno" href="/oportunidades#op-{{ o.id }}">Ver a resposta</a></div>
   </div>
   {% endfor %}

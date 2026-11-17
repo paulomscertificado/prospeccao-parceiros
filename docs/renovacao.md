@@ -130,7 +130,9 @@ base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renova
     tem o botão na faixa "APROVAÇÃO NECESSÁRIA".
 15. **Respostas**: o fluxo normal (cancela os próximos toques, Oportunidade). A IA SDR não responde
    (`empresas_novas.e_lead_de_venda` inclui a origem "Renovação"). No WhatsApp Leads o contato ganha a etiqueta da IA
-   SDR (a Atendente IA de lá não responde).
+   SDR (a Atendente IA de lá não responde). Cliente que diz que já renovou: descartar a oportunidade com o motivo
+   **Já renovou** marca o certificado como Renovado (`rotas/sdr._ja_renovou` + `ativos_do_lead`; só com um certificado
+   ativo no contato, senão avisa para marcar na tela; pedido da Maria em 16/11/2026).
 
 ## Banco
 

@@ -63,9 +63,10 @@ def duas_ars(cliente):
                         mensagem=f"Mensagem {SIGILO}")
         cert = Certificado(cliente_nome=f"Certificado {SIGILO}", data_vencimento=date.today() + timedelta(days=20),
                            lead_id=lead.id, campanha_id=camp.id)
+        oportunidade = Oportunidade(lead_id=lead.id, resumo=f"Resumo {SIGILO}")
         db.add_all([tarefa, cert, Historico(lead_id=lead.id, tipo="nota", descricao=f"Nota {SIGILO}"),
                     Mensagem(canal="email", lead_id=lead.id, assunto=f"Assunto {SIGILO}", corpo=f"Corpo {SIGILO}"),
-                    Oportunidade(lead_id=lead.id, resumo=f"Resumo {SIGILO}"),
+                    oportunidade,
                     Venda(cliente_id=cliente_ms.id, observacoes=f"Venda {SIGILO}"),
                     ConexaoWhatsApp(id=f"u{ms.id}", nome=f"Numero {SIGILO}", dono_id=ms.id),
                     ContaEmail(nome=f"Conta {SIGILO}", dono_id=ms.id, endereco="sigiloms7q@mscertificados.com.br"),
@@ -76,7 +77,8 @@ def duas_ars(cliente):
         db.flush()
         do_ms = [o for o in (lead, camp, tarefa, cert, cliente_ms, parceiro, visual) if o.tenant_id != ids_ar["ms"]]
         assert not do_ms, do_ms  # tudo nasceu na AR MS (pela pessoa dona)
-        ids_ms = sorted({lead.id, camp.id, tarefa.id, cert.id, cliente_ms.id, parceiro.id, visual.id, ms.id})
+        ids_ms = sorted({lead.id, camp.id, tarefa.id, cert.id, cliente_ms.id, parceiro.id, visual.id, ms.id,
+                         oportunidade.id})
         dados = {"certy_email": certy.email, "ms_email": ms.email, "ids_ms": ids_ms, "lead_ms": lead.id,
                  "lead_certy": lead_certy.id, "camp_ms": camp.id, "conexao_ms": f"u{ms.id}"}
     return dados
@@ -87,7 +89,8 @@ def _foto_ms(dados) -> tuple:
         lead, camp = db.get(Lead, dados["lead_ms"]), db.get(Campanha, dados["camp_ms"])
         return (lead and (lead.empresa, lead.status, lead.vendedor_id, lead.opt_out, lead.etapa),
                 camp and (camp.nome, camp.status, camp.aprovado_em),
-                db.execute(select(Tarefa.status).where(Tarefa.lead_id == dados["lead_ms"])).scalars().all())
+                db.execute(select(Tarefa.status).where(Tarefa.lead_id == dados["lead_ms"])).scalars().all(),
+                db.execute(select(Oportunidade.status).where(Oportunidade.lead_id == dados["lead_ms"])).scalars().all())
 
 
 PLATAFORMA = ("/cadencias", "/categorias", "/templates", "/permissoes")  # modelos e papéis da plataforma: Fase 3

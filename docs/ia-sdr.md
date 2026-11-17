@@ -18,7 +18,7 @@
 | WhatsApp | `app/integracoes/whatsapp_cloud.py` | API oficial: templates aprovados, resposta dentro da janela de 24 h, webhook com assinatura |
 | CRM | `app/config.py` (status), pipeline | Novo → Pesquisando → Abordagem criada → Contatado → Aguardando resposta → Respondeu → Interessado → Humano assumiu → Reunião → Negociação → Parceiro → Parceiro ativo / Perdido |
 | Calendar | `app/agenda_horarios.py` | Horários livres = expediente do responsável − reuniões marcadas (nunca inventa horário) |
-| Human Handoff | `Oportunidade`, `/oportunidades` | Tela "Oportunidades" (Novas, Assumidas, Descartadas, Todas as respostas), botão **Assumir lead**, avisos |
+| Human Handoff | `Oportunidade`, `/oportunidades` | Tela "Oportunidades" (Novas, Atendidas, Descartadas, Todas as respostas), a equipe toda vê; botão **Marcar como atendido**, avisos |
 | Analytics | `app/metricas.py` (`inteligencia`) | Painel "Inteligência de Prospecção", ranking de segmentos, sugestões |
 | Knowledge Base | tabela `base_conhecimento`, `/conhecimento` | O que a SDR pode responder sozinha |
 | Partner Management | módulo Parceiros (já existente) | Parceiros, vendas, comissão, vencimentos |
@@ -446,8 +446,9 @@ empresas, com as MESMAS colunas da `base_receita`, para reaproveitar `base_recei
 
 ## Oportunidades em abas e com filtros (nov/2026)
 
-- `rotas/sdr.py`, `GET /oportunidades`: abas `?ver=novas|assumidas|descartadas|respostas` (`ABAS_OPORTUNIDADES`;
-  o endereço antigo `?ver=tratadas` abre Assumidas; Todas as respostas só com `oportunidades.respostas`).
+- `rotas/sdr.py`, `GET /oportunidades`: abas `?ver=novas|atendidas|descartadas|respostas` (`ABAS_OPORTUNIDADES`;
+  os endereços antigos `?ver=tratadas` e `?ver=assumidas` abrem Atendidas, `ABAS_ANTIGAS`; Todas as respostas só com
+  `oportunidades.respostas`).
   Filtros `periodo` (`PERIODOS_OP`, regra em `_no_periodo_op`), `temperatura`, `canal`, `classe` (só respostas:
   `_classe_op` agrupa a `classificacao_resposta` do lead) e `busca` (nome da empresa, sem acento). Cada botão mostra
   quantos há com os outros filtros aplicados (`quantos`); `url_op(...)` monta os links (padrão fica fora do endereço).
@@ -455,17 +456,42 @@ empresas, com as MESMAS colunas da `base_receita`, para reaproveitar `base_recei
   carrega os registros completos só do que aparece (`LIMITE_CARTOES` = 50 cartões em Novas, `LIMITE_LINHAS` = 200
   linhas nas outras abas). `sdr.resumo_handoff` só nos cartões de Novas. Com os dados da nuvem: 15 a 25 consultas.
 - Ordem e grupos (`_grupos_por_dia`): Novas pela data da resposta, com as quentes primeiro em cada dia (antes o
-  `order_by(temperatura)` punha as mornas na frente); Assumidas/Descartadas pela data em que alguém assumiu ou
+  `order_by(temperatura)` punha as mornas na frente); Atendidas/Descartadas pela data em que alguém atendeu ou
   descartou (`assumida_em`); respostas pela chegada. "Esperando há..." fica vermelho depois de `ESPERA_DEMAIS` (2 h).
 - Números do topo: novas, quentes, esperando há mais de 2 h, tempo típico até atender (mediana de `assumida_em -
-  criado_em` das assumidas e descartadas dos últimos 30 dias) e respostas dos últimos 7 dias (mesma regra de dias do
+  criado_em` das atendidas e descartadas dos últimos 30 dias) e respostas dos últimos 7 dias (mesma regra de dias do
   filtro, para o número bater com a lista).
 - Ações: `POST /oportunidades/{id}/descartar` (agora volta para a tela de onde veio, `voltar_para`),
   `POST /oportunidades/descartar-varias` (ids mostrados, no máximo 50; o botão só aparece com filtro) e
-  `POST /oportunidades/{id}/reabrir` (desfaz um descarte: volta para Novas, com histórico). Todas conferem
-  `oportunidades.ver` e o alcance de cada oportunidade (de outra pessoa: 404 / não mexe); `voltar_para` só aceita
-  caminho do próprio sistema (`_destino_seguro`).
+  `POST /oportunidades/{id}/reabrir` (desfaz um descarte: volta para Novas, com histórico) e
+  `POST /oportunidades/{id}/atendida` (ver abaixo). Todas conferem `oportunidades.ver` (sem alcance desde 16/11/2026:
+  a equipe toda trata as da AR; de outra AR: 404 pelo isolamento); `voltar_para` só aceita caminho do próprio sistema
+  (`_destino_seguro`).
 - Testes: `testes/test_oportunidades_tela.py`.
+
+## Oportunidades da equipe toda e motivo "Já renovou" (16/11/2026)
+
+Pedido da Maria: "deixe aberto para toda equipe ver, pois o foco é ser o mais eficiente possível, foco em atender o
+cliente rápido". Antes cada pessoa via só as respostas dos leads dela e tinha de **assumir** o lead (virava dona dele).
+
+- `oportunidades.ver` ficou **sem alcance** (`com_escopo=False` no `autorizacao.CATALOGO`): quem tem a permissão vê e
+  trata todas as oportunidades da AR, na tela e no Painel (`hoje.itens`). O isolamento por AR continua.
+- **Marcar como atendido** (`POST /oportunidades/{id}/atendida`, `sdr.marcar_atendida`): as oportunidades "nova" do
+  lead viram "assumida" (o banco guarda "assumida"; a tela chama de **Atendida**) com `responsavel_id` = quem clicou;
+  a automação do lead para e ele passa para "Humano assumiu" (`sdr._equipe_cuida`, o mesmo de `assumir_lead`), **sem
+  mudar `vendedor_id` nem `humano_id`**. Já atendida ou descartada: avisa quem fez, sem mexer. Registro de atividades
+  `atendeu_oportunidade`.
+- **Assumir lead** ficou só na ficha do lead (e na reunião marcada): `POST /leads/{id}/assumir` agora confere
+  `leads.editar` (do próprio ou sem dono), já que `oportunidades.ver` deixou de ter alcance.
+- Cartão: "Responsável pelo lead" virou **Contato do cliente** (nome e telefone); o nome da empresa só é link para quem
+  pode abrir a ficha (`abre_lead`, alcance de `leads.ver`), senão a ficha daria "não encontrada".
+- **Já renovou** (`config.MOTIVO_JA_RENOVOU`, em `MOTIVOS_DESCARTE`): o descarte de UMA oportunidade com esse motivo
+  chama `rotas/sdr._ja_renovou`. Com um só certificado ativo da planilha no lead (`renovacao.ativos_do_lead`) e a
+  permissão `campanhas.gerenciar`, `renovacao.mudar_situacao(..., "Renovado")` cancela os avisos que faltam, com
+  registro de atividades (`situacao_certificado`) e histórico do lead. Com mais de um certificado ativo, só avisa para
+  marcar na tela Renovação. "Descartar as N mostradas" não mexe em certificado; "Voltar para Novas" não desfaz o
+  Renovado (avisa que ele continua).
+- Testes: `testes/test_oportunidades_equipe.py`.
 
 ## Visual das campanhas: e-mail em HTML e imagem no WhatsApp (nov/2026)
 
@@ -518,13 +544,13 @@ empresas, com as MESMAS colunas da `base_receita`, para reaproveitar `base_recei
 ## Quem precisa de mim hoje e motivo obrigatório (auditoria P1.7, nov/2026)
 
 - `app/hoje.py`, quadro no topo do Dashboard (`rotas/painel.py`, `templates/dashboard.html`): respostas quentes
-  esperando (oportunidades "nova" no alcance de `oportunidades.ver`, da mais antiga para a mais nova), contagem das
+  esperando (todas as oportunidades "nova" da AR desde 16/11/2026, da mais antiga para a mais nova), contagem das
   mornas, tarefas da pessoa de hoje e atrasadas (`Tarefa.tipo != "prospeccao"`; os toques ficam na Minha fila), leads
   da pessoa (`vendedor_id` ou `humano_id`) em `STATUS_COM_HUMANO` sem histórico há `dias_lead_parado` dias e sem
   tarefa pendente de hoje em diante ("esfriando") e `metricas.parceiros_parados`.
 - Prazo: `hoje.prazo_para_assumir` = 2 horas úteis (`somar_horas_uteis`, com `horario_envio_inicio/fim`, segunda a
-  sexta, sem feriados). A tela Oportunidades usa o mesmo prazo no selo ("assumir até 10:30" / "fora do prazo") e no
-  número "Fora do prazo". Meta da auditoria: mediana até assumir abaixo de 2 h úteis (era 18,6 h).
+  sexta, sem feriados). A tela Oportunidades usa o mesmo prazo no selo ("responder até 10:30" / "fora do prazo") e no
+  número "Fora do prazo". Meta da auditoria: mediana até atender abaixo de 2 h úteis (era 18,6 h).
 - Motivo obrigatório: `Oportunidade.motivo` (coluna nova, entra sozinha no banco) com `config.MOTIVOS_DESCARTE`;
   descartar (um ou vários) sem motivo não faz nada e avisa; "Voltar para Novas" limpa o motivo. Lead "Perdido" sem
   `motivo_perda` é recusado na ficha, na mudança em lote e na API do Pipeline (o Pipeline já perguntava).

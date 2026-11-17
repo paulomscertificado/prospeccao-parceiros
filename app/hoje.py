@@ -1,7 +1,8 @@
 """Quem precisa de mim hoje (auditoria de 11/11/2026, P1.7): uma lista de trabalho só, no topo do Painel.
 
-- Respostas quentes esperando alguém assumir, com prazo de 2 horas úteis (horário de envio do sistema, dias úteis).
-  Em 3 semanas a mediana até assumir foi de 18,6 h: o lead quente esfria.
+- Respostas quentes esperando atendimento, com prazo de 2 horas úteis (horário de envio do sistema, dias úteis).
+  Em 3 semanas a mediana até alguém atender foi de 18,6 h: o lead quente esfria. Desde 16/11/2026 a equipe toda vê
+  todas as respostas da AR (pedido da Maria: quem estiver livre atende, sem "assumir" o lead).
 - Respostas mornas para decidir (insistir ou descartar, com motivo).
 - Tarefas de hoje e atrasadas da pessoa (reunião, ligação, follow-up; os toques de campanha ficam na Minha fila).
 - Leads da pessoa em negociação sem movimento há dias e sem nada agendado ("esfriando").
@@ -71,12 +72,11 @@ def itens(db, usuario: Usuario) -> dict:
     """Tudo o que espera a pessoa agora, já em ordem de urgência."""
     momento = agora()
     resultado = {"quentes": [], "mornas": 0, "morna_mais_antiga": "", "tarefas": [], "esfriando": [],
-                 "parceiros": [], "total": 0}
+                 "parceiros": [], "total": 0, "abre_lead": set()}
 
     if autorizacao.pode(usuario, "oportunidades.ver"):
-        novas = db.execute(autorizacao.filtrar(
-            select(Oportunidade).join(Lead, Oportunidade.lead_id == Lead.id).where(Oportunidade.status == "nova"),
-            usuario, "oportunidades.ver", Lead.vendedor_id, sem_dono=True)
+        novas = db.execute(
+            select(Oportunidade).join(Lead, Oportunidade.lead_id == Lead.id).where(Oportunidade.status == "nova")
             .options(selectinload(Oportunidade.lead)).order_by(Oportunidade.criado_em)).scalars().all()
         for o in novas:
             if o.temperatura != "quente":
@@ -86,6 +86,9 @@ def itens(db, usuario: Usuario) -> dict:
                                          "espera": _tempo(momento - o.criado_em),
                                          "falta": _tempo(prazo - momento) if prazo > momento else "",
                                          "passou": _tempo(momento - prazo) if momento > prazo else ""})
+        # o nome da empresa só vira link para quem pode abrir a ficha do lead (senão a ficha dá "não encontrada")
+        resultado["abre_lead"] = {q["o"].lead_id for q in resultado["quentes"]
+                                  if autorizacao.pode(usuario, "leads.ver", q["o"].lead)}
         mornas = [o for o in novas if o.temperatura != "quente"]
         resultado["mornas"] = len(mornas)
         resultado["morna_mais_antiga"] = _tempo(momento - mornas[0].criado_em) if mornas else ""

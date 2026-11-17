@@ -43,6 +43,10 @@ Regras fixas de segurança:
 - `usuarios.perfil` continua sendo o **tipo base** (decide portal × equipe e 2FA); `papel_id` só é usado por papéis
   criados na tela.
 
+- `oportunidades.ver` não tem alcance desde 16/11/2026 (pedido da Maria: "deixe aberto para toda equipe ver"): quem
+  tem a permissão vê e atende todas as oportunidades da AR. A ficha do lead continua no alcance de `leads.ver` e o
+  "Assumir lead" da ficha no de `leads.editar`.
+
 ## Padrões (migração sem ninguém ganhar nem perder acesso)
 
 O campo `padrao` de cada permissão reproduz o acesso de antes: `A` = só administrador, `G` = administrador e gestor,

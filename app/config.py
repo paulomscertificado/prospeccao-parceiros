@@ -152,7 +152,8 @@ STATUS_PERDIDO = ["Perdido"]
 MOTIVOS_PERDA = ["Sem interesse", "Sem resposta", "Já possui parceiro", "Contato inválido", "Sem fit",
                  "CNPJ inativo", "Opt-out", "Outro"]
 # Por que uma resposta (oportunidade) foi descartada: obrigatório (auditoria de 11/11/2026: sem motivo não se aprende)
-MOTIVOS_DESCARTE = ["Sem interesse", "Já tem parceiro ou fornecedor", "Resposta automática (robô)",
+MOTIVO_JA_RENOVOU = "Já renovou"  # pedido da Maria em 16/11/2026: o certificado do cliente vira Renovado
+MOTIVOS_DESCARTE = ["Sem interesse", MOTIVO_JA_RENOVOU, "Já tem parceiro ou fornecedor", "Resposta automática (robô)",
                     "Não é a pessoa certa / contato errado", "Pediu para não receber", "Fora do perfil", "Outro"]
 
 # Status antigos (versão 1) → novos. Aplicado sozinho ao abrir o sistema.

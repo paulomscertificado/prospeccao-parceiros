@@ -881,19 +881,21 @@ def test_varias_respostas_do_mesmo_lead_ficam_numa_oportunidade():
         db.rollback()
 
 
-def test_assumir_pela_tela_de_oportunidades_tira_o_cartao(cliente):
+def test_marcar_como_atendido_pela_tela_de_oportunidades_tira_os_cartoes(cliente):
     with sessao() as db:
         lead = _novo_lead(db, "Assume Some Ltda")
-        db.add_all([Oportunidade(lead_id=lead.id, temperatura="morna", classificacao="RESPOSTA INDEFINIDA",
-                                 resposta=f"oi {i}") for i in range(2)])
+        ops = [Oportunidade(lead_id=lead.id, temperatura="morna", classificacao="RESPOSTA INDEFINIDA",
+                            resposta=f"oi {i}") for i in range(2)]
+        db.add_all(ops)
         db.commit()
-        lid = lead.id
+        oid = ops[0].id
     r = cliente.get("/oportunidades")
     assert "Assume Some Ltda" in r.text and r.headers.get("cache-control") == "no-store"
     csrf = r.text.split('name="csrf" content="')[1].split('"')[0]
-    r = cliente.post(f"/leads/{lid}/assumir", data={"csrf": csrf, "voltar_para": "/oportunidades"}, follow_redirects=False)
+    r = cliente.post(f"/oportunidades/{oid}/atendida", data={"csrf": csrf, "voltar_para": "/oportunidades"},
+                     follow_redirects=False)
     assert r.headers["location"].endswith("/oportunidades")
-    assert "· Assume Some Ltda" not in cliente.get("/oportunidades").text  # cartão saiu (só o aviso cita)
+    assert "· Assume Some Ltda" not in cliente.get("/oportunidades").text  # os dois cartões saíram
 
 
 def test_agente_de_ia_com_assinatura_e_reconhecido_e_resposta_respeita_limite(monkeypatch):

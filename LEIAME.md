@@ -172,8 +172,9 @@ preço nem comissão e não fecha parceria.
    Toda empresa da campanha ganha a mensagem de WhatsApp. Se o campo **WhatsApp** da empresa estiver em branco, a
    mensagem fica pronta e **não sai**: cadastre o número na ficha da empresa e ela fica liberada.
    Empresa com WhatsApp **e** e-mail recebe os dois em cada toque (nas Empresas novas, só o WhatsApp).
-5. Quando alguém responde com interesse, a automação para e aparece em **Oportunidades** (🔥) com o resumo.
-   Clique em **Assumir lead**, ligue, marque a reunião e siga com a negociação (veja **Oportunidades** abaixo).
+5. Quando alguém responde com interesse, a automação para e a resposta aparece em **Oportunidades** (🔥), com o
+   resumo, para a equipe toda. Quem estiver livre responde o cliente, clica em **Marcar como atendido** e segue com a
+   negociação (veja **Oportunidades** abaixo).
 6. Veja em **Inteligência** qual segmento, canal e mensagem funcionam melhor.
 
 **E-mail:** as campanhas saem do e-mail @mscertificados.com.br configurado em **Configurações > E-mail**
@@ -201,15 +202,22 @@ numa conversa sem fim. Se o mesmo lead mandar várias mensagens, tudo fica na me
 Os números do topo também são atalhos: clique em **Atrasados** para ver só os atrasados, em **Para sair hoje** para
 ver os de hoje e os atrasados. Admin e gestor podem ver a fila de outra pessoa ou da equipe toda.
 
-**Oportunidades (menu 🔥):** os leads que responderam, em 4 abas:
-- **Novas:** esperam alguém assumir. Ficam separadas por dia (Hoje, Ontem, o dia da semana) e, em cada dia, as
-  **quentes vêm primeiro**. Cada cartão mostra há quanto tempo o lead está **esperando** e até quando assumir: o
-  **prazo é de 2 horas úteis** (horário de envio, de segunda a sexta; uma resposta das 17h30 tem prazo até 10h do dia
-  útil seguinte). Passou do prazo, fica vermelho. Mostra também a campanha, o canal, o que enviamos, o que o lead
-  respondeu e o que a IA entendeu. Botões: **Assumir lead**, **Iniciar WhatsApp**, **Ver conversa** (abre a conversa
-  em Conversas) e **Descartar**: para descartar é preciso **escolher o motivo** (sem interesse, já tem parceiro,
-  resposta de robô, pessoa errada...). O motivo aparece na aba Descartadas e ensina o que ajustar nas campanhas.
-- **Assumidas:** quem assumiu, quando e quanto tempo depois da resposta.
+**Oportunidades (menu 🔥):** os leads que responderam. **A equipe toda vê todas as respostas**: ninguém precisa
+"assumir" o lead, quem estiver livre atende o cliente na hora. São 4 abas:
+- **Novas:** esperam alguém da equipe responder. Ficam separadas por dia (Hoje, Ontem, o dia da semana) e, em cada
+  dia, as **quentes vêm primeiro**. Cada cartão mostra há quanto tempo o lead está **esperando** e até quando
+  responder: o **prazo é de 2 horas úteis** (horário de envio, de segunda a sexta; uma resposta das 17h30 tem prazo até
+  10h do dia útil seguinte). Passou do prazo, fica vermelho. Mostra também a campanha e quem é o dono dela, o canal
+  (e por qual número a mensagem saiu), o contato do cliente, o que enviamos, o que o lead respondeu e o que a IA
+  entendeu. Botões: **Marcar como atendido** (depois de responder o cliente: a resposta sai da lista e a automação do
+  lead para; o responsável pelo lead continua o mesmo), **Iniciar WhatsApp**, **Ver conversa** (abre a conversa em
+  Conversas) e **Descartar**: para descartar é preciso **escolher o motivo** (sem interesse, já renovou, já tem
+  parceiro, resposta de robô, pessoa errada...). O motivo aparece na aba Descartadas e ensina o que ajustar nas
+  campanhas.
+  **Já renovou:** quando o cliente da Renovação diz que já renovou, descarte com esse motivo: o certificado dele vira
+  **Renovado** na tela Renovação e os avisos que faltavam não saem mais. Se o contato tiver mais de um certificado
+  ativo, o sistema avisa para marcar na tela Renovação qual foi renovado.
+- **Atendidas:** quem atendeu, quando e quanto tempo depois da resposta.
 - **Descartadas:** o que foi descartado. Descartou sem querer? O botão **Voltar para Novas** desfaz.
 - **Todas as respostas** (só administrador e gestor): tudo o que os leads responderam, inclusive "sem interesse",
   "pediu para sair" e respostas de robô.
@@ -219,13 +227,13 @@ Para achar uma oportunidade, use os filtros: **Quando** (tudo, hoje, ontem, últ
 empresa**. Cada filtro mostra quantas há nele. Com um filtro escolhido aparece **Descartar as N mostradas**, para
 descartar de uma vez, por exemplo, todas as "para analisar" de ontem (o sistema pede confirmação; dá para voltar com
 elas pela aba Descartadas). Os números do topo mostram quantas esperam, quantas são quentes, quantas passaram do
-prazo de 2 horas úteis e o tempo típico até alguém atender. Cada pessoa vê as oportunidades dos leads dela (administrador e
-gestor veem todas, conforme as permissões).
+prazo de 2 horas úteis e o tempo típico até alguém atender. Todos da equipe veem todas as oportunidades; o nome da
+empresa só abre a ficha do lead para quem pode ver aquele lead.
 
 **Quem precisa de mim hoje (topo do Dashboard):** a lista de trabalho de cada pessoa, para nenhum interessado ser
 esquecido:
-- **Respostas quentes** esperando alguém assumir, com o prazo de 2 horas úteis ("assumir até 10:30" ou "fora do
-  prazo há 3 h") e o botão **Assumir** ali mesmo;
+- **Respostas quentes** esperando atendimento (de toda a equipe), com o prazo de 2 horas úteis ("responder até
+  10:30" ou "fora do prazo há 3 h") e o botão **Marcar como atendido** ali mesmo;
 - **Respostas para analisar** (mornas): decidir se insiste ou descarta, com o motivo;
 - **Suas tarefas** de hoje e as atrasadas (reuniões, ligações, follow-ups; os toques das campanhas ficam na Minha fila);
 - **Leads esfriando:** os seus, em conversa (respondeu, interessado, assumido, reunião, negociação), sem nada
@@ -410,7 +418,8 @@ renovação novo antes, para entrarem os clientes de janeiro).
 - **Os mesmos cuidados com o WhatsApp:** uma mensagem a cada 3 minutos, limites por hora e por dia, só no horário de
   envio, e quem responde SAIR não recebe mais.
 - **Quando o cliente responde:** os avisos seguintes param e a resposta vai para **Oportunidades** e **Quem precisa de
-  mim hoje**. A IA não responde esses clientes: quem conversa é a equipe.
+  mim hoje**. A IA não responde esses clientes: quem conversa é a equipe. Se ele disser que já renovou, descarte a
+  resposta com o motivo **Já renovou**: o certificado vira Renovado sozinho.
 - **Arte do aviso:** cada aviso vai com a **arte do site** (mscertificados.com.br/interno/aviso-vencimento)
   preenchida com os dados do cliente: e-CNPJ ou e-CPF, A1 ou A3, razão social ou nome, CNPJ ou CPF, a data de
   vencimento e quantos dias faltam. No WhatsApp a arte vai como imagem e o texto como legenda, **para todos os

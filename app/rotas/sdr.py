@@ -33,8 +33,10 @@ def _equipe(db: Session):
 
 # ---------------------------------------------------------------- Novas oportunidades (handoff)
 
-ABAS_OPORTUNIDADES = ("novas", "assumidas", "descartadas", "respostas")
-STATUS_DA_ABA = {"novas": "nova", "assumidas": "assumida", "descartadas": "descartada"}
+ABAS_OPORTUNIDADES = ("novas", "atendidas", "descartadas", "respostas")
+# "assumida" no banco = Atendida na tela: desde 16/11/2026 ninguém "assume" a resposta, a equipe toda vê e atende
+STATUS_DA_ABA = {"novas": "nova", "atendidas": "assumida", "descartadas": "descartada"}
+ABAS_ANTIGAS = {"tratadas": "atendidas", "assumidas": "atendidas"}  # endereços antigos continuam abrindo
 PERIODOS_OP = [("tudo", "Tudo"), ("hoje", "Hoje"), ("ontem", "Ontem"), ("7d", "Últimos 7 dias"),
                ("30d", "Últimos 30 dias"), ("antes", "Mais de 30 dias")]
 TEMPERATURAS_OP = [("quente", "🔥 Quentes", "selo-erro"), ("morna", "Para analisar (mornas)", "selo-alerta")]
@@ -113,7 +115,7 @@ def oportunidades(request: Request, ver: str = "novas", periodo: str = "tudo", t
                   db: Session = Depends(obter_db)):
     hoje, momento = date.today(), agora()
     ve_respostas = autorizacao.pode(usuario, "oportunidades.respostas")
-    ver = "assumidas" if ver == "tratadas" else ver  # endereço antigo (Assumidas/descartadas)
+    ver = ABAS_ANTIGAS.get(ver, ver)
     if ver not in ABAS_OPORTUNIDADES or (ver == "respostas" and not ve_respostas):
         ver = "novas"
     periodo = periodo if periodo in dict(PERIODOS_OP) else "tudo"
@@ -130,15 +132,15 @@ def oportunidades(request: Request, ver: str = "novas", periodo: str = "tudo", t
     db.commit()
 
     def visiveis(*colunas):
-        """As oportunidades que a pessoa alcança (dela, da equipe ou todas, conforme a permissão)."""
-        return autorizacao.filtrar(select(*colunas).join(Lead, Oportunidade.lead_id == Lead.id), usuario,
-                                   "oportunidades.ver", Lead.vendedor_id, sem_dono=True)
+        """Todas as oportunidades da AR (a AR já vem filtrada pelo isolamento). Pedido da Maria em 16/11/2026: "deixe
+        aberto para toda equipe ver" (antes cada pessoa via só as dos leads dela)."""
+        return select(*colunas).join(Lead, Oportunidade.lead_id == Lead.id)
 
     por_status = dict(db.execute(visiveis(Oportunidade.status, func.count(Oportunidade.id))
                                  .group_by(Oportunidade.status)).all())
     respostas_q = (select(Mensagem.id, Mensagem.criado_em, Mensagem.canal, Lead.empresa, Lead.classificacao_resposta)
                    .join(Lead, Mensagem.lead_id == Lead.id).where(Mensagem.status == "recebida"))
-    abas = {"novas": por_status.get("nova", 0), "assumidas": por_status.get("assumida", 0),
+    abas = {"novas": por_status.get("nova", 0), "atendidas": por_status.get("assumida", 0),
             "descartadas": por_status.get("descartada", 0),
             "respostas": db.execute(select(func.count()).select_from(respostas_q.subquery())).scalar() or 0
             if ve_respostas else 0}
@@ -186,7 +188,7 @@ def oportunidades(request: Request, ver: str = "novas", periodo: str = "tudo", t
                             .order_by((Oportunidade.criado_em if ver == "novas" else
                                        func.coalesce(Oportunidade.assumida_em, Oportunidade.criado_em)).desc())
                             .limit(LIMITE_OLHADOS)).all()
-        # Novas: pela data da resposta. Assumidas e descartadas: pela data em que alguém assumiu ou descartou
+        # Novas: pela data da resposta. Atendidas e descartadas: pela data em que alguém atendeu ou descartou
         itens = [{"id": oid, "temperatura": temp, "canal": _canal_op(c), "criado": criado,
                   "quando": criado if ver == "novas" else (assumida or criado)}
                  for oid, temp, c, criado, assumida, empresa in linhas if not termo or termo in util.chave_texto(empresa)]
@@ -226,9 +228,11 @@ def oportunidades(request: Request, ver: str = "novas", periodo: str = "tudo", t
         ids_camp = {m.campanha_id for m in mensagens_por_id.values() if m.campanha_id}
         for i in mostrados:
             i["m"] = mensagens_por_id[i["id"]]
+        leads_resposta = ({l.id: l for l in db.execute(select(Lead).where(Lead.id.in_(ids_leads))).scalars()}
+                          if ids_leads else {})
         contexto.update({
-            "leads_resposta": {l.id: l for l in db.execute(select(Lead).where(Lead.id.in_(ids_leads))).scalars()}
-            if ids_leads else {},
+            "leads_resposta": leads_resposta,
+            "abre_lead": {l.id for l in leads_resposta.values() if autorizacao.pode(usuario, "leads.ver", l)},
             "ops_do_lead": ops_do_lead,
             "nomes_camp": {c.id: c.nome for c in db.execute(select(Campanha).where(Campanha.id.in_(ids_camp))).scalars()}
             if ids_camp else {},
@@ -244,6 +248,10 @@ def oportunidades(request: Request, ver: str = "novas", periodo: str = "tudo", t
             i["levou"] = _tempo_curto(o.assumida_em - o.criado_em) if o.assumida_em else ""
         # Resumo completo (campanha, dono, canal, o que enviamos) só nos cartões da aba Novas
         contexto["resumos"] = {i["o"].id: sdr.resumo_handoff(db, i["o"].lead) for i in mostrados} if ver == "novas" else {}
+        # A equipe toda vê as respostas, mas a ficha do lead segue o alcance de leads.ver: o nome da empresa só vira
+        # link para quem pode abrir a ficha (senão daria "não encontrada")
+        contexto["abre_lead"] = {i["o"].lead_id for i in mostrados
+                                 if i["o"].lead is not None and autorizacao.pode(usuario, "leads.ver", i["o"].lead)}
     contexto["grupos"] = _grupos_por_dia(mostrados, hoje)
 
     atuais = {"ver": ver, "periodo": periodo, "temperatura": temperatura, "canal": canal, "classe": classe,
@@ -258,7 +266,7 @@ def oportunidades(request: Request, ver: str = "novas", periodo: str = "tudo", t
     contexto["url_op"] = url_op
     contexto["voltar"] = url_op()
     resposta = tela(request, "oportunidades.html", contexto)
-    resposta.headers["Cache-Control"] = "no-store"  # voltar no navegador recarrega (sem cartão já assumido)
+    resposta.headers["Cache-Control"] = "no-store"  # voltar no navegador recarrega (sem cartão já atendido)
     return resposta
 
 
@@ -279,19 +287,66 @@ def _descartar(db: Session, op: Oportunidade, usuario: Usuario, motivo: str) -> 
 SEM_MOTIVO = "Escolha o motivo do descarte (ele ensina o que ajustar nas campanhas). Nada foi descartado."
 
 
+def _ja_renovou(request: Request, db: Session, op: Oportunidade, usuario: Usuario) -> str:
+    """Descartada com o motivo "Já renovou" (pedido da Maria em 16/11/2026): o certificado do cliente vira Renovado na
+    tela Renovação e os avisos dele que ainda não saíram param. Com mais de um certificado ativo no contato, a pessoa
+    escolhe lá qual foi renovado. Devolve o complemento do aviso da tela."""
+    from .. import renovacao
+
+    ativos = renovacao.ativos_do_lead(db, op.lead) if op.lead is not None else []
+    if not ativos:
+        return ""
+    if len(ativos) > 1:
+        return (f" Este contato tem {len(ativos)} certificados ativos na tela Renovação: marque lá qual foi renovado "
+                "(botão Renovado).")
+    if not autorizacao.pode(usuario, "campanhas.gerenciar"):
+        return " Peça a quem cuida da Renovação para marcar o certificado deste cliente como Renovado."
+    cert = ativos[0]
+    vence = f", vence {cert.data_vencimento:%d/%m/%Y}" if cert.data_vencimento else ""
+    cancelados = renovacao.mudar_situacao(db, cert, "Renovado", usuario)
+    registrar_log(db, usuario, "situacao_certificado", "certificado", cert.id,
+                  f"Renovado ({cert.cliente_nome}{vence}): oportunidade descartada com o motivo \"Já renovou\"", request)
+    historico(db, op.lead_id, "sistema", f"Certificado de {cert.cliente_nome}{vence} marcado como Renovado "
+                                         "(oportunidade descartada com o motivo \"Já renovou\").", usuario)
+    return (f" O certificado de {cert.cliente_nome} ficou como Renovado na tela Renovação"
+            + (f" e {cancelados} aviso(s) que ainda não tinham saído foram cancelados." if cancelados else "."))
+
+
 @rotas.post("/oportunidades/{oid:int}/descartar", dependencies=[Depends(verificar_csrf)])
 def descartar(request: Request, oid: int, voltar_para: str = Form("/oportunidades"), motivo: str = Form(""),
               usuario: Usuario = Depends(exige("oportunidades.ver")), db: Session = Depends(obter_db)):
-    op = db.get(Oportunidade, oid)
-    if not op or not autorizacao.pode(usuario, "oportunidades.ver", op, sem_dono=True):
+    op = db.get(Oportunidade, oid)  # a equipe toda vê e trata as oportunidades da AR (16/11/2026)
+    if not op:
         raise HTTPException(404)
     if motivo not in config.MOTIVOS_DESCARTE:
         avisar(request, SEM_MOTIVO, "erro")
         return voltar(_destino_seguro(voltar_para))
     _descartar(db, op, usuario, motivo)
+    extra = _ja_renovou(request, db, op, usuario) if motivo == config.MOTIVO_JA_RENOVOU else ""
     db.commit()
     avisar(request, f"Oportunidade de {op.lead.empresa if op.lead else 'lead'} descartada (está na aba Descartadas; "
-                    "lá dá para voltar com ela para Novas).")
+                    "lá dá para voltar com ela para Novas)." + extra)
+    return voltar(_destino_seguro(voltar_para))
+
+
+@rotas.post("/oportunidades/{oid:int}/atendida", dependencies=[Depends(verificar_csrf)])
+def atendida(request: Request, oid: int, voltar_para: str = Form("/oportunidades"),
+             usuario: Usuario = Depends(exige("oportunidades.ver")), db: Session = Depends(obter_db)):
+    """Botão "Marcar como atendido": qualquer pessoa da equipe tira a resposta das Novas, sem virar dona do lead
+    (pedido da Maria em 16/11/2026)."""
+    op = db.get(Oportunidade, oid)
+    if not op or op.lead is None:
+        raise HTTPException(404)
+    empresa = op.lead.empresa
+    if op.status != "nova":
+        quem = op.responsavel.nome if op.responsavel else "alguém da equipe"
+        avisar(request, f"{empresa}: {quem} já tinha {'atendido' if op.status == 'assumida' else 'descartado'} "
+                        "esta resposta.", "alerta")
+        return voltar(_destino_seguro(voltar_para))
+    sdr.marcar_atendida(db, op.lead, usuario)
+    registrar_log(db, usuario, "atendeu_oportunidade", "oportunidade", op.id, empresa, request)
+    db.commit()
+    avisar(request, f"{empresa}: marcada como atendida por você (está na aba Atendidas). A automação deste lead parou.")
     return voltar(_destino_seguro(voltar_para))
 
 
@@ -306,7 +361,7 @@ def descartar_varias(request: Request, ids: str = Form(""), voltar_para: str = F
     escolhidas = [i for i in (util.para_int(x) for x in ids.split(",")) if i][:LIMITE_CARTOES]
     total = 0
     for op in db.execute(select(Oportunidade).where(Oportunidade.id.in_(escolhidas))).scalars().all() if escolhidas else []:
-        if op.status == "nova" and autorizacao.pode(usuario, "oportunidades.ver", op, sem_dono=True):
+        if op.status == "nova":
             _descartar(db, op, usuario, motivo)
             total += 1
     if total:
@@ -314,7 +369,7 @@ def descartar_varias(request: Request, ids: str = Form(""), voltar_para: str = F
                       f"{total} oportunidades descartadas de uma vez", request)
         avisar(request, f"{total} oportunidade(s) descartada(s). Estão na aba Descartadas, se precisar voltar com alguma.")
     else:
-        avisar(request, "Nenhuma oportunidade para descartar (já foram assumidas ou descartadas).", "alerta")
+        avisar(request, "Nenhuma oportunidade para descartar (já foram atendidas ou descartadas).", "alerta")
     db.commit()
     return voltar(_destino_seguro(voltar_para))
 
@@ -324,28 +379,33 @@ def reabrir(request: Request, oid: int, voltar_para: str = Form("/oportunidades?
             usuario: Usuario = Depends(exige("oportunidades.ver")), db: Session = Depends(obter_db)):
     """Desfaz um descarte: a oportunidade volta para a aba Novas."""
     op = db.get(Oportunidade, oid)
-    if not op or not autorizacao.pode(usuario, "oportunidades.ver", op, sem_dono=True):
+    if not op:
         raise HTTPException(404)
     if op.status != "descartada":
         avisar(request, "Só dá para voltar com uma oportunidade descartada.", "alerta")
     else:
+        renovou = op.motivo == config.MOTIVO_JA_RENOVOU
         op.status, op.responsavel_id, op.assumida_em, op.motivo = "nova", None, None, ""
         historico(db, op.lead_id, "sistema", f"Oportunidade voltou para Novas ({usuario.nome} desfez o descarte).",
                   usuario)
         db.commit()
-        avisar(request, f"A oportunidade de {op.lead.empresa if op.lead else 'lead'} voltou para Novas.")
+        avisar(request, f"A oportunidade de {op.lead.empresa if op.lead else 'lead'} voltou para Novas."
+                        + (" Se o certificado foi marcado como Renovado, ele continua assim: para desfazer, use Reabrir "
+                           "na tela Renovação." if renovou else ""))
     return voltar(_destino_seguro(voltar_para))
 
 
 @rotas.post("/leads/{lead_id:int}/assumir", dependencies=[Depends(verificar_csrf)])
 def assumir(request: Request, lead_id: int, voltar_para: str = Form(""), usuario: Usuario = Depends(exige("oportunidades.ver")),
             db: Session = Depends(obter_db)):
-    lead = autorizacao.garantir(usuario, "oportunidades.ver", db.get(Lead, lead_id), sem_dono=True)
+    """Botão "Assumir lead" da ficha: a pessoa vira a responsável pelo lead. As oportunidades são da equipe toda
+    (oportunidades.ver sem alcance), então quem pode assumir segue o alcance de leads.editar (o dela ou sem dono)."""
+    lead = autorizacao.garantir(usuario, "leads.editar", db.get(Lead, lead_id), sem_dono=True)
     sdr.assumir_lead(db, lead, usuario)
     registrar_log(db, usuario, "assumiu_lead", "lead", lead.id, request=request)
     db.commit()
     avisar(request, f"Você assumiu {lead.empresa}. A automação deste lead foi parada"
-                    + (" e a oportunidade saiu das novas (está na aba Assumidas)." if voltar_para.startswith("/oportunidades")
+                    + (" e a resposta saiu das novas (está na aba Atendidas)." if voltar_para.startswith("/oportunidades")
                        else "."))
     return voltar(voltar_para if voltar_para.startswith("/") and not voltar_para.startswith("//")
                   else f"/leads/{lead_id}#handoff")
