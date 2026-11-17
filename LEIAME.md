@@ -436,6 +436,10 @@ renovação novo antes, para entrarem os clientes de janeiro).
   resposta com o motivo **Já renovou**: o certificado vira Renovado sozinho.
 - **Pelo número oficial (API da Meta):** dá para mandar os avisos pelo número oficial da empresa, com os botões Quero
   renovar, Já renovei e Parar avisos (veja **API oficial do WhatsApp (Meta)**). Ligue no quadro 4.
+- **E-mail em HTML com a marca:** com o módulo liberado para a marca, o quadro 4 mostra o botão **✉️ E-mail em HTML com
+  a marca** (vem marcado). Os e-mails dos avisos que vão **sem a arte** (quem tem vários certificados, ou quando a arte
+  não fica pronta) saem com o logo e a cor da marca, em **todos** os avisos (quem recebe é cliente, não contato frio).
+  Com a arte, continua indo a arte. Desmarcar vale também para as campanhas em andamento.
 - **Arte do aviso:** cada aviso vai com a **arte do site** (mscertificados.com.br/interno/aviso-vencimento)
   preenchida com os dados do cliente: e-CNPJ ou e-CPF, A1 ou A3, razão social ou nome, CNPJ ou CPF, a data de
   vencimento e quantos dias faltam. No WhatsApp a arte vai como imagem e o texto como legenda, **para todos os

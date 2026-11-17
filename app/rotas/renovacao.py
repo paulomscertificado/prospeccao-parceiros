@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .. import autorizacao, marca, renovacao, util
+from .. import visual as _visual
 from ..banco import gravar_config, ler_config_int, obter_db
 from ..modelos import Certificado, Tarefa, Usuario
 from ..seguranca import exige, registrar_log, verificar_csrf
@@ -125,6 +126,7 @@ def tela_renovacao(request: Request, ver: str = "avisar", q: str = "", usuario: 
         "numero_auto": numero_auto, "pode_escolher_numero": autorizacao.pode(usuario, "campanhas.escolher_numero"),
         **_api_oficial(db, request, usuario),
         "pode_aprovar": autorizacao.pode(usuario, "campanhas.gerenciar"),
+        "email_html_liberado": _visual.html_da_marca_ligado(db),
         "proximos_feriados": renovacao.proximos_feriados(db),
     })
 
@@ -279,6 +281,11 @@ async def configurar(request: Request, usuario: Usuario = Depends(exige("campanh
             avisar(request, ("Os avisos de WhatsApp passam a sair pela API oficial da Meta" if oficial else
                              "Os avisos de WhatsApp voltam a sair pelo número do QR code")
                    + (f", também nas {mudaram} campanha(s) em andamento." if mudaram else "."))
+    if _visual.html_da_marca_ligado(db):  # o botão "E-mail em HTML com a marca" só aparece com o módulo liberado
+        email_html = bool(form.get("email_html"))
+        if email_html != (renovacao.cfg(db, "renov_email_html") != "0"):
+            gravar_config(db, "renov_email_html", "1" if email_html else "0")
+            renovacao.aplicar_email_html(db, email_html)  # também nas campanhas em andamento
     for chave, valor in [("renov_ativo", "1" if form.get("ativo") else "0"), ("renov_canais", canais),
                          ("renov_arte", "1" if form.get("arte") else "0"),
                          ("renov_maximo_dia", str(maximo)), ("renov_hora", hora), ("renov_dono_id", str(dono_id or ""))]:

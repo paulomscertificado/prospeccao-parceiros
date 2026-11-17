@@ -537,7 +537,8 @@ cliente rápido". Antes cada pessoa via só as respostas dos leads dela e tinha 
   (`email_html_liberado`/`email_html_atual` no contexto da Nova campanha e das Empresas novas); grava
   `Campanha.email_html` (padrão sim; sem o módulo, fica sim) e `novas_email_html` (copiado em
   `empresas_novas.criar_campanha`). Desmarcado, `usa_html_da_marca` devolve falso; `resumo_da_campanha` mostra "e-mail com a
-  marca · do 2º e-mail em diante" na página da campanha.
+  marca · do 2º e-mail em diante" na página da campanha. Na Renovação o botão fica no quadro 4 e vale para os e-mails
+  sem a arte, em todos os avisos (`visual.usa_html_da_marca_na_renovacao`, `docs/renovacao.md`).
 
 ## Nova campanha: tela em 4 passos, tons e cadências novos (nov/2026)
 

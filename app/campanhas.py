@@ -1012,6 +1012,8 @@ def _enviar_email_da_tarefa(db, t: Tarefa, usuario: Usuario | None, resultado: s
         from . import renovacao
 
         html, imagens = renovacao.email_com_arte(db, t, t.mensagem, email_smtp.link_descadastro(lead.id))
+        if not html and visual.usa_html_da_marca_na_renovacao(db, t):  # sem a arte: o e-mail com a marca
+            html = visual.html_da_marca(db, t.tenant_id, t.mensagem, email_smtp.link_descadastro(lead.id))
     try:
         id_externo = email_smtp.enviar(lead.email, t.assunto or marca.da_pessoa(quem)["nome"], t.mensagem,
                                        lead_id=lead.id, conta=conta, html=html, **({"imagens": imagens} if imagens else {}))

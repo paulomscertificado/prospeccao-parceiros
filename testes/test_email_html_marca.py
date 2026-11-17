@@ -194,3 +194,44 @@ def test_botao_do_email_html_so_com_o_modulo_liberado(cliente, monkeypatch):
                 db.execute(delete(Configuracao).where(Configuracao.chave == chave))
             for c in db.execute(select(Campanha).where(Campanha.nome.like("Campanha Botao Html%"))).scalars():
                 c.status = "cancelada"
+
+
+def test_renovacao_tem_o_botao_e_o_email_sem_arte_sai_com_a_marca(cliente, monkeypatch):
+    """Renovação: com o módulo liberado, o quadro 4 mostra o botão; o e-mail do aviso que vai sem a arte sai com a marca
+    em todos os avisos (quem recebe é cliente); desmarcado, vale também para as campanhas em andamento."""
+    from app import renovacao
+
+    with sessao() as db:
+        _ligar(db, False)
+    assert 'name="email_html"' not in cliente.get("/renovacao").text
+    with sessao() as db:
+        _ligar(db, True)
+        lead, toques = _campanha(db, "renovacao", "Html Marca Renov Botao Ltda", "renovbotao@html-marca-teste.com.br")
+        assert visual.usa_html_da_marca_na_renovacao(db, toques[0])  # já no 1º aviso
+        enviados = []
+        monkeypatch.setattr(email_smtp, "enviar", lambda para, assunto, corpo, **k: enviados.append(k) or "<id@x>")
+        monkeypatch.setattr(campanhas, "conta_do_toque", lambda *a, **k: None)
+        assert campanhas._enviar_email_da_tarefa(db, toques[0], _admin(db), "Enviada") == ""
+        assert 'role="presentation"' in enviados[-1]["html"] and "Toque 1" in enviados[-1]["html"]
+        camp_id = toques[0].campanha_id
+        guardadas = {c: ler_config(db, c) for c in renovacao.PADRAO}
+        db.commit()
+    try:
+        pagina = cliente.get("/renovacao").text
+        assert 'name="email_html" checked' in pagina and "E-mail em HTML com a marca" in pagina
+        form = {"csrf": csrf_de(pagina), "canal_whatsapp": "on", "canal_email": "on", "hora": "07:45",
+                "maximo_dia": "40", "hora_fim": "18:00"}
+        cliente.post("/renovacao/configurar", data=form)  # botão desmarcado
+        with sessao() as db:
+            assert renovacao.cfg(db, "renov_email_html") == "0"
+            assert db.get(Campanha, camp_id).email_html is False  # a campanha em andamento também
+            assert not visual.usa_html_da_marca_na_renovacao(db, db.get(Tarefa, toques[1].id))
+        cliente.post("/renovacao/configurar", data={**form, "email_html": "on"})
+        with sessao() as db:
+            assert renovacao.cfg(db, "renov_email_html") == "1" and db.get(Campanha, camp_id).email_html is True
+    finally:
+        with sessao() as db:
+            for chave, valor in guardadas.items():
+                gravar_config(db, chave, valor)
+            _ligar(db, False)
+            db.get(Campanha, camp_id).status = "cancelada"

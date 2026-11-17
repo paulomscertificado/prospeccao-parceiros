@@ -218,6 +218,16 @@ def usa_html_da_marca(db, tarefa: Tarefa | None) -> bool:
     return not primeiro_email(db, tarefa)
 
 
+def usa_html_da_marca_na_renovacao(db, tarefa: Tarefa | None) -> bool:
+    """Renovação: o e-mail do aviso que vai SEM a arte (quem tem vários certificados, arte desligada ou que não ficou
+    pronta) sai com a marca, com o módulo liberado e o botão marcado na tela Renovação. Em todos os avisos: quem recebe
+    é cliente, não contato frio (a arte, quando existe, continua valendo: campanhas._enviar_email_da_tarefa)."""
+    if tarefa is None or not tarefa.campanha_id or not html_da_marca_ligado(db):
+        return False
+    camp = db.get(Campanha, tarefa.campanha_id)
+    return camp is not None and camp.tipo == "renovacao" and camp.email_html is not False
+
+
 def _cor(valor: str) -> str:
     valor = (valor or "").strip()
     return valor if re.fullmatch(r"#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3}", valor) else COR_PADRAO

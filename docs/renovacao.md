@@ -137,6 +137,11 @@ base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renova
    (`Campanha.envio_oficial`), o WhatsApp dos avisos sai pelo número oficial com o modelo aprovado
    (`whatsapp_oficial.processar_fila`), a arte desenhada pelo computador do WhatsApp Leads a pedido da nuvem e os botões
    Quero renovar / Já renovei / Parar avisos (`whatsapp_oficial.tratar_botao`). O e-mail do aviso continua igual.
+17. **E-mail em HTML com a marca** (17/11/2026): com o módulo "email_html" liberado para a AR, o quadro 4 mostra o botão
+   (`renov_email_html`, padrão "1"; gravado em `Campanha.email_html` por `criar_campanha` e, ao mudar, nas campanhas
+   em andamento por `aplicar_email_html`). Em `campanhas._enviar_email_da_tarefa`, o e-mail que ficou sem a arte do aviso
+   (`email_com_arte` vazio) sai com `visual.html_da_marca` quando `visual.usa_html_da_marca_na_renovacao`: em todos os
+   avisos (cliente, não contato frio). O teste da tela (quadro 1) faz igual.
 
 ## Banco
 

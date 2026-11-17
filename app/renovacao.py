@@ -73,6 +73,7 @@ PADRAO = {
     "renov_arte": "1",                # a arte do aviso (a do site) vai junto no WhatsApp e no e-mail
     "renov_conexao": "",              # número de WhatsApp dos disparos ("" = automático, sempre um número de verdade)
     "renov_envio_oficial": "0",       # WhatsApp dos avisos pela API oficial da Meta (etapa 2, whatsapp_oficial.py)
+    "renov_email_html": "1",          # botão "E-mail em HTML com a marca" (só aparece com o módulo liberado)
     "renov_dias": "30,15,5,1",        # dias antes do vencimento dos 4 avisos (piloto de 13/11/2026: 12, 6, 3 e 1)
     "renov_hora_inicio": "",          # os avisos saem a partir deste horário ("" = o horário de envio geral)
     "renov_hora_fim": "18:00",        # e até este (pedido da Maria em 13/11/2026: segunda a sexta, das 10:00 às 18:00)
@@ -938,6 +939,7 @@ def criar_campanha(db, usuario: Usuario, quantidade: int | None = None, ate: dat
                     canais=cfg(db, "renov_canais"), status="gerando", usuario_id=usuario.id, inicio=hoje,
                     cadencia_id=garantir_cadencia(db).id, conexao_id=numero or "",
                     envio_oficial=cfg(db, "renov_envio_oficial") == "1",
+                    email_html=cfg(db, "renov_email_html") != "0",
                     pedido=f"Clientes com certificado vencendo até {ultimo:%d/%m/%Y} (planilha de renovação)")
     db.add(camp)
     db.commit()
@@ -1520,6 +1522,18 @@ def arte_do_toque(db, tarefa: Tarefa | None) -> dict | None:
     return {"tarefa": tarefa.id, **dados} if dados else None
 
 
+def aplicar_email_html(db, ligado: bool) -> int:
+    """O botão "E-mail em HTML com a marca" vale também para as campanhas de renovação em andamento (os e-mails que
+    ainda não saíram). Devolve quantas campanhas mudaram."""
+    mudaram = 0
+    for camp in db.execute(select(Campanha).where(Campanha.tipo == TIPO_CAMPANHA, Campanha.status.in_(
+            ("ativa", "aguardando_aprovacao", "gerando")))).scalars():
+        if (camp.email_html is not False) != ligado:
+            camp.email_html = ligado
+            mudaram += 1
+    return mudaram
+
+
 def aplicar_envio_oficial(db, ligado: bool) -> int:
     """Liga/desliga a API oficial também nas campanhas de renovação em andamento (os avisos que ainda não saíram passam
     a sair pelo número oficial, ou voltam para o QR code). Devolve quantas campanhas mudaram."""
@@ -1815,6 +1829,8 @@ def enviar_teste(db, usuario: Usuario, cert_id: int, canal: str, destino: str, a
                     html = visual.montar_html(SimpleNamespace(html=HTML_EMAIL_COM_ARTE), f"{rotulo}\n\n{t['email']}", {})
                     imagens = {"arte-aviso": imagem_email}
                     feito["arte"] = True
+                elif visual.html_da_marca_ligado(db) and cfg(db, "renov_email_html") != "0":  # sem a arte: com a marca
+                    html = visual.html_da_marca(db, getattr(cert, "tenant_id", None), f"{rotulo}\n\n{t['email']}")
                 email_smtp.enviar(destino, f"[TESTE] {t['assunto']}", f"{rotulo}\n\n{t['email']}", lead_id=None,
                                   conta=conta, html=html, **({"imagens": imagens} if imagens else {}))
             feito["enviadas"] += 1
