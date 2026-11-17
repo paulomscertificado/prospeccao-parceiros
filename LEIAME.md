@@ -146,6 +146,10 @@ e-mail** para cada empresa continua **só em texto** (no primeiro contato, e-mai
 Promoções). Veja a prévia em **Campanhas > 🎨 Visuais**. É um **módulo**: o admin master libera **por marca** em
 **Painel master > Módulos de cada AR** ("E-mail em HTML com a marca"); marca nova começa desligada. Vale também para as
 campanhas em andamento (os e-mails que ainda não saíram). A Renovação continua com a arte do aviso.
+Com o módulo liberado para a marca, a **Nova campanha** (parte Visual) e a configuração das **Empresas novas** (passo 5)
+mostram o botão **✉️ E-mail em HTML com a marca**, que já vem marcado: desmarque para aquela campanha (ou para as
+campanhas diárias das Empresas novas) mandar todos os e-mails só em texto. A página da campanha mostra "visual: e-mail
+com a marca" quando ela usa.
 
 **Pergunta final (vai no fim do 1º contato):** 14 perguntas prontas em 5 tipos (descobrir como fazem hoje,
 convidar para conversar, achar a pessoa certa, mandar informação, resposta de uma palavra), **Automática** (a mais

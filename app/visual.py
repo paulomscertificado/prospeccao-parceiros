@@ -213,8 +213,8 @@ def usa_html_da_marca(db, tarefa: Tarefa | None) -> bool:
     if tarefa is None or not tarefa.campanha_id or not tarefa.lead_id or not html_da_marca_ligado(db):
         return False
     camp = db.get(Campanha, tarefa.campanha_id)
-    if camp is None or camp.tipo not in TIPOS_COM_HTML_DA_MARCA:
-        return False
+    if camp is None or camp.tipo not in TIPOS_COM_HTML_DA_MARCA or camp.email_html is False:
+        return False  # o botão "E-mail em HTML com a marca" desmarcado na campanha: tudo em texto
     return not primeiro_email(db, tarefa)
 
 
@@ -321,6 +321,8 @@ def imagem_do_whatsapp(db, tarefa: Tarefa | None, lead: Lead | None, so_para_que
 def resumo_da_campanha(db, camp: Campanha) -> str:
     """Ex.: "Folheto parceria · e-mail e WhatsApp (só para quem já conversou) · do 2º toque em diante"."""
     if not camp.visual_id or not camp.visual_canais:
+        if (camp.tipo in TIPOS_COM_HTML_DA_MARCA and camp.email_html is not False and html_da_marca_ligado(db)):
+            return "e-mail com a marca · do 2º e-mail em diante"
         return ""
     visual = db.get(VisualCampanha, camp.visual_id)
     if visual is None:

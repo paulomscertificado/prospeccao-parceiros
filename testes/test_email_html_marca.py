@@ -6,10 +6,12 @@ from datetime import date, timedelta
 
 from sqlalchemy import select
 
-from app import autorizacao, campanhas, config, visual
-from app.banco import gravar_config, sessao, usar_config_da_ar
+from sqlalchemy import delete
+
+from app import autorizacao, campanhas, config, empresas_novas, visual
+from app.banco import gravar_config, ler_config, sessao, usar_config_da_ar
 from app.integracoes import email_smtp
-from app.modelos import Campanha, Lead, Tarefa, Tenant, Usuario
+from app.modelos import Campanha, Configuracao, Lead, Tarefa, Tenant, Usuario
 from conftest import csrf_de
 
 TEXTO = ("Olá, Ana!\n\nToque {n}: fale com a gente em https://wa.me/5581999990000.\n\n"
@@ -20,9 +22,10 @@ def _admin(db):
     return db.execute(select(Usuario).where(Usuario.perfil == "admin")).scalars().first()
 
 
-def _campanha(db, tipo: str, empresa: str, email: str) -> tuple[Lead, list[Tarefa]]:
+def _campanha(db, tipo: str, empresa: str, email: str, email_html: bool = True) -> tuple[Lead, list[Tarefa]]:
     admin = _admin(db)
-    camp = Campanha(nome=f"HTML marca {empresa}", tipo=tipo, status="ativa", usuario_id=admin.id, canais="email")
+    camp = Campanha(nome=f"HTML marca {empresa}", tipo=tipo, status="ativa", usuario_id=admin.id, canais="email",
+                    email_html=email_html)
     lead = Lead(empresa=empresa, email=email, vendedor_id=admin.id, responsavel="Ana")
     db.add_all([camp, lead])
     db.flush()
@@ -74,6 +77,10 @@ def test_ligado_o_html_com_a_marca_vem_do_segundo_email_em_diante(cliente, monke
         assert visual.html_do_email(db, sdr[1], lead_sdr, None, sdr[1].mensagem, sair)
         lead_renov, renov = _campanha(db, "renovacao", "Html Marca Renovacao Ltda", "renov@html-marca-teste.com.br")
         assert visual.html_do_email(db, renov[1], lead_renov, None, renov[1].mensagem, sair) == ""
+        # o botão "E-mail em HTML com a marca" desmarcado na campanha: tudo em texto, mesmo com o módulo liberado
+        lead_txt, txt = _campanha(db, "parceiros", "Html Marca Texto Ltda", "texto@html-marca-teste.com.br",
+                                  email_html=False)
+        assert visual.html_do_email(db, txt[1], lead_txt, None, txt[1].mensagem, sair) == ""
 
         # no envio de verdade, o e-mail sai com as duas versões (texto e o HTML com a marca)
         enviados = []
@@ -137,3 +144,53 @@ def test_modulo_liberado_por_marca_no_painel_master(cliente):
         usar_config_da_ar(db, certy)
         assert autorizacao.modulos_ligados(db) == antes
         usar_config_da_ar(db, None)
+
+
+def test_botao_do_email_html_so_com_o_modulo_liberado(cliente, monkeypatch):
+    """Nova campanha (IA SDR) e configuração das Empresas novas: o botão aparece só com o módulo liberado para a marca
+    e a escolha fica na campanha (desmarcado = tudo em texto)."""
+    with sessao() as db:
+        _ligar(db, False)
+    nova = cliente.get("/campanhas/nova").text
+    assert 'name="email_html"' not in nova and "as mensagens saem só com texto" in nova
+    assert 'name="email_html"' not in cliente.get("/empresas-novas").text
+    with sessao() as db:
+        _ligar(db, True)
+    try:
+        nova = cliente.get("/campanhas/nova").text
+        assert 'name="email_html" checked' in nova and "E-mail em HTML com a marca" in nova and "/visuais#marca" in nova
+        monkeypatch.setattr(campanhas, "gerar_em_segundo_plano", lambda *a, **k: None)
+        base = {"csrf": csrf_de(nova), "cidade": "Recife", "estado": "PE", "quantidade": "5", "categorias": ["contabil"],
+                "canais": ["email"], "tom": "consultivo", "objetivo": "Encontrar parceiros"}
+        cliente.post("/campanhas/nova", data={**base, "nome": "Campanha Botao Html Sim", "email_html": "on"})
+        cliente.post("/campanhas/nova", data={**base, "nome": "Campanha Botao Html Nao"})
+        with sessao() as db:
+            sim = db.execute(select(Campanha).where(Campanha.nome == "Campanha Botao Html Sim")).scalars().one()
+            nao = db.execute(select(Campanha).where(Campanha.nome == "Campanha Botao Html Nao")).scalars().one()
+            assert sim.email_html is True and nao.email_html is False
+            assert visual.resumo_da_campanha(db, sim) == "e-mail com a marca · do 2º e-mail em diante"
+            assert visual.resumo_da_campanha(db, nao) == ""
+            sim_id = sim.id
+        assert "e-mail com a marca · do 2º e-mail em diante" in cliente.get(f"/campanhas/{sim_id}").text
+
+        # Empresas novas: o botão vem marcado; desmarcado, as campanhas diárias saem em texto
+        novas = cliente.get("/empresas-novas").text
+        assert 'name="email_html" checked' in novas
+        cliente.post("/empresas-novas/configurar", data={
+            "csrf": csrf_de(novas), "ufs": ["PE"], "canal_whatsapp": "on", "maximo_dia": "10", "hora": "07:30"})
+        with sessao() as db:
+            assert ler_config(db, "novas_email_html") == "0"
+            camp = empresas_novas.criar_campanha(db, [{"empresa": "Nova Botao Html Ltda", "cnpj": "12345678000188",
+                                                        "whatsapp": "81975550099", "email": ""}], _admin(db), "teste html")
+            assert camp.email_html is False
+            camp.status = "cancelada"
+    finally:
+        with sessao() as db:
+            _ligar(db, False)
+            # volta ao padrão tudo o que o formulário das Empresas novas gravou
+            for chave in ("novas_email_html", "novas_visual_id", "novas_visual_canais", "novas_visual_toques",
+                          "novas_ativo", "novas_ufs", "novas_canais", "novas_maximo_dia", "novas_hora",
+                          "novas_sem_individual", "novas_dono_id", "novas_excluir_listas"):
+                db.execute(delete(Configuracao).where(Configuracao.chave == chave))
+            for c in db.execute(select(Campanha).where(Campanha.nome.like("Campanha Botao Html%"))).scalars():
+                c.status = "cancelada"

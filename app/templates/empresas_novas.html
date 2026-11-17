@@ -108,6 +108,7 @@
       frio: a imagem no WhatsApp só vai para quem já respondeu; o HTML vale para quem recebe por e-mail.</p>
     {% set visual_atual = (cfg.novas_visual_id|int) if cfg.novas_visual_id else None %}
     {% set visual_canais, visual_toques = cfg.novas_visual_canais, cfg.novas_visual_toques %}
+    {% set email_html_atual = cfg.novas_email_html != '0' %}
     {% include "_escolha_visual.html" %}
   </div>
 

@@ -655,6 +655,9 @@ class Campanha(DaAR, Base):
     # WhatsApp pela API oficial da Meta (número oficial da AR, modelos aprovados) em vez do WhatsApp Leads (QR code):
     # etapa 2, Renovação (pedido da Maria em 16/11/2026). Fila própria: whatsapp_oficial.processar_fila
     envio_oficial: Mapped[bool] = mapped_column(Boolean, default=False)
+    # E-mail em HTML com a marca (módulo "email_html" da AR): o botão da Nova campanha e da configuração das Empresas
+    # novas, que só aparece com o módulo liberado (pedido de 17/11/2026). Padrão sim (visual.usa_html_da_marca)
+    email_html: Mapped[bool] = mapped_column(Boolean, default=True)
     # Visual (HTML no e-mail, imagem no WhatsApp) — app/visual.py. toques: "seguintes" (do 2º em diante) ou "todos"
     visual_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     visual_canais: Mapped[str] = mapped_column(String(40), default="")

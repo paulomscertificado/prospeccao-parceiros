@@ -586,6 +586,7 @@ def nova_campanha(request: Request, pedido: str = "", base: str = "", usuario: U
         "categorias": db.execute(select(Categoria).where(Categoria.ativa.is_(True)).order_by(Categoria.prioridade)).scalars().all(),
         "cadencias": _cadencias_da_ia(db), "cadencia_sdr": campanhas.cadencia_sdr(db), "ia_ligada": ia.disponivel(),
         "visuais": visual.disponiveis(db, "sdr"),
+        "email_html_liberado": visual.html_da_marca_ligado(db), "email_html_atual": True,
         "whatsapp_sozinho_padrao": ler_config(db, "whatsapp_sozinho_padrao") != "0",
     })
 
@@ -636,6 +637,8 @@ async def criar_campanha(request: Request, usuario: Usuario = Depends(exige("cam
         inicio=util.para_data(form.get("inicio")) or date.today(), status="gerando", personalizar_ia=ia.disponivel(),
     )
     camp.visual_id, camp.visual_canais, camp.visual_toques = visual.escolha_do_formulario(db, form, "sdr")
+    # o botão só aparece com o módulo liberado para a marca; sem ele, a campanha segue o que a marca tiver depois
+    camp.email_html = bool(form.get("email_html")) if visual.html_da_marca_ligado(db) else True
     db.add(camp)
     db.flush()
     registrar_log(db, usuario, "criou_campanha", "campanha", camp.id,

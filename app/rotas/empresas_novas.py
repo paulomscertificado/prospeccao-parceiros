@@ -36,6 +36,7 @@ def tela_empresas_novas(request: Request, usuario: Usuario = Depends(exige("camp
         "limite_teste": empresas_novas.LIMITE_TESTE, "quantidades": empresas_novas.QUANTIDADES_BUSCA,
         "limite_frios": ler_config_int(db, "limite_frios_whatsapp", 0),
         "visuais": visual.disponiveis(db, "empresas_novas"),
+        "email_html_liberado": visual.html_da_marca_ligado(db),
     })
 
 
@@ -129,6 +130,8 @@ async def configurar(request: Request, usuario: Usuario = Depends(exige("campanh
     gravar_config(db, "novas_visual_id", str(vid or ""))
     gravar_config(db, "novas_visual_canais", canais_visual)
     gravar_config(db, "novas_visual_toques", toques)
+    if visual.html_da_marca_ligado(db):  # o botão só aparece com o módulo liberado para a marca
+        gravar_config(db, "novas_email_html", "1" if form.get("email_html") else "0")
     registrar_log(db, usuario, "configurou_empresas_novas", "configuracao", None, request=request)
     db.commit()
     if form.get("ativo") and not empresas_novas.chave_api():

@@ -62,6 +62,7 @@ PADRAO = {
     "novas_visual_id": "",             # visual das campanhas diárias (app/visual.py); vazio = só texto
     "novas_visual_canais": "email",
     "novas_visual_toques": "seguintes",
+    "novas_email_html": "1",           # botão "E-mail em HTML com a marca" (só aparece com o módulo liberado)
 }
 LIMITE_TESTE = 10  # consulta de teste: 10 empresas = 1 crédito
 # "Buscar agora": quantas empresas pedir à CNPJá, escolhido na tela (pedido da Maria em 12/11/2026). A campanha leva
@@ -525,6 +526,7 @@ def criar_campanha(db, dados: list[dict], usuario: Usuario, rotulo: str,
     if escolhido is not None and escolhido.ativo and "empresas_novas" in (escolhido.usar_em or "").split(","):
         camp.visual_id = escolhido.id
         camp.visual_canais, camp.visual_toques = cfg(db, "novas_visual_canais"), cfg(db, "novas_visual_toques")
+    camp.email_html = cfg(db, "novas_email_html") != "0"
     db.add(camp)
     db.commit()
     trabalhos.iniciar("campanha", camp.id, usuario.id, {"fase": "novas", "registros": dados})

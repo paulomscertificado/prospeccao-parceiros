@@ -1,6 +1,15 @@
 {# Escolha do visual (HTML do e-mail e imagem do WhatsApp) — o mesmo bloco na Nova campanha (IA SDR) e nas Empresas novas.
-   Usa do contexto: visuais (lista), visual_atual (id), visual_canais ("email,whatsapp"), visual_toques. #}
+   Usa do contexto: visuais (lista), visual_atual (id), visual_canais ("email,whatsapp"), visual_toques,
+   email_html_liberado (o módulo "E-mail em HTML com a marca" está liberado para a marca) e email_html_atual. #}
 <div class="bloco-visual">
+  {% if email_html_liberado %}
+  <div class="cartoes-escolha" style="margin-bottom:12px">
+    <label class="escolha"><input type="checkbox" name="email_html" {{ 'checked' if email_html_atual is not sameas false }}>
+      <span class="escolha-corpo"><span class="escolha-marca" aria-hidden="true">✓</span>
+        <b>✉️ E-mail em HTML com a marca</b><span class="pequeno suave">do 2º e-mail em diante, com o logo e a cor da
+          marca (o 1º vai só em texto). <a href="/visuais#marca" target="_blank" rel="noopener">Ver a prévia</a></span></span></label>
+  </div>
+  {% endif %}
   {% if visuais %}
   <div class="campos" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)">
     <div><label for="visual_id">Visual</label>
@@ -22,7 +31,8 @@
     O 1º contato frio costuma responder melhor só com texto, por isso o padrão é usar o visual do 2º toque em diante.
     <a href="/visuais">Ver e cadastrar visuais</a>.</p>
   {% else %}
-  <p class="ajuda" style="margin:0">Nenhum visual cadastrado ainda: as mensagens saem só com texto.
+  <p class="ajuda" style="margin:0">{% if email_html_liberado %}Visual próprio (opcional): nenhum cadastrado ainda. Sem ele,
+    vale o e-mail com a marca acima.{% else %}Nenhum visual cadastrado ainda: as mensagens saem só com texto.{% endif %}
     {% if pode('templates.editar') %}<a href="/visuais">Cadastrar um visual</a> (HTML do e-mail e imagem do WhatsApp).{% endif %}</p>
   {% endif %}
 </div>

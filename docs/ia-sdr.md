@@ -533,6 +533,11 @@ cliente rápido". Antes cada pessoa via só as respostas dos leads dela e tinha 
   `https://` e `wa.me/` viram link) e o descadastro de 1 clique embaixo. A versão em texto continua indo junto. A
   Renovação não muda (tem a arte do aviso). Prévia em Campanhas > Visuais (`visual.previa_da_marca`, logo em `data:` no
   quadro isolado). Testes: `testes/test_email_html_marca.py`.
+  Botão por campanha (17/11/2026): com o módulo liberado, `_escolha_visual.html` mostra "✉️ E-mail em HTML com a marca"
+  (`email_html_liberado`/`email_html_atual` no contexto da Nova campanha e das Empresas novas); grava
+  `Campanha.email_html` (padrão sim; sem o módulo, fica sim) e `novas_email_html` (copiado em
+  `empresas_novas.criar_campanha`). Desmarcado, `usa_html_da_marca` devolve falso; `resumo_da_campanha` mostra "e-mail com a
+  marca · do 2º e-mail em diante" na página da campanha.
 
 ## Nova campanha: tela em 4 passos, tons e cadências novos (nov/2026)
 
