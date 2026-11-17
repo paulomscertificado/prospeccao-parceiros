@@ -28,7 +28,7 @@ app WhatsApp Business: provavelmente coexistência, o app continua no celular), 
 | Etapa | O quê | Situação |
 |---|---|---|
 | 1 | Conta oficial por AR (chaves protegidas), teste de conexão, mensagem de teste, webhook (respostas, SAIR, situação) | **no ar (16/11/2026)** |
-| 2 | Modelos do WhatsApp (criar, mandar para aprovação, acompanhar) e ligação dos toques da **Renovação** aos modelos (utilidade) | a fazer |
+| 2 | Modelos do WhatsApp (criar, mandar para aprovação, acompanhar) e ligação dos toques da **Renovação** aos modelos (utilidade) | **no ar (16/11/2026)**, desligado até a Meta aprovar e o admin ligar |
 | 3 | Respostas dentro da janela de 24 h pela API (IA SDR, Conversas, envio manual) e cópia das conversas oficiais | a fazer |
 | 4 | Campanhas de parceiros/Empresas novas pela API (depende da decisão sobre o opt-in) | decisão da Maria |
 | 5 | White label: a plataforma como Provedor de Tecnologia da Meta e Cadastro Incorporado (cada AR liga o próprio número) | depois da validação |
@@ -64,6 +64,64 @@ app WhatsApp Business: provavelmente coexistência, o app continua no celular), 
   WhatsApp Business do celular.
 - **Testes**: `testes/test_whatsapp_oficial.py` (Meta imitada; nada sai de verdade).
 
+## Etapa 2 (no ar): Renovação pelo número oficial
+
+Pedido da Maria em 16/11/2026: "que continue fazendo essa campanha mas que seja enviada pela API da Meta".
+
+- **Modelos** (tabela `modelos_whatsapp_oficial`, `modelos.ModeloWhatsAppOficial`, por conta/AR): dois, categoria
+  **utilidade** (`UTILITY`; a Meta pode mudar para marketing: `categoria_meta`), idioma `pt_BR`:
+  `aviso_vencimento_certificado_arte` (cabeçalho IMAGEM) e `aviso_vencimento_certificado` (só texto; vale para todos e é
+  o que precisa estar aprovado para ligar). Corpo (`whatsapp_oficial.corpo_renovacao`, com o nome da marca da AR):
+  `{{1}}` primeiro nome do contato, `{{2}}` o certificado ("e-CNPJ A1 em nome de ...") ou a lista numa linha, `{{3}}` o
+  vencimento ("21/11/2026 (faltam 5 dias)"); valores sem quebra de linha (`renovacao.valores_do_modelo`, os
+  certificados da onda do aviso: `certificados_do_aviso`). Rodapé "Para não receber estes avisos, toque em Parar
+  avisos." e 3 botões de resposta rápida: **Quero renovar**, **Já renovei**, **Parar avisos**.
+  `whatsapp_oficial.pedir_modelos_renovacao` (tela: Configurações > WhatsApp > API oficial > "Enviar os modelos para a
+  Meta aprovar", `POST /whatsapp/oficial/modelos`): primeiro adota o que já existe na Meta com esses nomes; aprovado ou
+  em análise fica; recusado/pausado vai de novo (`whatsapp_cloud.editar_modelo`); novo: `criar_modelo`
+  (`POST /{waba}/message_templates`). A imagem de exemplo do modelo com a arte (`app/static/renovacao/aviso_exemplo.png`,
+  dados fictícios, desenhada pelo `arte_aviso.gerar`) sobe pelo envio em partes da Meta (`app_do_token` +
+  `subir_exemplo`: `POST /{app}/uploads` e o `header_handle`). Situação: `atualizar_modelos` (botão "Atualizar a
+  situação", `POST /whatsapp/oficial/modelos/atualizar`, e a rotina de hora em hora `atualizar_modelos_pendentes`).
+  "Enviar um aviso de exemplo" (`POST /whatsapp/oficial/modelos/teste`, `enviar_teste_renovacao`): EMPRESA EXEMPLO LTDA
+  com a arte de exemplo; os botões do exemplo não fazem nada.
+- **Ligar** (tela Renovação, quadro 4, só quem escolhe o número: `campanhas.escolher_numero`): "Enviar o WhatsApp dos
+  avisos pela API oficial da Meta" grava `renov_envio_oficial` e marca `Campanha.envio_oficial` nas campanhas de
+  renovação em andamento (`renovacao.aplicar_envio_oficial`; campanha nova já nasce com ele em `criar_campanha`). Só
+  liga com `whatsapp_oficial.falta_para_renovacao(ar) == ""` (conta com token, testada, com a chave secreta do app,
+  sem a qual o webhook recusa as respostas e os botões, e o modelo só de texto aprovado). Desligar volta para o QR code.
+- **Fila** (`whatsapp_oficial.processar_fila`, passo `fila_whatsapp_oficial` do relógio, até `POR_RODADA` = 5 avisos por
+  minuto): toques pendentes de WhatsApp das campanhas com `envio_oficial`, no horário da AR e da Renovação (segunda a
+  sexta, sem feriados), até `DIAS_ATRASO_AUTOMATICO` de atraso, um aviso por vez para cada empresa
+  (`_toque_anterior_pendente`) e nunca dois WhatsApps automáticos em menos de 20 h. Valem opt-out, controle de
+  frequência e o limite da campanha (`mensagens.bloqueio_de_envio` sem número); o teto de contatos frios e os limites
+  por número são do QR code e não valem (o limite é o da Meta: 2.000 conversas por dia no número da MS). A fila do QR
+  code (`campanhas.processar_fila_whatsapp`) pula essas campanhas (`Campanha.envio_oficial.is_not(True)`); o clique
+  ("Enviar" da Minha fila, "Disparar campanha") também sai pela API (`campanhas._enviar_toque`, `disparar`). A Meta
+  recusou um aviso: tenta de novo depois de `NOVA_TENTATIVA_MIN` (30 min); problema da conta: a rodada para.
+  Registro: `Mensagem` com `modo="oficial"`, `status="enviada"`, `id_externo` = wamid (a situação entregue/lida/falhou
+  chega pelo webhook), `conexao="oficial:<phone_number_id>"` (Oportunidades mostra "WhatsApp oficial (API da Meta)") e o
+  texto preenchido com os botões.
+- **Arte** (`whatsapp_oficial.arte_do_envio`): com o modelo com a arte aprovado e a arte do aviso cabendo
+  (`renovacao.arte_do_toque`: AR MS, um certificado), a nuvem pede ao computador do WhatsApp Leads um comando
+  `desenhar_arte` (`comandos_whatsapp`, coluna nova `tarefa_id`; até `ARTES_POR_RODADA` por rodada). O computador
+  desenha (`ponte_nuvem._arte_pedida`) e devolve em `POST /api/ponte/arte-pedido/{id}` (senha da ponte; vira
+  `artes_aviso` com `ponte_id=0`, que o e-mail do mesmo aviso também usa). A rodada seguinte sobe a arte para a Meta
+  (`subir_midia`, `POST /{phone_number_id}/media`) e manda o modelo com ela. Sem a arte em `ESPERA_DA_ARTE_MIN` (15 min)
+  ou com erro (computador desligado, sem Chrome, versão antiga do WhatsApp Leads: "pedido desconhecido"), sai o modelo
+  só de texto. Quem tem vários certificados recebe sempre o só de texto, com a lista.
+- **Botões** (payload `renov:<ação>:<tarefa>`, `whatsapp_cloud.ler_webhook` → `botao`; `whatsapp_oficial.tratar_botao`,
+  chamado pelo webhook antes do SAIR): confere se a tarefa é da AR do número e do mesmo telefone (senão segue como
+  resposta comum). **Quero renovar**: oportunidade quente "QUER RENOVAR" (`config.CLASSES_QUENTES`), lead Interessado,
+  aviso para a equipe toda. **Já renovei**: com um certificado ativo, ele vira Renovado e os avisos param, sem trabalho
+  para a equipe; com vários, oportunidade morna "JÁ RENOVOU" para conferir qual. **Parar avisos**: opt-out em todas as
+  ARs (como o SAIR). Os três cancelam os próximos avisos.
+- **Testes**: `testes/test_whatsapp_oficial_renovacao.py` (Meta imitada) e, no WhatsApp Leads,
+  `testes/teste_ponta_a_ponta.py` (pedido `desenhar_arte`).
+- **Falta (etapa 3)**: responder o cliente pelo sistema dentro da janela de 24 h e a cópia das conversas oficiais na
+  tela Conversas. Até lá a equipe responde pelo app WhatsApp Business do celular (se o número estiver nele) e as
+  respostas e os botões aparecem nas Oportunidades e na ficha do lead.
+
 ## Passo a passo na Meta (o que a AR faz)
 
 1. Meta for Developers (<https://developers.facebook.com/apps>) > Criar app (Empresa) > adicionar o produto
@@ -78,3 +136,5 @@ app WhatsApp Business: provavelmente coexistência, o app continua no celular), 
 4. Webhook: Meta for Developers > app > WhatsApp > Configuração: URL de retorno e token de verificação mostrados na
    tela do sistema; assinar o campo `messages`.
 5. **Enviar teste** para o próprio celular. Forma de pagamento na conta do WhatsApp para os modelos pagos.
+6. Etapa 2: em Configurações > WhatsApp > API oficial, **Enviar os modelos para a Meta aprovar**; aprovado, **Enviar um
+   aviso de exemplo** e ligar o envio pela API na tela Renovação (quadro 4).

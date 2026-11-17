@@ -6,7 +6,9 @@ enviar MODELOS (templates) aprovados no Gerenciador do WhatsApp. Texto livre só
 
 Duas formas de usar:
 - por AR (app/whatsapp_oficial.py, tela Configurações > WhatsApp > "API oficial da Meta"): as funções com
-  `phone_number_id` e `token` explícitos (consultar_numero, enviar_modelo, enviar_texto_por);
+  `phone_number_id` e `token` explícitos (consultar_numero, enviar_modelo, enviar_texto_por, subir_midia) e as dos
+  modelos, com o ID da conta do WhatsApp Business (criar_modelo, modelos_da_conta; a imagem de exemplo do modelo
+  sobe pelo app do token: app_do_token + subir_exemplo);
 - a antiga, por variável (WHATSAPP_TOKEN e WHATSAPP_PHONE_NUMBER_ID): configurado(), enviar_template(),
   enviar_texto() — botão "Enviar pela API" da ficha do lead.
 """
@@ -85,18 +87,97 @@ def inscrever_app(waba_id: str, token: str, versao: str | None = None) -> bool:
     return bool(dados.get("success", True))
 
 
+def _texto_do_parametro(valor) -> str:
+    """A Meta recusa parâmetro vazio, com quebra de linha, tabulação ou mais de 4 espaços seguidos."""
+    texto = " ".join(str(valor or "").split())
+    return texto[:900] or "-"
+
+
 def enviar_modelo(phone_number_id: str, token: str, telefone: str, nome_modelo: str, idioma: str = "pt_BR",
-                  parametros: list[str] | None = None, versao: str | None = None) -> str:
-    """Envia um modelo aprovado. Devolve o id da mensagem na Meta (wamid)."""
+                  parametros: list[str] | None = None, versao: str | None = None, imagem_id: str = "",
+                  botoes: list[str] | None = None) -> str:
+    """Envia um modelo aprovado. `imagem_id`: a imagem do cabeçalho (subir_midia); `botoes`: o payload de cada botão
+    de resposta rápida, na ordem do modelo (volta no webhook quando o contato toca nele). Devolve o id da mensagem na
+    Meta (wamid)."""
     if not nome_modelo:
         raise ErroWhatsApp("Falta o nome do modelo aprovado na Meta.")
     corpo = {"messaging_product": "whatsapp", "to": _destino(telefone), "type": "template",
              "template": {"name": nome_modelo, "language": {"code": idioma or "pt_BR"}}}
+    componentes = []
+    if imagem_id:
+        componentes.append({"type": "header", "parameters": [{"type": "image", "image": {"id": imagem_id}}]})
     if parametros:
-        corpo["template"]["components"] = [{"type": "body", "parameters": [
-            {"type": "text", "text": p or "-"} for p in parametros]}]
+        componentes.append({"type": "body", "parameters": [
+            {"type": "text", "text": _texto_do_parametro(p)} for p in parametros]})
+    for indice, carga in enumerate(botoes or []):
+        componentes.append({"type": "button", "sub_type": "quick_reply", "index": str(indice),
+                            "parameters": [{"type": "payload", "payload": str(carga)[:256]}]})
+    if componentes:
+        corpo["template"]["components"] = componentes
     dados = _pedir("POST", f"{phone_number_id}/messages", token, versao, json=corpo)
     return (dados.get("messages") or [{}])[0].get("id", "")
+
+
+def subir_midia(phone_number_id: str, token: str, conteudo: bytes, tipo: str = "image/png",
+                versao: str | None = None) -> str:
+    """Manda uma imagem para a Meta (fica lá 30 dias) e devolve o id dela, para usar no cabeçalho do modelo."""
+    dados = _pedir("POST", f"{phone_number_id}/media", token, versao, data={"messaging_product": "whatsapp", "type": tipo},
+                   files={"file": ("imagem" + (".png" if "png" in tipo else ".jpg"), conteudo, tipo)})
+    if not dados.get("id"):
+        raise ErroWhatsApp("A Meta não devolveu o número da imagem enviada.")
+    return str(dados["id"])
+
+
+# ---------------------------------------------------------------- modelos (templates)
+
+def app_do_token(token: str, versao: str | None = None) -> str:
+    """O ID do app da Meta dono do token (precisa dele para subir a imagem de exemplo de um modelo novo)."""
+    dados = _pedir("GET", "debug_token", token, versao, params={"input_token": token})
+    return str((dados.get("data") or {}).get("app_id") or "")
+
+
+def subir_exemplo(app_id: str, token: str, conteudo: bytes, tipo: str = "image/png", nome: str = "exemplo.png",
+                  versao: str | None = None) -> str:
+    """Sobe a imagem de exemplo de um modelo com imagem no cabeçalho (envio em partes da Meta, "Resumable Upload")
+    e devolve o código dela (header_handle) para o pedido de aprovação."""
+    sessao_envio = _pedir("POST", f"{app_id}/uploads", token, versao,
+                          params={"file_name": nome, "file_length": len(conteudo), "file_type": tipo})
+    if not sessao_envio.get("id"):
+        raise ErroWhatsApp("A Meta não abriu o envio da imagem de exemplo.")
+    try:
+        r = httpx.request("POST", _url(str(sessao_envio["id"]), versao), content=conteudo, timeout=60,
+                          headers={"Authorization": f"OAuth {token}", "file_offset": "0"})
+    except httpx.HTTPError:
+        raise ErroWhatsApp("Sem conexão com a API do WhatsApp. Confira a internet.") from None
+    if r.status_code >= 400:
+        raise ErroWhatsApp(f"A Meta recusou a imagem de exemplo: {_erro_da_meta(r)}")
+    try:
+        codigo = r.json().get("h", "")
+    except ValueError:
+        codigo = ""
+    if not codigo:
+        raise ErroWhatsApp("A Meta não devolveu o código da imagem de exemplo.")
+    return codigo
+
+
+def criar_modelo(waba_id: str, token: str, nome: str, idioma: str, categoria: str, componentes: list[dict],
+                 versao: str | None = None) -> dict:
+    """Pede a aprovação de um modelo novo. Devolve {"id", "status", "category"} (a Meta pode trocar a categoria)."""
+    return _pedir("POST", f"{waba_id}/message_templates", token, versao,
+                  json={"name": nome, "language": idioma, "category": categoria, "components": componentes})
+
+
+def editar_modelo(meta_id: str, token: str, categoria: str, componentes: list[dict], versao: str | None = None) -> dict:
+    """Manda de novo um modelo recusado (ou pausado) com o texto atual: volta para a análise da Meta."""
+    return _pedir("POST", meta_id, token, versao, json={"category": categoria, "components": componentes})
+
+
+def modelos_da_conta(waba_id: str, token: str, versao: str | None = None) -> list[dict]:
+    """Os modelos da conta do WhatsApp Business, com a situação (APPROVED, PENDING, REJECTED, PAUSED, DISABLED), a
+    categoria e o motivo da recusa."""
+    dados = _pedir("GET", f"{waba_id}/message_templates", token, versao,
+                   params={"fields": "id,name,language,status,category,rejected_reason", "limit": 200})
+    return list(dados.get("data") or [])
 
 
 def enviar_texto_por(phone_number_id: str, token: str, telefone: str, texto: str, versao: str | None = None) -> str:
@@ -164,8 +245,11 @@ def ler_webhook(dados: dict) -> tuple[list[dict], list[dict]]:
             for m in valor.get("messages", []):
                 texto = ((m.get("text") or {}).get("body") or (m.get("button") or {}).get("text")
                          or ((m.get("interactive") or {}).get("button_reply") or {}).get("title") or f"[{m.get('type')}]")
+                # botão de resposta rápida de um modelo: o payload que o sistema mandou junto (ex.: renov:renovar:123)
+                botao = str((m.get("button") or {}).get("payload")
+                            or ((m.get("interactive") or {}).get("button_reply") or {}).get("id") or "")
                 recebidas.append({"de": m.get("from", ""), "texto": texto, "id": m.get("id", ""), "numero_id": numero_id,
-                                  "nome": nomes.get(m.get("from", ""), "")})
+                                  "nome": nomes.get(m.get("from", ""), ""), "botao": botao[:256]})
             for s in valor.get("statuses", []):
                 erros = s.get("errors") or [{}]
                 status.append({"id": s.get("id", ""), "status": s.get("status", ""), "numero_id": numero_id,

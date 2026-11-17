@@ -133,6 +133,10 @@ base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renova
    SDR (a Atendente IA de lá não responde). Cliente que diz que já renovou: descartar a oportunidade com o motivo
    **Já renovou** marca o certificado como Renovado (`rotas/sdr._ja_renovou` + `ativos_do_lead`; só com um certificado
    ativo no contato, senão avisa para marcar na tela; pedido da Maria em 16/11/2026).
+16. **API oficial da Meta** (etapa 2, `docs/whatsapp-oficial.md`): com `renov_envio_oficial` ligado no quadro 4
+   (`Campanha.envio_oficial`), o WhatsApp dos avisos sai pelo número oficial com o modelo aprovado
+   (`whatsapp_oficial.processar_fila`), a arte desenhada pelo computador do WhatsApp Leads a pedido da nuvem e os botões
+   Quero renovar / Já renovei / Parar avisos (`whatsapp_oficial.tratar_botao`). O e-mail do aviso continua igual.
 
 ## Banco
 

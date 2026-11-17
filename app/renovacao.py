@@ -72,6 +72,7 @@ PADRAO = {
     "renov_ultima_importacao": "",
     "renov_arte": "1",                # a arte do aviso (a do site) vai junto no WhatsApp e no e-mail
     "renov_conexao": "",              # número de WhatsApp dos disparos ("" = automático, sempre um número de verdade)
+    "renov_envio_oficial": "0",       # WhatsApp dos avisos pela API oficial da Meta (etapa 2, whatsapp_oficial.py)
     "renov_dias": "30,15,5,1",        # dias antes do vencimento dos 4 avisos (piloto de 13/11/2026: 12, 6, 3 e 1)
     "renov_hora_inicio": "",          # os avisos saem a partir deste horário ("" = o horário de envio geral)
     "renov_hora_fim": "18:00",        # e até este (pedido da Maria em 13/11/2026: segunda a sexta, das 10:00 às 18:00)
@@ -936,6 +937,7 @@ def criar_campanha(db, usuario: Usuario, quantidade: int | None = None, ate: dat
                     objetivo="Renovar o certificado digital dos clientes", quantidade=len(escolhidos),
                     canais=cfg(db, "renov_canais"), status="gerando", usuario_id=usuario.id, inicio=hoje,
                     cadencia_id=garantir_cadencia(db).id, conexao_id=numero or "",
+                    envio_oficial=cfg(db, "renov_envio_oficial") == "1",
                     pedido=f"Clientes com certificado vencendo até {ultimo:%d/%m/%Y} (planilha de renovação)")
     db.add(camp)
     db.commit()
@@ -1511,16 +1513,79 @@ def arte_do_toque(db, tarefa: Tarefa | None) -> dict | None:
     camp = db.get(Campanha, tarefa.campanha_id)
     if camp is None or camp.tipo != TIPO_CAMPANHA:
         return None
-    certs = db.execute(select(Certificado).where(Certificado.campanha_id == camp.id, Certificado.lead_id == tarefa.lead_id,
-                                                 Certificado.status == "Ativo")).scalars().all()
-    guia = db.get(Certificado, tarefa.certificado_id)
-    if guia is not None:  # só os certificados da onda deste aviso
-        limite = guia.data_vencimento + timedelta(days=janela(db))
-        certs = [c for c in certs if guia.data_vencimento <= c.data_vencimento <= limite]
+    certs = certificados_do_aviso(db, tarefa)
     if len(certs) != 1:
         return None
     dados = _arte_do_certificado(certs[0])
     return {"tarefa": tarefa.id, **dados} if dados else None
+
+
+def aplicar_envio_oficial(db, ligado: bool) -> int:
+    """Liga/desliga a API oficial também nas campanhas de renovação em andamento (os avisos que ainda não saíram passam
+    a sair pelo número oficial, ou voltam para o QR code). Devolve quantas campanhas mudaram."""
+    mudaram = 0
+    for camp in db.execute(select(Campanha).where(Campanha.tipo == TIPO_CAMPANHA, Campanha.status.in_(
+            ("ativa", "aguardando_aprovacao", "gerando")))).scalars():
+        if bool(camp.envio_oficial) != ligado:
+            camp.envio_oficial = ligado
+            mudaram += 1
+    return mudaram
+
+
+def certificados_do_aviso(db, tarefa: Tarefa) -> list[Certificado]:
+    """Os certificados ativos do contato na campanha deste aviso, só os da onda dele (a do certificado guia), do que
+    vence primeiro ao último. Usado na arte e no modelo da API oficial."""
+    certs = db.execute(select(Certificado).where(Certificado.campanha_id == tarefa.campanha_id,
+                                                 Certificado.lead_id == tarefa.lead_id,
+                                                 Certificado.status == "Ativo")).scalars().all()
+    guia = db.get(Certificado, tarefa.certificado_id) if tarefa.certificado_id else None
+    if guia is not None:  # só os certificados da onda deste aviso
+        limite = guia.data_vencimento + timedelta(days=janela(db))
+        certs = [c for c in certs if guia.data_vencimento <= c.data_vencimento <= limite]
+    return sorted(certs, key=lambda c: (c.data_vencimento, c.cliente_nome or "", c.id or 0))
+
+
+def _dias_que_faltam(vencimento: date, hoje: date) -> str:
+    dias = (vencimento - hoje).days
+    if dias < 0:
+        return "já venceu"
+    return "vence hoje" if dias == 0 else "falta 1 dia" if dias == 1 else f"faltam {dias} dias"
+
+
+def valores_do_modelo(db, tarefa: Tarefa | None, hoje: date | None = None) -> dict | None:
+    """Os valores do modelo do aviso na API oficial da Meta, cada um numa linha só (a Meta não aceita quebra de linha
+    nos valores): o nome do contato, o certificado (ou a lista) e o vencimento. None: o aviso não tem certificado
+    ativo."""
+    if tarefa is None or not tarefa.campanha_id or not tarefa.lead_id:
+        return None
+    certs = certificados_do_aviso(db, tarefa)
+    if not certs:
+        return None
+    hoje = hoje or date.today()
+    lead = tarefa.lead
+    responsavel = next((c.responsavel for c in certs if c.responsavel), "") or (lead.responsavel if lead else "")
+    nome = util.primeiro_nome(responsavel or "") or "tudo bem"
+    if len(certs) == 1:
+        c = certs[0]
+        tipo = tipo_curto(c.tipo)
+        if _do_proprio(c):
+            descricao = f"seu {tipo}" if tipo else "seu certificado"
+        else:
+            descricao = f"{tipo + ' ' if tipo else ''}em nome de {_titular(c)}"
+        vencimento = f"{c.data_vencimento:%d/%m/%Y} ({_dias_que_faltam(c.data_vencimento, hoje)})"
+    elif len(certs) <= MAXIMO_NA_LISTA:
+        partes = []
+        for c in certs:
+            tipo = tipo_curto(c.tipo)
+            quem = "seu certificado" if _do_proprio(c) else _titular(c)
+            partes.append(f"{quem}{f' ({tipo})' if tipo else ''}, vence em {c.data_vencimento:%d/%m}")
+        descricao = f"{len(certs)} certificados: " + "; ".join(partes)
+        vencimento = (f"a partir de {certs[0].data_vencimento:%d/%m/%Y} "
+                      f"({_dias_que_faltam(certs[0].data_vencimento, hoje)})")
+    else:
+        descricao = f"{len(certs)} certificados digitais que você acompanha (o primeiro em nome de {_titular(certs[0])})"
+        vencimento = f"entre {certs[0].data_vencimento:%d/%m} e {certs[-1].data_vencimento:%d/%m/%Y}"
+    return {"nome": nome, "certificados": descricao[:600], "vencimento": vencimento}
 
 
 def _arte_do_certificado(cert: Certificado) -> dict | None:

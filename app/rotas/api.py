@@ -85,6 +85,10 @@ async def webhook_receber(request: Request):
                     analise = sdr.processar_resposta(db, lead, r["texto"], "whatsapp")
                     responder_automaticamente(db, lead, "whatsapp", analise)
                 continue
+            if str(r.get("botao") or "").startswith("renov:"):  # botão do aviso de vencimento (etapa 2)
+                usar_config_da_ar(db, conta.tenant_id)
+                if whatsapp_oficial.tratar_botao(db, conta, telefone, r):
+                    continue
             if mensagens.pede_opt_out(r["texto"]):
                 from ..leads_servico import registrar_opt_out
 
@@ -197,6 +201,31 @@ async def ponte_arte(request: Request, pid: int):
             existente.imagem = dados
         else:
             db.add(ArteAviso(ponte_id=pid, tarefa_id=tarefa_id, imagem=dados))
+    return {"ok": True}
+
+
+@rotas.post("/ponte/arte-pedido/{cid:int}")
+async def ponte_arte_pedido(request: Request, cid: int):
+    """A arte de um aviso da Renovação que vai pela API oficial da Meta: a nuvem pediu ao computador do WhatsApp Leads
+    (comando "desenhar_arte", whatsapp_oficial.pedir_arte), ele desenha e devolve aqui (senha da ponte)."""
+    from ..modelos import ArteAviso
+
+    if not _ponte_autorizada(request):
+        return JSONResponse({"erro": "token inválido"}, status_code=403)
+    dados = await request.body()
+    if not dados.startswith(b"\x89PNG") or len(dados) > 3_000_000:
+        return JSONResponse({"erro": "imagem inválida"}, status_code=400)
+    with sessao() as db:
+        comando = db.get(ComandoWhatsApp, cid)
+        if comando is None or comando.acao != whatsapp_oficial.ACAO_ARTE or not comando.tarefa_id:
+            return JSONResponse({"erro": "pedido não encontrado"}, status_code=404)
+        existente = db.execute(select(ArteAviso).where(ArteAviso.tarefa_id == comando.tarefa_id,
+                                                       ArteAviso.ponte_id == 0)).scalars().first()
+        if existente is not None:
+            existente.imagem = dados
+        else:
+            db.add(ArteAviso(ponte_id=0, tarefa_id=comando.tarefa_id, imagem=dados, tenant_id=comando.tenant_id))
+        comando.status, comando.erro = "feito", ""
     return {"ok": True}
 
 

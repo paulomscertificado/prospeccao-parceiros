@@ -143,6 +143,18 @@
     desconectado: os avisos esperam até ele conectar (WhatsApp > Meu WhatsApp).</div>{% endif %}
   {% else %}<p class="ajuda">Número dos disparos: {{ numero_auto if not cfg.renov_conexao else cfg.renov_conexao }}
     (quem troca é o administrador).</p>{% endif %}
+  {% if pode_escolher_numero %}
+  <div style="margin-top:12px">
+    <label class="interruptor"><input type="checkbox" name="oficial" {{ 'checked' if cfg.renov_envio_oficial == '1' }} {{ 'disabled' if falta_oficial and cfg.renov_envio_oficial != '1' }}>
+      <span class="trilho" aria-hidden="true"></span>
+      <span><b>Enviar o WhatsApp dos avisos pela API oficial da Meta</b><br><span class="pequeno suave">sai do número
+        oficial{{ ' ' ~ numero_oficial if numero_oficial }}, com o modelo aprovado pela Meta, a arte e os botões Quero
+        renovar, Já renovei e Parar avisos. Sem o limite de 20 por dia do QR code (a Meta cobra por mensagem). Vale também
+        para as campanhas de renovação em andamento.</span></span></label>
+    {% if falta_oficial %}<p class="ajuda">{{ 'Ainda não dá para ligar' if cfg.renov_envio_oficial != '1' else 'Atenção: está ligado, mas os avisos esperam' }}: {{ falta_oficial }}.</p>{% endif %}
+  </div>
+  {% elif cfg.renov_envio_oficial == '1' %}<p class="ajuda">Os avisos de WhatsApp saem pela <b>API oficial da Meta</b>
+    (quem troca é o administrador).</p>{% endif %}
   <div class="cartoes-escolha" style="margin-top:10px">
     <label class="escolha"><input type="checkbox" name="canal_whatsapp" {{ 'checked' if 'whatsapp' in cfg.renov_canais }}>
       <span class="escolha-corpo"><span class="escolha-marca" aria-hidden="true">✓</span>
@@ -232,7 +244,7 @@
   <div class="tabela-rolagem"><table>
     <tr><th>Campanha</th><th>Situação</th><th>Contatos</th><th>Dono</th><th>Criada em</th><th></th></tr>
     {% for c in campanhas %}{% set selo = SELOS.get(c.status, ('', c.status)) %}
-    <tr><td><a href="/campanhas/{{ c.id }}">{{ c.nome }}</a>{% if c.status == 'erro' and c.erro %}<div class="pequeno suave">{{ c.erro[:200] }}</div>{% elif c.etapa %}<div class="pequeno suave">{{ c.etapa }}</div>{% endif %}</td>
+    <tr><td><a href="/campanhas/{{ c.id }}">{{ c.nome }}</a>{% if c.envio_oficial %} <span class="selo selo-azul" title="O WhatsApp desta campanha sai pela API oficial da Meta">API oficial</span>{% endif %}{% if c.status == 'erro' and c.erro %}<div class="pequeno suave">{{ c.erro[:200] }}</div>{% elif c.etapa %}<div class="pequeno suave">{{ c.etapa }}</div>{% endif %}</td>
       <td><span class="selo {{ selo[0] }}">{{ selo[1] }}</span></td>
       <td>{{ contatos_por_campanha.get(c.id, 0) }}</td>
       <td>{{ (usuarios|selectattr('id', 'equalto', c.usuario_id)|map(attribute='nome')|first) or '—' }}</td>

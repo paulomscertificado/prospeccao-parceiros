@@ -187,9 +187,11 @@ CLASSES_RESPOSTA = [
 CLASSE_AUTOMATICA = "RESPOSTA AUTOMÁTICA"
 # Estas classes param a automação e viram oportunidade para o time humano.
 CLASSES_QUENTES = ["INTERESSADO", "MUITO INTERESSADO", "QUER SABER MAIS", "QUER REUNIÃO", "QUER LIGAÇÃO",
-                   "QUER PROPOSTA", "QUER PREÇO"]
+                   "QUER PROPOSTA", "QUER PREÇO",
+                   "QUER RENOVAR"]  # botão "Quero renovar" do aviso pela API oficial (whatsapp_oficial.tratar_botao)
 # Estas também vão para o humano, mas como oportunidade "morna" (decidir se insiste).
-CLASSES_MORNAS = ["JÁ POSSUI PARCEIRO", "OBJEÇÃO", "NÃO É RESPONSÁVEL", "RESPOSTA INDEFINIDA"]
+CLASSES_MORNAS = ["JÁ POSSUI PARCEIRO", "OBJEÇÃO", "NÃO É RESPONSÁVEL", "RESPOSTA INDEFINIDA",
+                  "JÁ RENOVOU"]  # botão "Já renovei" de quem tem vários certificados (a equipe confere qual)
 
 FITS = ["Muito alto potencial", "Alto potencial", "Médio potencial", "Baixo potencial", "Sem fit"]
 

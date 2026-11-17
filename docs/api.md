@@ -44,6 +44,8 @@ pessoa: veja a lista e as regras em [permissoes.md](permissoes.md). Sem a permis
 | `GET /configuracoes` e `POST /configuracoes/...` | A | Geral, score, usuários, integrações, base da Receita, LGPD, logs; `POST /configuracoes/alertas/teste` manda o e-mail de teste dos avisos de problema |
 | `GET /portal`, `/portal/indicar`, `/portal/clientes`, `/portal/vencimentos` | P | Portal do parceiro |
 | `GET /oportunidades` · `POST /oportunidades/{id}/descartar` · `/descartar-varias` (os dois exigem `motivo`) · `/{id}/reabrir` · `/{id}/atendida` | A G V | Oportunidades (a equipe toda vê as da AR): `?ver=` novas, atendidas, descartadas ou respostas, filtros `periodo`, `temperatura`, `canal`, `classe`, `busca` |
+| `POST /whatsapp/oficial/modelos` · `/modelos/atualizar` · `/modelos/teste` | A | Modelos do aviso de renovação na Meta: pedir a aprovação, atualizar a situação, aviso de exemplo (etapa 2, `docs/whatsapp-oficial.md`) |
+| `POST /api/ponte/arte-pedido/{id}` | senha da ponte | O computador do WhatsApp Leads devolve a arte pedida (`desenhar_arte`) para o aviso pela API oficial |
 | `POST /leads/{id}/assumir` | A G V | Assumir lead (botão da ficha): vira o responsável e para toda automação (alcance de `leads.editar`) |
 | `GET/POST /leads/{id}/agendar` | A G V | Horários livres reais e marcação de reunião |
 | `POST /leads/{id}/pesquisar` · `/abordagem-sdr` | A G V | Perfil do parceiro e mensagens SDR (4 ângulos) |

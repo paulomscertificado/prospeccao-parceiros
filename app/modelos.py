@@ -213,6 +213,28 @@ class ContaWhatsAppOficial(DaAR, Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
 
 
+class ModeloWhatsAppOficial(DaAR, Base):
+    """Modelo de mensagem (template) da Meta de uma conta oficial: o sistema pede a aprovação e acompanha a situação
+    (etapa 2, Renovação; app/whatsapp_oficial.py). Primeira mensagem para o cliente só sai com modelo APROVADO."""
+    __tablename__ = "modelos_whatsapp_oficial"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    conta_id: Mapped[int] = mapped_column(Integer, index=True)
+    uso: Mapped[str] = mapped_column(String(30), default="")  # renovacao_arte (com imagem) ou renovacao_texto
+    nome: Mapped[str] = mapped_column(String(120), default="")  # nome do modelo na Meta (minúsculas e _)
+    idioma: Mapped[str] = mapped_column(String(10), default="pt_BR")
+    categoria: Mapped[str] = mapped_column(String(20), default="UTILITY")  # a pedida
+    categoria_meta: Mapped[str] = mapped_column(String(20), default="")  # a que a Meta deu (pode mudar)
+    status: Mapped[str] = mapped_column(String(20), default="")  # PENDING, APPROVED, REJECTED, PAUSED, DISABLED, erro
+    motivo: Mapped[str] = mapped_column(Text, default="")  # motivo da recusa ou erro do pedido
+    meta_id: Mapped[str] = mapped_column(String(40), default="")
+    corpo: Mapped[str] = mapped_column(Text, default="")  # o texto com {{1}}, {{2}}... (como foi para a Meta)
+    rodape: Mapped[str] = mapped_column(String(60), default="")
+    botoes: Mapped[str] = mapped_column(Text, default="[]")  # JSON: os textos dos botões de resposta rápida
+    com_imagem: Mapped[bool] = mapped_column(Boolean, default=False)
+    criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
+    atualizado_em: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
 class ContaEmail(DaAR, Base):
     """Uma conta de e-mail para as campanhas: a principal da MS (dados em Configurações > E-mail) ou a de um
     usuário (dados aqui, senha criptografada). Ver app/contas_email.py."""
@@ -250,8 +272,10 @@ class ComandoWhatsApp(DaAR, Base):
     """Botão da tela WhatsApp (nuvem) esperando o computador do WhatsApp Leads executar. Ver rotas/whatsapp.py."""
     __tablename__ = "comandos_whatsapp"
     id: Mapped[int] = mapped_column(primary_key=True)
-    acao: Mapped[str] = mapped_column(String(30))       # conectar, pausar, desligar, salvar_regras
+    acao: Mapped[str] = mapped_column(String(30))       # conectar, pausar, desligar, salvar_regras, desenhar_arte
     dados: Mapped[str] = mapped_column(Text, default="{}")
+    # desenhar_arte: o aviso da Renovação que vai pela API oficial (whatsapp_oficial.pedir_arte)
+    tarefa_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     status: Mapped[str] = mapped_column(String(20), default="aguardando", index=True)  # aguardando, retirado, feito, erro
     erro: Mapped[str] = mapped_column(Text, default="")
     usuario_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -628,6 +652,9 @@ class Campanha(DaAR, Base):
     # WhatsApp sai sozinho depois da aprovação, também para contato frio: o admin liga por campanha (as de Empresas
     # novas já saem sozinhas). Mesmas travas da fila automática (campanhas.campanhas_que_saem_sozinhas)
     whatsapp_sozinho: Mapped[bool] = mapped_column(Boolean, default=False)
+    # WhatsApp pela API oficial da Meta (número oficial da AR, modelos aprovados) em vez do WhatsApp Leads (QR code):
+    # etapa 2, Renovação (pedido da Maria em 16/11/2026). Fila própria: whatsapp_oficial.processar_fila
+    envio_oficial: Mapped[bool] = mapped_column(Boolean, default=False)
     # Visual (HTML no e-mail, imagem no WhatsApp) — app/visual.py. toques: "seguintes" (do 2º em diante) ou "todos"
     visual_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     visual_canais: Mapped[str] = mapped_column(String(40), default="")

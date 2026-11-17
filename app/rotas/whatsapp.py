@@ -71,11 +71,28 @@ def tela_whatsapp(request: Request, usuario: Usuario = Depends(exige("whatsapp.v
     # API oficial da Meta (app/whatsapp_oficial.py): um número por AR; o Admin Master configura dentro da AR
     ar_oficial = marca.ar_da_tela(request, usuario) if autorizacao.pode(usuario, "whatsapp.gerenciar_todos") else None
     oficial = whatsapp_oficial.da_ar(db) if ar_oficial else None
+    modelos = whatsapp_oficial.modelos_da_conta(db, oficial)
+    previa = ""
+    if oficial is not None:  # o texto do aviso (etapa 2), com os valores de exemplo
+        previa = (whatsapp_oficial.preencher(whatsapp_oficial.corpo_renovacao(marca.da_ar(db, ar_oficial)["nome"]),
+                                             whatsapp_oficial.EXEMPLO_DOS_VALORES)
+                  + "\n\n" + whatsapp_oficial.RODAPE_RENOVACAO)
     return tela(request, "whatsapp.html", {"secao": "whatsapp", "estado": estado, "regras": estado["regras"], "equipe": equipe_,
                                            "url_local": config.WHATSAPP_LEADS_URL + "/whatsapp",
                                            "oficial_ar": ar_oficial, "oficial": oficial,
                                            "oficial_situacao": whatsapp_oficial.situacao(oficial),
-                                           "webhook_url": _endereco_do_webhook(request)})
+                                           "webhook_url": _endereco_do_webhook(request),
+                                           "oficial_modelos": modelos, "previa_do_modelo": previa,
+                                           "nomes_de_uso": whatsapp_oficial.NOMES_DE_USO,
+                                           "nomes_dos_modelos": whatsapp_oficial.NOMES_DOS_MODELOS,
+                                           "situacoes_do_modelo": whatsapp_oficial.SITUACOES_DO_MODELO,
+                                           "categorias_do_modelo": whatsapp_oficial.CATEGORIAS,
+                                           "botoes_do_aviso": whatsapp_oficial.BOTOES_RENOVACAO,
+                                           "pode_pedir_modelos": oficial is not None and any(
+                                               (modelos.get(u) is None or modelos[u].status not in
+                                                ("APPROVED", "PENDING", "IN_APPEAL"))
+                                               for u in whatsapp_oficial.NOMES_DOS_MODELOS),
+                                           "modelo_aprovado": any(m.status == "APPROVED" for m in modelos.values())})
 
 
 def _conta_oficial_da_tela(request: Request, usuario: Usuario, db: Session, precisa_existir: bool = True):
@@ -157,6 +174,67 @@ async def mensagem_de_teste_oficial(request: Request, usuario: Usuario = Depends
     db.commit()
     avisar(request, "Mensagem de teste enviada pela API oficial. Ela chega em alguns segundos no WhatsApp desse número.")
     return voltar("/whatsapp#oficial")
+
+
+@rotas.post("/whatsapp/oficial/modelos", dependencies=[Depends(verificar_csrf)])
+async def pedir_modelos_oficial(request: Request, usuario: Usuario = Depends(exige("whatsapp.gerenciar_todos")),
+                                db: Session = Depends(obter_db)):
+    """Pede à Meta a aprovação dos modelos do aviso de vencimento da Renovação (etapa 2)."""
+    conta, motivo = _conta_oficial_da_tela(request, usuario, db)
+    if motivo:
+        avisar(request, motivo, "erro")
+        return voltar("/whatsapp#modelos")
+    problemas = whatsapp_oficial.pedir_modelos_renovacao(db, conta)
+    registrar_log(db, usuario, "pediu_modelos_whatsapp_oficial", "whatsapp_oficial", conta.id,
+                  ("; ".join(problemas) or "modelos do aviso de renovação enviados para a aprovação da Meta")[:400],
+                  request, modulo="WhatsApp")
+    db.commit()
+    if problemas:
+        avisar(request, "Nem tudo chegou à Meta: " + " ".join(problemas), "erro")
+    else:
+        avisar(request, "Modelos enviados para a Meta aprovar. A resposta costuma sair em minutos (às vezes em até 24 "
+                        "horas): o sistema confere sozinho de hora em hora, ou clique em Atualizar a situação.")
+    return voltar("/whatsapp#modelos")
+
+
+@rotas.post("/whatsapp/oficial/modelos/atualizar", dependencies=[Depends(verificar_csrf)])
+async def atualizar_modelos_oficial(request: Request, usuario: Usuario = Depends(exige("whatsapp.gerenciar_todos")),
+                                    db: Session = Depends(obter_db)):
+    conta, motivo = _conta_oficial_da_tela(request, usuario, db)
+    if motivo:
+        avisar(request, motivo, "erro")
+        return voltar("/whatsapp#modelos")
+    try:
+        mudaram = whatsapp_oficial.atualizar_modelos(db, conta)
+    except whatsapp_cloud.ErroWhatsApp as erro:
+        avisar(request, f"Não consegui falar com a Meta: {erro}", "erro")
+        return voltar("/whatsapp#modelos")
+    db.commit()
+    avisar(request, "Situação dos modelos atualizada." if mudaram else "Nada mudou na Meta desde a última consulta.")
+    return voltar("/whatsapp#modelos")
+
+
+@rotas.post("/whatsapp/oficial/modelos/teste", dependencies=[Depends(verificar_csrf)])
+async def teste_modelo_oficial(request: Request, usuario: Usuario = Depends(exige("whatsapp.gerenciar_todos")),
+                               db: Session = Depends(obter_db)):
+    """Um aviso de exemplo (EMPRESA EXEMPLO LTDA) para o WhatsApp de quem testa, com o modelo aprovado."""
+    conta, motivo = _conta_oficial_da_tela(request, usuario, db)
+    if motivo:
+        avisar(request, motivo, "erro")
+        return voltar("/whatsapp#modelos")
+    form = await request.form()
+    telefone = str(form.get("telefone", "")).strip()
+    try:
+        nome = whatsapp_oficial.enviar_teste_renovacao(db, conta, telefone)
+    except whatsapp_cloud.ErroWhatsApp as erro:
+        avisar(request, f"O aviso de exemplo não saiu: {erro}", "erro")
+        return voltar("/whatsapp#modelos")
+    registrar_log(db, usuario, "teste_aviso_whatsapp_oficial", "whatsapp_oficial", conta.id,
+                  f"aviso de exemplo ({nome}) para {telefone}", request, modulo="WhatsApp")
+    db.commit()
+    avisar(request, "Aviso de exemplo enviado pela API oficial: chega em alguns segundos no WhatsApp desse número. "
+                    "Os botões do exemplo não fazem nada.")
+    return voltar("/whatsapp#modelos")
 
 
 @rotas.post("/whatsapp/oficial/remover", dependencies=[Depends(verificar_csrf)])

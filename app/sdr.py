@@ -775,7 +775,9 @@ def origem_do_contato(db, lead: Lead, enviada: Mensagem | None, op: Oportunidade
     canal = (op.canal if op and op.canal else "") or (enviada.canal if enviada else "")
     saiu_por = ""
     if enviada and enviada.conexao:
-        if canal == "whatsapp":
+        if canal == "whatsapp" and enviada.conexao.startswith("oficial:"):
+            saiu_por = "WhatsApp oficial (API da Meta)"
+        elif canal == "whatsapp":
             conexao = db.get(ConexaoWhatsApp, enviada.conexao)
             saiu_por = conexao.nome if conexao and conexao.nome else enviada.conexao
         else:

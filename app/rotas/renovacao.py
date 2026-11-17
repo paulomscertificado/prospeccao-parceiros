@@ -123,6 +123,7 @@ def tela_renovacao(request: Request, ver: str = "avisar", q: str = "", usuario: 
         "remetente": renovacao.dono(db) or usuario, "numeros": numeros,
         "numeros_disparo": renovacao.numeros_para_escolher(db, renovacao.dono(db) or usuario),
         "numero_auto": numero_auto, "pode_escolher_numero": autorizacao.pode(usuario, "campanhas.escolher_numero"),
+        **_api_oficial(db, request, usuario),
         "pode_aprovar": autorizacao.pode(usuario, "campanhas.gerenciar"),
         "proximos_feriados": renovacao.proximos_feriados(db),
     })
@@ -182,6 +183,21 @@ async def montar(request: Request, usuario: Usuario = Depends(exige("campanhas.g
     avisar(request, f"A campanha está sendo montada com {camp.quantidade} contatos (os que vencem primeiro) e vai pedir "
                     "aprovação (leva alguns minutos).")
     return voltar(f"/campanhas/{camp.id}")
+
+
+def _ar_da_renovacao(db, request: Request, usuario: Usuario):
+    """A AR da tela (o Admin Master fora de uma AR fala pela AR MS, dona da Renovação)."""
+    return marca.ar_da_tela(request, usuario) or marca.ar_padrao(db)
+
+
+def _api_oficial(db, request: Request, usuario: Usuario) -> dict:
+    """Para o quadro 4: o que falta para os avisos saírem pela API oficial da Meta e o número oficial."""
+    from .. import whatsapp_oficial
+
+    ar = _ar_da_renovacao(db, request, usuario)
+    conta = whatsapp_oficial.conta_da_ar(db, ar)
+    return {"falta_oficial": whatsapp_oficial.falta_para_renovacao(db, ar),
+            "numero_oficial": (conta.numero or conta.nome) if conta is not None else ""}
 
 
 @rotas.post("/renovacao/configurar", dependencies=[Depends(verificar_csrf)])
@@ -245,6 +261,24 @@ async def configurar(request: Request, usuario: Usuario = Depends(exige("campanh
                    "erro")
             return voltar("/renovacao#configurar")
         gravar_config(db, "renov_conexao", conexao if c is not None else "")
+        # WhatsApp dos avisos pela API oficial da Meta (etapa 2, pedido da Maria em 16/11/2026)
+        from .. import whatsapp_oficial
+
+        oficial, antes = bool(form.get("oficial")), renovacao.cfg(db, "renov_envio_oficial") == "1"
+        if oficial and not antes:
+            falta = whatsapp_oficial.falta_para_renovacao(db, _ar_da_renovacao(db, request, usuario))
+            if falta:
+                avisar(request, f"Ainda não dá para enviar pela API oficial da Meta: {falta}.", "erro")
+                return voltar("/renovacao#configurar")
+        if oficial != antes:
+            gravar_config(db, "renov_envio_oficial", "1" if oficial else "0")
+            mudaram = renovacao.aplicar_envio_oficial(db, oficial)
+            registrar_log(db, usuario, "renovacao_api_oficial", "configuracao", None,
+                          ("ligou" if oficial else "desligou") + f" o envio pela API oficial ({mudaram} campanha(s) em "
+                          "andamento)", request)
+            avisar(request, ("Os avisos de WhatsApp passam a sair pela API oficial da Meta" if oficial else
+                             "Os avisos de WhatsApp voltam a sair pelo número do QR code")
+                   + (f", também nas {mudaram} campanha(s) em andamento." if mudaram else "."))
     for chave, valor in [("renov_ativo", "1" if form.get("ativo") else "0"), ("renov_canais", canais),
                          ("renov_arte", "1" if form.get("arte") else "0"),
                          ("renov_maximo_dia", str(maximo)), ("renov_hora", hora), ("renov_dono_id", str(dono_id or ""))]:

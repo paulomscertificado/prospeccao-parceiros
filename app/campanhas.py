@@ -1148,6 +1148,16 @@ def _enviar_toque(db, t: Tarefa, usuario: Usuario) -> str:
         if erro:
             return f"O e-mail não saiu: {erro}"
         return ""
+    camp = db.get(Campanha, t.campanha_id) if t.campanha_id else None
+    if camp is not None and camp.envio_oficial:  # Renovação pela API oficial da Meta (número oficial da AR)
+        from . import whatsapp_oficial
+
+        try:
+            whatsapp_oficial.enviar_toque(db, t, usuario)
+        except whatsapp_oficial.EnvioOficialRecusado as erro:
+            return str(erro)
+        t.resultado = f"Enviado por {usuario.nome} pela API oficial da Meta (Minha fila)"
+        return ""
     try:
         sdr.enviar_whatsapp_conectado(db, t.mensagem, usuario, lead=lead, tarefa=t)
     except sdr.EnvioRecusado as erro:
@@ -1197,6 +1207,20 @@ def disparar(db, camp: Campanha, usuario: Usuario, canal: str) -> dict:
             if erro:
                 feito["erros"].append(f"O e-mail não saiu: {erro}")
                 break
+        elif camp.envio_oficial:  # Renovação pela API oficial da Meta
+            from . import whatsapp_oficial
+
+            try:
+                whatsapp_oficial.enviar_toque(db, t, usuario)
+            except whatsapp_oficial.EnvioOficialRecusado as erro:
+                texto_erro = str(erro)
+                if "não está pronta" in texto_erro or "token" in texto_erro.lower():
+                    feito["parou"] = texto_erro
+                    break
+                feito["bloqueados"] += 1
+                feito["motivos"][motivo_curto(texto_erro)] += 1
+                continue
+            t.resultado = f"Disparado por {usuario.nome} pela API oficial da Meta"
         else:
             try:
                 sdr.enviar_whatsapp_conectado(db, t.mensagem, usuario, lead=lead, tarefa=t)
@@ -1452,6 +1476,7 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
                 .where(Tarefa.status == "pendente", Tarefa.tipo == "prospeccao", Tarefa.canal == "whatsapp",
                        _ja_na_hora(hoje, hora), Campanha.status == "ativa", Campanha.aprovado_em.is_not(None),
                        func.coalesce(Lead.whatsapp, "") != "",
+                       Campanha.envio_oficial.is_not(True),  # essas saem pela API oficial (whatsapp_oficial)
                        or_(Lead.consentimento.is_(True), conversou, da_campanha_automatica),
                        ~_toque_anterior_pendente(),  # o toque anterior da empresa sai primeiro
                        ~recebeu_ha_pouco)  # nunca dois WhatsApps automáticos para a mesma empresa em menos de 20 h

@@ -135,6 +135,37 @@
     <form class="inline" method="post" action="/whatsapp/oficial/remover" data-confirmar="Remover a API oficial deste sistema? As chaves são apagadas daqui; nada muda na conta da Meta."><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-perigo btn-pequeno">Remover</button></form>
   </div>
   <p class="pequeno suave">O teste usa o modelo de exemplo que a Meta cria em toda conta (hello_world, em inglês), a não ser que você escreva o nome de outro modelo aprovado. Cada envio é cobrado pela Meta.</p>
+
+  <h3 style="margin:22px 0 6px" id="modelos">Modelos do aviso de renovação</h3>
+  <p class="pequeno" style="margin:0 0 8px">Para começar a conversa com o cliente, a Meta só aceita um <b>modelo aprovado</b> por ela.
+    Os avisos da Renovação usam dois: um com a arte do aviso em cima e um só com o texto (para quem tem vários
+    certificados ou quando a arte não fica pronta).</p>
+  {% if oficial_modelos %}
+  <div class="tabela-rolagem"><table>
+    <tr><th>Modelo</th><th>Situação na Meta</th><th>Categoria</th></tr>
+    {% for uso, nome_uso in nomes_de_uso.items() %}{% set m = oficial_modelos.get(uso) %}
+    <tr><td><b>{{ nome_uso }}</b><div class="pequeno suave">{{ m.nome if m else nomes_dos_modelos[uso] }}</div></td>
+      <td>{% if m %}<span class="selo {{ 'selo-ok' if m.status == 'APPROVED' else ('selo-erro' if m.status in ('REJECTED', 'DISABLED', 'erro') else 'selo-alerta') }}">{{ situacoes_do_modelo.get(m.status, m.status or '—') }}</span>
+        {% if m.motivo %}<div class="pequeno">{{ m.motivo }}</div>{% endif %}{% else %}<span class="suave">ainda não pedido</span>{% endif %}</td>
+      <td>{% if m %}{{ categorias_do_modelo.get(m.categoria_meta or m.categoria, m.categoria_meta or m.categoria) }}{% if m.categoria_meta and m.categoria_meta != m.categoria %} <span class="pequeno">(pedimos {{ categorias_do_modelo.get(m.categoria, m.categoria) }}; a Meta mudou)</span>{% endif %}{% else %}—{% endif %}</td></tr>
+    {% endfor %}
+  </table></div>
+  {% endif %}
+  <details class="pequeno" style="margin:8px 0"><summary>Ver o texto do aviso</summary>
+    <div class="mensagem" style="white-space:pre-wrap;margin-top:6px">{{ previa_do_modelo }}</div>
+    <p style="margin:6px 0 0">Botões: {% for b in botoes_do_aviso %}[{{ b }}] {% endfor %}— <b>Quero renovar</b> vira uma oportunidade
+      quente para a equipe; <b>Já renovei</b> marca o certificado como Renovado (com vários certificados, a equipe confere);
+      <b>Parar avisos</b> funciona como o SAIR.</p></details>
+  <div class="grupo-btn" style="align-items:flex-end;flex-wrap:wrap">
+    {% if pode_pedir_modelos %}<form class="inline" method="post" action="/whatsapp/oficial/modelos"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-verde">Enviar os modelos para a Meta aprovar</button></form>{% endif %}
+    {% if oficial_modelos %}<form class="inline" method="post" action="/whatsapp/oficial/modelos/atualizar"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">Atualizar a situação</button></form>{% endif %}
+    {% if modelo_aprovado %}<form class="inline" method="post" action="/whatsapp/oficial/modelos/teste" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div><label class="pequeno">Aviso de exemplo para (com DDD)</label><input type="text" inputmode="tel" name="telefone" placeholder="(81) 99999-0000" style="width:170px"></div>
+      <button class="btn">Enviar um aviso de exemplo</button></form>{% endif %}
+  </div>
+  <p class="pequeno suave">A Meta costuma responder em minutos (às vezes em até 24 horas); o sistema confere sozinho de hora em hora.
+    Com o modelo aprovado, ligue o envio pela API oficial na tela <a href="/renovacao#configurar">Renovação</a> (quadro 4).</p>
   {% endif %}
   {% endif %}
 </div>

@@ -287,6 +287,15 @@ def _fila_whatsapp() -> None:
             log.info("Fila do WhatsApp: %s mensagens para contatos que já conversaram", r["enviados"])
 
 
+def _fila_whatsapp_oficial() -> None:
+    from . import whatsapp_oficial
+
+    with sessao() as db:  # avisos da Renovação pela API oficial da Meta (campanhas com envio_oficial)
+        r = whatsapp_oficial.processar_fila(db)
+        if r["enviados"]:
+            log.info("API oficial do WhatsApp: %s avisos enviados", r["enviados"])
+
+
 def _sincronizar_whatsapp() -> None:
     with sessao() as db:
         r = sdr.sincronizar_whatsapp_conectado(db)
@@ -325,6 +334,10 @@ def _rotina_hora() -> None:
         renovacao.encerrar_toques(db)  # aviso de renovação de certificado vencido ou renovado não sai
         renovacao.limpar_artes(db)  # as artes do aviso ficam só uns dias (já foram no WhatsApp e no e-mail)
         campanhas.finalizar_cadencias(db)
+    with sessao() as db:  # modelo da API oficial em análise: pergunta à Meta se já foi aprovado
+        from . import whatsapp_oficial
+
+        whatsapp_oficial.atualizar_modelos_pendentes(db)
     with sessao() as db:
         reservas.preencher_reservas_antigas(db)  # só na primeira vez
         liberadas = reservas.liberar_vencidas(db)
@@ -349,6 +362,7 @@ def rodada(numero: int | None) -> None:
         alertas.marcar_rodada()  # avisa se o agendador tinha ficado parado mais de 30 minutos
     _passo("fila_email", _fila_email)
     _passo("fila_whatsapp", _fila_whatsapp)
+    _passo("fila_whatsapp_oficial", _fila_whatsapp_oficial)
     _passo("sincronizar_whatsapp", _sincronizar_whatsapp)
     if _na_vez(numero, "ultima_leitura_email", 5):
         _passo("ler_emails", _ler_emails)

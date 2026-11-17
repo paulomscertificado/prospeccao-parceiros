@@ -422,6 +422,8 @@ renovação novo antes, para entrarem os clientes de janeiro).
 - **Quando o cliente responde:** os avisos seguintes param e a resposta vai para **Oportunidades** e **Quem precisa de
   mim hoje**. A IA não responde esses clientes: quem conversa é a equipe. Se ele disser que já renovou, descarte a
   resposta com o motivo **Já renovou**: o certificado vira Renovado sozinho.
+- **Pelo número oficial (API da Meta):** dá para mandar os avisos pelo número oficial da empresa, com os botões Quero
+  renovar, Já renovei e Parar avisos (veja **API oficial do WhatsApp (Meta)**). Ligue no quadro 4.
 - **Arte do aviso:** cada aviso vai com a **arte do site** (mscertificados.com.br/interno/aviso-vencimento)
   preenchida com os dados do cliente: e-CNPJ ou e-CPF, A1 ou A3, razão social ou nome, CNPJ ou CPF, a data de
   vencimento e quantos dias faltam. No WhatsApp a arte vai como imagem e o texto como legenda, **para todos os
@@ -538,6 +540,20 @@ Como ligar (o administrador da AR; o Admin Master, dentro da AR):
 
 Quem responder ao número oficial: a resposta aparece no lead (para os próximos toques e avisa a equipe) e quem
 mandar SAIR deixa de receber mensagens. Por enquanto, responda pelo app WhatsApp Business do celular.
+
+**Avisos da Renovação pelo número oficial:**
+1. Em **Configurações > WhatsApp > API oficial da Meta**, clique em **Enviar os modelos para a Meta aprovar**. São
+   dois: o aviso com a arte e o aviso só com o texto, com os botões **Quero renovar**, **Já renovei** e **Parar
+   avisos**. A Meta costuma responder em minutos (às vezes em até 24 horas); o sistema confere sozinho de hora em hora.
+2. Aprovado, use **Enviar um aviso de exemplo** para ver como chega no seu celular.
+3. Na tela **Renovação**, quadro 4, ligue **Enviar o WhatsApp dos avisos pela API oficial da Meta** e salve. Vale também
+   para as campanhas de renovação em andamento. Para voltar ao número do QR code, é só desligar.
+
+Como fica: os mesmos dias e horários de sempre, a arte do aviso em cima (quem tem vários certificados recebe a lista
+no texto) e sem o limite de 20 por dia do QR code (a Meta cobra por mensagem). Quando o cliente toca em um botão:
+**Quero renovar** vira uma oportunidade quente para a equipe; **Já renovei** marca o certificado como Renovado (com
+vários certificados, a equipe confere qual); **Parar avisos** funciona como o SAIR. A arte é desenhada no computador do
+WhatsApp Leads; se ele estiver desligado, o aviso sai só com o texto.
 
 ## 5. Perfis de acesso
 

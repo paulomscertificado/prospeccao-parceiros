@@ -118,6 +118,7 @@ def test_toda_rota_da_equipe_confere_permissao():
                "/api/ponte/teste", "/api/ponte/troca", "/api/ponte/retorno", "/static",
                "/api/ponte/midia/{mid:int}",  # imagem do visual para o WhatsApp Leads (senha da ponte)
                "/api/ponte/arte/{pid:int}",  # arte do aviso de vencimento que o WhatsApp Leads desenhou (senha da ponte)
+               "/api/ponte/arte-pedido/{cid:int}",  # arte pedida para o aviso pela API oficial (senha da ponte)
                "/visual/arquivo/{aid:int}/{nome}",  # imagem do e-mail: o programa de e-mail do lead precisa abrir
                "/marca/logo/{ar:int}/{assinatura}"}  # logo da AR (endereço assinado; aparece também no descadastro)
     sem_porteiro, conferidas = [], 0
