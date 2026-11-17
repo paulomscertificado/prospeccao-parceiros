@@ -670,6 +670,19 @@ cliente rápido". Antes cada pessoa via só as respostas dos leads dela e tinha 
   `leads_com_contato_recente(db, ids, "email")` (parâmetro `recentes_email` de `fila._situacao`): "Sai sozinho
   depois: a empresa recebeu e-mail há menos de 20 h". A tela Envios mostra o intervalo da fila automática
   (`horas_minimas_automatico`), não o de Configurações. Envio manual segue a configuração.
+- **Horário previsto de saída (17/11/2026, pedido da Maria: "do lado de programado, coloque o horário exato que vai
+  sair o disparo"):** `fila.itens_da_fila` monta as linhas das telas Minha fila e Envios com `situacao_e_previsao`
+  (`_situacao` ficou como atalho sem o horário). Para o toque que sai sozinho (`automatico`: e-mail com o envio
+  automático ligado; WhatsApp `sozinho` que não espera o anterior), `_previsao` parte do horário marcado (nunca antes de
+  agora), soma as 20 h desde o último envio do canal (`campanhas.ultimos_envios_recentes`, que dá a hora do último
+  envio; `leads_com_contato_recente` virou atalho dele), espera o WhatsApp da empresa no e-mail das Empresas novas
+  (os WhatsApps são calculados primeiro, `previsto_zap`) e leva para a janela de envio (`campanhas.JanelaDeEnvio` /
+  `janela_de_envio`: dia útil, `horario_envio_inicio`-`fim`; na Renovação também `renov_hora_inicio`-`fim`, feriados e
+  os 10 minutos de margem do WhatsApp). A linha mostra "sai hoje às 15:00 / amanhã às 08:41 / 18/11 às 10:00"
+  (`quando_sai`) ao lado do selo; a explicação ganha o motivo quando o horário muda ("sai quando completar 20 h do
+  último WhatsApp..."). Toque que pode sair agora mas está fora da janela da Renovação passa de "Sai sozinho" para
+  "Fora do horário". A previsão não simula a fila (um a cada 3-4 min na plataforma): com muitos livres na mesma hora,
+  alguns saem minutos depois. Teste: `testes/test_previsao_de_saida.py`.
 - Campanhas de parceiros (12/11/2026, pedido da Maria: "a partir do momento de aprovadas, entrem na fila de
   envios"): **toda campanha nova da IA SDR já vem com o WhatsApp automático ligado** (`rotas/sdr.py`, config
   `whatsapp_sozinho_padrao` = "1" em Configurações > Geral; "0" volta ao clique nas próximas) e as campanhas em aberto

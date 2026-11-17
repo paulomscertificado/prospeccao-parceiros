@@ -2,7 +2,7 @@
 (e por que ainda não saiu), o que saiu ou falhou e o registro (log) dos disparos. Cada um vê os próprios; admin e
 gestor podem ver a fila de outra pessoa ou da equipe toda."""
 
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -47,29 +47,86 @@ LIMITE_PENDENTES = 600  # toques olhados por vez (atrasados primeiro)
 LIMITE_MOSTRAR = 200    # toques mostrados de uma vez (a página não pode ficar pesada; os filtros acham o resto)
 
 
-def _situacao(t: Tarefa, hoje: date, no_horario: bool, conversaram: set[int], email_auto: bool,
-              whats_auto: bool, automaticas: set[int] = frozenset(),
-              com_anterior: set[int] = frozenset(), recentes: set[int] = frozenset(),
-              espera_whatsapp: set[int] = frozenset(), recentes_email: set[int] = frozenset()) -> tuple[str, str]:
-    """(situação, explicação) de por que o toque ainda não saiu, em linguagem simples. O que pede uma ação da pessoa
-    (WhatsApp ou e-mail em branco) aparece também nos toques dos próximos dias, para dar tempo de corrigir.
+def _marcado(t: Tarefa) -> datetime:
+    """Data e hora marcadas do toque (sem hora: o começo do dia; a janela leva para o horário de envio)."""
+    try:
+        hora = time(int((t.hora or "")[:2]), int((t.hora or "")[3:5]))
+    except ValueError:
+        hora = time(0, 0)
+    return datetime.combine(t.data, hora)
+
+
+def _previsao(t: Tarefa, recentes, recentes_email, espera_whatsapp, automaticas, janela,
+              previsto_zap) -> tuple[datetime | None, str]:
+    """(horário previsto de saída, por que mudou) do toque automático: o marcado (nunca antes de agora), ou quando
+    completam as 20 h do último envio do canal para a empresa, ou depois do WhatsApp da empresa (e-mail das Empresas
+    novas), levado para o próximo horário de envio (campanhas.JanelaDeEnvio). A fila manda um por vez, a cada 3 ou 4
+    minutos: com muitos na mesma hora, alguns saem uns minutos depois."""
+    if janela is None:
+        return None, ""
+    base, mudou = max(_marcado(t), agora()), ""
+    ultimos = recentes if t.canal == "whatsapp" else recentes_email
+    ultimo = ultimos.get(t.lead_id) if isinstance(ultimos, dict) else None
+    horas = janela.horas(t.canal)
+    if ultimo and ultimo + timedelta(hours=horas) > base:
+        base = ultimo + timedelta(hours=horas)
+        mudou = (f"sai quando completar {horas} h do último {'e-mail' if t.canal == 'email' else 'WhatsApp'} para a "
+                 "empresa (nunca dois no mesmo dia)")
+    if t.canal == "email" and t.id in espera_whatsapp:
+        zaps = [p for m, p in (previsto_zap or {}).get((t.campanha_id, t.lead_id), []) if m <= _marcado(t)]
+        if not zaps:
+            return None, ""  # o WhatsApp da empresa ainda não tem horário: o e-mail sai depois dele
+        base = max([base] + zaps)
+    renovacao = isinstance(automaticas, dict) and automaticas.get(t.campanha_id) == "renovacao"
+    previsto = janela.proxima(base, renovacao, t.canal)
+    if previsto and previsto > base + timedelta(minutes=1) and not mudou:
+        mudou = "fica para o próximo horário de envio" + (" da Renovação" if renovacao else "")
+    return previsto, mudou
+
+
+def quando_sai(momento: datetime, hoje: date) -> str:
+    """"hoje às 15:00", "amanhã às 08:41" ou "18/11 às 10:00"."""
+    if momento.date() == hoje:
+        return f"hoje às {momento:%H:%M}"
+    if momento.date() == hoje + timedelta(days=1):
+        return f"amanhã às {momento:%H:%M}"
+    return f"{momento:%d/%m} às {momento:%H:%M}"
+
+
+def situacao_e_previsao(t: Tarefa, hoje: date, no_horario: bool, conversaram: set[int], email_auto: bool,
+                        whats_auto: bool, automaticas: set[int] = frozenset(), com_anterior: set[int] = frozenset(),
+                        recentes=frozenset(), espera_whatsapp: set[int] = frozenset(), recentes_email=frozenset(),
+                        janela=None, previsto_zap=None) -> tuple[str, str, datetime | None]:
+    """(situação, explicação, horário previsto de saída) do toque que ainda não saiu, em linguagem simples. O que pede
+    uma ação da pessoa (WhatsApp ou e-mail em branco) aparece também nos toques dos próximos dias, para dar tempo de
+    corrigir.
     automaticas = campanhas cujo WhatsApp sai sozinho depois da aprovação (campanhas.campanhas_que_saem_sozinhas);
     com_anterior = toques que esperam o toque anterior da mesma empresa sair (campanhas.toques_com_anterior_pendente);
     recentes = leads que receberam WhatsApp há menos de 20 h (campanhas.leads_com_whatsapp_recente);
     espera_whatsapp = e-mails de Empresas novas que esperam o WhatsApp da empresa sair primeiro
     (campanhas.emails_que_esperam_whatsapp);
-    recentes_email = leads que receberam e-mail há menos de 20 h (campanhas.leads_com_contato_recente)."""
+    recentes_email = leads que receberam e-mail há menos de 20 h (campanhas.leads_com_contato_recente).
+    Com recentes/recentes_email como {lead: hora do último envio} (campanhas.ultimos_envios_recentes) e a janela
+    (campanhas.janela_de_envio), o toque que sai sozinho ganha o horário previsto (pedido da Maria em 17/11/2026:
+    "coloque o horário exato que vai sair o disparo"); previsto_zap = {(campanha, lead): [(marcado, previsto)]} dos
+    WhatsApps, para o e-mail das Empresas novas que espera o WhatsApp da empresa."""
     lead = t.lead
     if not lead or not sdr.automacao_ativa(lead):
-        return "parado", "Automação parada para este lead (respondeu, opt-out ou está com alguém)"
+        return "parado", "Automação parada para este lead (respondeu, opt-out ou está com alguém)", None
     if t.canal == "email" and not lead.email:
-        return "sem_email", "Sem e-mail cadastrado"
+        return "sem_email", "Sem e-mail cadastrado", None
     if t.canal == "whatsapp" and not (lead.whatsapp or "").strip():
-        return "sem_whatsapp", "WhatsApp em branco: cadastre o número na ficha da empresa para a mensagem sair"
+        return "sem_whatsapp", "WhatsApp em branco: cadastre o número na ficha da empresa para a mensagem sair", None
     da_campanha_automatica = campanhas.toque_sai_sozinho(t, automaticas, hoje)
     sozinho = t.canal == "whatsapp" and whats_auto and (
         da_campanha_automatica or bool(lead.consentimento) or lead.id in conversaram)
     espera_anterior = t.canal == "whatsapp" and t.id in com_anterior
+    automatico = email_auto if t.canal == "email" else (sozinho and not espera_anterior)
+    previsto, mudou = (_previsao(t, recentes, recentes_email, espera_whatsapp, automaticas, janela, previsto_zap)
+                       if automatico else (None, ""))
+    depois = f"; {mudou}" if mudou else ""
+    # sai sozinho, mas não agora (horário da Renovação, ou as 20 h desde o último envio do canal)
+    fora_da_hora = bool(previsto and previsto > agora() + timedelta(minutes=1))
     if t.data > hoje:
         quando = f"Programado para {t.data:%d/%m} às {t.hora or '09:00'}"
         if t.canal == "whatsapp":
@@ -77,37 +134,73 @@ def _situacao(t: Tarefa, hoje: date, no_horario: bool, conversaram: set[int], em
                        else " (sai sozinho)" if sozinho else " (vai esperar o seu clique)")
         elif t.id in espera_whatsapp:
             quando += " (depois do WhatsApp desta empresa)"
-        return "programado", quando
+        return "programado", quando + depois, previsto
     if t.canal == "email":
         if not email_auto:
-            return "email_manual", "Envio automático de e-mail desligado: use Disparar campanha e-mail"
+            return "email_manual", "Envio automático de e-mail desligado: use Disparar campanha e-mail", None
         if not no_horario:
-            return "horario", "Aguardando o horário de envio"
+            return "horario", "Aguardando o horário de envio", previsto
         if t.data == hoje and (t.hora or "00:00") > agora().strftime("%H:%M"):
-            return "programado", f"Programado para hoje às {t.hora}"
+            return "programado", f"Programado para hoje às {t.hora}{depois}", previsto
         if t.id in espera_whatsapp:
-            return "programado", "Sai sozinho depois do WhatsApp desta empresa (o WhatsApp tem prioridade)"
+            return "programado", "Sai sozinho depois do WhatsApp desta empresa (o WhatsApp tem prioridade)", previsto
         if lead.id in recentes_email:
             return "programado", ("Sai sozinho depois: a empresa recebeu e-mail há menos de "
-                                  f"{campanhas.HORAS_MINIMAS_FILA_AUTOMATICA} h (nunca dois no mesmo dia)")
-        return "rodada", "Sai na próxima rodada da fila (a cada minuto)"
+                                  f"{campanhas.HORAS_MINIMAS_FILA_AUTOMATICA} h (nunca dois no mesmo dia)"), previsto
+        if fora_da_hora:
+            return "horario", "Aguardando o horário de envio" + (f" ({mudou})" if mudou else ""), previsto
+        return "rodada", "Sai na próxima rodada da fila (a cada minuto)", None
     if espera_anterior:
-        return "clique", "Aguardando: o toque anterior desta empresa ainda não saiu (envie o anterior primeiro)"
+        return "clique", "Aguardando: o toque anterior desta empresa ainda não saiu (envie o anterior primeiro)", None
     if sozinho:
         if not no_horario:
-            return "horario", "Aguardando o horário de envio"
+            return "horario", "Aguardando o horário de envio", previsto
         if t.data == hoje and (t.hora or "00:00") > agora().strftime("%H:%M"):
-            return "programado", f"Programado para hoje às {t.hora} (sai sozinho)"
+            return "programado", f"Programado para hoje às {t.hora} (sai sozinho){depois}", previsto
         if lead.id in recentes:
             return "programado", ("Sai sozinho depois: a empresa recebeu WhatsApp há menos de "
-                                  f"{campanhas.HORAS_MINIMAS_FILA_AUTOMATICA} h (nunca dois no mesmo dia)")
+                                  f"{campanhas.HORAS_MINIMAS_FILA_AUTOMATICA} h (nunca dois no mesmo dia)"), previsto
+        if fora_da_hora:
+            return "horario", "Aguardando o horário de envio" + (f" ({mudou})" if mudou else ""), previsto
         if da_campanha_automatica:
-            return "sozinho", f"Sai sozinho: {campanhas.motivo_automatico(automaticas, t.campanha_id)} (um por vez, com pausas)"
-        return "sozinho", "Sai sozinho (contato já conversou com a empresa)"
+            return "sozinho", f"Sai sozinho: {campanhas.motivo_automatico(automaticas, t.campanha_id)} (um por vez, com pausas)", None
+        return "sozinho", "Sai sozinho (contato já conversou com a empresa)", None
     if t.campanha_id in automaticas:
         return "clique", (f"Aguardando seu clique: atrasado mais de {campanhas.DIAS_ATRASO_AUTOMATICO} dias, "
-                          "não sai sozinho")
-    return "clique", "Aguardando seu clique (WhatsApp de hoje ou Disparar campanha WhatsApp)"
+                          "não sai sozinho"), None
+    return "clique", "Aguardando seu clique (WhatsApp de hoje ou Disparar campanha WhatsApp)", None
+
+
+def _situacao(t: Tarefa, hoje: date, no_horario: bool, conversaram: set[int], email_auto: bool,
+              whats_auto: bool, automaticas: set[int] = frozenset(),
+              com_anterior: set[int] = frozenset(), recentes: set[int] = frozenset(),
+              espera_whatsapp: set[int] = frozenset(), recentes_email: set[int] = frozenset()) -> tuple[str, str]:
+    """(situação, explicação) de por que o toque ainda não saiu: situacao_e_previsao sem o horário previsto."""
+    chave, motivo, _ = situacao_e_previsao(t, hoje, no_horario, conversaram, email_auto, whats_auto, automaticas,
+                                           com_anterior, recentes, espera_whatsapp, recentes_email)
+    return chave, motivo
+
+
+def itens_da_fila(tarefas, hoje: date, no_horario: bool, conversaram, email_auto: bool, whats_auto: bool, automaticas,
+                  com_anterior, recentes, espera_whatsapp, recentes_email, janela=None) -> list[dict]:
+    """Situação, explicação e horário previsto de saída de cada toque (Minha fila e Envios), na ordem recebida. Os
+    WhatsApps são calculados primeiro: o e-mail das Empresas novas que espera o WhatsApp da empresa sai depois dele."""
+    calculado, previsto_zap = {}, {}
+    for t in sorted(tarefas, key=lambda t: t.canal != "whatsapp"):
+        chave, motivo, previsto = situacao_e_previsao(
+            t, hoje, no_horario, conversaram, email_auto, whats_auto, automaticas, com_anterior, recentes,
+            espera_whatsapp, recentes_email, janela, previsto_zap)
+        if previsto and t.canal == "whatsapp":
+            previsto_zap.setdefault((t.campanha_id, t.lead_id), []).append((_marcado(t), previsto))
+        calculado[t.id] = (chave, motivo, previsto)
+    itens = []
+    for t in tarefas:
+        chave, motivo, previsto = calculado[t.id]
+        rotulo, classe = SITUACOES[chave]
+        itens.append({"t": t, "situacao": chave, "rotulo": rotulo, "classe": classe, "motivo": motivo,
+                      "previsto": quando_sai(previsto, hoje) if previsto else "",
+                      "atrasado": t.data < hoje, "dias": (hoje - t.data).days})
+    return itens
 
 
 def _no_periodo(p: dict, periodo: str, hoje: date) -> bool:
@@ -188,16 +281,12 @@ def minha_fila(request: Request, de: str = "", canal: str = "", aba: str = "prox
     whats_auto = ler_config(db, "enviar_whatsapp_automatico") == "1"
     automaticas = campanhas.campanhas_que_saem_sozinhas(db)
     com_anterior = campanhas.toques_com_anterior_pendente(db, tarefas)
-    recentes = campanhas.leads_com_whatsapp_recente(db, [t.lead_id for t in tarefas if t.canal == "whatsapp"])
+    # com a hora do último envio de cada empresa: a tela mostra quando o toque sai (17/11/2026)
+    recentes = campanhas.ultimos_envios_recentes(db, [t.lead_id for t in tarefas if t.canal == "whatsapp"], "whatsapp")
     espera_whatsapp = campanhas.emails_que_esperam_whatsapp(db, tarefas)
-    recentes_email = campanhas.leads_com_contato_recente(db, [t.lead_id for t in tarefas if t.canal == "email"], "email")
-    pendentes = []
-    for t in tarefas:
-        chave, motivo = _situacao(t, hoje, no_horario, conversaram, email_auto, whats_auto, automaticas, com_anterior,
-                                  recentes, espera_whatsapp, recentes_email)
-        rotulo, classe = SITUACOES[chave]
-        pendentes.append({"t": t, "situacao": chave, "rotulo": rotulo, "classe": classe, "motivo": motivo,
-                          "atrasado": t.data < hoje, "dias": (hoje - t.data).days})
+    recentes_email = campanhas.ultimos_envios_recentes(db, [t.lead_id for t in tarefas if t.canal == "email"], "email")
+    pendentes = itens_da_fila(tarefas, hoje, no_horario, conversaram, email_auto, whats_auto, automaticas, com_anterior,
+                              recentes, espera_whatsapp, recentes_email, campanhas.janela_de_envio(db))
 
     # Filtros da aba Próximos envios: campanha e busca valem para tudo; o período e a situação mostram quantos há
     # em cada opção, já com os outros filtros aplicados

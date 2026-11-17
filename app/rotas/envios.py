@@ -174,16 +174,12 @@ def tela_envios(request: Request, canal: str = "", status: str = "", campanha: s
     whats_auto = ler_config(db, "enviar_whatsapp_automatico") == "1"
     automaticas = campanhas.campanhas_que_saem_sozinhas(db)
     com_anterior = campanhas.toques_com_anterior_pendente(db, tarefas)
-    recentes = campanhas.leads_com_whatsapp_recente(db, [t.lead_id for t in tarefas if t.canal == "whatsapp"])
+    # com a hora do último envio de cada empresa: a tela mostra quando o toque sai (17/11/2026)
+    recentes = campanhas.ultimos_envios_recentes(db, [t.lead_id for t in tarefas if t.canal == "whatsapp"], "whatsapp")
     espera_whatsapp = campanhas.emails_que_esperam_whatsapp(db, tarefas)
-    recentes_email = campanhas.leads_com_contato_recente(db, [t.lead_id for t in tarefas if t.canal == "email"], "email")
-    proximos = []
-    for t in tarefas:
-        chave, motivo = fila._situacao(t, hoje, no_horario, conversaram, email_auto, whats_auto, automaticas,
-                                       com_anterior, recentes, espera_whatsapp, recentes_email)
-        rotulo, classe = fila.SITUACOES[chave]
-        proximos.append({"t": t, "situacao": chave, "rotulo": rotulo, "classe": classe, "motivo": motivo,
-                         "atrasado": t.data < hoje, "dias": (hoje - t.data).days})
+    recentes_email = campanhas.ultimos_envios_recentes(db, [t.lead_id for t in tarefas if t.canal == "email"], "email")
+    proximos = fila.itens_da_fila(tarefas, hoje, no_horario, conversaram, email_auto, whats_auto, automaticas,
+                                  com_anterior, recentes, espera_whatsapp, recentes_email, campanhas.janela_de_envio(db))
     prox_base = [p for p in proximos if (not camp_id or p["t"].campanha_id == camp_id)
                  and (not termo or termo in util.chave_texto(p["t"].lead.empresa if p["t"].lead else ""))]
     prox_na_situacao = [p for p in prox_base if not situacao or p["situacao"] == situacao]

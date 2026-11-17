@@ -212,6 +212,11 @@ numa conversa sem fim. Se o mesmo lead mandar várias mensagens, tudo fica na me
 - **Próximos envios:** o que ainda vai sair, separado por dia (Atrasados, Hoje, Amanhã, os próximos dias) e na ordem
   em que vai sair. Cada envio mostra a situação em destaque (ex.: "Aguardando seu clique", "WhatsApp em branco",
   "Programado") e o botão certo: **Enviar** ou **Cadastrar WhatsApp**/**Cadastrar e-mail**, quando falta o contato.
+  Ao lado de **Programado** e de **Fora do horário** aparece **quando o envio sai sozinho** (ex.: "sai amanhã às
+  08:41"): o horário marcado, ou quando completam 20 horas do último WhatsApp (ou e-mail) para a empresa, sempre dentro
+  do horário de envio, em dia útil (a Renovação também respeita o horário e os feriados dela). A fila manda um por vez,
+  a cada 3 ou 4 minutos: quando muitos ficam livres na mesma hora, alguns saem uns minutos depois. Envio que espera o
+  seu clique não mostra horário.
   Para achar um envio, use os filtros: **Quando** (todos, hoje e atrasados, atrasados, hoje, amanhã, próximos dias),
   **Situação**, a **campanha** e a **busca pelo nome da empresa**. Cada filtro mostra quantos envios há nele;
   **Limpar filtros** volta a mostrar tudo.

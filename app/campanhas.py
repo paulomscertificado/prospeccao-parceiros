@@ -10,6 +10,7 @@ Fluxo: pedido em texto ("quero parceiros entre empresas que atendem PMEs em São
 import logging
 import re
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
 from sqlalchemy import and_, case, func, or_, select
@@ -1312,23 +1313,85 @@ def _recebeu_ha_pouco(db, canal: str, lead_id):
         Mensagem.criado_em > agora() - timedelta(hours=horas_minimas_automatico(db, canal))).exists())
 
 
-def leads_com_contato_recente(db, ids, canal: str = "whatsapp") -> set[int]:
-    """Dos leads informados, os que receberam mensagem deste canal há menos de horas_minimas_automatico (o toque
-    automático deles espera: a regra de _recebeu_ha_pouco), para as telas Minha fila e Envios."""
+def ultimos_envios_recentes(db, ids, canal: str = "whatsapp") -> dict[int, datetime]:
+    """Dos leads informados, os que receberam mensagem deste canal há menos de horas_minimas_automatico, com a hora do
+    último envio: o toque automático deles espera completar o intervalo (a regra de _recebeu_ha_pouco). As telas
+    Minha fila e Envios mostram quando o toque sai (17/11/2026)."""
     from .modelos import Mensagem
 
     ids = [i for i in set(ids or []) if i]
     if not ids:
-        return set()
+        return {}
     desde = agora() - timedelta(hours=horas_minimas_automatico(db, canal))
-    return set(db.execute(select(Mensagem.lead_id).where(
+    return dict(db.execute(select(Mensagem.lead_id, func.max(Mensagem.criado_em)).where(
         Mensagem.lead_id.in_(ids), Mensagem.canal == canal, Mensagem.direcao == "saida",
-        Mensagem.angulo != "resposta", Mensagem.status.in_(mensagens.ENVIADAS), Mensagem.criado_em > desde)).scalars())
+        Mensagem.angulo != "resposta", Mensagem.status.in_(mensagens.ENVIADAS), Mensagem.criado_em > desde)
+        .group_by(Mensagem.lead_id)).all())
+
+
+def leads_com_contato_recente(db, ids, canal: str = "whatsapp") -> set[int]:
+    """Dos leads informados, os que receberam mensagem deste canal há menos de horas_minimas_automatico (o toque
+    automático deles espera: a regra de _recebeu_ha_pouco)."""
+    return set(ultimos_envios_recentes(db, ids, canal))
 
 
 def leads_com_whatsapp_recente(db, ids) -> set[int]:
     """Dos leads informados, os que receberam WhatsApp há menos de 20 h (o toque automático deles espera)."""
     return leads_com_contato_recente(db, ids, "whatsapp")
+
+
+@dataclass(frozen=True)
+class JanelaDeEnvio:
+    """Quando as filas automáticas enviam, para a previsão de saída nas telas Minha fila e Envios (pedido da Maria em
+    17/11/2026: "coloque o horário exato que vai sair o disparo"): dia útil, dentro do horário de envio; na Renovação
+    também sem os feriados e no horário dela (o WhatsApp para 10 minutos antes do fim, como na fila)."""
+    inicio: str = "08:30"
+    fim: str = "18:00"
+    renov_inicio: str = "08:30"
+    renov_fim: str = "18:00"
+    feriados_renovacao: frozenset = frozenset()
+    horas_whatsapp: int = HORAS_MINIMAS_FILA_AUTOMATICA
+    horas_email: int = HORAS_MINIMAS_FILA_AUTOMATICA
+
+    def horas(self, canal: str) -> int:
+        return self.horas_email if canal == "email" else self.horas_whatsapp
+
+    def proxima(self, momento: datetime, renovacao: bool = False, canal: str = "whatsapp") -> datetime | None:
+        """O primeiro momento, a partir de `momento`, em que a fila automática pode enviar (None: nenhum horário nos
+        próximos 15 dias, ex.: horário de envio vazio nas Configurações)."""
+        from .renovacao import MARGEM_WHATSAPP_MINUTOS
+
+        abre, fecha = cadencias._minutos(self.inicio, 0), cadencias._minutos(self.fim, 24 * 60)
+        if renovacao:
+            abre = max(abre, cadencias._minutos(self.renov_inicio, 0))
+            fecha = min(fecha, cadencias._minutos(self.renov_fim, 24 * 60)
+                        - (MARGEM_WHATSAPP_MINUTOS if canal == "whatsapp" else 0))
+        if abre >= fecha:
+            return None
+        for dias in range(15):
+            dia = momento.date() + timedelta(days=dias)
+            if dia.weekday() >= 5 or (renovacao and dia in self.feriados_renovacao):
+                continue
+            meia_noite = datetime.combine(dia, datetime.min.time())
+            inicio, fim = meia_noite + timedelta(minutes=abre), meia_noite + timedelta(minutes=fecha)
+            if dias == 0:
+                if momento >= fim:
+                    continue
+                return max(momento, inicio)
+            return inicio
+        return None
+
+
+def janela_de_envio(db) -> JanelaDeEnvio:
+    """A janela das filas automáticas com as configurações de agora (as da AR de quem vê a tela)."""
+    from . import renovacao
+
+    inicio = ler_config(db, "horario_envio_inicio") or "08:30"
+    fim = ler_config(db, "horario_envio_fim") or "18:00"
+    return JanelaDeEnvio(inicio=inicio, fim=fim, renov_inicio=renovacao.hora_inicio(db) or inicio,
+                         renov_fim=renovacao.hora_fim(db) or fim, feriados_renovacao=renovacao.dias_sem_envio(db),
+                         horas_whatsapp=horas_minimas_automatico(db, "whatsapp"),
+                         horas_email=horas_minimas_automatico(db, "email"))
 
 
 def campanhas_que_saem_sozinhas(db) -> dict[int, str]:
