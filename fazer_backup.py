@@ -56,13 +56,16 @@ class SenhaErrada(Exception):
 # ---------------------------------------------------------------- Banco da nuvem
 
 def endereco_da_nuvem() -> str:
+    """O banco do sistema: o do dados/supabase.txt (computador da MS) ou, no servidor da Hostinger (onde esse arquivo
+    não existe), o DATABASE_URL das configurações do servidor. Só endereço PostgreSQL: nunca o SQLite local."""
     try:
         for linha in ARQUIVO_SUPABASE.read_text(encoding="utf-8-sig").splitlines():
             if linha.startswith("DATABASE_URL="):
                 return endereco_postgres(linha.split("=", 1)[1])
     except OSError:
         pass
-    return ""
+    do_ambiente = endereco_postgres(os.environ.get("DATABASE_URL", ""))
+    return do_ambiente if do_ambiente.startswith("postgresql+psycopg://") else ""
 
 
 def motor_da_nuvem(endereco: str):

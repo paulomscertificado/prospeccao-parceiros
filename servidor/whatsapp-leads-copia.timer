@@ -1,0 +1,9 @@
+[Unit]
+Description=Copia de seguranca do WhatsApp Leads todo dia as 06:30
+
+[Timer]
+OnCalendar=*-*-* 06:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

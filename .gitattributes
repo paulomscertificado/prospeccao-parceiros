@@ -1,0 +1,7 @@
+# Arquivos que rodam no servidor Linux (Hostinger) ou no Git Bash: sempre com o fim de linha do Linux (LF).
+# Com CRLF (padrão do Windows) o bash e o systemd do servidor não leem o arquivo. Ver docs/migracao-hostinger.md.
+servidor/*.sh text eol=lf
+servidor/*.service text eol=lf
+servidor/*.timer text eol=lf
+servidor/Caddyfile.modelo text eol=lf
+servidor/pc/*.sh text eol=lf

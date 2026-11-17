@@ -1,0 +1,12 @@
+# Site do sistema da MS (gerado pelo servidor/instalar_sistema.sh a partir de servidor/Caddyfile.modelo).
+# O Caddy pede e renova sozinho o certificado (cadeado) para o endereço abaixo.
+__DOMINIO__ {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8001
+	log {
+		output file /var/log/caddy/acesso.log {
+			roll_size 20MiB
+			roll_keep 5
+		}
+	}
+}

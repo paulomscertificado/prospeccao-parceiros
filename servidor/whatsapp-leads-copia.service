@@ -1,0 +1,9 @@
+[Unit]
+Description=Copia de seguranca diaria do WhatsApp Leads (criptografada; o computador da MS baixa e manda para o Drive)
+
+[Service]
+Type=oneshot
+User=wleads
+WorkingDirectory=/opt/whatsapp-leads
+Environment=PYTHONIOENCODING=utf-8 PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/whatsapp-leads/.venv/bin/python -W ignore fazer_backup.py --automatico

@@ -1,0 +1,9 @@
+[Unit]
+Description=Chama o relogio da Prospeccao a cada minuto
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

@@ -1,5 +1,7 @@
 # Publicar na Vercel (sistema na nuvem)
 
+> **Saindo da Vercel (17/11/2026, opção B do plano Hostinger):** o sistema vai para um servidor próprio na Hostinger (site, banco e WhatsApp Leads juntos). Kit, ensaio e roteiro da virada em [migracao-hostinger.md](migracao-hostinger.md). Este documento continua valendo até a virada e como reserva.
+
 Endereço: o domínio gratuito da Vercel (`https://<projeto>.vercel.app`, escolha da Maria; domínio próprio é opcional). O sistema roda na Vercel, os dados ficam num
 **PostgreSQL** (Supabase, plano grátis) e o **WhatsApp continua no computador da MS** (WhatsApp Leads).
 Planos: Vercel **Hobby** e Supabase **Free** (escolha da MS); ver "Plano grátis" abaixo.

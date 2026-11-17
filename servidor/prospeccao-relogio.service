@@ -1,0 +1,10 @@
+[Unit]
+Description=Relogio da Prospeccao (filas, respostas e avisos)
+After=prospeccao.service
+
+[Service]
+Type=oneshot
+User=prospeccao
+EnvironmentFile=/etc/prospeccao/ambiente
+# Igual ao cron da Vercel: o sistema faz uma rodada das rotinas. Uma rodada por vez (o timer espera a anterior).
+ExecStart=/usr/bin/curl -fsS --max-time 290 -o /dev/null -H "Authorization: Bearer ${CRON_SECRET}" http://127.0.0.1:8001/api/cron

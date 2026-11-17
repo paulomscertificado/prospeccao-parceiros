@@ -8,6 +8,7 @@
 | [renovacao.md](renovacao.md) | **Renovação**: planilha de renovação da certificadora → avisos 30, 15, 5 e 1 dia antes do vencimento, um por contato |
 | [configuracao.md](configuracao.md) | 3. IA · 4. WhatsApp · 5. E-mail · 6. APIs externas (Receita, Google Places, OpenStreetMap, BrasilAPI) |
 | [deploy-vercel.md](deploy-vercel.md) | **Publicar na Vercel**: o que muda na nuvem, trabalhos em etapas, agendador, ponte do WhatsApp, passo a passo |
+| [migracao-hostinger.md](migracao-hostinger.md) | **Servidor da Hostinger** (opção B, 17/11/2026): kit `servidor/`, configurações conferidas, ensaio, roteiro da noite da virada, portão, como voltar e como publicar depois |
 | [deploy.md](deploy.md) | 10. Como colocar o sistema em produção (Docker + PostgreSQL + HTTPS) |
 | [arquitetura.md](arquitetura.md) | Decisões técnicas, fluxo, banco de dados (schema), segurança |
 | [white-label.md](white-label.md) | **White label**: várias ARs (marcas) na mesma plataforma, as 7 fases, Fase 1 (a AR entra nos dados, `migrar_ar.py`) |

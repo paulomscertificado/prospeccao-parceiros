@@ -1,0 +1,9 @@
+[Unit]
+Description=Copia de seguranca da Prospeccao todo dia as 06:10
+
+[Timer]
+OnCalendar=*-*-* 06:10:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
