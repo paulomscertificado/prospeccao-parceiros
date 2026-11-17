@@ -51,7 +51,9 @@ base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renova
    ou foi marcado Renovado / Não renovará / Avisos cancelados é cancelado. `mudar_situacao` (botões da tela):
    Renovado/Não renovará/"Cancelar avisos" (status `Avisos cancelados`, em `ENCERRADOS`, aba "Avisos cancelados";
    pedido da Maria em 13/11/2026) cancela os avisos pendentes do contato (se ele tiver outro certificado ativo na mesma campanha, os avisos passam a
-   seguir esse outro); Reabrir volta para a fila se a campanha acabou. Cancelar a campanha devolve à fila quem não
+   seguir esse outro); Reabrir volta para a fila se a campanha acabou. Certificado vencido (status `Vencido` ou `Ativo` com a data
+   passada; aba Vencidos) também mostra Renovado e Não vai renovar (sem Cancelar avisos: vencido não recebe aviso;
+   pedido da Maria em 17/11/2026, `test_certificado_vencido_tambem_pode_ser_marcado_renovado`). Cancelar a campanha devolve à fila quem não
    recebeu nenhum aviso (`liberar_da_campanha`); excluir marca `fora_motivo` em quem já recebeu (`antes_de_excluir`).
    **Pesquisa na lista** (pedido da Maria em 16/11/2026): `GET /renovacao?q=` filtra os certificados já carregados para
    a tela (nenhuma consulta a mais no banco), em todas as abas (`rotas/renovacao._na_busca`): só números (3 ou mais,

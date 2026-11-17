@@ -1296,3 +1296,36 @@ def test_campo_de_pesquisa_acha_o_certificado_em_todas_as_abas(cliente, csrf):
     assert "PMI BUSCA CORRETAGEM" not in sem_busca and "POUSADA BUSCA SUNSET" in sem_busca  # aba de sempre
     with sessao() as db:
         _limpar(db)
+
+
+def test_certificado_vencido_tambem_pode_ser_marcado_renovado(cliente, csrf):
+    """Pedido da Maria (17/11/2026): o certificado que já venceu (cliente que renova depois do vencimento) mostra
+    Renovado e Não vai renovar; marcado, sai da aba Vencidos e vai para Renovados e não vão renovar."""
+    with sessao() as db:
+        _limpar(db)
+        vencido = Certificado(origem=renovacao.ORIGEM, protocolo="9700001", cliente_nome="CLIENTE VENCIDO TESTE",
+                              tipo="e-CPF A1", data_vencimento=date.today() - timedelta(days=4), status="Ativo",
+                              whatsapp="81988887777")
+        importado_vencido = Certificado(origem=renovacao.ORIGEM, protocolo="9700002", cliente_nome="OUTRO VENCIDO TESTE",
+                                        tipo="e-CNPJ A1", data_vencimento=date.today() - timedelta(days=40),
+                                        status="Vencido")
+        db.add_all([vencido, importado_vencido])
+        db.commit()
+        cid, outro = vencido.id, importado_vencido.id
+    pagina = cliente.get("/renovacao?ver=vencidos").text
+    linha = pagina.split("CLIENTE VENCIDO TESTE", 1)[1].split("</tr>", 1)[0]
+    assert "Venceu" in linha and 'value="Renovado"' in linha and 'value="Não renovará"' in linha
+    assert 'value="Avisos cancelados"' not in linha  # vencido não recebe aviso: não há o que cancelar
+    assert 'value="Renovado"' in pagina.split("OUTRO VENCIDO TESTE", 1)[1].split("</tr>", 1)[0]
+    r = cliente.post(f"/renovacao/certificado/{cid}/situacao", data={"csrf": csrf, "situacao": "Renovado", "ver": "vencidos"})
+    assert "CLIENTE VENCIDO TESTE: renovado." in r.text
+    with sessao() as db:
+        assert db.get(Certificado, cid).status == "Renovado"
+    assert "CLIENTE VENCIDO TESTE" not in cliente.get("/renovacao?ver=vencidos").text
+    encerrados = cliente.get("/renovacao?ver=encerrados").text
+    assert "CLIENTE VENCIDO TESTE" in encerrados and "Reabrir" in encerrados.split("CLIENTE VENCIDO TESTE", 1)[1]
+    cliente.post(f"/renovacao/certificado/{outro}/situacao", data={"csrf": csrf, "situacao": "Não renovará"})
+    with sessao() as db:
+        assert db.get(Certificado, outro).status == "Não renovará"
+        _limpar(db)
+        db.commit()

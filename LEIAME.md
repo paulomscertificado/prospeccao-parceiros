@@ -466,7 +466,9 @@ renovação novo antes, para entrarem os clientes de janeiro).
   **todas as abas** (inclusive renovados, cancelados e vencidos), não liga para acento nem para maiúsculas e aceita o
   número com ou sem pontos e traços. Os botões da linha funcionam ali mesmo, e **Limpar a busca** volta para a aba.
 - **Renovou?** Na lista de certificados, clique em **Renovado** (ou **Não vai renovar**): os avisos que ainda não
-  saíram param (WhatsApp e e-mail). **Reabrir** desfaz.
+  saíram param (WhatsApp e e-mail). **Reabrir** desfaz. Vale também para o certificado que **já venceu** (o cliente
+  que renova depois do vencimento): na aba **Vencidos**, os botões **Renovado** e **Não vai renovar** aparecem na
+  linha e ele passa para a aba **Renovados e não vão renovar**.
 - **Parar os avisos de um cliente** sem dizer se renovou: botão vermelho **Cancelar avisos** na linha dele. Os avisos
   que ainda não saíram param e ele vai para a aba **Avisos cancelados** (**Reabrir** desfaz).
 - **Cancelar a campanha inteira:** botão **Cancelar campanha**, no aviso do topo (campanha esperando aprovação) ou no
