@@ -9,6 +9,8 @@ Ordem de decisão de uma permissão (ver docs/permissoes.md):
 
 Alcance ("escopo") das permissões que tratam de dados com dono:
   tudo      -> qualquer registro
+  abaixo    -> os da própria pessoa e os de quem tem papel abaixo do dela (hierarquia, 17/11/2026:
+               administrador > gestor > funcionário > vendedor; papel criado = o nível do tipo em que se baseia)
   equipe    -> registros cujo dono é da mesma equipe (sem equipe = só os próprios)
   proprios  -> só os registros da própria pessoa
 
@@ -29,10 +31,15 @@ from sqlalchemy.orm import Session, object_session
 
 from .modelos import ExcecaoPermissao, Papel, PermissaoPapel, Usuario
 
-TUDO, EQUIPE, PROPRIOS = "tudo", "equipe", "proprios"
-ESCOPOS = {TUDO: "Tudo", EQUIPE: "Só a equipe", PROPRIOS: "Só os próprios"}
-_ORDEM = {PROPRIOS: 1, EQUIPE: 2, TUDO: 3}
+TUDO, ABAIXO, EQUIPE, PROPRIOS = "tudo", "abaixo", "equipe", "proprios"
+ESCOPOS = {TUDO: "Tudo", ABAIXO: "Eu e quem está abaixo", EQUIPE: "Só a equipe", PROPRIOS: "Só os próprios"}
+_ORDEM = {PROPRIOS: 1, EQUIPE: 2, ABAIXO: 2, TUDO: 3}
 PERFIS_BASE = ("admin", "gestor", "funcionario", "vendedor", "parceiro")
+# Hierarquia (pedido da Maria em 17/11/2026: "quero que quem for acima veja as coisas de quem está abaixo"): o nível
+# vem do tipo base do papel (um papel criado pelo administrador tem o nível do tipo em que se baseia) e o admin master
+# fica acima de todos. Alcance "abaixo" = os registros da própria pessoa e os de quem tem nível menor, na mesma AR.
+NIVEIS = {"admin": 4, "gestor": 3, "funcionario": 2, "vendedor": 1, "parceiro": 0}
+NIVEL_MASTER = 5
 
 
 @dataclass(frozen=True)
@@ -45,7 +52,8 @@ class Permissao:
     padrao: str = ""              # quem tem hoje: A=admin, G=admin+gestor, F=+funcionário, E=equipe toda, P=parceiro
 
 
-# Padrões = exatamente o acesso que cada perfil tinha antes das permissões em camadas (ninguém ganha nem perde).
+# Padrões = o acesso que cada perfil tinha antes das permissões em camadas, com a hierarquia de 17/11/2026 por cima:
+# gestor e funcionário veem o que é deles e o de quem está abaixo (ver padrao_do_perfil).
 CATALOGO = [
     Permissao("painel.ver", "Painel", "Ver o Dashboard e os avisos", True, padrao="E"),
     Permissao("relatorios.ver", "Painel", "Ver relatórios", True, padrao="E"),
@@ -73,6 +81,11 @@ CATALOGO = [
               padrao="A"),
     Permissao("campanhas.whatsapp_sozinho", "IA SDR",
               "Ligar o WhatsApp automático da campanha (contato frio sai sem clique)", modulo="campanhas", padrao="A"),
+    # Renovação e Empresas novas valem para a AR toda (planilha da certificadora, busca paga na CNPJá): só quem
+    # configura abre essas telas (17/11/2026); as campanhas delas seguem a hierarquia, como as outras
+    Permissao("campanhas.configurar", "IA SDR",
+              "Configurar a Renovação e as Empresas novas (planilha, textos, avisos e busca paga na CNPJá)",
+              modulo="campanhas", padrao="G"),
     Permissao("fila.ver", "IA SDR", "Ver a fila de mensagens", True, padrao="E"),
     Permissao("fila.enviar", "IA SDR", "Enviar e editar mensagens da fila", True, padrao="E"),
     Permissao("envios.ver", "IA SDR", "Ver os envios", True, padrao="E"),
@@ -154,16 +167,23 @@ SENSIVEIS = ("configuracoes.alterar", "usuarios.gerenciar", "permissoes.gerencia
 NAO_NEGAVEIS = ("permissoes.gerenciar",)
 
 
+def so_ver(p: Permissao) -> bool:
+    """Permissão só de ver (ou de exportar o que vê), sem mexer no registro."""
+    return p.codigo.endswith((".ver", ".exportar"))
+
+
 def padrao_do_perfil(perfil: str, p: Permissao) -> str:
-    """Alcance que o perfil tinha antes (ou "" se não tinha)."""
+    """Alcance padrão do perfil (ou "" se ele não tem). Hierarquia (17/11/2026): o administrador vê tudo; o gestor vê
+    e cuida do que é dele e de quem está abaixo; o funcionário vê o de quem está abaixo e mexe só no dele; o vendedor
+    fica com o dele."""
     if perfil == "parceiro":
         return TUDO if p.padrao == "P" else ""
     if perfil == "admin":
         return TUDO if p.padrao != "P" else ""
     if perfil == "gestor":
-        return TUDO if p.padrao in ("G", "F", "E") else ""
+        return (ABAIXO if p.com_escopo else TUDO) if p.padrao in ("G", "F", "E") else ""
     if perfil == "funcionario" and p.padrao in ("F", "E"):
-        return PROPRIOS if p.com_escopo else TUDO
+        return ((ABAIXO if so_ver(p) else PROPRIOS) if p.com_escopo else TUDO)
     if perfil == "vendedor" and p.padrao == "E":
         return PROPRIOS if p.com_escopo else TUDO
     return ""
@@ -201,7 +221,26 @@ def preparar(db: Session) -> None:
             if escopo and p.codigo not in tem:
                 db.add(PermissaoPapel(papel_id=papel.id, permissao=p.codigo, escopo=escopo))
         papel.permissoes_conhecidas = ",".join(sorted(conhecidas | {p.codigo for p in novas}))
+    _aplicar_hierarquia(db, existentes)
     db.flush()
+
+
+def _aplicar_hierarquia(db: Session, papeis: dict) -> None:
+    """Uma vez só (17/11/2026, pedido da Maria): os papéis Gestor e Funcionário do sistema passam a ver o que é de
+    quem está abaixo. Só troca o que ainda está no padrão antigo (o que o administrador mudou à mão fica)."""
+    from .banco import gravar_config, ler_config
+
+    if ler_config(db, "permissoes_hierarquia") == "1":
+        return
+    for codigo, antigo in (("gestor", TUDO), ("funcionario", PROPRIOS)):
+        papel = papeis.get(codigo)
+        if papel is None or not papel.sistema:
+            continue
+        for r in db.execute(select(PermissaoPapel).where(PermissaoPapel.papel_id == papel.id)).scalars():
+            p = POR_CODIGO.get(r.permissao)
+            if p is not None and p.com_escopo and r.escopo == antigo:
+                r.escopo = padrao_do_perfil(codigo, p) or r.escopo
+    gravar_config(db, "permissoes_hierarquia", "1")
 
 
 # ---------------------------------------------------------------- Admin master e travas contra escalada
@@ -370,6 +409,7 @@ def esquecer(usuario: Usuario) -> None:
     """Depois de mudar papel/exceções na mesma conexão com o banco."""
     usuario.__dict__.pop("_permissoes", None)
     usuario.__dict__.pop("_equipe_ids", None)
+    usuario.__dict__.pop("_abaixo_ids", None)
 
 
 def escopo(usuario: Usuario | None, permissao: str) -> str:
@@ -393,16 +433,67 @@ def ids_da_equipe(usuario: Usuario) -> set[int]:
     return ids
 
 
+def nivel(usuario: Usuario, db: Session | None = None) -> int:
+    """Lugar da pessoa na hierarquia (NIVEIS): o do tipo base do papel dela; o admin master fica acima de todos."""
+    if getattr(usuario, "master", False):
+        return NIVEL_MASTER
+    db = db or _sessao(usuario)
+    papel = papel_de(db, usuario) if db is not None else None
+    return NIVEIS.get(papel.base if papel is not None else usuario.perfil, 0)
+
+
+def ids_abaixo(usuario: Usuario) -> set[int]:
+    """A própria pessoa e quem tem papel de nível mais baixo, na mesma AR (inclusive quem já saiu: o que era dessas
+    pessoas continua com quem está acima)."""
+    guardado = usuario.__dict__.get("_abaixo_ids")
+    if guardado is not None:
+        return guardado
+    ids = {usuario.id}
+    db = _sessao(usuario)
+    if db is not None:
+        meu = nivel(usuario, db)
+        bases = {pid: base for pid, base in db.execute(select(Papel.id, Papel.base))}
+        consulta = select(Usuario.id, Usuario.perfil, Usuario.papel_id, Usuario.master)
+        if getattr(usuario, "tenant_id", None) is not None:
+            consulta = consulta.where(Usuario.tenant_id == usuario.tenant_id)
+        for uid, perfil, papel_id, master in db.execute(consulta):
+            outro = NIVEL_MASTER if master else NIVEIS.get(bases.get(papel_id) or perfil, 0)
+            if outro < meu:
+                ids.add(uid)
+    usuario.__dict__["_abaixo_ids"] = ids
+    return ids
+
+
 def donos_visiveis(usuario: Usuario, permissao: str) -> set[int] | None:
     """None = todos; senão, os ids dos donos cujos registros a pessoa alcança (vazio = nenhum)."""
     alcance = escopo(usuario, permissao)
     if alcance == TUDO:
         return None
+    if alcance == ABAIXO:
+        return ids_abaixo(usuario)
     if alcance == EQUIPE:
         return ids_da_equipe(usuario)
     if alcance == PROPRIOS:
         return {usuario.id}
     return set()
+
+
+def escolhe_de_quem(usuario: Usuario | None, permissao: str) -> bool:
+    """A pessoa alcança registros de outras pessoas nesta permissão (tudo, quem está abaixo ou a equipe)? Então as
+    telas mostram o filtro "de quem" para ela escolher."""
+    if usuario is None:
+        return False
+    ids = donos_visiveis(usuario, permissao)
+    return ids is None or len(ids) > 1
+
+
+def pessoas_visiveis(usuario: Usuario | None, permissao: str, pessoas) -> list:
+    """Das pessoas da lista, as que entram no filtro "de quem" da tela (as que a pessoa alcança nesta permissão);
+    lista vazia quando ela só alcança a si mesma."""
+    if not escolhe_de_quem(usuario, permissao):
+        return []
+    ids = donos_visiveis(usuario, permissao)
+    return [p for p in pessoas if ids is None or p.id in ids]
 
 
 def dono_de(obj) -> set[int | None]:

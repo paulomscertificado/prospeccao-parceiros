@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .. import empresas_novas, util
+from .. import autorizacao, empresas_novas, util
 from ..banco import gravar_config, ler_config_int, obter_db
 from ..modelos import Tarefa, Usuario
 from ..seguranca import exige, registrar_log, verificar_csrf
@@ -17,11 +17,12 @@ rotas = APIRouter()
 
 
 @rotas.get("/empresas-novas")
-def tela_empresas_novas(request: Request, usuario: Usuario = Depends(exige("campanhas.ver")),
+def tela_empresas_novas(request: Request, usuario: Usuario = Depends(exige("campanhas.configurar")),
                         db: Session = Depends(obter_db)):
     from .. import visual
 
-    campanhas = empresas_novas.campanhas_recentes(db)
+    # as campanhas seguem a hierarquia: as da pessoa e as de quem está abaixo (o administrador vê todas)
+    campanhas = [c for c in empresas_novas.campanhas_recentes(db) if autorizacao.pode(usuario, "campanhas.ver", c)]
     contagem = dict(db.execute(select(Tarefa.campanha_id, func.count(func.distinct(Tarefa.lead_id)))
                                .where(Tarefa.campanha_id.in_([c.id for c in campanhas]))
                                .group_by(Tarefa.campanha_id)).all()) if campanhas else {}
@@ -41,7 +42,7 @@ def tela_empresas_novas(request: Request, usuario: Usuario = Depends(exige("camp
 
 
 @rotas.get("/empresas-novas/busca/{busca_id:int}")
-def ver_busca(request: Request, busca_id: int, usuario: Usuario = Depends(exige("campanhas.ver")),
+def ver_busca(request: Request, busca_id: int, usuario: Usuario = Depends(exige("campanhas.configurar")),
               db: Session = Depends(obter_db)):
     """Lista das empresas que a CNPJá devolveu nessa busca (com quem ficou de fora e por quê) e a campanha."""
     from fastapi import HTTPException
@@ -61,7 +62,7 @@ def ver_busca(request: Request, busca_id: int, usuario: Usuario = Depends(exige(
 
 
 @rotas.post("/empresas-novas/testar", dependencies=[Depends(verificar_csrf)])
-def testar_api(request: Request, usuario: Usuario = Depends(exige("campanhas.gerenciar")), db: Session = Depends(obter_db)):
+def testar_api(request: Request, usuario: Usuario = Depends(exige("campanhas.configurar")), db: Session = Depends(obter_db)):
     try:
         r = empresas_novas.testar(db, usuario)
     except empresas_novas.ErroCnpja as erro:
@@ -76,7 +77,7 @@ def testar_api(request: Request, usuario: Usuario = Depends(exige("campanhas.ger
 
 
 @rotas.post("/empresas-novas/busca/{busca_id:int}/campanha", dependencies=[Depends(verificar_csrf)])
-def campanha_da_busca(request: Request, busca_id: int, usuario: Usuario = Depends(exige("campanhas.gerenciar")),
+def campanha_da_busca(request: Request, busca_id: int, usuario: Usuario = Depends(exige("campanhas.configurar")),
                       db: Session = Depends(obter_db)):
     from fastapi import HTTPException
 
@@ -98,7 +99,7 @@ def campanha_da_busca(request: Request, busca_id: int, usuario: Usuario = Depend
 
 
 @rotas.post("/empresas-novas/configurar", dependencies=[Depends(verificar_csrf)])
-async def configurar(request: Request, usuario: Usuario = Depends(exige("campanhas.gerenciar")),
+async def configurar(request: Request, usuario: Usuario = Depends(exige("campanhas.configurar")),
                      db: Session = Depends(obter_db)):
     from .. import config
 
@@ -145,7 +146,7 @@ async def configurar(request: Request, usuario: Usuario = Depends(exige("campanh
 
 
 @rotas.post("/empresas-novas/mensagens", dependencies=[Depends(verificar_csrf)])
-async def salvar_mensagens(request: Request, usuario: Usuario = Depends(exige("campanhas.gerenciar")),
+async def salvar_mensagens(request: Request, usuario: Usuario = Depends(exige("campanhas.configurar")),
                            db: Session = Depends(obter_db)):
     from .. import sdr
 
@@ -168,7 +169,7 @@ async def salvar_mensagens(request: Request, usuario: Usuario = Depends(exige("c
 
 
 @rotas.post("/empresas-novas/restaurar-mensagens", dependencies=[Depends(verificar_csrf)])
-def restaurar_mensagens(request: Request, usuario: Usuario = Depends(exige("campanhas.gerenciar")),
+def restaurar_mensagens(request: Request, usuario: Usuario = Depends(exige("campanhas.configurar")),
                         db: Session = Depends(obter_db)):
     gravar_config(db, "novas_mensagens", "")
     db.commit()
@@ -177,7 +178,7 @@ def restaurar_mensagens(request: Request, usuario: Usuario = Depends(exige("camp
 
 
 @rotas.post("/empresas-novas/buscar", dependencies=[Depends(verificar_csrf)])
-async def buscar_agora(request: Request, usuario: Usuario = Depends(exige("campanhas.gerenciar")),
+async def buscar_agora(request: Request, usuario: Usuario = Depends(exige("campanhas.configurar")),
                        db: Session = Depends(obter_db)):
     form = await request.form()
     desde = util.para_data(form.get("desde")) or date.today()
@@ -211,7 +212,7 @@ async def buscar_agora(request: Request, usuario: Usuario = Depends(exige("campa
 
 
 @rotas.post("/empresas-novas/saldo", dependencies=[Depends(verificar_csrf)])
-def ver_saldo(request: Request, usuario: Usuario = Depends(exige("campanhas.gerenciar"))):
+def ver_saldo(request: Request, usuario: Usuario = Depends(exige("campanhas.configurar"))):
     try:
         s = empresas_novas.saldo()
     except empresas_novas.ErroCnpja as erro:

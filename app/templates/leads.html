@@ -18,9 +18,9 @@
   <select name="potencial"><option value="">Todo potencial</option>{% for p in potenciais %}<option {{ 'selected' if filtros.potencial==p }}>{{ p }}</option>{% endfor %}</select>
   <select name="uf"><option value="">UF</option>{% for u in config.UFS %}<option {{ 'selected' if filtros.uf==u }}>{{ u }}</option>{% endfor %}</select>
   <input type="text" name="cidade" value="{{ filtros.cidade }}" placeholder="Cidade" style="min-width:110px">
-  {% if ve_tudo_em('leads.ver') %}
-  <select name="vendedor"><option value="">Todos os vendedores</option><option value="sem" {{ 'selected' if filtros.vendedor=='sem' }}>Sem vendedor</option>
-    {% for v in vendedores %}<option value="{{ v.id }}" {{ 'selected' if filtros.vendedor==v.id|string }}>{{ v.nome }}</option>{% endfor %}</select>{% endif %}
+  {% if escolhe_de_quem('leads.ver') %}
+  <select name="vendedor"><option value="">Todos os vendedores</option>{% if ve_tudo_em('leads.ver') %}<option value="sem" {{ 'selected' if filtros.vendedor=='sem' }}>Sem vendedor</option>{% endif %}
+    {% for v in vendedores_filtro %}<option value="{{ v.id }}" {{ 'selected' if filtros.vendedor==v.id|string }}>{{ v.nome }}</option>{% endfor %}</select>{% endif %}
   <select name="origem"><option value="">Toda origem</option>{% for o in origens %}<option {{ 'selected' if filtros.origem==o }}>{{ o }}</option>{% endfor %}</select>
   <select name="ordem">{% for c,n in [("score","Maior score"),("recentes","Mais recentes"),("proximo","Próximo contato"),("nome","Nome")] %}<option value="{{ c }}" {{ 'selected' if filtros.ordem==c }}>{{ n }}</option>{% endfor %}</select>
   <button class="btn btn-primario">Filtrar</button> <a class="btn" href="/leads">Limpar</a>

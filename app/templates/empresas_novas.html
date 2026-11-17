@@ -28,7 +28,7 @@
 {% if not tem_chave %}<div class="aviso aviso-alerta">Para começar, coloque a chave da API da CNPJá em
   <a href="/configuracoes?aba=integracoes#cnpja">Configurações &gt; Integrações</a>{% if not pode('configuracoes.alterar') %} (peça ao administrador){% endif %}.</div>{% endif %}
 
-{% if pode('campanhas.gerenciar') %}
+{% if pode('campanhas.configurar') %}
 <div class="cartao">
   <h2>Buscar agora</h2>
   <div class="grupo-btn" style="align-items:end">

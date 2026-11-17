@@ -182,7 +182,7 @@ def agenda(request: Request, ver: str = "hoje", canal: str = "", tipo: str = "",
                    and ler_config(db, "enviar_whatsapp_automatico") == "1" and whatsapp_liberado(db, t.lead)}
     return tela(request, "agenda.html", {
         "tarefas": tarefas, "automaticas": automaticas, "ver": ver, "canal": canal, "tipo": tipo, "pendentes_hoje": pendentes_hoje,
-        "usuarios": usuarios if ve_tudo(usuario, "agenda.ver") else [], "responsavel": responsavel, "bloqueios": bloqueios,
+        "usuarios": autorizacao.pessoas_visiveis(usuario, "agenda.ver", usuarios), "responsavel": responsavel, "bloqueios": bloqueios,
         "limites": {c: (mensagens.enviadas_hoje(db, c), mensagens.limite_diario(db, c)) for c in ("whatsapp", "email")},
     })
 

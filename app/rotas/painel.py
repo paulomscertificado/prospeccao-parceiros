@@ -33,12 +33,12 @@ def dashboard(request: Request, periodo: str = "30d", vendedor: str = "",
     p = metricas.periodo(periodo)
     # padrão: os números de quem está usando a conta; "todos" = toda a equipe
     vendedor = ((None if vendedor == "todos" else (util.para_int(vendedor) or usuario.id))
-                if ve_tudo(usuario, metricas.NUMEROS) else None)
+                if autorizacao.escolhe_de_quem(usuario, metricas.NUMEROS) else None)
     ind = metricas.indicadores(db, usuario, p, vendedor)
     ranking = sorted(metricas.ranking_parceiros(db, usuario, p, vendedor), key=lambda r: (-r["certificados"], -r["faturamento"]))
     top = [r for r in ranking if r["certificados"]][:10]
     regioes = metricas.por_grupo(db, usuario, p, "estado", vendedor)[:10]
-    vendedores = metricas.por_vendedor(db, usuario, p) if ve_tudo(usuario, metricas.NUMEROS) else []
+    vendedores = metricas.por_vendedor(db, usuario, p) if autorizacao.escolhe_de_quem(usuario, metricas.NUMEROS) else []
     graficos = {
         "tempo": metricas.leads_por_tempo(db, usuario, vendedor),
         "funil": metricas.funil(ind),
@@ -57,7 +57,7 @@ def dashboard(request: Request, periodo: str = "30d", vendedor: str = "",
         "fila_hoje": fila_hoje.itens(db, usuario),  # "Quem precisa de mim hoje" (auditoria P1.7)
         "dias_lead_parado": ler_config_int(db, "dias_lead_parado", 7),
         "ind": ind, "p": p, "periodo": periodo, "graficos": graficos, "ranking": ranking[:5], "regioes": regioes,
-        "vendedores_perf": vendedores, "vendedores": _vendedores(db) if ve_tudo(usuario, metricas.NUMEROS) else [],
+        "vendedores_perf": vendedores, "vendedores": autorizacao.pessoas_visiveis(usuario, metricas.NUMEROS, _vendedores(db)),
         "vendedor_sel": vendedor, "followups": metricas.contar_followups_hoje(db, usuario),
         "parados": metricas.parceiros_parados(db, usuario), "vencendo": vencendo,
     })
@@ -84,7 +84,8 @@ def _dados_relatorio(db: Session, usuario: Usuario, p: metricas.Periodo):
     ]
     return {
         "ind": ind, "metricas": metr, "funil": metricas.funil(ind),
-        "vendedores": metricas.por_vendedor(db, usuario, p) if ve_tudo(usuario, metricas.NUMEROS) else [],
+        "vendedores": (metricas.por_vendedor(db, usuario, p)
+                       if autorizacao.escolhe_de_quem(usuario, metricas.NUMEROS) else []),
         "estados": metricas.por_grupo(db, usuario, p, "estado"),
         "cidades": metricas.por_grupo(db, usuario, p, "cidade")[:20],
         "origens": metricas.por_grupo(db, usuario, p, "origem"),

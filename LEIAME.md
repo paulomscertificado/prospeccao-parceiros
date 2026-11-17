@@ -598,10 +598,17 @@ WhatsApp Leads; se ele estiver desligado, o aviso sai só com o texto.
 | Perfil | Vê |
 |---|---|
 | Administrador | Tudo, inclusive Configurações, usuários, todos os números de WhatsApp e as regras de envio |
-| Gestor | Toda a equipe e os indicadores; aprova campanhas (não altera configurações) |
-| Funcionário MS | Quase toda a plataforma (prospecção, campanhas, IA, cadências, templates, categorias, conversas), mas **só os próprios dados** e o que for compartilhado com ele; não aprova campanhas nem mexe em Configurações |
-| Vendedor | Só os próprios leads, tarefas e vendas |
+| Gestor | O que é dele e o de **quem está abaixo** (funcionários e vendedores), com os indicadores; aprova as campanhas dessas pessoas e configura a Renovação e as Empresas novas (não altera configurações) |
+| Funcionário MS | Quase toda a plataforma (prospecção, campanhas, IA, cadências, templates, categorias, conversas); **vê** o que é dele e o dos vendedores, mas só **mexe** no que é dele e no que for compartilhado com ele; não mexe em Configurações |
+| Vendedor | Só os próprios leads, campanhas, tarefas e vendas |
 | Parceiro | Só o portal: própria carteira, indicações, vendas e comissão |
+
+**Quem está acima vê o que é de quem está abaixo** (pedido de 17/11/2026): Administrador > Gestor > Funcionário >
+Vendedor. Colegas do mesmo nível não veem o que é um do outro, e quem está abaixo não vê o que é de quem está acima.
+Nas telas com o filtro "de quem" (Campanhas, Minha fila, Leads, Pipeline, Agenda e Dashboard), quem está acima escolhe
+uma das pessoas abaixo ou "todos". As **Oportunidades** continuam abertas para a equipe toda (16/11/2026). As telas
+**Renovação** e **Empresas novas** (planilha da certificadora e busca paga na CNPJá) são só de quem as configura
+(administrador e gestor).
 
 Crie usuários em **Configurações > Usuários** (o perfil padrão é Funcionário MS).
 
@@ -667,8 +674,8 @@ Cada perfil acima é um **papel**. Em **Configurações > Papéis e permissões*
 
 1. **Papéis:** ver e mudar o que cada papel pode fazer. As permissões ficam em grupos que abrem e fecham (Painel,
    Leads, IA SDR...), cada um mostrando quantas estão liberadas. Em cada item escolha **Não**, **Só os próprios** (só
-   o que é da pessoa), **Só a equipe** ou **Tudo**. Clique em **Salvar permissões do papel**. O Administrador tem
-   sempre tudo.
+   o que é da pessoa), **Só a equipe**, **Eu e quem está abaixo** (o que é da pessoa e o de quem tem papel abaixo do
+   dela) ou **Tudo**. Clique em **Salvar permissões do papel**. O Administrador tem sempre tudo.
 2. **Novo papel:** clique em **+ Novo papel**, dê um nome (ex.: "Vendedor sênior"), escolha de qual papel copiar e
    ajuste. Depois escolha esse papel para a pessoa em Configurações > Usuários.
 3. **Exceções por pessoa:** escolha uma pessoa (a lista separa as marcas) para dar uma exceção só para ela:

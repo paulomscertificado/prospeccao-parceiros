@@ -248,19 +248,25 @@ def minha_fila(request: Request, de: str = "", canal: str = "", aba: str = "prox
     aba = aba if aba in ABAS else "proximos"
     periodo = periodo if periodo in dict(PERIODOS) else "todos"
     situacao = situacao if situacao in SITUACOES else ""
-    alvo_id = usuario.id
-    if ve_tudo(usuario, "fila.ver") and de:
-        alvo_id = None if de == "todos" else (util.para_int(de) or usuario.id)
+    # de quem: a própria pessoa; quem está acima (ou vê tudo, ou a equipe) escolhe uma das pessoas que alcança ou
+    # "todos" (hierarquia, 17/11/2026)
+    visiveis = autorizacao.donos_visiveis(usuario, "fila.ver")  # None = todas as pessoas
+    escolhe = autorizacao.escolhe_de_quem(usuario, "fila.ver")
+    alvos: set[int] | None = {usuario.id}
+    if escolhe and de == "todos":
+        alvos = visiveis
+    elif escolhe and util.para_int(de) and (visiveis is None or util.para_int(de) in visiveis):
+        alvos = {util.para_int(de)}
 
     def do_alvo_tarefa(q):
-        if alvo_id is None:
+        if alvos is None:
             return q
-        return q.where(or_(Campanha.usuario_id == alvo_id, Lead.vendedor_id == alvo_id))
+        return q.where(or_(Campanha.usuario_id.in_(alvos), Lead.vendedor_id.in_(alvos)))
 
     def do_alvo_mensagem(q):
-        if alvo_id is None:
+        if alvos is None:
             return q
-        return q.where(or_(Mensagem.usuario_id == alvo_id, Lead.vendedor_id == alvo_id, Campanha.usuario_id == alvo_id))
+        return q.where(or_(Mensagem.usuario_id.in_(alvos), Lead.vendedor_id.in_(alvos), Campanha.usuario_id.in_(alvos)))
 
     canais = [canal] if canal in ("email", "whatsapp") else ["email", "whatsapp"]
 
@@ -328,8 +334,8 @@ def minha_fila(request: Request, de: str = "", canal: str = "", aba: str = "prox
     log_q = select(LogAuditoria).where(or_(LogAuditoria.acao.like("disparou_campanha%"),
                                            LogAuditoria.acao == "testou_campanha"),
                                        LogAuditoria.criado_em >= agora() - timedelta(days=30))
-    if alvo_id is not None:
-        log_q = log_q.where(LogAuditoria.usuario_id == alvo_id)
+    if alvos is not None:
+        log_q = log_q.where(LogAuditoria.usuario_id.in_(alvos))
     logs = db.execute(log_q.order_by(LogAuditoria.criado_em.desc()).limit(50)).scalars().all()
 
     inicio_hoje = agora().replace(hour=0, minute=0, second=0)
@@ -347,12 +353,12 @@ def minha_fila(request: Request, de: str = "", canal: str = "", aba: str = "prox
     tarefas_por_id = {t.id: t for t in db.execute(select(Tarefa).where(Tarefa.id.in_(ids_t))).scalars()} if ids_t else {}
     ids = {m.lead_id for m in envios if m.lead_id}
     leads_por_id = {l.id: l for l in db.execute(select(Lead).where(Lead.id.in_(ids))).scalars()} if ids else {}
-    pessoas = db.execute(select(Usuario).where(Usuario.ativo.is_(True)).order_by(Usuario.nome)).scalars().all() \
-        if ve_tudo(usuario, "fila.ver") else []
+    pessoas = autorizacao.pessoas_visiveis(usuario, "fila.ver", db.execute(
+        select(Usuario).where(Usuario.ativo.is_(True)).order_by(Usuario.nome)).scalars().all()) if escolhe else []
     return tela(request, "fila.html", {
         "pendentes": pendentes, "na_fila": na_fila, "historico": historico, "logs": logs, "resumo": resumo,
         "leads_por_id": leads_por_id, "nomes_camp": nomes_camp, "STATUS_ENVIO": STATUS_ENVIO, "hoje": hoje,
-        "no_horario": no_horario, "pessoas": pessoas, "filtro_de": "todos" if alvo_id is None else str(alvo_id),
+        "no_horario": no_horario, "pessoas": pessoas, "filtro_de": "todos" if (escolhe and de == "todos") else str(next(iter(alvos))),
         "filtro_canal": canal, "horario": (ler_config(db, "horario_envio_inicio"), ler_config(db, "horario_envio_fim")),
         "CANAIS": config.CANAIS, "canais_do_toque": campanhas.canais_do_toque,
         "texto_do_canal": campanhas.texto_do_canal, "tarefas_por_id": tarefas_por_id,

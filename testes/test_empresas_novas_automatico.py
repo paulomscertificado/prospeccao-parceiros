@@ -9,6 +9,7 @@ from sqlalchemy import select
 from app import campanhas, sdr
 from app.banco import agora, gravar_config, sessao
 from app.modelos import Campanha, Lead, Tarefa, Usuario
+from conftest import no_horario_de_envio
 
 
 def _admin(db):
@@ -70,7 +71,7 @@ def test_empresas_novas_aprovada_sai_sozinha_e_parceiros_espera_o_clique(cliente
 
 
 def test_fila_mostra_que_empresas_novas_sai_sozinha(cliente, monkeypatch):
-    monkeypatch.setattr(campanhas.mensagens, "dentro_do_horario", lambda db, momento=None: True)
+    no_horario_de_envio(monkeypatch)
     with sessao() as db:
         gravar_config(db, "enviar_whatsapp_automatico", "1")
         novas = _campanha(db, "Empresas novas na fila", "empresas_novas")

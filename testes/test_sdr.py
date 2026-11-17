@@ -14,6 +14,7 @@ from app.banco import agora, gravar_config, migrar_status, sessao
 from app.integracoes import email_smtp
 from app.modelos import (Campanha, Categoria, Lead, Mensagem, Notificacao, Oportunidade, Tarefa, Usuario)
 from app.leads_servico import criar_lead
+from conftest import no_horario_de_envio
 
 
 @pytest.fixture(autouse=True)
@@ -443,7 +444,7 @@ def test_fila_de_whatsapp_so_para_quem_ja_conversou(cliente, monkeypatch):
     monkeypatch.setattr(whatsapp_leads, "enviar", falso.enviar)
     monkeypatch.setattr(whatsapp_leads, "status", lambda usar_cache=True: {"disponivel": True, "conectado": True})
     monkeypatch.setattr(whatsapp_leads, "status", lambda usar_cache=True: {"disponivel": True, "conectado": True})
-    monkeypatch.setattr(mensagens, "dentro_do_horario", lambda db, momento=None: True)
+    no_horario_de_envio(monkeypatch)
     with sessao() as db:
         gravar_config(db, "horas_entre_contatos", "0")
         camp = Campanha(nome="Zap automático", status="ativa", aprovado_em=agora(), usuario_id=_admin(db).id)

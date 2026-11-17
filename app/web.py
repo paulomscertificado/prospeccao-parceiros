@@ -44,7 +44,7 @@ modelos_html.env.globals.update(config=config, CANAIS=config.CANAIS, PERFIS=conf
 # Cada item aparece só para quem tem a permissão (e com o módulo ligado). A proteção de verdade é a da rota.
 PERMISSAO_DO_MENU = {
     "/": "painel.ver", "/campanhas": "campanhas.ver", "/envios": "envios.ver", "/fila": "fila.ver",
-    "/oportunidades": "oportunidades.ver", "/empresas-novas": "campanhas.ver", "/renovacao": "campanhas.ver", "/prospeccao": "prospeccao.buscar", "/leads": "leads.ver",
+    "/oportunidades": "oportunidades.ver", "/empresas-novas": "campanhas.configurar", "/renovacao": "campanhas.configurar", "/prospeccao": "prospeccao.buscar", "/leads": "leads.ver",
     "/agenda": "agenda.ver", "/cadencias": "cadencias.ver", "/parceiros": "parceiros.ver", "/clientes": "clientes.ver",
     "/vencimentos": "vencimentos.ver", "/vendas": "vendas.ver", "/comissoes": "comissoes.ver",
     "/relatorios": "relatorios.ver", "/inteligencia": "inteligencia.ver", "/ia": "ia.usar", "/conversas": "conversas.ver",
@@ -141,6 +141,8 @@ def tela(request: Request, nome: str, contexto: dict | None = None, status_code:
         # nas telas: {% if pode('leads.atribuir') %} (só esconde o botão; a rota confere de novo)
         "pode": lambda codigo: codigo in permissoes,
         "ve_tudo_em": lambda codigo: permissoes.get(codigo) == autorizacao.TUDO,
+        # filtro "de quem": quem alcança registros de outras pessoas (tudo, quem está abaixo ou a equipe)
+        "escolhe_de_quem": lambda codigo: autorizacao.escolhe_de_quem(usuario, codigo),
         "mostrar_vendas": mostrar_vendas,
         "mostrar_agenda": mostrar_agenda,
         "caminho": request.url.path,

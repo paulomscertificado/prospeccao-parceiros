@@ -98,9 +98,13 @@ def test_papeis_do_sistema_tem_o_acesso_de_antes(cliente):
         admin, gestor, func, vend, parc = (tem(c) for c in autorizacao.PERFIS_BASE)
     assert len(admin) == len([p for p in autorizacao.CATALOGO if p.modulo != "portal"])
     assert set(admin.values()) == {"tudo"}
-    assert gestor["leads.ver"] == "tudo" and "leads.atribuir" in gestor and "configuracoes.ver" not in gestor
+    # hierarquia (17/11/2026): o gestor vê e cuida do que é dele e de quem está abaixo; o funcionário vê o de quem
+    # está abaixo e mexe só no dele
+    assert gestor["leads.ver"] == "abaixo" and gestor["leads.editar"] == "abaixo"
+    assert "leads.atribuir" in gestor and "configuracoes.ver" not in gestor and "campanhas.configurar" in gestor
     assert "vendas.excluir" not in gestor and "comissoes.pagar" not in gestor and "vencimentos.importar" in gestor
-    assert func["leads.ver"] == "proprios" and "cadencias.editar" in func and "leads.atribuir" not in func
+    assert func["leads.ver"] == "abaixo" and func["leads.editar"] == "proprios" and func["campanhas.gerenciar"] == "proprios"
+    assert "cadencias.editar" in func and "leads.atribuir" not in func and "campanhas.configurar" not in func
     assert vend["leads.ver"] == "proprios" and set(vend) < set(func)
     assert "cadencias.editar" not in vend and "categorias.ver" not in vend and "cadencias.ver" in vend
     assert set(parc) == {"portal.usar"}

@@ -70,7 +70,7 @@ def _endereco_da_lista(ver: str, busca: str = "") -> str:
 
 
 @rotas.get("/renovacao")
-def tela_renovacao(request: Request, ver: str = "avisar", q: str = "", usuario: Usuario = Depends(exige("campanhas.ver")),
+def tela_renovacao(request: Request, ver: str = "avisar", q: str = "", usuario: Usuario = Depends(exige("campanhas.configurar")),
                    db: Session = Depends(obter_db)):
     hoje = date.today()
     ver = ver if ver in FILTROS else "avisar"
@@ -92,7 +92,8 @@ def tela_renovacao(request: Request, ver: str = "avisar", q: str = "", usuario: 
     no_filtro = (lambda c: _na_busca(c, busca)) if busca else (lambda c: _no_filtro(ver, c, hoje))
     lista = sorted((c for c in todos if no_filtro(c)), key=lambda c: (c.data_vencimento, c.cliente_nome))
     por_contato = Counter(renovacao.chave_do_contato(c) for c in abertos)
-    campanhas = renovacao.campanhas_recentes(db)
+    # as campanhas seguem a hierarquia: as da pessoa e as de quem está abaixo (o administrador vê todas)
+    campanhas = [c for c in renovacao.campanhas_recentes(db) if autorizacao.pode(usuario, "campanhas.ver", c)]
     contagem = dict(db.execute(select(Tarefa.campanha_id, func.count(func.distinct(Tarefa.lead_id)))
                                .where(Tarefa.campanha_id.in_([c.id for c in campanhas]))
                                .group_by(Tarefa.campanha_id)).all()) if campanhas else {}
@@ -125,14 +126,14 @@ def tela_renovacao(request: Request, ver: str = "avisar", q: str = "", usuario: 
         "numeros_disparo": renovacao.numeros_para_escolher(db, renovacao.dono(db) or usuario),
         "numero_auto": numero_auto, "pode_escolher_numero": autorizacao.pode(usuario, "campanhas.escolher_numero"),
         **_api_oficial(db, request, usuario),
-        "pode_aprovar": autorizacao.pode(usuario, "campanhas.gerenciar"),
+        "aprovaveis": {c.id for c in campanhas if autorizacao.pode(usuario, "campanhas.gerenciar", c)},
         "email_html_liberado": _visual.html_da_marca_ligado(db),
         "proximos_feriados": renovacao.proximos_feriados(db),
     })
 
 
 @rotas.post("/renovacao/importar", dependencies=[Depends(verificar_csrf)])
-async def importar(request: Request, arquivo: UploadFile = File(...), usuario: Usuario = Depends(exige("campanhas.gerenciar")),
+async def importar(request: Request, arquivo: UploadFile = File(...), usuario: Usuario = Depends(exige("campanhas.configurar")),
                    db: Session = Depends(obter_db)):
     conteudo = await arquivo.read()
     if not conteudo:
@@ -168,7 +169,7 @@ async def importar(request: Request, arquivo: UploadFile = File(...), usuario: U
 
 
 @rotas.post("/renovacao/montar", dependencies=[Depends(verificar_csrf)])
-async def montar(request: Request, usuario: Usuario = Depends(exige("campanhas.gerenciar")),
+async def montar(request: Request, usuario: Usuario = Depends(exige("campanhas.configurar")),
                  db: Session = Depends(obter_db)):
     form = await request.form()
     quantidade = util.para_int(form.get("quantidade"))
@@ -203,7 +204,7 @@ def _api_oficial(db, request: Request, usuario: Usuario) -> dict:
 
 
 @rotas.post("/renovacao/configurar", dependencies=[Depends(verificar_csrf)])
-async def configurar(request: Request, usuario: Usuario = Depends(exige("campanhas.gerenciar")),
+async def configurar(request: Request, usuario: Usuario = Depends(exige("campanhas.configurar")),
                      db: Session = Depends(obter_db)):
     form = await request.form()
     canais = ",".join(c for c in ("whatsapp", "email") if form.get(f"canal_{c}"))
@@ -310,7 +311,7 @@ async def configurar(request: Request, usuario: Usuario = Depends(exige("campanh
 
 
 @rotas.post("/renovacao/mensagens", dependencies=[Depends(verificar_csrf)])
-async def salvar_mensagens(request: Request, usuario: Usuario = Depends(exige("campanhas.gerenciar")),
+async def salvar_mensagens(request: Request, usuario: Usuario = Depends(exige("campanhas.configurar")),
                            db: Session = Depends(obter_db)):
     from .. import sdr
 
@@ -337,7 +338,7 @@ async def salvar_mensagens(request: Request, usuario: Usuario = Depends(exige("c
 
 
 @rotas.post("/renovacao/restaurar-mensagens", dependencies=[Depends(verificar_csrf)])
-def restaurar_mensagens(request: Request, usuario: Usuario = Depends(exige("campanhas.gerenciar")),
+def restaurar_mensagens(request: Request, usuario: Usuario = Depends(exige("campanhas.configurar")),
                         db: Session = Depends(obter_db)):
     gravar_config(db, "renov_mensagens", "")
     registrar_log(db, usuario, "restaurou_mensagens_renovacao", "configuracao", None, request=request)
@@ -347,7 +348,7 @@ def restaurar_mensagens(request: Request, usuario: Usuario = Depends(exige("camp
 
 
 @rotas.post("/renovacao/testar", dependencies=[Depends(verificar_csrf)])
-async def testar(request: Request, usuario: Usuario = Depends(exige("campanhas.gerenciar")),
+async def testar(request: Request, usuario: Usuario = Depends(exige("campanhas.configurar")),
                  db: Session = Depends(obter_db)):
     """Área de teste (como a da IA SDR): os avisos chegam no WhatsApp ou no e-mail de quem testa, com "[TESTE]"."""
     form = await request.form()
@@ -399,7 +400,7 @@ async def testar(request: Request, usuario: Usuario = Depends(exige("campanhas.g
 
 
 @rotas.post("/renovacao/certificado/{cid:int}/situacao", dependencies=[Depends(verificar_csrf)])
-async def mudar_situacao(request: Request, cid: int, usuario: Usuario = Depends(exige("campanhas.gerenciar")),
+async def mudar_situacao(request: Request, cid: int, usuario: Usuario = Depends(exige("campanhas.configurar")),
                          db: Session = Depends(obter_db)):
     form = await request.form()
     cert = db.get(Certificado, cid)

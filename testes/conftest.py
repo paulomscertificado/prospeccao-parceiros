@@ -45,6 +45,17 @@ def cliente():
         yield c
 
 
+def no_horario_de_envio(monkeypatch):
+    """Finge que agora é horário de envio para a fila (mensagens.dentro_do_horario) E para a previsão de saída da Minha
+    fila (campanhas.JanelaDeEnvio): sem a segunda, depois das 18 h ou no fim de semana a previsão manda o toque para o
+    próximo horário e o teste passa ou falha conforme a hora em que roda."""
+    from app import campanhas, mensagens
+
+    monkeypatch.setattr(mensagens, "dentro_do_horario", lambda db, momento=None: True)
+    monkeypatch.setattr(campanhas.JanelaDeEnvio, "proxima",
+                        lambda self, momento, renovacao=False, canal="whatsapp": momento)
+
+
 def ligar_modulos(*modulos: str, ligado: bool = True):
     from app import autorizacao
     from app.banco import gravar_config, sessao

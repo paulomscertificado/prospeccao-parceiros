@@ -13,7 +13,7 @@
   <p><b>{{ busca.encontradas }}</b> empresas encontradas · <b>{{ busca.encontradas - busca.fora }}</b> podem entrar na campanha ·
     <b>{{ busca.fora }}</b> ficaram de fora · ≈ {{ busca.creditos }} crédito(s) da CNPJá.</p>
   {% if campanha %}<p>Campanha: <a href="/campanhas/{{ campanha.id }}"><b>{{ campanha.nome }}</b></a> — {{ campanha.etapa or campanha.status }}</p>
-  {% elif busca.encontradas - busca.fora > 0 and pode('campanhas.gerenciar') %}
+  {% elif busca.encontradas - busca.fora > 0 and pode('campanhas.configurar') %}
   <form method="post" action="/empresas-novas/busca/{{ busca.id }}/campanha" data-confirmar="Montar a campanha de venda do e-CNPJ com as {{ busca.encontradas - busca.fora }} empresas que podem entrar? Ela só começa depois da aprovação. Não gasta crédito.">
     <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-primario">Montar a campanha com estas empresas</button></form>
   {% endif %}

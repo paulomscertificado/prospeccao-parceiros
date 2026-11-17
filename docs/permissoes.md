@@ -16,7 +16,7 @@ uma mudança localizada: uma coluna `empresa_id` nos registros e mais uma condi�
 |---|---|---|
 | Papel | `papeis` + `permissoes_papel` | Conjunto de permissões, cada uma com um alcance. 5 papéis do sistema (código = perfil) + papéis criados na tela (código `p_...`, copiados de gestor/funcionário/vendedor) |
 | Permissão | `autorizacao.CATALOGO` | Ação no padrão `recurso.acao` (ex.: `leads.exportar`, `usuarios.gerenciar`) |
-| Alcance | coluna `escopo` | `tudo`, `equipe` (dono na mesma equipe; sem equipe = próprios) ou `proprios` — só nas permissões marcadas `com_escopo` |
+| Alcance | coluna `escopo` | `tudo`, `abaixo` (a pessoa e quem tem papel de nível menor, na mesma AR), `equipe` (dono na mesma equipe; sem equipe = próprios) ou `proprios` — só nas permissões marcadas `com_escopo` |
 | Exceção | `excecoes_permissao` | PERMITIR ou NEGAR para uma pessoa, com alcance, prazo (`ate`) e motivo |
 | Módulo | `configuracoes` (`mostrar_vendas`, `mostrar_agenda`, `modulo_*`) | Liga/desliga partes inteiras para todos |
 
@@ -47,11 +47,38 @@ Regras fixas de segurança:
   tem a permissão vê e atende todas as oportunidades da AR. A ficha do lead continua no alcance de `leads.ver` e o
   "Assumir lead" da ficha no de `leads.editar`.
 
+## Hierarquia (17/11/2026)
+
+Pedido da Maria: "quero que quem for acima veja as coisas de quem está abaixo". O nível vem do tipo base do papel
+(`autorizacao.NIVEIS`: administrador 4 > gestor 3 > funcionário 2 > vendedor 1 > parceiro 0; papel criado na tela = o
+nível do papel de que foi copiado; o admin master fica acima de todos). O alcance `abaixo` ("Eu e quem está abaixo")
+alcança os registros da própria pessoa e os de quem tem nível menor, na mesma AR, inclusive de quem já saiu
+(`autorizacao.ids_abaixo`). Colegas do mesmo nível não se veem; quem está abaixo não vê o de quem está acima.
+
+| Papel | Alcance padrão nas permissões com alcance |
+|---|---|
+| Administrador | `tudo` (vê tudo da AR) |
+| Gestor | `abaixo` em todas: vê e cuida do que é dele e de quem está abaixo (não do que é do administrador) |
+| Funcionário | `abaixo` nas de ver/exportar (`autorizacao.so_ver`), `proprios` nas de mexer (editar, enviar, aprovar) |
+| Vendedor | `proprios` |
+
+`autorizacao._aplicar_hierarquia` trocou uma vez só (config `permissoes_hierarquia`) os papéis Gestor e Funcionário
+do sistema que ainda estavam no padrão antigo (`tudo` e `proprios`); o que o administrador tinha mudado à mão ficou.
+Os filtros "de quem" das telas (Campanhas, Minha fila, Leads, Pipeline, Agenda, Dashboard) aparecem para quem alcança
+outras pessoas (`autorizacao.escolhe_de_quem`) e listam só elas (`autorizacao.pessoas_visiveis`).
+
+**Renovação e Empresas novas** valem para a AR toda (planilha da certificadora, busca paga na CNPJá): as telas, a
+configuração, os textos, a planilha, o "Montar", o teste, o "Buscar agora" e a situação dos certificados exigem
+`campanhas.configurar` (administrador e gestor). As campanhas dessas telas seguem a hierarquia (`campanhas.ver`) e o
+APROVAR só aparece para quem pode aprovar aquela campanha. Quem não configura vê as campanhas de renovação que alcança na
+lista de Campanhas. Teste: `testes/test_hierarquia.py`.
+
 ## Padrões (migração sem ninguém ganhar nem perder acesso)
 
 O campo `padrao` de cada permissão reproduz o acesso de antes: `A` = só administrador, `G` = administrador e gestor,
-`F` = + Funcionário MS, `E` = toda a equipe, `P` = parceiro. Administrador e gestor recebem `tudo`; funcionário e
-vendedor recebem `proprios` nas permissões com alcance. `autorizacao.preparar` (chamado por `banco.criar_tabelas`)
+`F` = + Funcionário MS, `E` = toda a equipe, `P` = parceiro. Administrador recebe `tudo`; desde a hierarquia de
+17/11/2026 o gestor recebe `abaixo`, o funcionário `abaixo` nas de ver e `proprios` nas de mexer, e o vendedor
+`proprios` nas permissões com alcance. `autorizacao.preparar` (chamado por `banco.criar_tabelas`)
 cria os papéis que faltam e, para cada permissão **nova** do catálogo (ainda fora de `permissoes_conhecidas`), dá o
 padrão do perfil base — nunca desfaz o que o administrador escolheu. O catálogo entra na versão do esquema, então a
 nuvem prepara o banco de novo quando uma permissão nova aparece.

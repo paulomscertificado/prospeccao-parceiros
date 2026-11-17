@@ -500,7 +500,7 @@ FILTROS_CAMPANHA = {"todas": "Todas", "aprovacao": "Aguardando aprovação", "at
 
 
 def _campanha(db: Session, cid: int, usuario: Usuario, permissao: str = "campanhas.ver") -> Campanha:
-    """A campanha, se a pessoa pode vê-la: cada um vê as próprias; administrador e gestor veem todas."""
+    """A campanha, se a pessoa pode vê-la: o dono e quem está acima dele (hierarquia); o administrador vê todas."""
     camp = db.get(Campanha, cid)
     if not camp or not autorizacao.pode(usuario, permissao, camp):
         raise HTTPException(404)
@@ -513,17 +513,20 @@ AREAS_DAS_CAMPANHAS = {"renovacao": ("/renovacao", "Renovação"), "empresas_nov
 @rotas.get("/campanhas")
 def lista_campanhas(request: Request, ver: str = "todas", de: str = "", usuario: Usuario = Depends(exige("campanhas.ver")),
                     db: Session = Depends(obter_db)):
-    # cada um com as suas campanhas (ou as da equipe); quem vê todas escolhe de quem
+    # cada um com as suas campanhas; quem está acima vê também as de quem está abaixo (o administrador, todas) e
+    # escolhe de quem
     consulta = autorizacao.filtrar(select(Campanha), usuario, "campanhas.ver", Campanha.usuario_id)
-    if ve_tudo(usuario, "campanhas.ver"):
+    if autorizacao.escolhe_de_quem(usuario, "campanhas.ver"):
         if de in ("", "minhas"):
             de = "minhas"  # padrão: as campanhas de quem está usando a conta
             consulta = consulta.where(Campanha.usuario_id == usuario.id)
         elif util.para_int(de):
             consulta = consulta.where(Campanha.usuario_id == util.para_int(de))
     consulta = consulta.where(Campanha.arquivada.is_(ver == "arquivadas"))
-    # as campanhas de Renovação ficam na tela Renovação (pedido da Maria em 13/11/2026: "preciso dela como renovação")
-    consulta = consulta.where(Campanha.tipo != "renovacao")
+    # as campanhas de Renovação ficam na tela Renovação (pedido da Maria em 13/11/2026: "preciso dela como renovação");
+    # quem não abre aquela tela (não configura a Renovação) vê aqui as que alcança
+    if autorizacao.pode(usuario, "campanhas.configurar"):
+        consulta = consulta.where(Campanha.tipo != "renovacao")
     if ver == "aprovacao":
         consulta = consulta.where(Campanha.status == "aguardando_aprovacao")
     elif ver == "ativas":
@@ -537,9 +540,9 @@ def lista_campanhas(request: Request, ver: str = "todas", de: str = "", usuario:
                                           .group_by(Tarefa.status)).all())
     nomes_cat = {c.codigo: c.nome for c in db.execute(select(Categoria)).scalars()}
     pessoas = {u.id: u.nome for u in db.execute(select(Usuario)).scalars()}
-    equipe_ = ([] if not ve_tudo(usuario, "campanhas.ver") else
-               sorted({c.usuario_id for c in db.execute(select(Campanha)).scalars() if c.usuario_id},
-                      key=lambda i: pessoas.get(i, "")))
+    donos = autorizacao.filtrar(select(Campanha.usuario_id).distinct(), usuario, "campanhas.ver", Campanha.usuario_id)
+    equipe_ = ([] if not autorizacao.escolhe_de_quem(usuario, "campanhas.ver") else
+               sorted({uid for (uid,) in db.execute(donos) if uid}, key=lambda i: pessoas.get(i, "")))
     return tela(request, "campanhas.html", {"campanhas": lista, "contagens": contagens, "ver": ver, "de": de,
                                             "filtros": FILTROS_CAMPANHA, "nomes_cat": nomes_cat, "pessoas": pessoas,
                                             "equipe_campanhas": equipe_})
@@ -717,6 +720,10 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(exige("c
     contagem = campanhas.mensagens_para_teste(db, [t.id for t in testaveis])
     from .. import bases_importadas
 
+    # Renovação e Empresas novas têm área própria (só para quem as configura): o menu marca a área e o "Voltar" leva
+    # para lá; para os outros, a lista de Campanhas
+    area = AREAS_DAS_CAMPANHAS.get(camp.tipo) if autorizacao.pode(usuario, "campanhas.configurar") else None
+    pode_gerenciar = autorizacao.pode(usuario, "campanhas.gerenciar", camp)
     return tela(request, "campanha.html", {
         "nome_base": bases_importadas.nome(db, camp.base or "receita"),
         "testaveis": [{"id": t.id, "nome": t.nome, **contagem[t.id]} for t in testaveis],
@@ -730,15 +737,14 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(exige("c
         "numeros_admin": _numeros_para_admin(db, usuario, db.get(Usuario, camp.usuario_id) if camp.usuario_id else None),
         "visual_resumo": visual.resumo_da_campanha(db, camp),
         "pode_whatsapp_sozinho": autorizacao.pode(usuario, "campanhas.whatsapp_sozinho"),
-        "pode_gerenciar": autorizacao.pode(usuario, "campanhas.gerenciar", camp),
+        "pode_gerenciar": pode_gerenciar,
         "dono": db.get(Usuario, camp.usuario_id) if camp.usuario_id else None,
         "c": camp, "resumo": campanhas.resumo_aprovacao(db, camp), "nomes_categorias": nomes,
-        "rodando": camp.status == "gerando", "pode_aprovar": True,
+        "rodando": camp.status == "gerando", "pode_aprovar": pode_gerenciar,
         "aprovador": db.get(Usuario, camp.aprovado_por_id) if camp.aprovado_por_id else None,
-        # Renovação e Empresas novas têm área própria: o menu marca a área e o "Voltar" leva para lá
-        "caminho": AREAS_DAS_CAMPANHAS.get(camp.tipo, (request.url.path,))[0],
-        "voltar_para": AREAS_DAS_CAMPANHAS.get(camp.tipo, ("/campanhas",))[0],
-        "nome_da_area": AREAS_DAS_CAMPANHAS.get(camp.tipo, ("", "IA SDR"))[1],
+        "caminho": area[0] if area else request.url.path,
+        "voltar_para": area[0] if area else "/campanhas",
+        "nome_da_area": area[1] if area else "IA SDR",
     })
 
 
@@ -796,7 +802,8 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
         registrar_log(db, usuario, "aprovou_campanha", "campanha", cid, f"{n} tarefas", request)
         if camp.whatsapp_sozinho:
             avisar(request, f"Campanha aprovada: {n} contatos programados. Os e-mails e os WhatsApps entram na fila e "
-                            "saem sozinhos, cada um no seu horário (WhatsApp: um a cada 3 minutos, com os limites do número).")
+                            "saem sozinhos, cada um no seu horário (WhatsApp: um de cada vez, com "
+                            f"{campanhas.texto_do_intervalo(db)} entre um e outro e os limites do número).")
         else:
             avisar(request, f"Campanha aprovada: {n} contatos programados. Os WhatsApps de cada dia aparecem aqui na "
                             "campanha para enviar com um clique (para quem já conversou com a empresa, saem sozinhos); "
@@ -953,8 +960,9 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
             if not ligar:
                 avisar(request, "WhatsApp automático desligado: quem nunca conversou com a empresa volta a esperar o seu clique.")
             elif camp.status == "ativa" and camp.aprovado_em:
-                avisar(request, "WhatsApp automático ligado: as mensagens desta campanha saem sozinhas, uma a cada "
-                                "3 minutos, no horário de envio e com os limites do número.")
+                avisar(request, "WhatsApp automático ligado: as mensagens desta campanha saem sozinhas, uma de cada "
+                                f"vez, com {campanhas.texto_do_intervalo(db)} entre uma e outra, no horário de envio e "
+                                "com os limites do número.")
             else:
                 avisar(request, "WhatsApp automático ligado: começa quando a campanha for aprovada.")
         db.commit()

@@ -71,7 +71,7 @@ def lista(request: Request, q: str = "", status: str = "", potencial: str = "", 
         consulta = consulta.where(Lead.cidade.ilike(f"%{cidade}%"))
     if vendedor == "sem" and ve_tudo(usuario, "leads.ver"):
         consulta = consulta.where(Lead.vendedor_id.is_(None))
-    elif vendedor and ve_tudo(usuario, "leads.ver"):
+    elif vendedor and autorizacao.escolhe_de_quem(usuario, "leads.ver"):
         consulta = consulta.where(Lead.vendedor_id == util.para_int(vendedor))
     if origem:
         consulta = consulta.where(Lead.origem == origem)
@@ -86,6 +86,7 @@ def lista(request: Request, q: str = "", status: str = "", potencial: str = "", 
         "filtros": {"q": q, "status": status, "potencial": potencial, "uf": uf, "cidade": cidade,
                     "vendedor": vendedor, "origem": origem, "ordem": ordem},
         "origens": origens, "vendedores": _vendedores(db), "potenciais": score.NOMES_POTENCIAL,
+        "vendedores_filtro": autorizacao.pessoas_visiveis(usuario, "leads.ver", _vendedores(db)),
         "cadencias": db.execute(select(Cadencia).where(Cadencia.ativa.is_(True))).scalars().all(),
     })
 
@@ -151,7 +152,7 @@ async def acoes_em_lote(request: Request, usuario: Usuario = Depends(exige("lead
 @rotas.get("/leads/pipeline")
 def pipeline(request: Request, vendedor: str = "", usuario: Usuario = Depends(exige("leads.ver")), db: Session = Depends(obter_db)):
     consulta = filtrar_por_usuario(select(Lead).where(Lead.anonimizado.is_(False)), usuario)
-    if ve_tudo(usuario, "leads.ver") and vendedor != "todos":
+    if autorizacao.escolhe_de_quem(usuario, "leads.ver") and vendedor != "todos":
         vendedor = vendedor or str(usuario.id)  # padrão: os leads de quem está usando a conta
         consulta = consulta.where(Lead.vendedor_id == util.para_int(vendedor))
     colunas = []
@@ -160,7 +161,8 @@ def pipeline(request: Request, vendedor: str = "", usuario: Usuario = Depends(ex
         total = db.execute(select(func.count()).select_from(q.subquery())).scalar()
         itens = db.execute(q.order_by(Lead.score.desc()).limit(60)).scalars().all()
         colunas.append({"codigo": codigo, "nome": nome, "status": lista_status, "leads": itens, "total": total})
-    return tela(request, "pipeline.html", {"colunas": colunas, "vendedores": _vendedores(db), "vendedor": vendedor})
+    return tela(request, "pipeline.html", {"colunas": colunas, "vendedor": vendedor,
+                                           "vendedores": autorizacao.pessoas_visiveis(usuario, "leads.ver", _vendedores(db))})
 
 
 @rotas.post("/api/leads/{lead_id}/status", dependencies=[Depends(verificar_csrf)])

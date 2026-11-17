@@ -12,7 +12,7 @@ from app.banco import agora, gravar_config, sessao
 from app.main import app
 from app.modelos import Campanha, Lead, Tarefa, Usuario
 from app.seguranca import resumir_senha
-from conftest import SENHA, csrf_de
+from conftest import SENHA, csrf_de, no_horario_de_envio
 
 
 def _admin(db):
@@ -143,7 +143,7 @@ def test_nunca_dois_whatsapps_automaticos_em_menos_de_20h(cliente, monkeypatch):
 
 
 def test_fila_mostra_que_a_campanha_sai_sozinha(cliente, monkeypatch):
-    monkeypatch.setattr(campanhas.mensagens, "dentro_do_horario", lambda db, momento=None: True)
+    no_horario_de_envio(monkeypatch)
     with sessao() as db:
         gravar_config(db, "enviar_whatsapp_automatico", "1")
         ligada = _campanha(db, "Parceiros automatico na fila", True)
