@@ -45,3 +45,36 @@ def test_fila_para_quando_ainda_nao_deu_o_intervalo(cliente, monkeypatch):
         monkeypatch.undo()
     with sessao() as db:
         gravar_config(db, "proximo_envio_automatico:email", "")
+
+
+def test_whatsapp_automatico_espera_8_a_12_minutos_e_segue_as_configuracoes(cliente, monkeypatch):
+    """17/11/2026: o WhatsApp restringiu o número do Paulo Lucas por "envio de spam" (66 mensagens no dia, uma a cada 3
+    a 4 minutos). O WhatsApp automático passa a esperar 8 a 12 minutos, ajustável em Configurações > Geral; o e-mail
+    continua com 3 a 4 minutos."""
+    from datetime import datetime
+
+    monkeypatch.setattr(config, "ESPACAR_ENVIOS", True)
+    chaves = ("intervalo_whatsapp_min", "intervalo_whatsapp_max")
+    with sessao() as db:
+        antes = {c: ler_config(db, c) for c in chaves}
+        try:
+            for c in chaves:
+                gravar_config(db, c, "")  # sem valor: o padrão
+            assert campanhas.intervalo_automatico(db, "whatsapp") == (480.0, 720.0)
+            assert campanhas.texto_do_intervalo(db) == "8 a 12 minutos"
+            assert campanhas.intervalo_automatico(db, "email") == campanhas.INTERVALO_AUTOMATICO_SEG
+            for _ in range(10):
+                campanhas._anotar_envio(db, "whatsapp")
+                proximo = datetime.fromisoformat(ler_config(db, "proximo_envio_automatico:whatsapp"))
+                assert 470 <= (proximo - agora()).total_seconds() <= 721
+            gravar_config(db, "intervalo_whatsapp_min", "15")
+            gravar_config(db, "intervalo_whatsapp_max", "10")  # máximo menor que o mínimo: vale o mínimo
+            assert campanhas.intervalo_automatico(db, "whatsapp") == (900.0, 900.0)
+            assert campanhas.texto_do_intervalo(db) == "15 minutos"
+            db.commit()
+            assert "com 15 minutos entre um e outro" in cliente.get("/envios?aba=regras").text
+        finally:
+            for c, v in antes.items():
+                gravar_config(db, c, v)
+            gravar_config(db, "proximo_envio_automatico:whatsapp", "")
+            db.commit()

@@ -36,6 +36,9 @@ CAMPOS_GERAIS = [
     ("prioridade_canais", "IA SDR · prioridade dos canais (ex.: whatsapp,email,linkedin)", "texto"),
     ("limite_hora_email", "IA SDR · limite de e-mails por hora", "numero"),
     ("limite_hora_whatsapp", "IA SDR · limite de WhatsApp por hora", "numero"),
+    ("intervalo_whatsapp_min", "WhatsApp · tempo mínimo entre duas mensagens automáticas (minutos; a fila sorteia um "
+     "tempo entre o mínimo e o máximo, para todos os números)", "numero"),
+    ("intervalo_whatsapp_max", "WhatsApp · tempo máximo entre duas mensagens automáticas (minutos)", "numero"),
     ("limite_frios_whatsapp", "WhatsApp · contatos frios por número por dia (quem nunca conversou com a empresa; "
      "protege o número contra bloqueio; 0 = sem teto)", "numero"),
     ("pausa_frios_sair", "WhatsApp · pedidos de SAIR no mesmo dia que pausam os contatos frios do número até amanhã "

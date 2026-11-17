@@ -175,7 +175,7 @@ preço nem comissão e não fecha parceria.
    escreve uma mensagem **diferente para cada empresa**, nos toques da cadência escolhida (padrão: dia 1, 3, 7 e 12).
 3. Você confere e clica em **APROVAR CAMPANHA** (ou edita/cancela). Nada sai antes disso.
 4. **Aprovou, entrou na fila.** Os e-mails e os WhatsApps saem sozinhos, cada um no seu horário, também para quem
-   nunca conversou com a MS (desde 12/11/2026). O WhatsApp sai pelo celular conectado, uma mensagem a cada 3 minutos,
+   nunca conversou com a MS (desde 12/11/2026). O WhatsApp sai pelo celular conectado, uma mensagem a cada 8 a 12 minutos (Configurações > Geral; desde 17/11/2026),
    só no horário de envio, com o limite por hora (sem limite por dia e sem teto de contatos frios desde 17/11/2026) e
    pausa com 3 pedidos de SAIR. Toque atrasado mais de 2 dias espera o clique, para não sair tudo de uma vez, e o toque seguinte
    da mesma empresa espera o anterior sair (o "último contato" nunca chega antes da apresentação). A fila nunca manda
@@ -215,7 +215,7 @@ numa conversa sem fim. Se o mesmo lead mandar várias mensagens, tudo fica na me
   Ao lado de **Programado** e de **Fora do horário** aparece **quando o envio sai sozinho** (ex.: "sai amanhã às
   08:41"): o horário marcado, ou quando completam 20 horas do último WhatsApp (ou e-mail) para a empresa, sempre dentro
   do horário de envio, em dia útil (a Renovação também respeita o horário e os feriados dela). A fila manda um por vez,
-  a cada 3 ou 4 minutos: quando muitos ficam livres na mesma hora, alguns saem uns minutos depois. Envio que espera o
+  com alguns minutos entre um e outro: quando muitos ficam livres na mesma hora, alguns saem depois. Envio que espera o
   seu clique não mostra horário.
   Para achar um envio, use os filtros: **Quando** (todos, hoje e atrasados, atrasados, hoje, amanhã, próximos dias),
   **Situação**, a **campanha** e a **busca pelo nome da empresa**. Cada filtro mostra quantos envios há nele;
@@ -344,8 +344,8 @@ do dia seguinte ao último já buscado, até 2 dias atrás, porque a Receita pub
 atraso; nenhum dia é buscado duas vezes e empresa que já entrou em campanha nunca entra de novo), cadastra
 como leads (origem "Empresas novas (CNPJá)") e monta a campanha **"Empresas novas dd/mm – PE"**, que fica
 **aguardando aprovação**. Depois de aprovada, **tudo sai sozinho, sem clique**: o e-mail e o WhatsApp entram na fila
-e saem cada um no seu horário, um por vez, com as pausas e os limites do número (no máximo 1 a cada 3 minutos,
-15 por hora por número, sem limite por dia desde 17/11/2026, só no horário de envio; quem pede SAIR não recebe mais). Toque atrasado mais
+e saem cada um no seu horário, um por vez, com as pausas e os limites do número (WhatsApp: 1 a cada 8 a 12 minutos,
+6 por hora por número, sem limite por dia desde 17/11/2026, só no horário de envio; quem pede SAIR não recebe mais). Toque atrasado mais
 de 2 dias não sai sozinho (espera um clique em **Minha fila**), para não sair tudo de uma vez. São 3 toques: dia 1 (boas-vindas + oferta do e-CNPJ), dia 3 (lembrete)
 e dia 7 (último contato). As mensagens podem ser editadas na própria tela. A IA não responde sozinha esses
 leads: as respostas vão para **Oportunidades** e o time conversa.
@@ -446,7 +446,7 @@ renovação novo antes, para entrarem os clientes de janeiro).
   1º aviso e os lembretes entram nas vagas que sobram. Com 100 clientes, os primeiros avisos levam uma semana.
 - **Renovação antes das Empresas novas:** as duas usam o mesmo número e o mesmo limite. No mesmo dia, a renovação sai
   primeiro (tem prazo). Nos dias cheios de renovação, as Empresas novas esperam.
-- **Os mesmos cuidados com o WhatsApp:** uma mensagem a cada 3 minutos, limites por hora e por dia, só no horário de
+- **Os mesmos cuidados com o WhatsApp:** uma mensagem a cada 8 a 12 minutos, limite por hora, só no horário de
   envio, e quem responde SAIR não recebe mais.
 - **Quando o cliente responde:** os avisos seguintes param e a resposta vai para **Oportunidades** e **Quem precisa de
   mim hoje**. A IA não responde esses clientes: quem conversa é a equipe. Se ele disser que já renovou, descarte a
@@ -489,8 +489,11 @@ renovação novo antes, para entrarem os clientes de janeiro).
 ### Intervalo entre os envios automáticos
 
 Nas campanhas automáticas (depois da aprovação), os **e-mails** e as **mensagens de WhatsApp** que saem sozinhos
-saem **um de cada vez**, com **3 a 4 minutos** entre um e outro, sorteados a cada envio (nunca todos no mesmo
-horário). E-mail e WhatsApp têm cada um o seu intervalo. Os envios feitos por clique de uma pessoa não esperam.
+saem **um de cada vez**, sorteando o tempo a cada envio (nunca todos no mesmo horário): **e-mail, 3 a 4 minutos**
+entre um e outro; **WhatsApp, 8 a 12 minutos** (desde 17/11/2026, quando o WhatsApp restringiu um número por "envio de
+spam" depois de 66 mensagens no dia; muda em **Configurações > Geral**). E-mail e WhatsApp têm cada um o seu
+intervalo. Os envios feitos por clique de uma pessoa não esperam a fila da Prospecção, mas o WhatsApp Leads também
+espera de 3 a 6 minutos entre uma mensagem e outra de cada número (Configurações do WhatsApp Leads).
 Com mais de uma marca, a vez **reveza**: o próximo envio é da marca que mandou há mais tempo, e uma marca que chegou ao
 limite dela espera sozinha, sem segurar as outras.
 

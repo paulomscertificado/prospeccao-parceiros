@@ -789,7 +789,8 @@ def whatsapp_de_hoje(db, camp: Campanha) -> list[Tarefa]:
 
 # ---------------------------------------------------------------- Fila e fim de cadência (rotina)
 
-# Envios automáticos: um de cada vez por canal, com 3 a 4 minutos entre eles, sempre num intervalo diferente.
+# Envios automáticos: um de cada vez por canal, sempre num intervalo diferente. E-mail: 3 a 4 minutos entre eles.
+# WhatsApp: o de Configurações > Geral (intervalo_whatsapp, 8 a 12 minutos desde 17/11/2026).
 # O relógio roda a cada minuto, então o próximo fica liberado entre 2,5 e 3,5 min depois: na prática sai 3 ou 4 min
 # depois do anterior (sorteado), nunca vários no mesmo minuto.
 INTERVALO_AUTOMATICO_SEG = (150, 210)
@@ -802,12 +803,30 @@ def _vez_do_canal(db, canal: str) -> bool:
     return ler_config(db, f"proximo_envio_automatico:{canal}") <= agora().isoformat(timespec="seconds")
 
 
+def intervalo_automatico(db, canal: str) -> tuple[float, float]:
+    """Segundos entre dois envios automáticos do canal (a fila sorteia entre os dois). WhatsApp: o de Configurações >
+    Geral (intervalo_whatsapp_min/max, em minutos), 8 a 12 desde 17/11/2026: o número do Paulo Lucas foi restringido
+    pelo WhatsApp ("pode caracterizar envio de spam") depois de 66 mensagens no dia, 65 para quem nunca tinha
+    respondido, uma a cada 3 a 4 minutos. Vale para a plataforma toda (um WhatsApp automático por vez)."""
+    if canal != "whatsapp":
+        return INTERVALO_AUTOMATICO_SEG
+    minimo = max(1, ler_config_int(db, "intervalo_whatsapp_min", 8))
+    maximo = max(minimo, ler_config_int(db, "intervalo_whatsapp_max", 12))
+    return minimo * 60.0, maximo * 60.0
+
+
+def texto_do_intervalo(db, canal: str = "whatsapp") -> str:
+    """"8 a 12 minutos": o intervalo da fila automática, para as telas."""
+    minimo, maximo = (round(s / 60) for s in intervalo_automatico(db, canal))
+    return f"{minimo} minutos" if minimo == maximo else f"{minimo} a {maximo} minutos"
+
+
 def _anotar_envio(db, canal: str) -> None:
     """Depois de um envio automático: sorteia quando o próximo deste canal pode sair."""
     import random
 
     if config.ESPACAR_ENVIOS:
-        proximo = agora() + timedelta(seconds=random.uniform(*INTERVALO_AUTOMATICO_SEG))
+        proximo = agora() + timedelta(seconds=random.uniform(*intervalo_automatico(db, canal)))
         gravar_config(db, f"proximo_envio_automatico:{canal}", proximo.isoformat(timespec="seconds"))
 
 

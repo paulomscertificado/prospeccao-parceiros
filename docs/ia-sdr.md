@@ -319,6 +319,14 @@ de cada envio `_anotar_envio` sorteia o próximo horário liberado (`INTERVALO_A
 `proximo_envio_automatico:<canal>`). Com a rodada a cada minuto, cada envio sai 3 ou 4 minutos depois do anterior.
 E-mail recusado pelo destinatário também conta (o servidor foi chamado). Testes desligam com `ESPACAR_ENVIOS=0`
 (conftest); a regra tem teste próprio em `testes/test_intervalo_envios.py`.
+**WhatsApp mais devagar (17/11/2026):** o WhatsApp restringiu o número do Paulo Lucas (u3) por "envio de spam" depois
+de 66 mensagens no dia, 65 para quem nunca tinha respondido (50 das campanhas do Paulo Marinho, que usa o número
+compartilhado), uma a cada 3-4 min e uma rajada de 11 cliques em 15 min às 07:30. A pedido da Maria: o WhatsApp
+automático usa `campanhas.intervalo_automatico(db, "whatsapp")` = Configurações > Geral `intervalo_whatsapp_min`/`max`
+(minutos, padrão 8 a 12; o e-mail continua com `INTERVALO_AUTOMATICO_SEG`); `limite_hora_whatsapp` = 6 na nuvem (era
+15); no WhatsApp Leads `intervalo_min_seg`/`max_seg` = 180/360 (era 30/90), que espaça também os envios por clique.
+Sem teto diário de frios (a Maria escolheu só o intervalo). As telas mostram o intervalo da fila
+(`texto_do_intervalo`) ou "alguns minutos", nunca mais "um a cada 3 minutos".
 Chave da CNPJá: Configurações > Integrações (`/configuracoes/cnpja`, `/configuracoes/cnpja/saldo`); saiu da tela
 Empresas novas, que virou um painel em 4 passos (estados por caixinha, `name="ufs"` repetido).
 
@@ -681,7 +689,7 @@ cliente rápido". Antes cada pessoa via só as respostas dos leads dela e tinha 
   os 10 minutos de margem do WhatsApp). A linha mostra "sai hoje às 15:00 / amanhã às 08:41 / 18/11 às 10:00"
   (`quando_sai`) ao lado do selo; a explicação ganha o motivo quando o horário muda ("sai quando completar 20 h do
   último WhatsApp..."). Toque que pode sair agora mas está fora da janela da Renovação passa de "Sai sozinho" para
-  "Fora do horário". A previsão não simula a fila (um a cada 3-4 min na plataforma): com muitos livres na mesma hora,
+  "Fora do horário". A previsão não simula a fila (um WhatsApp a cada 8-12 min e um e-mail a cada 3-4 min na plataforma): com muitos livres na mesma hora,
   alguns saem minutos depois. Teste: `testes/test_previsao_de_saida.py`.
 - Campanhas de parceiros (12/11/2026, pedido da Maria: "a partir do momento de aprovadas, entrem na fila de
   envios"): **toda campanha nova da IA SDR já vem com o WhatsApp automático ligado** (`rotas/sdr.py`, config

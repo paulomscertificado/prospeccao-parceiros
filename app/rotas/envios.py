@@ -205,6 +205,7 @@ def tela_envios(request: Request, canal: str = "", status: str = "", campanha: s
         "limite_frios_whatsapp")}
     regras["horas_whatsapp"] = campanhas.horas_minimas_automatico(db, "whatsapp")  # a fila automática: nunca < 20 h
     regras["horas_email"] = campanhas.horas_minimas_automatico(db, "email")
+    regras["intervalo_whatsapp"] = campanhas.texto_do_intervalo(db, "whatsapp")
     camp_q = select(Campanha).where(Campanha.arquivada.is_(False)).order_by(Campanha.criado_em.desc()).limit(100)
     camp_q = autorizacao.filtrar(camp_q, usuario, "envios.ver", Campanha.usuario_id)
     pessoas = {u.id: u.nome for u in db.execute(select(Usuario)).scalars()}

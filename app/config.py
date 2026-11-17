@@ -311,6 +311,8 @@ CONFIG_PADRAO = {
     "prioridade_canais": "whatsapp,email,linkedin",
     "limite_hora_email": "20",
     "limite_hora_whatsapp": "15",
+    "intervalo_whatsapp_min": "8",   # minutos entre dois WhatsApps automáticos (a fila sorteia entre o mínimo e o máximo)
+    "intervalo_whatsapp_max": "12",
     "limite_frios_whatsapp": "20",         # contatos frios (quem nunca conversou) por número por dia
     "pausa_frios_sair": "3",               # pedidos de SAIR no dia que pausam os frios do número até amanhã
     "limite_banco_mb": "500",              # tamanho do banco contratado (aviso por e-mail em 80%)

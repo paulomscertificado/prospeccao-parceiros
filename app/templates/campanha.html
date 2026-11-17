@@ -39,7 +39,7 @@
 {% if pode_whatsapp_sozinho and c.tipo not in ('empresas_novas', 'renovacao') and c.status in ('aguardando_aprovacao', 'ativa', 'pausada') %}
 <form class="cartao" id="whatsapp-sozinho" method="post" action="/campanhas/{{ c.id }}/whatsapp-sozinho"
       style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap"
-      {% if not c.whatsapp_sozinho %}data-confirmar="Ligar o WhatsApp automático? Depois da aprovação, as mensagens de WhatsApp desta campanha saem sozinhas, também para quem nunca conversou {{ marca.frase('com') }} (uma a cada 3 minutos, com os limites do número)."{% endif %}>
+      {% if not c.whatsapp_sozinho %}data-confirmar="Ligar o WhatsApp automático? Depois da aprovação, as mensagens de WhatsApp desta campanha saem sozinhas, também para quem nunca conversou {{ marca.frase('com') }} (uma de cada vez, com alguns minutos entre elas e os limites do número)."{% endif %}>
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <input type="hidden" name="ligar" value="{{ '0' if c.whatsapp_sozinho else '1' }}">
   <div style="flex:1;min-width:260px"><b>WhatsApp sai sozinho depois da aprovação</b> <span class="selo">só admin</span>
@@ -47,8 +47,8 @@
     <p class="pequeno suave" style="margin:4px 0 0">{% if c.whatsapp_sozinho %}As mensagens de WhatsApp desta campanha saem sem o seu clique,
       também para quem nunca conversou {{ marca.frase('com') }}, como nas Empresas novas.{% else %}Desligado, quem nunca conversou {{ marca.frase('com') }}
       espera o seu clique. Ligado, o WhatsApp sai sozinho, como nas Empresas novas.{% endif %}
-      Travas: uma mensagem a cada 3 minutos, só no horário de envio, limites por hora e por dia, até 20 contatos frios
-      por número por dia e pausa com 3 pedidos de SAIR. Toque atrasado mais de 2 dias espera o clique.</p></div>
+      Travas: uma mensagem de cada vez, com alguns minutos entre elas (Configurações &gt; Geral), só no horário de envio,
+      limite por hora de cada número e pausa com 3 pedidos de SAIR. Toque atrasado mais de 2 dias espera o clique.</p></div>
   <button class="btn {{ '' if c.whatsapp_sozinho else 'btn-verde' }}">{{ 'Desligar' if c.whatsapp_sozinho else 'Ligar' }}</button>
 </form>
 {% endif %}
@@ -259,7 +259,7 @@
   <h2>Andamento por empresa <a class="btn btn-pequeno" href="/envios?campanha={{ c.id }}&periodo=90d">Ver todos os envios</a></h2>
   <p class="pequeno suave">Cada bolinha é um toque: <span class="selo selo-ok">enviado</span> <span class="selo selo-azul">na fila / programado</span>
     <span class="selo selo-erro">não saiu</span> <span class="selo">rascunho / cancelado</span>. Cada toque mostra o dia e o horário agendado; os automáticos podem
-    sair alguns minutos depois (um de cada vez, com 3 a 4 minutos entre eles). Passe o mouse para ver quando saiu.</p>
+    sair alguns minutos depois (um de cada vez, com alguns minutos entre eles). Passe o mouse para ver quando saiu.</p>
   <div class="tabela-rolagem"><table>
     <tr><th>Empresa</th><th>Toques</th><th>Resposta</th></tr>
     {% for l in andamento %}

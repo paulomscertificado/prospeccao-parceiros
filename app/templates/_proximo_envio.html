@@ -99,7 +99,7 @@
     </dialog>{% endfor %}
     {% if canais_t|length > 1 %}<div class="pequeno suave">marcado: {{ CANAIS.get(t.canal) }}</div>{% endif %}</div>
   <div class="situacao-fila"><span class="selo {{ p.classe }}">{{ p.rotulo }}</span>{% if p.previsto %}
-    <b class="previsto-envio" title="Horário previsto de saída. A fila manda um por vez, a cada 3 ou 4 minutos: com muitos na mesma hora, alguns saem uns minutos depois.">sai {{ p.previsto }}</b>{% endif %}
+    <b class="previsto-envio" title="Horário previsto de saída. A fila manda um por vez, com alguns minutos entre um e outro: com muitos na mesma hora, alguns saem depois.">sai {{ p.previsto }}</b>{% endif %}
     <div class="motivo pequeno">{{ p.motivo }}</div>
     <div class="grupo-btn" style="margin-top:6px">{% for c in canais_t %}
       {% set sem_contato = t.lead and ((c == 'whatsapp' and not (t.lead.whatsapp or '').strip()) or (c == 'email' and not t.lead.email)) %}
