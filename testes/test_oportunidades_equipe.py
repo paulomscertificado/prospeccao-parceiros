@@ -1,16 +1,16 @@
 """Oportunidades da equipe toda (pedido da Maria em 16/11/2026): ninguém "assume" a resposta. Todos veem as respostas
-da AR, quem atendeu o cliente clica em "Marcar como atendido" (sem virar dono do lead) e o descarte com o motivo
-"Já renovou" marca o certificado da Renovação como Renovado."""
+da AR, quem atendeu o cliente clica em "Marcar como atendido" (sem virar dono do lead), o aviso de resposta nova vai
+para a equipe toda da AR e o descarte com o motivo "Já renovou" marca o certificado da Renovação como Renovado."""
 
 from datetime import date, timedelta
 
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from app import renovacao
+from app import renovacao, sdr
 from app.banco import agora, sessao
 from app.main import app
-from app.modelos import Campanha, Certificado, Lead, Oportunidade, Tarefa, Usuario
+from app.modelos import Campanha, Certificado, Lead, Notificacao, Oportunidade, Tarefa, Tenant, Usuario
 from app.seguranca import resumir_senha
 from conftest import csrf_de
 
@@ -29,6 +29,15 @@ def _bia(db) -> Usuario:
         db.add(bia)
         db.flush()
     return bia
+
+
+def _usuario(db, email, nome, perfil, **extra) -> Usuario:
+    u = db.execute(select(Usuario).where(Usuario.email == email)).scalars().first()
+    if not u:
+        u = Usuario(nome=nome, email=email, perfil=perfil, senha_hash=resumir_senha(SENHA), **extra)
+        db.add(u)
+        db.flush()
+    return u
 
 
 def _entrar(email) -> TestClient:
@@ -151,3 +160,43 @@ def test_descartar_com_ja_renovou_marca_o_certificado_como_renovado(cliente):
         assert "voltou para Novas" in r.text and "continua assim" in r.text
     finally:
         _limpar("RENOVOU ")
+
+
+def test_resposta_nova_avisa_a_equipe_toda_da_ar(cliente, monkeypatch):
+    from app.integracoes import email_smtp
+
+    emails = []
+    monkeypatch.setattr(email_smtp, "configurado", lambda: True)
+    monkeypatch.setattr(email_smtp, "enviar", lambda para, *args, **kwargs: emails.append(para))
+    with sessao() as db:
+        ids_ar = {s: i for i, s in db.execute(select(Tenant.id, Tenant.slug))}
+        bia = _bia(db)
+        dono = _usuario(db, "dono.aviso@teste.com.br", "Dono Aviso", "vendedor")
+        chefe_ms = _usuario(db, "chefe.aviso@teste.com.br", "Chefe MS Aviso", "admin")
+        certy = _usuario(db, "certy.aviso@grupocerty.com.br", "Certy Aviso", "admin", empresa_nome="Grupo Certy")
+        portal = _usuario(db, "portal.aviso@teste.com.br", "Parceiro Aviso", "parceiro")
+        master = db.execute(select(Usuario).where(Usuario.master.is_(True))).scalars().first()
+        assert certy.tenant_id == ids_ar["grupo-certy"] and bia.tenant_id == dono.tenant_id == ids_ar["ms"]
+        lead = Lead(empresa="Aviso Equipe Ltda", vendedor_id=dono.id, whatsapp="81347720021")
+        db.add(lead)
+        db.flush()
+        analise = sdr.processar_resposta(db, lead, "Tenho interesse, pode me ligar amanhã?", "whatsapp")
+        link = f"/oportunidades#op-{analise['oportunidade_id']}"
+        avisados = set(db.execute(select(Notificacao.usuario_id).where(Notificacao.link == link)).scalars())
+        # a equipe toda da AR recebe no sininho (antes só o dono do lead)
+        assert {dono.id, bia.id, chefe_ms.id, master.id} <= avisados
+        assert certy.id not in avisados and portal.id not in avisados  # outra AR e parceiro (portal), não
+        assert emails == [dono.email]  # o e-mail continua só para quem cuida do lead
+        # alguém da equipe atendeu: o aviso sai do sininho de todos
+        sdr.marcar_atendida(db, lead, bia)
+        db.flush()
+        assert not db.execute(select(Notificacao).where(Notificacao.link == link, Notificacao.lida.is_(False))).first()
+        # lead sem dono de outra AR: avisa só os administradores de lá (antes iam os de todas as ARs)
+        sem_dono = Lead(empresa="Aviso Certy Sem Dono Ltda", tenant_id=ids_ar["grupo-certy"])
+        db.add(sem_dono)
+        db.flush()
+        chefes = {u.id for u in sdr.destinatarios(db, sem_dono)}
+        assert certy.id in chefes and chefe_ms.id not in chefes and master.id not in chefes
+        # e um lead sem dono da MS avisa os administradores da MS (com o Admin Master)
+        assert {chefe_ms.id, master.id} <= {u.id for u in sdr.destinatarios(db, Lead(empresa="x", tenant_id=ids_ar["ms"]))}
+        db.rollback()

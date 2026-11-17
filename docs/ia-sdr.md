@@ -491,6 +491,15 @@ cliente rápido". Antes cada pessoa via só as respostas dos leads dela e tinha 
   registro de atividades (`situacao_certificado`) e histórico do lead. Com mais de um certificado ativo, só avisa para
   marcar na tela Renovação. "Descartar as N mostradas" não mexe em certificado; "Voltar para Novas" não desfaz o
   Renovado (avisa que ele continua).
+- **Aviso de resposta nova para a equipe toda** ("Sim, avisar todos", 16/11/2026): `criar_oportunidade` chama
+  `sdr.notificar(..., equipe_toda=True)`: sininho para quem cuida do lead (`destinatarios`) e para
+  `sdr.equipe_do_lead` (pessoas ativas da AR do lead com `oportunidades.ver`; o Admin Master, da plataforma, conta na
+  AR MS, onde ficam os leads dele; parceiros e outras ARs ficam de fora). O e-mail (`notificar_por_email`) continua só
+  para quem cuida do lead. Atendeu ou descartou: `sdr.avisos_resolvidos` marca como lido o aviso
+  (`/oportunidades#op-<id>`) de todos. Mensagens seguintes de lead já atendido (`_mensagem_para_o_humano`) seguem só
+  para quem cuida dele.
+- `destinatarios` sem dono agora escolhe os administradores e gestores **da AR do lead** (`_da_mesma_ar`); antes iam
+  os de todas as ARs e o nome da empresa aparecia no aviso de outra AR.
 - Testes: `testes/test_oportunidades_equipe.py`.
 
 ## Visual das campanhas: e-mail em HTML e imagem no WhatsApp (nov/2026)

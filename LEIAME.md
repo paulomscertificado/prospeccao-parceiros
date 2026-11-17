@@ -203,7 +203,9 @@ Os números do topo também são atalhos: clique em **Atrasados** para ver só o
 ver os de hoje e os atrasados. Admin e gestor podem ver a fila de outra pessoa ou da equipe toda.
 
 **Oportunidades (menu 🔥):** os leads que responderam. **A equipe toda vê todas as respostas**: ninguém precisa
-"assumir" o lead, quem estiver livre atende o cliente na hora. São 4 abas:
+"assumir" o lead, quem estiver livre atende o cliente na hora. Quando chega uma resposta nova, **todos da equipe
+recebem o aviso no sininho** (o aviso por e-mail continua indo só para o responsável pelo lead). Quando alguém atende
+ou descarta, o aviso some do sininho de todos. São 4 abas:
 - **Novas:** esperam alguém da equipe responder. Ficam separadas por dia (Hoje, Ontem, o dia da semana) e, em cada
   dia, as **quentes vêm primeiro**. Cada cartão mostra há quanto tempo o lead está **esperando** e até quando
   responder: o **prazo é de 2 horas úteis** (horário de envio, de segunda a sexta; uma resposta das 17h30 tem prazo até

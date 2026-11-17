@@ -276,11 +276,15 @@ def _destino_seguro(destino: str) -> str:
 
 
 def _descartar(db: Session, op: Oportunidade, usuario: Usuario, motivo: str) -> None:
-    """Descarta a oportunidade (e os cartões repetidos do mesmo lead que ainda estão em Novas), com o motivo."""
+    """Descarta a oportunidade (e os cartões repetidos do mesmo lead que ainda estão em Novas), com o motivo. O aviso
+    dela sai do sininho da equipe toda."""
+    ids = [op.id]
     for o in db.execute(select(Oportunidade).where(Oportunidade.lead_id == op.lead_id,
                                                    Oportunidade.status == "nova")).scalars():
         o.status, o.responsavel_id, o.assumida_em, o.motivo = "descartada", usuario.id, agora(), motivo
+        ids.append(o.id)
     op.status, op.responsavel_id, op.assumida_em, op.motivo = "descartada", usuario.id, agora(), motivo
+    sdr.avisos_resolvidos(db, ids)
     historico(db, op.lead_id, "sistema", f"Oportunidade descartada por {usuario.nome} ({motivo}).", usuario)
 
 

@@ -622,7 +622,7 @@ def criar_oportunidade(db, lead: Lead, analise: dict, texto: str, canal: str, en
         if temperatura == "quente" and aberta.temperatura != "quente":
             aberta.temperatura = "quente"
             notificar(db, lead, f"🔥 NOVO LEAD QUENTE: {lead.empresa} ({analise['classe'].lower()})",
-                      f"/oportunidades#op-{aberta.id}")
+                      f"/oportunidades#op-{aberta.id}", equipe_toda=True)
         return aberta
     oportunidade = Oportunidade(
         lead_id=lead.id, temperatura=temperatura, classificacao=analise["classe"], canal=canal,
@@ -633,29 +633,74 @@ def criar_oportunidade(db, lead: Lead, analise: dict, texto: str, canal: str, en
     db.add(oportunidade)
     db.flush()
     emoji = "🔥 NOVO LEAD QUENTE" if temperatura == "quente" else "Nova resposta para analisar"
-    notificar(db, lead, f"{emoji}: {lead.empresa} ({analise['classe'].lower()})", f"/oportunidades#op-{oportunidade.id}")
+    notificar(db, lead, f"{emoji}: {lead.empresa} ({analise['classe'].lower()})", f"/oportunidades#op-{oportunidade.id}",
+              equipe_toda=True)
     return oportunidade
 
 
+def _da_mesma_ar(db, pessoas: list[Usuario], lead: Lead) -> list[Usuario]:
+    """Só as pessoas da AR do lead (white label: o aviso traz o nome da empresa). O Admin Master, que é da plataforma
+    (sem AR), conta na AR MS, onde ficam os leads dele (ars.PADRAO); lead sem AR também conta como da MS."""
+    from . import ars
+    from .modelos import Tenant
+
+    ar_ms = db.execute(select(Tenant.id).where(Tenant.slug == ars.PADRAO["do_master"])).scalar()
+    ar_do_lead = lead.tenant_id if lead.tenant_id is not None else ar_ms
+    if ar_do_lead is None:  # instalação sem ARs
+        return list(pessoas)
+    return [u for u in pessoas if (u.tenant_id if u.tenant_id is not None or not u.master else ar_ms) == ar_do_lead]
+
+
 def destinatarios(db, lead: Lead) -> list[Usuario]:
+    """Quem cuida do lead: quem assumiu, senão o vendedor dele, senão os administradores e gestores da AR do lead
+    (antes iam os de todas as ARs, e o nome da empresa aparecia no aviso de outra AR)."""
     for uid in (lead.humano_id, lead.vendedor_id):  # quem assumiu o lead; senão o vendedor dele
         dono = db.get(Usuario, uid) if uid else None
         if dono and dono.ativo:
             return [dono]
-    return list(db.execute(select(Usuario).where(Usuario.perfil.in_(["admin", "gestor"]), Usuario.ativo.is_(True))).scalars())
+    chefes = db.execute(select(Usuario).where(Usuario.perfil.in_(["admin", "gestor"]), Usuario.ativo.is_(True))
+                        .order_by(Usuario.id)).scalars().all()
+    return _da_mesma_ar(db, chefes, lead)
 
 
-def notificar(db, lead: Lead, texto: str, link: str) -> None:
+def equipe_do_lead(db, lead: Lead) -> list[Usuario]:
+    """A equipe toda da AR do lead que vê as Oportunidades: recebe o aviso de resposta nova (pedido da Maria em
+    16/11/2026, "avisar todos": quem estiver livre atende rápido). Parceiros (portal) e as outras ARs ficam de fora."""
+    from . import autorizacao
+
+    pessoas = db.execute(select(Usuario).where(Usuario.ativo.is_(True)).order_by(Usuario.id)).scalars().all()
+    return [u for u in _da_mesma_ar(db, pessoas, lead) if autorizacao.pode(u, "oportunidades.ver")]
+
+
+def notificar(db, lead: Lead, texto: str, link: str, equipe_toda: bool = False) -> None:
+    """Aviso no sininho para quem cuida do lead (destinatarios) e, com equipe_toda, para a equipe toda da AR (resposta
+    nova nas Oportunidades). O e-mail (configuração notificar_por_email) continua indo só para quem cuida do lead, para
+    não encher a caixa de todos."""
     from .integracoes import email_smtp
 
-    for usuario in destinatarios(db, lead):
+    responsaveis = destinatarios(db, lead)
+    pessoas = {u.id: u for u in responsaveis}
+    if equipe_toda:
+        for u in equipe_do_lead(db, lead):
+            pessoas.setdefault(u.id, u)
+    for usuario in pessoas.values():
         db.add(Notificacao(usuario_id=usuario.id, texto=texto[:300], link=link))
-        if ler_config(db, "notificar_por_email") == "1" and email_smtp.configurado():
+    if ler_config(db, "notificar_por_email") == "1" and email_smtp.configurado():
+        for usuario in responsaveis:
             try:
                 email_smtp.enviar(usuario.email, texto[:150], f"{texto}\n\nAbra no sistema: {config.URL_PUBLICA}{link}",
                                   com_rodape=False)
             except email_smtp.ErroEmail as erro:
                 log.warning("Aviso por e-mail falhou: %s", erro)
+
+
+def avisos_resolvidos(db, ids_oportunidades) -> None:
+    """Alguém atendeu ou descartou a resposta: o aviso dela sai do sininho de todos (a equipe toda foi avisada; resolvida
+    por uma pessoa, ninguém mais precisa correr para ela)."""
+    links = [f"/oportunidades#op-{i}" for i in ids_oportunidades if i]
+    if links:
+        db.execute(update(Notificacao).where(Notificacao.link.in_(links), Notificacao.lida.is_(False))
+                   .values(lida=True).execution_options(sem_filtro_de_ar=True, synchronize_session=False))
 
 
 # ---------------------------------------------------------------- Handoff humano
@@ -671,12 +716,13 @@ def _equipe_cuida(db, lead: Lead, usuario: Usuario, motivo: str, resultado: str)
         t.status, t.concluida_em, t.resultado = "cancelada", agora(), resultado
     if lead.etapa < 4 and not lead.perdido:
         mudar_status(db, lead, "Humano assumiu", usuario)
-    oportunidades = 0
+    resolvidas = []
     for op in db.execute(select(Oportunidade).where(Oportunidade.lead_id == lead.id,
                                                     Oportunidade.status == "nova")).scalars():
         op.status, op.responsavel_id, op.assumida_em = "assumida", usuario.id, agora()
-        oportunidades += 1
-    return canceladas, oportunidades
+        resolvidas.append(op.id)
+    avisos_resolvidos(db, resolvidas)
+    return canceladas, len(resolvidas)
 
 
 def assumir_lead(db, lead: Lead, usuario: Usuario) -> None:
