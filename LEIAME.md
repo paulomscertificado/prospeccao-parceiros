@@ -179,7 +179,8 @@ preço nem comissão e não fecha parceria.
    só no horário de envio, com o limite por hora (sem limite por dia e sem teto de contatos frios desde 17/11/2026) e
    pausa com 3 pedidos de SAIR. Toque atrasado mais de 2 dias espera o clique, para não sair tudo de uma vez, e o toque seguinte
    da mesma empresa espera o anterior sair (o "último contato" nunca chega antes da apresentação). A fila nunca manda
-   dois WhatsApps para a mesma empresa em menos de 20 horas, mesmo com o intervalo mínimo em 0 nas Configurações.
+   dois WhatsApps, nem dois e-mails, para a mesma empresa em menos de 20 horas, mesmo com o intervalo mínimo em 0 nas
+   Configurações (o e-mail desde 17/11/2026): o segundo fica para o dia seguinte. O envio manual segue as Configurações.
    LinkedIn: sempre com um clique.
    **Desligar numa campanha (só o administrador):** na tela da campanha, o cartão **WhatsApp sai sozinho depois da
    aprovação** tem o botão **Desligar**. Desligado, o WhatsApp só sai sozinho para quem já conversou com a MS

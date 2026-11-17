@@ -861,16 +861,19 @@ def processar_fila(db, maximo: int = 25) -> dict:
                        _ja_na_hora(date.today(), hora), Campanha.status == "ativa",
                        Campanha.aprovado_em.is_not(None),  # só campanhas aprovadas na IA SDR
                        # Empresas novas: o WhatsApp tem prioridade, o e-mail do toque só sai depois dele
-                       ~and_(Campanha.tipo.in_(TIPOS_WHATSAPP_PRIMEIRO), _whatsapp_da_empresa_pendente(date.today())))
+                       ~and_(Campanha.tipo.in_(TIPOS_WHATSAPP_PRIMEIRO), _whatsapp_da_empresa_pendente(date.today())),
+                       # nunca dois e-mails automáticos para a mesma empresa em menos de 20 h (17/11/2026)
+                       ~_recebeu_ha_pouco(db, "email", Tarefa.lead_id))
                 .order_by(Tarefa.data, Tarefa.hora, Tarefa.id).limit(max(maximo * 3, 400)))
     if renovacao.fora_do_horario(db):  # Renovação: só de segunda a sexta, das 10:00 às 18:00 (pedido da Maria)
         consulta = consulta.where(Campanha.tipo != renovacao.TIPO_CAMPANHA)
     campanhas_no_limite: set[int] = set()
     ars_paradas: set = set()  # AR que chegou ao limite dela nesta rodada: só ela espera (fila justa)
+    receberam: set[int] = set()  # empresas que já ganharam e-mail nesta rodada (sem a pausa de 3-4 min: testes)
     for t in _em_lotes(db, _revezar(db, "email", db.execute(consulta).all())):
         if feito["enviados"] >= maximo:
             break
-        if t.tenant_id in ars_paradas:
+        if t.tenant_id in ars_paradas or t.lead_id in receberam:
             continue
         usar_config_da_ar(db, t.tenant_id)  # daqui em diante, as configurações da AR desta tarefa
         if ler_config(db, "enviar_email_automatico") != "1" or not mensagens.dentro_do_horario(db):
@@ -917,6 +920,7 @@ def processar_fila(db, maximo: int = 25) -> dict:
             _avisar_caixa_com_erro(db, t, conta, erro)
             continue  # problema nesta caixa de envio: não insiste nela agora
         feito["enviados"] += 1
+        receberam.add(t.lead_id)
         _anotar_vez(db, "email", t.tenant_id)
         if config.ESPACAR_ENVIOS:
             _anotar_envio(db, "email")
@@ -1282,29 +1286,49 @@ TIPOS_WHATSAPP_PRIMEIRO = ("empresas_novas", "renovacao")
 NOMES_DOS_TIPOS = {"empresas_novas": "campanha de Empresas novas aprovada",
                    "renovacao": "campanha de Renovação aprovada"}
 DIAS_ATRASO_AUTOMATICO = 2  # toque com mais atraso que isto não sai sozinho (espera o clique): evita rajada
-# A fila automática nunca manda dois WhatsApps para a mesma empresa em menos que isto, mesmo com o intervalo mínimo
-# desligado (0) em Configurações: em 12/11/2026 a Britânica recebeu o 1º e o 2º toque com 10 minutos de diferença
-# (1º toque atrasado + 2º do dia, com horas_entre_contatos_whatsapp = 0 na nuvem).
+# A fila automática nunca manda duas mensagens do mesmo canal para a mesma empresa em menos que isto, mesmo com o
+# intervalo mínimo desligado (0) em Configurações. WhatsApp: em 12/11/2026 a Britânica recebeu o 1º e o 2º toque com
+# 10 minutos de diferença (1º toque atrasado + 2º do dia, com horas_entre_contatos_whatsapp = 0 na nuvem). E-mail
+# (pedido da Maria em 17/11/2026): 8 empresas de Empresas novas receberam 2 e-mails no mesmo dia em 16-17/11 (dois
+# toques marcados para o mesmo dia, ou dois atrasados soltos juntos, com 3 minutos de diferença), com
+# horas_entre_contatos_email = 0 na nuvem. Cada canal tem o seu controle: um e-mail não segura o WhatsApp.
 HORAS_MINIMAS_FILA_AUTOMATICA = 20
 
 
-def horas_minimas_automatico(db) -> int:
-    """Intervalo entre dois WhatsApps automáticos para a mesma empresa: o de Configurações, nunca menos de 20 h."""
-    return max(mensagens.horas_entre_contatos(db, "whatsapp"), HORAS_MINIMAS_FILA_AUTOMATICA)
+def horas_minimas_automatico(db, canal: str = "whatsapp") -> int:
+    """Intervalo entre duas mensagens automáticas do canal para a mesma empresa: o de Configurações, nunca menos de
+    20 h."""
+    return max(mensagens.horas_entre_contatos(db, canal), HORAS_MINIMAS_FILA_AUTOMATICA)
 
 
-def leads_com_whatsapp_recente(db, ids) -> set[int]:
-    """Dos leads informados, os que receberam WhatsApp há menos de horas_minimas_automatico (o toque automático
-    deles espera). Mesma conta de mensagens.ultimo_envio: a resposta automática da IA não conta."""
+def _recebeu_ha_pouco(db, canal: str, lead_id):
+    """Condição do banco (filas automáticas): a empresa recebeu mensagem deste canal há menos de
+    horas_minimas_automatico. Mesma conta de mensagens.ultimo_envio: a resposta automática da IA não conta."""
+    from .modelos import Mensagem
+
+    return (select(Mensagem.id).where(
+        Mensagem.lead_id == lead_id, Mensagem.canal == canal, Mensagem.direcao == "saida",
+        Mensagem.angulo != "resposta", Mensagem.status.in_(mensagens.ENVIADAS),
+        Mensagem.criado_em > agora() - timedelta(hours=horas_minimas_automatico(db, canal))).exists())
+
+
+def leads_com_contato_recente(db, ids, canal: str = "whatsapp") -> set[int]:
+    """Dos leads informados, os que receberam mensagem deste canal há menos de horas_minimas_automatico (o toque
+    automático deles espera: a regra de _recebeu_ha_pouco), para as telas Minha fila e Envios."""
     from .modelos import Mensagem
 
     ids = [i for i in set(ids or []) if i]
     if not ids:
         return set()
-    desde = agora() - timedelta(hours=horas_minimas_automatico(db))
+    desde = agora() - timedelta(hours=horas_minimas_automatico(db, canal))
     return set(db.execute(select(Mensagem.lead_id).where(
-        Mensagem.lead_id.in_(ids), Mensagem.canal == "whatsapp", Mensagem.direcao == "saida",
+        Mensagem.lead_id.in_(ids), Mensagem.canal == canal, Mensagem.direcao == "saida",
         Mensagem.angulo != "resposta", Mensagem.status.in_(mensagens.ENVIADAS), Mensagem.criado_em > desde)).scalars())
+
+
+def leads_com_whatsapp_recente(db, ids) -> set[int]:
+    """Dos leads informados, os que receberam WhatsApp há menos de 20 h (o toque automático deles espera)."""
+    return leads_com_contato_recente(db, ids, "whatsapp")
 
 
 def campanhas_que_saem_sozinhas(db) -> dict[int, str]:
@@ -1473,10 +1497,7 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
                                            Mensagem.status == "recebida", Mensagem.modo != "robo").exists())
     da_campanha_automatica = and_(or_(Campanha.tipo.in_(TIPOS_QUE_SAEM_SOZINHOS), Campanha.whatsapp_sozinho.is_(True)),
                                   Tarefa.data >= hoje - timedelta(days=DIAS_ATRASO_AUTOMATICO))
-    recebeu_ha_pouco = (select(Mensagem.id).where(
-        Mensagem.lead_id == Lead.id, Mensagem.canal == "whatsapp", Mensagem.direcao == "saida",
-        Mensagem.angulo != "resposta", Mensagem.status.in_(mensagens.ENVIADAS),
-        Mensagem.criado_em > agora() - timedelta(hours=horas_minimas_automatico(db))).exists())
+    recebeu_ha_pouco = _recebeu_ha_pouco(db, "whatsapp", Lead.id)
     consulta = (select(Tarefa.id, Tarefa.tenant_id).join(Campanha, Tarefa.campanha_id == Campanha.id)
                 .join(Lead, Tarefa.lead_id == Lead.id)
                 .where(Tarefa.status == "pendente", Tarefa.tipo == "prospeccao", Tarefa.canal == "whatsapp",

@@ -634,6 +634,14 @@ cliente rápido". Antes cada pessoa via só as respostas dos leads dela e tinha 
   `horas_entre_contatos_whatsapp` = 0 na nuvem, a Britânica (Campanha 3) recebeu o 1º toque (atrasado) e o 2º com
   10 minutos. Telas: `leads_com_whatsapp_recente` (parâmetro `recentes` de `fila._situacao`): "Sai sozinho depois:
   a empresa recebeu WhatsApp há menos de 20 h". Envio por clique segue a configuração.
+- **E-mail também (17/11/2026, pedido da Maria):** `processar_fila` só pega empresa que não recebeu e-mail há
+  `horas_minimas_automatico(db, "email")` (`_recebeu_ha_pouco(db, "email", Tarefa.lead_id)`, a mesma conta do
+  WhatsApp, com o helper usado pelas duas filas) e nunca dá dois e-mails à mesma empresa na mesma rodada. Caso real:
+  com `horas_entre_contatos_email` = 0 na nuvem, 8 empresas de Empresas novas receberam 2 e-mails no mesmo dia em
+  16-17/11 (dois toques marcados para o mesmo dia, ou dois atrasados soltos juntos com 3 minutos de diferença). Telas:
+  `leads_com_contato_recente(db, ids, "email")` (parâmetro `recentes_email` de `fila._situacao`): "Sai sozinho
+  depois: a empresa recebeu e-mail há menos de 20 h". A tela Envios mostra o intervalo da fila automática
+  (`horas_minimas_automatico`), não o de Configurações. Envio manual segue a configuração.
 - Campanhas de parceiros (12/11/2026, pedido da Maria: "a partir do momento de aprovadas, entrem na fila de
   envios"): **toda campanha nova da IA SDR já vem com o WhatsApp automático ligado** (`rotas/sdr.py`, config
   `whatsapp_sozinho_padrao` = "1" em Configurações > Geral; "0" volta ao clique nas próximas) e as campanhas em aberto
