@@ -152,7 +152,10 @@ def parece_devolucao(remetente: str, assunto: str, tipo_conteudo: str = "") -> b
 _TEXTO_DEVOLUCAO = re.compile(
     r"\*\* *endere[çc]o n[ãa]o encontrado *\*\*|sua mensagem n[ãa]o foi entregue|\*\* *address not found *\*\*|"
     r"your message (wasn'?t|was not|could not be) delivered|delivery to the following recipient|"
-    r"this is the mail system at host|mail delivery (failed|subsystem)|undeliverable:", re.I)
+    r"this is the mail system at host|mail delivery (failed|subsystem)|undeliverable:|"
+    r"\*\* *entrega incompleta *\*\*|\*\* *caixa de entrada do destinat[áa]rio cheia *\*\*|"
+    r"problema tempor[áa]rio na entrega da mensagem|\*\* *mensagem n[ãa]o entregue *\*\*|"
+    r"ocorreu um problema na entrega da mensagem", re.I)
 
 
 def texto_de_devolucao(texto: str) -> bool:

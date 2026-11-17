@@ -200,7 +200,12 @@ preço nem comissão e não fecha parceria.
 
 **Resposta de robô:** quando quem responde é um robô da empresa (ex.: "Recebemos sua mensagem, aguarde um
 momento", menu "digite 1", aviso de ausência), a IA SDR **não responde**, **não cria oportunidade** e a sequência
-continua normalmente. Além disso, a SDR responde no máximo 1 vez por dia para o mesmo contato, para nunca entrar
+continua normalmente. Desde 17/11/2026 o sistema reconhece também "X agradece sua mensagem. Não estamos disponíveis
+no momento", menus de departamento ("1 - Fiscal, 2 - Pessoal..."), "em breve você será atendido", "você foi removido
+do menu por inatividade", pesquisa de satisfação e "este canal é exclusivo para documentos". Uma recusa educada ("Agradecemos
+o contato, mas não temos interesse") continua valendo como recusa, e várias mensagens curtas seguidas de uma pessoa
+("Sim", "Bom dia", "Vamos agendar") não viram robô. O nome do atendente em negrito no começo ("*Gabi:* Boa tarde!")
+e um "Em que posso ajudar?" sozinho também não contam como robô: na dúvida, a resposta aparece como oportunidade. Além disso, a SDR responde no máximo 1 vez por dia para o mesmo contato, para nunca entrar
 numa conversa sem fim. Se o mesmo lead mandar várias mensagens, tudo fica na mesma oportunidade.
 
 **Minha fila (menu):** mostra os seus disparos num lugar só, em 4 abas:

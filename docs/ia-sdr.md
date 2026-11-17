@@ -149,6 +149,34 @@ sem oportunidade e sem cancelar a sequência. A IA também pode devolver essa cl
 responde no máximo 1 vez a cada 24 h por lead. `criar_oportunidade` junta novas respostas na oportunidade "nova" do lead.
 Agente de IA do lead: assinatura "*Nome:*" no começo (`ASSINATURA_DE_AGENTE`) ou 4+ mensagens em 10 min também contam como robô. A resposta automática da SDR respeita o limite diário do número por onde sai.
 
+**Revisão de 17/11/2026 (pedido da Maria: "muitos leads das campanhas de novas empresas têm bots como resposta").**
+Das 42 oportunidades de 03 a 17/11, 22 eram de máquina: ausência do WhatsApp Business ("X agradece sua mensagem. Não
+estamos disponíveis no momento"), menu de departamentos, "você será atendido por um atendente", "removido do menu por
+inatividade", pesquisa de satisfação, "este canal é exclusivo para documentos" e devoluções de e-mail (essas de antes
+de 09/11, quando as devoluções passaram a ser tratadas). O que mudou:
+- `FRASES_AUTOMATICAS` ganhou essas frases (uma basta) e `FRASES_AUTOMATICAS_FRACAS` as que uma pessoa também poderia
+  escrever ("você está falando com", "volte sempre"...): só contam duas juntas.
+- Menu de opções: 3+ linhas começando com o número da opção (`OPCAO_DE_MENU`: "1 - Fiscal", "*2* *-* Pessoal",
+  "3) Contábil", "4️⃣ RH"; hora como "16:00" não conta).
+- Recusa educada vale a recusa: com a classe de regras SEM INTERESSE ou JÁ POSSUI PARCEIRO, a frase de robô não conta
+  ("Agradecemos o contato, mas não temos interesse" → Sem interesse, sai da sequência).
+- `_rajada_de_mensagens` não vale quando alguma mensagem dos últimos 10 min foi de gente (`modo` diferente de "robo"):
+  dois clientes da Renovação escrevendo em várias mensagens curtas tinham ficado como robô.
+- `email_validacao.texto_de_devolucao` reconhece também "** Entrega incompleta **", "** Caixa de entrada do
+  destinatário cheia **" e "** Mensagem não entregue **" do Gmail, e `e_resposta_automatica` usa essa conferência:
+  aviso de e-mail não entregue nunca vira oportunidade.
+- A marca invisível que a mensagem automática do WhatsApp Business põe em volta do nome da empresa (U+200E,
+  `MARCA_DE_AUTOMACAO`) conta como uma frase fraca. Menu também no formato "(1) Geral".
+- O prefixo em negrito "*Empresa*:" (dois-pontos fora do negrito) NÃO é sinal de robô: plataformas de atendimento põem o
+  nome em mensagens de gente também ("*Fulano Contábil*: boa tarde, a princípio não").
+- `ASSINATURA_DE_AGENTE` ("*Nome:*" no começo) só vale colada na marca invisível (U+200E) que a automação põe: sem ela,
+  é o nome do atendente da plataforma ("*Gabi:* Boa tarde!", "*Recepção/Financeiro:* temos o nosso próprio controle",
+  "*MILENE OLIVEIRA:* por enquanto não tenho interesse" eram tratados como robô).
+- "Como posso ajudar?" / "Em que podemos ajudar?" passaram para as frases fracas: um atendente de verdade respondeu
+  "boa tarde, em que posso ajudar?". Na dúvida, a mensagem continua aparecendo como oportunidade.
+Conferência com os dados reais (só leitura): das 199 mensagens recebidas em 30 dias, 88 ficam como robô e 111 como gente; das 42 oportunidades de 14 dias, as 22 de robô deixariam de aparecer e as 20 de gente continuam.
+Teste: `testes/test_respostas_de_robo.py` (textos reais com nomes trocados: 32 de robô, 33 de gente).
+
 ## Quando a IA não classifica (correções de risco, out/2026)
 
 Valem para mensagens que chegam sozinhas (WhatsApp e e-mail). Uma resposta registrada à mão por alguém da equipe

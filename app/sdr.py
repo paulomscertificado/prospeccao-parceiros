@@ -338,38 +338,87 @@ FRASES_AUTOMATICAS = [
     "escolha uma das opcoes", "escolha uma opcao", "selecione uma opcao", "responda com o numero",
     "obrigado por entrar em contato", "obrigada por entrar em contato", "agradecemos o seu contato",
     "agradecemos seu contato", "agradecemos o contato", "seja bem-vindo", "seja bem vindo", "seja muito bem-vindo",
-    "como posso ajudar", "como podemos ajudar", "em que posso ajudar",
+    # 17/11/2026 (pedido da Maria): robôs que viraram oportunidade nas Empresas novas e nos parceiros em 03-17/11
+    "agradece seu contato", "agradece o seu contato", "agradece sua mensagem", "agradece a sua mensagem",
+    "agradecemos sua mensagem", "agradecemos a sua mensagem", "nao estamos disponiveis", "responderemos assim que",
+    "entraremos em contato assim que", "retornaremos assim que", "hoje nao teremos atendimento", "voce sera atendido",
+    "voce sera atendida", "sera atendido por", "sera atendida por", "falta de interacao", "ausencia de interacao",
+    "por inatividade", "removido do menu", "transferido para um atendente", "encaminhado para um atendente",
+    "numero do departamento", "departamento desejado", "depto desejado", "escolha o numero", "como voce avalia",
+    "avalia este atendimento", "avalie nosso atendimento", "avalie o nosso atendimento", "pesquisa de satisfacao",
+    "canal e exclusivo", "canal exclusivo para", "favor chamar no numero", "caso queira iniciar um novo atendimento",
+    "iniciar um novo atendimento", "basta enviar uma nova mensagem", "atendimento foi encerrado",
+    "atendimento encerrado", "protocolo de atendimento", "para oferecer o melhor atendimento", "seu nome e o assunto",
+    "bem vindo(a)", "bem-vindo(a)", "nao estou agora por aqui", "deixe sua mensagem", "deixe seu recado",
+    "digite uma das opcoes", "selecione uma das opcoes", "para agilizar seu atendimento", "para agilizar o seu atendimento",
+    "atendimento finalizado", "finalizando nosso atendimento", "finalizando o atendimento", "finalizando seu atendimento",
+    "nao estamos atendendo no momento", "assim que retornarmos", "responderemos em breve",
 ]
 
+# Frases que uma pessoa também poderia escrever: só contam juntas (duas ou mais na mesma mensagem). "Como posso
+# ajudar?" saiu da lista de cima em 17/11/2026: atendente de verdade respondeu "boa tarde, em que posso ajudar?".
+FRASES_AUTOMATICAS_FRACAS = [
+    "como posso ajuda", "como podemos ajuda", "como podemos te ajuda", "como podemos lhe ajuda", "como poderemos lhe ajuda",
+    "em que posso ajuda", "em que podemos ajuda",
+    "voce esta falando com", "estamos prontos para", "e um prazer atende", "prazer em atende", "volte sempre",
+    "esperamos ter ajudado", "por gentileza aguarde", "informe seu nome", "digite seu nome", "qualquer urgencia",
+    "melhor atendimento",
+]
+# A mensagem automática do WhatsApp Business põe uma marca invisível (U+200E) em volta do nome da empresa ("O Depto
+# Pessoal da \u200eExemplo agradece seu contato"): conta como uma frase fraca.
+MARCA_DE_AUTOMACAO = re.compile("[\u200e\u200f]")
 
-# Assinatura de agente de IA/atendimento no começo da mensagem: "*Sofia:*", "Sofia (assistente):"
-ASSINATURA_DE_AGENTE = re.compile(r"^[\s\u200e\u200f\u200b]*\*[^*\n]{2,40}:\*")
+# Menu de opções: 3 ou mais linhas que começam com o número da opção ("1 - Fiscal", "*2* *-* Pessoal", "3) Contábil",
+# "(4) RH", "5️⃣ Societário"). Hora ("16:00") não conta.
+OPCAO_DE_MENU = re.compile(r"^[ \t]*(?:\(\d{1,2}\)|\d{1,2}[ \t]*(?:\ufe0f?\u20e3|[-\u2013\u2014).]))[ \t]*\S", re.M)
+
+
+# Assinatura de agente de IA no começo da mensagem, colada na marca invisível que a automação põe ("\u200e*Sofia:*").
+# Sem a marca, "*Nome:*" é o nome do atendente que as plataformas de atendimento põem também em mensagens de gente
+# ("*Gabi:* Boa tarde!", "*MILENE OLIVEIRA:* por enquanto não tenho interesse"; revisão de 17/11/2026).
+ASSINATURA_DE_AGENTE = re.compile(r"^[ \t\r\n]*[\u200e\u200f\u200b]+[ \t\r\n]*\*[^*\n]{2,40}:\*")
 
 
 def e_resposta_automatica(texto: str) -> bool:
     """Parece mensagem de robô/chatbot/agente de IA/ausência (e não de uma pessoa)?"""
-    if ASSINATURA_DE_AGENTE.match(texto or ""):
-        return True
+    from . import email_validacao
+
+    if ASSINATURA_DE_AGENTE.match(texto or "") or email_validacao.texto_de_devolucao(texto):
+        return True  # agente de IA, ou aviso de e-mail não entregue que chegou como resposta
     t = util.chave_texto(texto)
-    return any(util.chave_texto(f) in t for f in FRASES_AUTOMATICAS)
+    if any(util.chave_texto(f) in t for f in FRASES_AUTOMATICAS):
+        return True
+    fracas = sum(util.chave_texto(f) in t for f in FRASES_AUTOMATICAS_FRACAS)
+    if fracas + bool(MARCA_DE_AUTOMACAO.search(texto or "")) >= 2:
+        return True
+    return len(OPCAO_DE_MENU.findall(re.sub(r"[*_~]", "", texto or ""))) >= 3  # menu de departamentos
 
 
 
 def _rajada_de_mensagens(db, lead: Lead) -> bool:
-    """3+ mensagens do lead em 2 minutos (menu de robô) ou 4+ em 10 minutos (agente de IA conversando sem parar)."""
+    """3+ mensagens do lead em 2 minutos (menu de robô) ou 4+ em 10 minutos (agente de IA conversando sem parar).
+    Se alguma delas foi de gente (não ficou como robô), é a pessoa escrevendo em várias mensagens curtas ("Sim" /
+    "Bom dia" / "Vamos agendar"): 17/11/2026, duas respostas de clientes da Renovação tinham ficado como robô."""
     from datetime import timedelta
 
-    def contar(minutos: int) -> int:
-        return db.execute(select(func.count(Mensagem.id)).where(
+    def contar(minutos: int, so_de_gente: bool = False) -> int:
+        consulta = select(func.count(Mensagem.id)).where(
             Mensagem.lead_id == lead.id, Mensagem.status == "recebida",
-            Mensagem.criado_em >= agora() - timedelta(minutes=minutos))).scalar() or 0
+            Mensagem.criado_em >= agora() - timedelta(minutes=minutos))
+        if so_de_gente:
+            consulta = consulta.where(func.coalesce(Mensagem.modo, "") != "robo")
+        return db.execute(consulta).scalar() or 0
 
+    if contar(10, so_de_gente=True):
+        return False
     return contar(2) >= 3 or contar(10) >= 4
 
 
 def classificar_resposta(db, lead: Lead, texto: str) -> dict:
     regras = classificar_por_regras(texto)
-    if regras["classe"] != "OPT-OUT" and not mensagens.pede_opt_out(texto) and (
+    # recusa educada ("Agradecemos o contato, mas não temos interesse") é de gente: vale a recusa, não a frase de robô
+    recusa = regras["classe"] in ("SEM INTERESSE", "JÁ POSSUI PARCEIRO")
+    if regras["classe"] != "OPT-OUT" and not recusa and not mensagens.pede_opt_out(texto) and (
             e_resposta_automatica(texto) or _rajada_de_mensagens(db, lead)):
         regras.update(classe=config.CLASSE_AUTOMATICA, interesse="nenhum", fonte="regras",
                       resumo="Resposta automática (robô/chatbot ou ausência) do lado da empresa.",
