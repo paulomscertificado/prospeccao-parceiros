@@ -1,15 +1,16 @@
 """E-mail das campanhas em HTML com a marca da AR (pedido da Maria em 16/11/2026): sem visual escolhido, a IA SDR e as
 Empresas novas mandam do 2º e-mail em diante um HTML leve com o logo e a cor da marca; o 1º e-mail para cada empresa
-continua só em texto. Fica desligado até ligar em Configurações > Geral (depois de ver a prévia em Campanhas > Visuais)."""
+continua só em texto. É um módulo ("email_html"): desligado até o Admin Master liberar para a marca (17/11/2026)."""
 
 from datetime import date, timedelta
 
 from sqlalchemy import select
 
-from app import campanhas, config, visual
-from app.banco import gravar_config, sessao
+from app import autorizacao, campanhas, config, visual
+from app.banco import gravar_config, sessao, usar_config_da_ar
 from app.integracoes import email_smtp
-from app.modelos import Campanha, Lead, Tarefa, Usuario
+from app.modelos import Campanha, Lead, Tarefa, Tenant, Usuario
+from conftest import csrf_de
 
 TEXTO = ("Olá, Ana!\n\nToque {n}: fale com a gente em https://wa.me/5581999990000.\n\n"
          "Atenciosamente,\nPaulo\nEmpresa Teste")
@@ -99,11 +100,40 @@ def test_tela_de_visuais_mostra_a_previa_e_se_esta_ligado(cliente):
     with sessao() as db:
         _ligar(db, False)
     pagina = cliente.get("/visuais").text
-    assert "E-mail com a marca (padrão)" in pagina and "Desligado" in pagina and "srcdoc=" in pagina
-    assert "do 2º e-mail em" in pagina
+    assert "E-mail com a marca (padrão)" in pagina and "Não liberado para esta marca" in pagina and "srcdoc=" in pagina
+    assert "do 2º e-mail em" in pagina and "Painel master" in pagina
     with sessao() as db:
         _ligar(db, True)
-    assert "Ligado" in cliente.get("/visuais").text
-    assert "e-mail em HTML com a marca" in cliente.get("/configuracoes").text
+    assert "Liberado para esta marca" in cliente.get("/visuais").text
     with sessao() as db:
         _ligar(db, False)
+
+
+def test_modulo_liberado_por_marca_no_painel_master(cliente):
+    """O Admin Master libera o módulo para UMA marca: os e-mails da outra continuam só em texto."""
+    assert "E-mail em HTML com a marca" in cliente.get("/master").text
+    assert "E-mail em HTML com a marca" in cliente.get("/permissoes?aba=modulos").text
+    with sessao() as db:
+        ms, certy = (db.execute(select(Tenant.id).where(Tenant.slug == s)).scalar_one() for s in ("ms", "grupo-certy"))
+        usar_config_da_ar(db, certy)
+        antes = autorizacao.modulos_ligados(db)  # os módulos da Certy agora (o formulário salva todos juntos)
+        usar_config_da_ar(db, None)
+    assert antes["email_html"] is False  # novo: começa desligado
+    pagina = cliente.get("/master").text
+    form = {"csrf": csrf_de(pagina), **{f"m__{m}": "on" for m, ligado in antes.items() if ligado}, "m__email_html": "on"}
+    try:
+        assert cliente.post(f"/master/ar/{certy}/modulos", data=form).status_code == 200
+        with sessao() as db:
+            usar_config_da_ar(db, certy)
+            assert visual.html_da_marca_ligado(db)  # liberado para a Certy
+            assert autorizacao.modulos_ligados(db) == {**antes, "email_html": True}  # os outros ficaram como estavam
+            usar_config_da_ar(db, ms)
+            assert not visual.html_da_marca_ligado(db)  # a MS não mudou
+            usar_config_da_ar(db, None)
+    finally:
+        volta = {"csrf": csrf_de(cliente.get("/master").text), **{f"m__{m}": "on" for m, ligado in antes.items() if ligado}}
+        cliente.post(f"/master/ar/{certy}/modulos", data=volta)
+    with sessao() as db:
+        usar_config_da_ar(db, certy)
+        assert autorizacao.modulos_ligados(db) == antes
+        usar_config_da_ar(db, None)

@@ -78,15 +78,15 @@ CHAVES_DA_AR = frozenset({
     "limite_hora_email", "limite_hora_whatsapp", "limite_diario_campanha", "limite_diario_dominio",
     "horario_envio_inicio", "horario_envio_fim", "enviar_email_automatico", "sdr_resposta_automatica",
     "dias_sem_resposta", "enviar_whatsapp_automatico", "whatsapp_sozinho_padrao", "whatsapp_convite",
-    "notificar_por_email", "score_pesos", "score_faixas", "receita_oculta", "email_html_marca",
+    "notificar_por_email", "score_pesos", "score_faixas", "receita_oculta",
     # módulos (autorizacao.MODULOS): cada AR tem os seus, mas só o Admin Master liga e desliga (Fase 3)
     "mostrar_vendas", "mostrar_agenda", "modulo_campanhas", "modulo_prospeccao", "modulo_conversas",
-    "modulo_ia_comercial", "modulo_portal"})
+    "modulo_ia_comercial", "modulo_portal", "modulo_email_html"})
 # Fase 5: o que fala da empresa. Sem valor próprio da AR, vem da marca dela (marca.config_da_marca), nunca da
 # plataforma: até a Fase 5 os valores da plataforma eram os textos da MS (que passaram para a AR MS, marca.garantir)
 CHAVES_DA_MARCA = frozenset({"empresa_nome", "link_parceria", "programa_parceria", "whatsapp_convite"})
 CHAVES_SO_MASTER = frozenset({"mostrar_vendas", "mostrar_agenda", "modulo_campanhas", "modulo_prospeccao",
-                              "modulo_conversas", "modulo_ia_comercial", "modulo_portal"})
+                              "modulo_conversas", "modulo_ia_comercial", "modulo_portal", "modulo_email_html"})
 
 
 def _ar_da_config(db: Session) -> int | None:

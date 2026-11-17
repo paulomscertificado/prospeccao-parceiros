@@ -325,9 +325,10 @@ CONFIG_PADRAO = {
     "dias_sem_resposta": "3",              # dias após o último toque para marcar "Sem resposta"
     "aprovacao_obrigatoria": "1",
     "notificar_por_email": "1",
-    # E-mail das campanhas da IA SDR e das Empresas novas em HTML leve com a marca da AR, do 2º e-mail em diante (o 1º
-    # contato frio continua só em texto). Pedido da Maria em 16/11/2026; liga depois de ela ver a prévia (visual.py)
-    "email_html_marca": "0",
+    # Módulo "E-mail em HTML com a marca" (autorizacao.MODULOS): o 2º e-mail em diante da IA SDR e das Empresas novas em
+    # HTML leve com a marca da AR (o 1º continua só em texto). Desligado até o Admin Master liberar para a marca
+    # (Painel master > Módulos de cada AR; pedidos de 16 e 17/11/2026)
+    "modulo_email_html": "0",
 }
 
 # Categorias de parceiros (o administrador cria outras na tela Categorias).

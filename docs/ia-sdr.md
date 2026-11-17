@@ -522,8 +522,9 @@ cliente rápido". Antes cada pessoa via só as respostas dos leads dela e tinha 
   O teste da campanha (`campanhas.testar`) usa o visual e manda a imagem mesmo sem conversa (vai para quem testa).
 - Testes: `testes/test_visual.py` (e `whatsapp-leads/testes/teste_ponta_a_ponta.py`, parte 24).
 - **E-mail com a marca (padrão)** (pedido da Maria em 16/11/2026: "Do 2º e-mail em diante"): sem visual de e-mail na
-  campanha, `visual.html_do_email` usa `visual.html_da_marca` quando `usa_html_da_marca`: configuração
-  `email_html_marca` = "1" (de cada AR, `banco.CHAVES_DA_AR`; padrão "0", Configurações > Geral), campanha da IA SDR
+  campanha, `visual.html_do_email` usa `visual.html_da_marca` quando `usa_html_da_marca`: o **módulo** "email_html"
+  (`autorizacao.MODULOS`, chave `modulo_email_html`, de cada AR em `banco.CHAVES_DA_AR` e `CHAVES_SO_MASTER`; padrão
+  "0"; o Admin Master libera por marca no Painel master > Módulos de cada AR, 17/11/2026) liberado, campanha da IA SDR
   (`tipo="parceiros"`) ou das Empresas novas, e não é o 1º e-mail da campanha para a empresa (`visual.primeiro_email`:
   nenhum e-mail anterior dela na campanha, feito ou ainda por sair; cancelado não conta). Decidido na hora do envio, então
   vale para as campanhas em andamento. O HTML: tabelas com estilo na linha, letra Arial, faixa na cor da marca

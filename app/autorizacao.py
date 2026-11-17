@@ -145,6 +145,8 @@ MODULOS = {
     "conversas": ("Conversas de WhatsApp", "modulo_conversas"),
     "ia_comercial": ("IA Comercial", "modulo_ia_comercial"),
     "portal": ("Portal do parceiro", "modulo_portal"),
+    # sem permissões ligadas: só decide se o 2º e-mail em diante sai em HTML com a marca (visual.html_da_marca_ligado)
+    "email_html": ("E-mail em HTML com a marca", "modulo_email_html"),
 }
 # Quem tem uma destas precisa da verificação em 2 etapas (como o admin e o gestor).
 SENSIVEIS = ("configuracoes.alterar", "usuarios.gerenciar", "permissoes.gerenciar")

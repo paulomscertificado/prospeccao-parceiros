@@ -26,9 +26,9 @@
     diante</b> este HTML leve, feito com o logo e a cor da marca (Configurações &gt; Marca). O 1º e-mail para cada empresa
     continua só em texto: no primeiro contato, e-mail "desenhado" cai mais no spam ou na aba Promoções.
     O e-mail sai com as duas versões (texto e HTML).</p>
-  <p style="margin:0 0 10px">{% if html_marca_ligado %}<span class="selo selo-ok">Ligado</span> os e-mails do 2º em diante saem assim.
-    {% else %}<span class="selo selo-alerta">Desligado</span> os e-mails saem só em texto.{% endif %}
-    {% if pode('configuracoes.alterar') %}Para {{ 'desligar' if html_marca_ligado else 'ligar' }}: <a href="/configuracoes">Configurações &gt; Geral</a>, "e-mail em HTML com a marca".{% endif %}</p>
+  <p style="margin:0 0 10px">{% if html_marca_ligado %}<span class="selo selo-ok">Liberado para esta marca</span> os e-mails do 2º em diante saem assim.
+    {% else %}<span class="selo selo-alerta">Não liberado para esta marca</span> os e-mails saem só em texto.{% endif %}
+    É um módulo: quem libera por marca é o admin master{% if usuario and usuario.master %} (<a href="/master">Painel master</a> &gt; Módulos de cada AR){% endif %}.</p>
   <iframe title="Prévia do e-mail com a marca" sandbox srcdoc="{{ previa_marca }}" style="width:100%;max-width:680px;height:470px;border:1px solid var(--borda);border-radius:8px;background:#f3f4f6"></iframe>
 </div>
 

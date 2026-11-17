@@ -143,9 +143,9 @@ e do WhatsApp e manda um e-mail de teste para você.
 diante** um e-mail em HTML leve, feito sozinho com o **logo e a cor da marca** (Configurações > Marca): uma faixa com o
 logo em cima, o texto de sempre com a assinatura de quem envia e o "Não quer mais receber?" discreto embaixo. O **1º
 e-mail** para cada empresa continua **só em texto** (no primeiro contato, e-mail "desenhado" cai mais no spam ou na aba
-Promoções). Veja a prévia em **Campanhas > 🎨 Visuais** e ligue em **Configurações > Geral**, "e-mail em HTML com a
-marca" (1 = sim). Vale também para as campanhas em andamento (os e-mails que ainda não saíram). A Renovação continua
-com a arte do aviso.
+Promoções). Veja a prévia em **Campanhas > 🎨 Visuais**. É um **módulo**: o admin master libera **por marca** em
+**Painel master > Módulos de cada AR** ("E-mail em HTML com a marca"); marca nova começa desligada. Vale também para as
+campanhas em andamento (os e-mails que ainda não saíram). A Renovação continua com a arte do aviso.
 
 **Pergunta final (vai no fim do 1º contato):** 14 perguntas prontas em 5 tipos (descobrir como fazem hoje,
 convidar para conversar, achar a pessoa certa, mandar informação, resposta de uma palavra), **Automática** (a mais
@@ -648,7 +648,9 @@ Cada perfil acima é um **papel**. Em **Configurações > Papéis e permissões*
 4. **Equipes:** crie equipes (ex.: "Unidade Recife") e escolha a equipe de cada pessoa em Configurações > Usuários.
    Serve para o alcance "Só a equipe" (ex.: um líder que vê os leads do time dele).
 5. **Módulos:** ligue ou desligue partes inteiras (Vendas, Agenda, IA SDR, Prospecção, Conversas, IA Comercial,
-   Portal). Desligado some do menu **e fica bloqueado para todos**.
+   Portal). Desligado some do menu **e fica bloqueado para todos**. O módulo **E-mail em HTML com a marca** não tem
+   menu: ligado, o 2º e-mail em diante das campanhas sai em HTML com a marca; desligado, sai só em texto. Por marca, o
+   admin master libera em Painel master > Módulos de cada AR.
 
 Se alguém tentar abrir um lead, parceiro, cliente ou venda de outra pessoa trocando o número no endereço, o sistema
 responde "Página não encontrada". Toda mudança de permissão fica no **Registro de atividades**. Quem receber poder de

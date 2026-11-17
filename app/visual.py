@@ -22,8 +22,8 @@ Para contato frio sai só o texto: imagem de número desconhecido parece propaga
 E-mail com a marca (padrão, pedido da Maria em 16/11/2026): sem visual escolhido na campanha, a IA SDR e as Empresas
 novas mandam do 2º e-mail em diante um HTML leve feito com a marca da AR (faixa com o logo e a cor, o texto do toque e
 o descadastro discreto): html_da_marca. O 1º e-mail para cada empresa continua só em texto (contato frio responde
-melhor e cai menos no spam ou na aba Promoções). Liga em Configurações > Geral ("email_html_marca", de cada AR);
-prévia em Campanhas > Visuais."""
+melhor e cai menos no spam ou na aba Promoções). É um MÓDULO ("email_html", autorizacao.MODULOS): o Admin Master libera
+por marca no Painel master (Módulos de cada AR); prévia em Campanhas > Visuais."""
 
 import hashlib
 import html as html_lib
@@ -182,7 +182,7 @@ def html_do_email(db, tarefa: Tarefa | None, lead: Lead | None, quem, texto: str
 
 # ---------------------------------------------------------------- E-mail com a marca (padrão)
 
-CHAVE_HTML_DA_MARCA = "email_html_marca"
+CHAVE_HTML_DA_MARCA = "modulo_email_html"  # o módulo "email_html" (autorizacao.MODULOS), de cada AR
 TIPOS_COM_HTML_DA_MARCA = ("parceiros", "empresas_novas")  # IA SDR e Empresas novas (a Renovação manda a arte)
 COR_PADRAO = "#123a63"
 FONTE_DO_EMAIL = "Arial, Helvetica, sans-serif"  # letra que todo programa de e-mail tem
@@ -190,10 +190,11 @@ ASSINATURA_EXEMPLO = "\n\nAtenciosamente,\nPaulo\n{marca}"
 
 
 def html_da_marca_ligado(db) -> bool:
-    """Ligado em Configurações > Geral (cada AR liga o seu; a rotina lê a configuração da AR da tarefa)."""
+    """O módulo está liberado para a marca? (o Admin Master libera por AR; a rotina lê a configuração da AR da tarefa).
+    Mesma regra dos outros módulos (autorizacao.modulos_ligados): só "0" desliga; o padrão dele é "0"."""
     from .banco import ler_config
 
-    return ler_config(db, CHAVE_HTML_DA_MARCA) == "1"
+    return ler_config(db, CHAVE_HTML_DA_MARCA) != "0"
 
 
 def primeiro_email(db, tarefa: Tarefa) -> bool:

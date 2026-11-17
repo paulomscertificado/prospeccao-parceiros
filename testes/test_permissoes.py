@@ -308,7 +308,8 @@ def test_modulo_desligado_bloqueia_ate_o_administrador(cliente, csrf):
     finally:
         ligar_modulos("campanhas")
     # pela tela
-    form = {"csrf": csrf, **{f"m__{m}": "on" for m in autorizacao.MODULOS if m != "ia_comercial"}}
+    # o "e-mail em HTML com a marca" fica como está (desligado): ele muda o formato dos e-mails dos outros testes
+    form = {"csrf": csrf, **{f"m__{m}": "on" for m in autorizacao.MODULOS if m not in ("ia_comercial", "email_html")}}
     cliente.post("/permissoes/modulos", data=form)
     try:
         assert cliente.get("/ia").status_code == 403
