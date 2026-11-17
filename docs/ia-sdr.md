@@ -521,6 +521,17 @@ cliente rápido". Antes cada pessoa via só as respostas dos leads dela e tinha 
   com `send_image` + legenda pela mesma fila. A Mensagem registrada ganha `assunto = "[com imagem: <visual>]"`.
   O teste da campanha (`campanhas.testar`) usa o visual e manda a imagem mesmo sem conversa (vai para quem testa).
 - Testes: `testes/test_visual.py` (e `whatsapp-leads/testes/teste_ponta_a_ponta.py`, parte 24).
+- **E-mail com a marca (padrão)** (pedido da Maria em 16/11/2026: "Do 2º e-mail em diante"): sem visual de e-mail na
+  campanha, `visual.html_do_email` usa `visual.html_da_marca` quando `usa_html_da_marca`: configuração
+  `email_html_marca` = "1" (de cada AR, `banco.CHAVES_DA_AR`; padrão "0", Configurações > Geral), campanha da IA SDR
+  (`tipo="parceiros"`) ou das Empresas novas, e não é o 1º e-mail da campanha para a empresa (`visual.primeiro_email`:
+  nenhum e-mail anterior dela na campanha, feito ou ainda por sair; cancelado não conta). Decidido na hora do envio, então
+  vale para as campanhas em andamento. O HTML: tabelas com estilo na linha, letra Arial, faixa na cor da marca
+  (`MarcaAR.cor`, senão `COR_PADRAO`) com o logo (`URL_PUBLICA` + `marca.endereco_do_logo`, altura 36 px pela
+  `logo_proporcao`; sem o sistema na internet, o nome da marca), o texto do toque (`texto_em_html`, endereços
+  `https://` e `wa.me/` viram link) e o descadastro de 1 clique embaixo. A versão em texto continua indo junto. A
+  Renovação não muda (tem a arte do aviso). Prévia em Campanhas > Visuais (`visual.previa_da_marca`, logo em `data:` no
+  quadro isolado). Testes: `testes/test_email_html_marca.py`.
 
 ## Nova campanha: tela em 4 passos, tons e cadências novos (nov/2026)
 

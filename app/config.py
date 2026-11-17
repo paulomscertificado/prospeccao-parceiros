@@ -325,6 +325,9 @@ CONFIG_PADRAO = {
     "dias_sem_resposta": "3",              # dias após o último toque para marcar "Sem resposta"
     "aprovacao_obrigatoria": "1",
     "notificar_por_email": "1",
+    # E-mail das campanhas da IA SDR e das Empresas novas em HTML leve com a marca da AR, do 2º e-mail em diante (o 1º
+    # contato frio continua só em texto). Pedido da Maria em 16/11/2026; liga depois de ela ver a prévia (visual.py)
+    "email_html_marca": "0",
 }
 
 # Categorias de parceiros (o administrador cria outras na tela Categorias).

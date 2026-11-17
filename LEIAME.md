@@ -139,6 +139,14 @@ e do WhatsApp e manda um e-mail de teste para você.
   sai só o texto, para proteger o número contra bloqueio.
 - O botão **Testar** da campanha manda o e-mail com o visual e o WhatsApp com a imagem para você mesmo.
 
+**E-mail com a marca (padrão):** sem um visual escolhido, a IA SDR e as Empresas novas podem mandar **do 2º e-mail em
+diante** um e-mail em HTML leve, feito sozinho com o **logo e a cor da marca** (Configurações > Marca): uma faixa com o
+logo em cima, o texto de sempre com a assinatura de quem envia e o "Não quer mais receber?" discreto embaixo. O **1º
+e-mail** para cada empresa continua **só em texto** (no primeiro contato, e-mail "desenhado" cai mais no spam ou na aba
+Promoções). Veja a prévia em **Campanhas > 🎨 Visuais** e ligue em **Configurações > Geral**, "e-mail em HTML com a
+marca" (1 = sim). Vale também para as campanhas em andamento (os e-mails que ainda não saíram). A Renovação continua
+com a arte do aviso.
+
 **Pergunta final (vai no fim do 1º contato):** 14 perguntas prontas em 5 tipos (descobrir como fazem hoje,
 convidar para conversar, achar a pessoa certa, mandar informação, resposta de uma palavra), **Automática** (a mais
 natural para cada empresa), **Variar** (cada empresa recebe uma pergunta de um tipo diferente, para descobrir qual

@@ -56,6 +56,9 @@ CAMPOS_GERAIS = [
     ("whatsapp_convite", "IA SDR · WhatsApp da empresa para os convites por e-mail (com DDD, ex.: 81999998888). Quem "
      "clicar abre a conversa com este número; vazio = o convite pede para responder o e-mail", "texto"),
     ("notificar_por_email", "IA SDR · avisar o responsável por e-mail quando surgir oportunidade (1 = sim)", "numero"),
+    ("email_html_marca", "IA SDR e Empresas novas · e-mail em HTML com a marca (logo e cores) do 2º e-mail em diante "
+     "(1 = sim, 0 = só texto). O 1º e-mail para cada empresa continua só em texto. Prévia em Campanhas > Visuais",
+     "numero"),
     ("alertas_emails", "Avisos de problema · e-mails que recebem (separados por vírgula; vazio = os administradores)",
      "texto"),
     ("limite_banco_mb", "Avisos de problema · tamanho do banco contratado em MB (o aviso sai em 80%)", "numero"),

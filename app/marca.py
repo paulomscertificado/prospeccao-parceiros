@@ -290,6 +290,7 @@ def _montar(ar: int, slug: str, nome_ar: str, linha: MarcaAR | None) -> dict:
          "logo_url": (endereco_do_logo(ar, int(linha.atualizado_em.timestamp()))
                       if linha is not None and linha.logo_tipo and linha.atualizado_em else "")}
     m["logo_largo"] = bool(m["logo_url"] and (linha.logo_proporcao or 0) >= LOGO_LARGO)
+    m["logo_proporcao"] = float(linha.logo_proporcao or 0) if m["logo_url"] else 0.0  # largura / altura
     m["css"] = tema(m["cor"], m["cor_detalhe"], m["cor_fundo"], m["fonte"])
     m["fonte_url"] = endereco_da_fonte(m["fonte"])
     return _com_frase(m)

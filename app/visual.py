@@ -17,13 +17,19 @@ na hora do envio (trocar o HTML depois vale para o que ainda não saiu).
 
 Proteção do número de WhatsApp: a imagem só sai para quem JÁ conversou com a MS (campanhas.whatsapp_liberado).
 Para contato frio sai só o texto: imagem de número desconhecido parece propaganda e aumenta bloqueio e denúncia
-(avaliação de 12/11/2026)."""
+(avaliação de 12/11/2026).
+
+E-mail com a marca (padrão, pedido da Maria em 16/11/2026): sem visual escolhido na campanha, a IA SDR e as Empresas
+novas mandam do 2º e-mail em diante um HTML leve feito com a marca da AR (faixa com o logo e a cor, o texto do toque e
+o descadastro discreto): html_da_marca. O 1º e-mail para cada empresa continua só em texto (contato frio responde
+melhor e cai menos no spam ou na aba Promoções). Liga em Configurações > Geral ("email_html_marca", de cada AR);
+prévia em Campanhas > Visuais."""
 
 import hashlib
 import html as html_lib
 import re
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 
 from . import config
 from .modelos import ArquivoVisual, Campanha, Lead, Tarefa, VisualCampanha
@@ -162,13 +168,140 @@ def _da_tarefa(db, tarefa: Tarefa | None, canal: str) -> VisualCampanha | None:
 
 
 def html_do_email(db, tarefa: Tarefa | None, lead: Lead | None, quem, texto: str, link_descadastro: str = "") -> str:
-    """O HTML do e-mail deste toque, ou vazio (sai só o texto)."""
+    """O HTML do e-mail deste toque, ou vazio (sai só o texto): o visual escolhido na campanha ou, sem ele, o e-mail
+    com a marca da AR (do 2º e-mail em diante, se estiver ligado)."""
     from . import mensagens
 
     visual = _da_tarefa(db, tarefa, "email")
-    if visual is None or not (visual.html or "").strip():
+    if visual is not None and (visual.html or "").strip():
+        return montar_html(visual, texto, mensagens.valores_variaveis(db, lead, quem), link_descadastro)
+    if usa_html_da_marca(db, tarefa):
+        return html_da_marca(db, tarefa.tenant_id, texto, link_descadastro)
+    return ""
+
+
+# ---------------------------------------------------------------- E-mail com a marca (padrão)
+
+CHAVE_HTML_DA_MARCA = "email_html_marca"
+TIPOS_COM_HTML_DA_MARCA = ("parceiros", "empresas_novas")  # IA SDR e Empresas novas (a Renovação manda a arte)
+COR_PADRAO = "#123a63"
+FONTE_DO_EMAIL = "Arial, Helvetica, sans-serif"  # letra que todo programa de e-mail tem
+ASSINATURA_EXEMPLO = "\n\nAtenciosamente,\nPaulo\n{marca}"
+
+
+def html_da_marca_ligado(db) -> bool:
+    """Ligado em Configurações > Geral (cada AR liga o seu; a rotina lê a configuração da AR da tarefa)."""
+    from .banco import ler_config
+
+    return ler_config(db, CHAVE_HTML_DA_MARCA) == "1"
+
+
+def primeiro_email(db, tarefa: Tarefa) -> bool:
+    """É o 1º e-mail desta campanha para a empresa? Conta o que já saiu e o que ainda vai sair antes dele (um e-mail
+    cancelado antes não conta: aí este vira o primeiro)."""
+    anterior = db.execute(select(Tarefa.id).where(
+        Tarefa.campanha_id == tarefa.campanha_id, Tarefa.lead_id == tarefa.lead_id, Tarefa.canal == "email",
+        Tarefa.id != tarefa.id, Tarefa.status.in_(("feita", "pendente", "rascunho")),
+        or_(Tarefa.data < tarefa.data, and_(Tarefa.data == tarefa.data, Tarefa.id < tarefa.id))).limit(1)).first()
+    return anterior is None
+
+
+def usa_html_da_marca(db, tarefa: Tarefa | None) -> bool:
+    """Este toque sai com o e-mail com a marca? Só na IA SDR e nas Empresas novas, com a opção ligada e do 2º e-mail
+    da campanha para a empresa em diante."""
+    if tarefa is None or not tarefa.campanha_id or not tarefa.lead_id or not html_da_marca_ligado(db):
+        return False
+    camp = db.get(Campanha, tarefa.campanha_id)
+    if camp is None or camp.tipo not in TIPOS_COM_HTML_DA_MARCA:
+        return False
+    return not primeiro_email(db, tarefa)
+
+
+def _cor(valor: str) -> str:
+    valor = (valor or "").strip()
+    return valor if re.fullmatch(r"#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3}", valor) else COR_PADRAO
+
+
+def _logo_para_email(m: dict) -> str:
+    """O endereço completo do logo da AR (o programa de e-mail do lead busca na internet). Sem o sistema publicado na
+    internet (computador local), o e-mail vai sem logo: o nome da empresa vai no lugar."""
+    if not m.get("logo_url") or any(x in config.URL_PUBLICA for x in ("localhost", "127.0.0.1")):
         return ""
-    return montar_html(visual, texto, mensagens.valores_variaveis(db, lead, quem), link_descadastro)
+    return config.URL_PUBLICA.rstrip("/") + m["logo_url"]
+
+
+def _logo_na_previa(db, ar: int | None) -> str:
+    """O logo dentro da própria prévia da tela (data:): ela fica num quadro isolado, que não busca nada no servidor."""
+    import base64
+
+    from . import marca
+
+    achado = marca.logo(db, ar) if ar else None
+    if not achado:
+        return ""
+    dados, tipo = achado
+    return f"data:{tipo};base64,{base64.b64encode(dados).decode('ascii')}"
+
+
+def _com_links(html: str, cor: str) -> str:
+    """Endereços do texto (site, wa.me do convite) viram links clicáveis no HTML (no texto o programa já faz isso)."""
+    def link(m):
+        endereco = m.group(0)
+        destino = endereco if endereco.startswith("http") else "https://" + endereco
+        return f'<a href="{destino}" style="color:{cor};text-decoration:underline">{endereco}</a>'
+
+    return re.sub(r"(?:https?://|\bwa\.me/)[^\s<]*[^\s<.,;:!?)\]]", link, html)
+
+
+def html_da_marca(db, ar: int | None, texto: str, link_descadastro: str = "", na_tela: bool = False) -> str:
+    """O e-mail em HTML leve com a marca da AR: faixa com o logo (ou o nome) na cor da marca, o texto do toque (o
+    mesmo da versão em texto, com a assinatura de quem envia) e o descadastro discreto embaixo. Uma imagem só e a letra
+    comum dos programas de e-mail: cara de e-mail de pessoa, não de propaganda."""
+    from . import marca
+
+    m = marca.da_ar(db, ar) if ar else marca.da_plataforma(db)
+    nome = html_lib.escape(m.get("nome") or "")
+    cor = _cor(m.get("cor"))
+    logo = (_logo_na_previa(db, ar) if na_tela else "") or _logo_para_email(m)
+    if logo:
+        proporcao = float(m.get("logo_proporcao") or 0)
+        largura = f' width="{min(220, round(36 * proporcao))}"' if proporcao > 0 else ""
+        cabeca = (f'<img src="{html_lib.escape(logo)}" alt="{nome}" height="36"{largura} '
+                  f'style="display:block;height:36px;max-width:220px;border:0;outline:none">')
+    else:
+        cabeca = (f'<span style="font-family:{FONTE_DO_EMAIL};font-size:18px;font-weight:bold;color:#ffffff">'
+                  f'{nome}</span>')
+    if link_descadastro:
+        sair = (f'Não quer mais receber nossos e-mails? <a href="{html_lib.escape(link_descadastro)}" '
+                f'style="color:#6b7280;text-decoration:underline">Clique aqui</a>.')
+    else:
+        sair = "Para não receber mais e-mails, responda com a palavra SAIR."
+    corpo = _com_links(texto_em_html(texto), cor)
+    return (
+        '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        f'<title>{nome}</title></head>'
+        '<body style="margin:0;padding:0;background:#f3f4f6">'
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f3f4f6">'
+        '<tr><td align="center" style="padding:24px 12px">'
+        '<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" '
+        'style="width:100%;max-width:600px;background:#ffffff;border-radius:10px">'
+        f'<tr><td style="background:{cor};padding:16px 28px;border-radius:10px 10px 0 0">{cabeca}</td></tr>'
+        f'<tr><td style="padding:26px 28px 12px;font-family:{FONTE_DO_EMAIL};font-size:15px;line-height:1.6;'
+        f'color:#1f2933">{corpo}</td></tr>'
+        '</table>'
+        f'<p style="max-width:600px;margin:14px auto 0;font-family:{FONTE_DO_EMAIL};font-size:12px;line-height:1.5;'
+        f'color:#6b7280;text-align:center">{sair}</p>'
+        '</td></tr></table></body></html>')
+
+
+def previa_da_marca(db, ar: int | None) -> str:
+    """O e-mail com a marca com um texto de exemplo (tela Campanhas > Visuais)."""
+    from . import marca
+
+    m = marca.da_ar(db, ar) if ar else marca.da_plataforma(db)
+    texto = TEXTO_EXEMPLO + ASSINATURA_EXEMPLO.format(marca=m.get("nome") or "")
+    return html_da_marca(db, ar, texto, f"{config.URL_PUBLICA}/descadastrar/exemplo", na_tela=True)
 
 
 def imagem_do_whatsapp(db, tarefa: Tarefa | None, lead: Lead | None, so_para_quem_conversou: bool = True):

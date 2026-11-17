@@ -43,7 +43,12 @@ def lista(request: Request, usuario: Usuario = Depends(exige("templates.ver")), 
     visuais = db.execute(select(VisualCampanha).order_by(VisualCampanha.ativo.desc(), VisualCampanha.nome)).scalars().all()
     uso = dict(db.execute(select(Campanha.visual_id, func.count(Campanha.id)).where(Campanha.visual_id.is_not(None))
                           .group_by(Campanha.visual_id)).all())
-    return tela(request, "visuais.html", {"visuais": visuais, "uso": uso, "SECOES": vis.SECOES})
+    from .. import marca
+
+    ar = marca.ar_da_tela(request, usuario) or marca.ar_padrao(db)  # o Admin Master fora de uma AR vê a da MS
+    return tela(request, "visuais.html", {"visuais": visuais, "uso": uso, "SECOES": vis.SECOES,
+                                          "previa_marca": vis.previa_da_marca(db, ar),
+                                          "html_marca_ligado": vis.html_da_marca_ligado(db)})
 
 
 @rotas.post("/visuais/novo", dependencies=[Depends(verificar_csrf)])

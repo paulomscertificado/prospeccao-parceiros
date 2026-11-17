@@ -20,6 +20,18 @@
   </ul>
 </div>
 
+<div class="cartao" id="marca">
+  <h2>E-mail com a marca (padrão)</h2>
+  <p style="margin:4px 0 8px">Sem um visual escolhido na campanha, a IA SDR e as Empresas novas mandam <b>do 2º e-mail em
+    diante</b> este HTML leve, feito com o logo e a cor da marca (Configurações &gt; Marca). O 1º e-mail para cada empresa
+    continua só em texto: no primeiro contato, e-mail "desenhado" cai mais no spam ou na aba Promoções.
+    O e-mail sai com as duas versões (texto e HTML).</p>
+  <p style="margin:0 0 10px">{% if html_marca_ligado %}<span class="selo selo-ok">Ligado</span> os e-mails do 2º em diante saem assim.
+    {% else %}<span class="selo selo-alerta">Desligado</span> os e-mails saem só em texto.{% endif %}
+    {% if pode('configuracoes.alterar') %}Para {{ 'desligar' if html_marca_ligado else 'ligar' }}: <a href="/configuracoes">Configurações &gt; Geral</a>, "e-mail em HTML com a marca".{% endif %}</p>
+  <iframe title="Prévia do e-mail com a marca" sandbox srcdoc="{{ previa_marca }}" style="width:100%;max-width:680px;height:470px;border:1px solid var(--borda);border-radius:8px;background:#f3f4f6"></iframe>
+</div>
+
 <div class="cartao">
   <h2>Visuais cadastrados</h2>
   {% for v in visuais %}
