@@ -10,6 +10,7 @@ import json
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+from app import config
 from app.banco import sessao
 from app.integracoes import whatsapp_cloud
 from app.leads_servico import limpar_campos
@@ -98,10 +99,11 @@ def test_tela_guarda_as_chaves_protegidas_testa_e_manda_o_teste(cliente, monkeyp
         assert descriptografar(conta.segredo_cripto) == SEGREDO and len(conta.verificacao) >= 20
         assert conta.numero == "+55 81 8343-0717" and conta.tenant_id == ar and conta.waba_id == "998877"
         verificacao = conta.verificacao
+    versao = config.WHATSAPP_API_VERSAO  # padrão v27.0; o .env pode trocar (o da pasta principal tinha v21.0)
     inscricao = [(m, u) for m, u, _ in chamadas if u.endswith("/subscribed_apps")]
-    assert inscricao == [("POST", "https://graph.facebook.com/v27.0/998877/subscribed_apps")]
+    assert inscricao == [("POST", f"https://graph.facebook.com/{versao}/998877/subscribed_apps")]
     metodo, url, kw = chamadas[0]  # o teste de conexão pergunta pelo número, com o token da conta
-    assert metodo == "GET" and url.endswith(f"/v27.0/{NUMERO_ID}") and "quality_rating" in kw["params"]["fields"]
+    assert metodo == "GET" and url.endswith(f"/{versao}/{NUMERO_ID}") and "quality_rating" in kw["params"]["fields"]
     assert kw["headers"]["Authorization"] == f"Bearer {TOKEN}"
     tela = c.get("/whatsapp").text
     assert TOKEN not in tela and SEGREDO not in tela  # as chaves nunca voltam para a tela
