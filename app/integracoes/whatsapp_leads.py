@@ -68,6 +68,21 @@ def espera_do_computador(dados: dict, momento: datetime | None = None) -> int:
     return 60 if momento.weekday() < 5 and 7 * 60 + 30 <= minutos < 19 * 60 else 300
 
 
+def marcar_tela(db, chave: str, a_cada: int = 10) -> None:
+    """Anota que a tela WhatsApp ("wl_tela_vista_em") ou Conversas ("wl_conversas_vista_em") está aberta: a ponte com
+    o computador fica mais rápida (/api/ponte/troca). Grava no máximo a cada `a_cada` s: antes gravava a cada
+    atualização da tela (de 3 em 3 s), e cada gravação é uma escrita no banco da nuvem (17/11/2026)."""
+    from ..banco import agora, gravar_config, ler_config
+
+    try:
+        if 0 <= (agora() - datetime.fromisoformat(ler_config(db, chave))).total_seconds() < a_cada:
+            return
+    except ValueError:
+        pass
+    gravar_config(db, chave, agora().isoformat())
+    db.commit()
+
+
 def _status_da_ponte(db=None) -> dict:
     from ..banco import ler_config, sessao
 

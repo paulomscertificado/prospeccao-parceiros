@@ -4,17 +4,24 @@ Cada pessoa vê as conversas do PRÓPRIO número e dos números compartilhados c
 administrador vê todas. As mensagens vêm do WhatsApp Leads pela ponte (tabela mensagens_whatsapp, ver /api/ponte/retorno). O que se
 escreve aqui vira um envio "manual" na fila da ponte (ponte_whatsapp.manual) e sai na hora pelo número,
 como as respostas escritas na tela Conversas do WhatsApp Leads. Quem pediu SAIR não recebe.
+
+A tela se atualiza sozinha (a conversa aberta a cada 5 s, a lista a cada 15 s). Para gastar pouco do banco da nuvem
+(Supabase), cada atualização manda a "marca" do que a tela já tem e o sistema só responde "igual" quando nada mudou;
+a conversa e a lista inteiras só vão de novo quando algo mudou (17/11/2026: a conversa inteira, até 300 mensagens,
+ia a cada 5 s e a lista era refeita a cada 15 s passando por todas as mensagens; era o que mais gastava).
 """
 
+import hashlib
 import json
+import secrets
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session
 
 from .. import config, conexoes, sdr, util
-from ..banco import agora, gravar_config, obter_db
+from ..banco import agora, gravar_config, ler_config, obter_db
 from ..integracoes import whatsapp_leads
 from ..leads_servico import historico, pode_ver
 from ..modelos import ComandoWhatsApp, ContatoWhatsApp, MensagemWhatsApp, PonteWhatsApp, Usuario
@@ -22,6 +29,9 @@ from ..seguranca import exige, verificar_csrf
 from ..web import tela
 
 rotas = APIRouter()
+
+TELA_ABERTA = "wl_conversas_vista_em"  # com a tela aberta, a ponte com o computador do WhatsApp troca a cada 10 s
+VERSAO = "wl_conversas_versao"  # muda quando mensagens são lidas ou um nome muda: as listas abertas se atualizam
 
 
 def _chave(telefone: str) -> str:
@@ -52,6 +62,7 @@ def _salvar_nome(db: Session, chave: str, nome: str, usuario: Usuario) -> bool:
         db.add(ContatoWhatsApp(telefone=chave, nome=nome))
     else:
         contato.nome, contato.atualizado_em = nome, agora()
+    _mudou(db)  # as listas abertas mostram o nome novo
     if nome and config.WHATSAPP_PONTE:
         db.add(ComandoWhatsApp(acao="renomear_contato", usuario_id=usuario.id,
                                dados=json.dumps({"telefone": "55" + chave if len(chave) in (10, 11) else chave,
@@ -74,7 +85,26 @@ def _numero_padrao(db: Session, usuario: Usuario) -> str:
 
 
 def _tela_vista(db: Session) -> None:
-    gravar_config(db, "wl_tela_vista_em", agora().isoformat())  # a ponte troca a cada 3 s enquanto a tela está aberta
+    whatsapp_leads.marcar_tela(db, TELA_ABERTA)
+
+
+def _mudou(db: Session) -> None:
+    """Muda a versão das conversas (um código novo a cada vez: duas mudanças no mesmo segundo também contam)."""
+    gravar_config(db, VERSAO, secrets.token_hex(8))
+
+
+def _marca(*partes) -> str:
+    """Assinatura curta do que a tela mostra: igual à da última vez = nada mudou."""
+    return hashlib.sha256(json.dumps(partes, default=str).encode()).hexdigest()[:20]
+
+
+def _marcar_lidas(db: Session, da_conversa: tuple) -> None:
+    """As mensagens recebidas da conversa ficam lidas (a lista tira o número de não lidas)."""
+    feitas = db.execute(update(MensagemWhatsApp).where(*da_conversa, MensagemWhatsApp.direcao == "entrada",
+                                                       MensagemWhatsApp.lida.is_(False)).values(lida=True)
+                        .execution_options(synchronize_session=False)).rowcount
+    if feitas:
+        _mudou(db)  # as listas abertas (desta e de outras pessoas) se atualizam
     db.commit()
 
 
@@ -92,9 +122,17 @@ def tela_conversas(request: Request, telefone: str = "", usuario: Usuario = Depe
 
 
 @rotas.get("/conversas/api/lista")
-def lista(busca: str = "", numero: str = "", usuario: Usuario = Depends(exige("conversas.ver")), db: Session = Depends(obter_db)):
+def lista(busca: str = "", numero: str = "", marca: str = "", usuario: Usuario = Depends(exige("conversas.ver")),
+          db: Session = Depends(obter_db)):
     _tela_vista(db)
     numeros = _numeros(db, usuario, numero)
+    situacao = _situacao(db, numero or _numero_padrao(db, usuario))
+    # Nenhuma mensagem nova (de nenhum número), nada lido e nenhum nome mudado desde a última vez: a lista é a mesma e
+    # não é refeita (é a consulta mais pesada da tela). O maior id vem do índice principal, sem passar pelas mensagens.
+    ultima = db.execute(select(func.max(MensagemWhatsApp.id)).execution_options(sem_filtro_de_ar=True)).scalar()
+    atual = _marca(ultima, ler_config(db, VERSAO), sorted(numeros), busca.strip(), numero)
+    if marca and marca == atual:
+        return JSONResponse({"igual": True, "marca": atual, "situacao": situacao})
     nomes_numeros = {c.id: c.nome for c in conexoes.todas(db)}
     # Uma linha por contato e número, a conversa mais recente primeiro (pela data da mensagem)
     consulta = (select(MensagemWhatsApp.conexao, MensagemWhatsApp.telefone,
@@ -130,8 +168,8 @@ def lista(busca: str = "", numero: str = "", usuario: Usuario = Depends(exige("c
                           "numero": conexao, "numero_nome": nomes_numeros.get(conexao, conexao),
                           "nome": nome, "ultima": m.texto[:120], "ultima_direcao": m.direcao,
                           "quando": _quando_curto(m.criado_em), "nao_lidas": int(nao_lidas or 0)})
-    return JSONResponse({"conversas": resultado, "situacao": _situacao(db, numero or _numero_padrao(db, usuario)),
-                         "varios_numeros": len(_numeros(db, usuario)) > 1})
+    return JSONResponse({"conversas": resultado, "situacao": situacao, "varios_numeros": len(_numeros(db, usuario)) > 1,
+                         "marca": atual})
 
 
 def _ultimas_mensagens(db: Session, conexoes_: set, telefones: set) -> dict:
@@ -175,23 +213,35 @@ def _situacao(db: Session, numero: str) -> dict:
 
 
 @rotas.get("/conversas/api/conversa/{telefone}")
-def conversa(telefone: str, numero: str = "", usuario: Usuario = Depends(exige("conversas.ver")), db: Session = Depends(obter_db)):
+def conversa(telefone: str, numero: str = "", marca: str = "", usuario: Usuario = Depends(exige("conversas.ver")),
+             db: Session = Depends(obter_db)):
     _tela_vista(db)
     chave = _chave(telefone)
     numero = numero if numero in _numeros(db, usuario) else _numero_padrao(db, usuario)
     if not numero:
         return JSONResponse({"erro": "Você ainda não tem número de WhatsApp. Conecte em WhatsApp > Meu WhatsApp."},
                             status_code=403)
-    mensagens = list(db.execute(select(MensagemWhatsApp).where(MensagemWhatsApp.telefone == chave,
-                                                               MensagemWhatsApp.conexao == numero)
+    da_conversa = (MensagemWhatsApp.telefone == chave, MensagemWhatsApp.conexao == numero)
+    # Primeiro só o que muda: as 30 mensagens mais novas (id e status, sem o texto) e o que está saindo agora. A conversa
+    # inteira (até 300 mensagens, com o texto) só vai quando algo mudou: numa conversa longa eram ~60 KB a cada 5 s.
+    recentes = db.execute(select(MensagemWhatsApp.id, MensagemWhatsApp.status, MensagemWhatsApp.direcao,
+                                 MensagemWhatsApp.lida).where(*da_conversa)
+                          .order_by(MensagemWhatsApp.id.desc()).limit(30)).all()
+    pendentes = [p for p in db.execute(select(PonteWhatsApp).where(
+        PonteWhatsApp.manual.is_(True), PonteWhatsApp.conexao == numero,
+        PonteWhatsApp.status.in_(["aguardando", "retirada"])).order_by(PonteWhatsApp.id)).scalars().all()
+        if _chave(p.telefone) == chave]
+    atual = _marca(chave, numero, [(r.id, r.status) for r in recentes], [p.id for p in pendentes])
+    igual = bool(marca) and marca == atual
+    if not igual or any(r.direcao == "entrada" and not r.lida for r in recentes):
+        _marcar_lidas(db, da_conversa)
+    if igual:
+        return JSONResponse({"igual": True, "marca": atual, "situacao": _situacao(db, numero)})
+    mensagens = list(db.execute(select(MensagemWhatsApp.direcao, MensagemWhatsApp.texto, MensagemWhatsApp.status,
+                                       MensagemWhatsApp.erro, MensagemWhatsApp.origem, MensagemWhatsApp.nome,
+                                       MensagemWhatsApp.criado_em).where(*da_conversa)
                                 .order_by(MensagemWhatsApp.criado_em.desc(), MensagemWhatsApp.id.desc())
-                                .limit(300)).scalars())[::-1]
-    for m in [m for m in mensagens if m.direcao == "entrada" and not m.lida]:
-        m.lida = True
-    db.commit()
-    pendentes = db.execute(select(PonteWhatsApp).where(PonteWhatsApp.manual.is_(True), PonteWhatsApp.conexao == numero,
-                                                       PonteWhatsApp.status.in_(["aguardando", "retirada"]))
-                           .order_by(PonteWhatsApp.id)).scalars().all()
+                                .limit(300)).all())[::-1]
     lead = sdr.lead_pelo_telefone(db, chave)
     escolhido = db.get(ContatoWhatsApp, chave)
     nome = (escolhido.nome if escolhido and escolhido.nome else "") \
@@ -202,11 +252,11 @@ def conversa(telefone: str, numero: str = "", usuario: Usuario = Depends(exige("
                        "quando": m.criado_em.strftime("%d/%m %H:%M"), "dia": m.criado_em.strftime("%Y-%m-%d"),
                        "hora": m.criado_em.strftime("%H:%M")} for m in mensagens],
         "enviando": [{"texto": p.texto, "quando": p.criado_em.strftime("%d/%m %H:%M"),
-                      "dia": p.criado_em.strftime("%Y-%m-%d"), "hora": p.criado_em.strftime("%H:%M")} for p in pendentes
-                     if _chave(p.telefone) == chave],
+                      "dia": p.criado_em.strftime("%Y-%m-%d"), "hora": p.criado_em.strftime("%H:%M")} for p in pendentes],
         "lead": {"id": lead.id, "empresa": lead.empresa, "status": lead.status, "opt_out": lead.opt_out}
         if lead and pode_ver(usuario, lead) else None,
         "situacao": _situacao(db, numero),
+        "marca": atual,
     })
 
 

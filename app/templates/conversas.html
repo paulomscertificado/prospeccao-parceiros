@@ -146,6 +146,8 @@ const NOMES_NUMEROS = Object.fromEntries({{ numeros|json }}.map(n => [n.id, n.no
 const filtroNumero = () => (document.getElementById('numero') || {}).value || '';
 let modoNovo = false;
 let assinatura = '';
+// "marca" do que já está na tela: o sistema responde só "igual" quando nada mudou (gasta pouco do banco da nuvem)
+let marcaConversa = '', marcaLista = '', chaveLista = '';
 const el = id => document.getElementById(id);
 const escapar = t => (t || '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 const STATUS = { na_fila: '🕓', enviada: '<span class="ok">✓</span>', erro: '⚠️ não saiu', cancelada: 'cancelada', recebida: '' };
@@ -181,11 +183,21 @@ function mostrarSituacao(s) {
   else a.style.display = 'none';
 }
 
-async function carregarLista() {
+function marcarAtiva() {
+  el('lista').querySelectorAll('[data-tel]').forEach(a => a.classList.toggle('ativa',
+    !modoNovo && a.dataset.tel === atual && a.dataset.numero === numeroAtual));
+}
+
+async function carregarLista(forcar) {
+  const busca = el('busca').value, numero = filtroNumero(), chave = busca + '|' + numero;
+  const marca = !forcar && chave === chaveLista ? marcaLista : '';
   let d;
-  try { d = await (await fetch('/conversas/api/lista?busca=' + encodeURIComponent(el('busca').value)
-                               + '&numero=' + encodeURIComponent(filtroNumero()))).json(); } catch (e) { return; }
+  try { d = await (await fetch('/conversas/api/lista?busca=' + encodeURIComponent(busca) + '&numero=' + encodeURIComponent(numero)
+                               + (marca ? '&marca=' + encodeURIComponent(marca) : ''))).json(); } catch (e) { return; }
   mostrarSituacao(d.situacao);
+  if (d.igual) return;  // nada mudou: a lista continua a mesma
+  if (busca !== el('busca').value || numero !== filtroNumero()) return;  // a busca mudou enquanto esperava
+  marcaLista = d.marca || ''; chaveLista = chave;
   el('lista').innerHTML = d.conversas.length ? d.conversas.map(c => `
     <a class="chat-item ${c.telefone === atual && c.numero === numeroAtual && !modoNovo ? 'ativa' : ''} ${c.nao_lidas ? 'nao-lida' : ''}" data-tel="${c.telefone}" data-numero="${c.numero}">
       <div class="avatar" style="background:${cor(c.telefone)}">${escapar(iniciais(c.nome, c.telefone))}</div>
@@ -199,10 +211,14 @@ async function carregarLista() {
   el('lista').querySelectorAll('[data-tel]').forEach(a => a.addEventListener('click', () => abrir(a.dataset.tel, a.dataset.numero)));
 }
 
-async function carregarConversa(rolar) {
+async function carregarConversa(rolar, forcar) {
   if (!atual || modoNovo) return;
+  const pedido = atual + '|' + numeroAtual, marca = rolar || forcar ? '' : marcaConversa;
   let d;
-  try { d = await (await fetch('/conversas/api/conversa/' + encodeURIComponent(atual) + '?numero=' + encodeURIComponent(numeroAtual))).json(); } catch (e) { return; }
+  try { d = await (await fetch('/conversas/api/conversa/' + encodeURIComponent(atual) + '?numero=' + encodeURIComponent(numeroAtual)
+                               + (marca ? '&marca=' + encodeURIComponent(marca) : ''))).json(); } catch (e) { return; }
+  if (pedido !== atual + '|' + numeroAtual) return;  // outra conversa foi aberta enquanto esperava
+  if (d.igual) { mostrarSituacao(d.situacao); return; }  // nada mudou: não baixa nem redesenha
   if (d.erro) { el('mensagens').innerHTML = `<div class="vazio-chat"><p>${escapar(d.erro)}</p></div>`; return; }
   if (el('form-nome').style.display === 'none') {
     el('c-nome').textContent = d.nome || d.telefone_formatado;
@@ -213,6 +229,7 @@ async function carregarConversa(rolar) {
   }
   el('c-lead').innerHTML = d.lead ? `· Lead: <a href="/leads/${d.lead.id}">${escapar(d.lead.empresa)}</a> <span class="selo selo-azul">${escapar(d.lead.status)}</span>` : '';
   el('c-optout').style.display = d.lead && d.lead.opt_out ? '' : 'none';
+  marcaConversa = d.marca || '';
   const todas = d.mensagens.concat(d.enviando.map(m => ({ ...m, direcao: 'saida', enviando: true })));
   const nova = JSON.stringify(todas.map(m => [m.texto, m.status, m.hora]));
   if (nova === assinatura && !rolar) { mostrarSituacao(d.situacao); return; }  // nada mudou: não redesenha
@@ -234,7 +251,7 @@ async function carregarConversa(rolar) {
 }
 
 function abrir(telefone, numero) {
-  atual = telefone; modoNovo = false; assinatura = '';
+  atual = telefone; modoNovo = false; assinatura = ''; marcaConversa = '';
   if (numero) numeroAtual = numero;
   el('sem-conversa').style.display = 'none';
   el('area-conversa').style.display = 'flex';
@@ -242,7 +259,9 @@ function abrir(telefone, numero) {
   el('editar-nome').style.display = '';
   fecharNome();
   history.replaceState(null, '', '/conversas?telefone=' + telefone + '&numero=' + numeroAtual);
-  carregarConversa(true); carregarLista();
+  marcarAtiva();
+  // primeiro a conversa (que marca as mensagens como lidas), depois a lista (que então tira o "não lida")
+  carregarConversa(true).then(() => carregarLista());
   el('texto').focus();
 }
 
@@ -258,7 +277,7 @@ el('nova').addEventListener('click', () => {
   el('mensagens').innerHTML = '<div class="vazio-chat"><p>Digite o celular, o nome (opcional) e a mensagem.</p></div>';
   el('novo-telefone').value = ''; el('novo-nome').value = '';
   el('novo-telefone').focus();
-  carregarLista();
+  marcarAtiva();
 });
 
 async function enviar(ev) {
@@ -295,19 +314,20 @@ el('form-nome').addEventListener('submit', async ev => {
   try {
     const r = await postarJSON('/conversas/api/nome', { telefone: atual, nome: el('campo-nome').value });
     el('c-nome').textContent = r.nome; avatar(el('c-avatar'), r.nome, atual);
-    fecharNome(); aviso('Nome salvo.'); carregarLista(); assinatura = ''; carregarConversa(false);
+    fecharNome(); aviso('Nome salvo.'); carregarLista(true); assinatura = ''; carregarConversa(false, true);
   } catch (e) { alert(e.message); }
 });
 
-carregarLista();
-if (atual) abrir(atual, numeroAtual);
-// Atualiza só com a aba visível (aba escondida não gasta o tráfego do banco); a lista a cada 15 s, a conversa a cada 5 s
+if (atual) abrir(atual, numeroAtual); else carregarLista();
+// Atualiza só com a aba visível (aba escondida não gasta o tráfego do banco): a conversa a cada 5 s e a lista a cada
+// 15 s, e cada vez o sistema só confere se algo mudou. A cada 5 min vem tudo de novo (lead, nomes, números).
 let voltas = 0;
 setInterval(() => {
   if (document.visibilityState !== 'visible') return;
   voltas += 1;
-  if (voltas % 3 === 0) carregarLista();
-  carregarConversa(false);
+  const tudo = voltas % 60 === 0;
+  if (voltas % 3 === 0) carregarLista(tudo);
+  carregarConversa(false, tudo);
 }, 5000);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') { carregarLista(); carregarConversa(false); }

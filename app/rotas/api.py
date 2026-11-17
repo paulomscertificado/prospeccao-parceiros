@@ -14,7 +14,7 @@ from sqlalchemy import func, or_, select, update
 
 from .. import config, mensagens, relogio, sdr, trabalhos, util, whatsapp_oficial
 from ..rotinas import responder_automaticamente, rodada
-from ..banco import agora, gravar_config, ler_config_int, sessao, usar_config_da_ar
+from ..banco import agora, gravar_config, ler_config_int, ler_config_json, sessao, usar_config_da_ar
 from ..integracoes import whatsapp_cloud
 from ..modelos import ComandoWhatsApp, Lead, Mensagem, MensagemWhatsApp, PonteWhatsApp
 from ..seguranca import ip_de, limite_api
@@ -266,9 +266,15 @@ async def ponte_troca(request: Request):
             comandos.append({"id": c.id, "acao": c.acao, "dados": json.loads(c.dados or "{}")})
         desde = ler_config_int(db, "wl_ultimo_id", 0)
         desde_conversas = ler_config_int(db, "wl_conv_ultimo_id", 0)
-        # rápido com a tela WhatsApp/Conversas aberta, com pedidos ou enquanto as conversas antigas são copiadas
-        rapido = comandos or envios or _tela_aberta(db) or ler_config_int(db, "wl_conv_pendente", 0)
-        intervalo = 3 if rapido else 30
+        # Rápido (3 s; o computador usa no mínimo 5) com a tela WhatsApp aberta, com pedidos ou enquanto as conversas
+        # antigas são copiadas; 10 s com a tela Conversas aberta (antes 5 s: cada troca são consultas no banco da nuvem;
+        # 17/11/2026); 30 s parado (o computador então usa o ritmo dele: 1 min de dia, 5 min à noite).
+        if comandos or envios or ler_config_int(db, "wl_conv_pendente", 0) or _tela_aberta(db, "wl_tela_vista_em"):
+            intervalo = 3
+        elif _tela_aberta(db, "wl_conversas_vista_em"):
+            intervalo = 10
+        else:
+            intervalo = 30
     return {"desde": desde, "envios": envios, "comandos": comandos, "intervalo": intervalo,
             "desde_conversas": desde_conversas}
 
@@ -278,8 +284,24 @@ CAMPOS_STATUS = ("conectado", "tipo", "estado", "numero", "enviadas_hoje", "limi
                  "espera")  # de quantos em quantos segundos o computador dá sinal (1 min de dia, 5 min à noite)
 
 
+STATUS_IGUAL_SEG = 50  # status igual ao gravado: só grava de novo (para o "visto_em") depois disto
+
+
 def _gravar_status(db, recebido: dict) -> None:
-    status = {k: recebido.get(k) for k in CAMPOS_STATUS}
+    from datetime import datetime
+
+    status = json.loads(json.dumps({k: recebido.get(k) for k in CAMPOS_STATUS}, default=str))
+    # O computador manda o status a cada troca (de 5 em 5 s com a tela aberta). Igual ao gravado e com o último sinal
+    # recente, não grava de novo: cada gravação é uma escrita no banco da nuvem (17/11/2026). O "visto_em" fica no
+    # máximo 50 s para trás, longe do limite que diz "computador desligado" (whatsapp_leads.SEGUNDOS_SEM_SINAL, 3 min).
+    anterior = ler_config_json(db, "wl_status", {})
+    if isinstance(anterior, dict):
+        try:
+            visto = datetime.fromisoformat(str(anterior.pop("visto_em", "")))
+            if anterior == status and 0 <= (agora() - visto).total_seconds() < STATUS_IGUAL_SEG:
+                return
+        except ValueError:
+            pass
     status["visto_em"] = agora().isoformat()
     gravar_config(db, "wl_status", status)
 
@@ -322,14 +344,15 @@ def _guardar_conversas(db, conversas: dict) -> None:
     gravar_config(db, "wl_conv_pendente", "1" if len(mensagens) >= 300 else "0")
 
 
-def _tela_aberta(db) -> bool:
-    """Alguém está com a tela WhatsApp aberta (ela se atualiza a cada 3 s)? Então a ponte troca a cada 3 s."""
+def _tela_aberta(db, chave: str) -> bool:
+    """Alguém está com a tela WhatsApp ("wl_tela_vista_em") ou Conversas ("wl_conversas_vista_em") aberta? Cada tela
+    anota isso no máximo a cada 10 s (whatsapp_leads.marcar_tela): vale por 30 s."""
     from datetime import datetime
 
     from ..banco import ler_config
 
     try:
-        return (agora() - datetime.fromisoformat(ler_config(db, "wl_tela_vista_em"))).total_seconds() < 20
+        return (agora() - datetime.fromisoformat(ler_config(db, chave))).total_seconds() < 30
     except ValueError:
         return False
 

@@ -34,6 +34,8 @@ no navegador, de qualquer lugar: não precisa do `iniciar.bat`. O passo a passo 
   celular (digite com DDD). Sai na hora pelo número da MS; quem pediu SAIR não recebe.
   O celular aparece sempre com o 9 na frente, mesmo quando o WhatsApp entrega o número antigo sem ele; a busca
   acha o contato digitando o número com ou sem o 9.
+  A tela se atualiza sozinha enquanto está aberta: mensagem nova aparece em até uns 15 segundos. Para gastar pouco
+  do banco da nuvem, ela só baixa a conversa de novo quando algo mudou (mensagem nova, status, mensagem lida).
   Para trocar o nome de um contato, abra a conversa e clique em **✏️ Editar nome** (o nome muda também no
   WhatsApp Leads).
   As conversas antigas (até 1 ano) chegam quando o celular é conectado pelo QR code. Para puxar de novo: menu

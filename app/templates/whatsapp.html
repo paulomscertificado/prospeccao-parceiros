@@ -207,12 +207,19 @@ function mostrar(e) {
     ap.textContent = p.status === 'erro' ? `${p.acao}: não deu certo (${p.erro}).` : `${p.acao}: aguardando o computador do WhatsApp...`;
   } else { ap.style.display = 'none'; }
 }
-mostrar({{ estado|json }});
-// só com a aba visível: aba escondida não gasta tráfego nem deixa a ponte do WhatsApp no modo rápido
-setInterval(async () => {
-  if (document.visibilityState !== 'visible') return;
-  try { mostrar(await (await fetch('/whatsapp/estado')).json()); } catch (e) {}
-}, 3000);
+let estadoAtual = {{ estado|json }};
+mostrar(estadoAtual);
+// Só com a aba visível: aba escondida não gasta tráfego nem deixa a ponte do WhatsApp no modo rápido.
+// De 3 em 3 s com QR code na tela ou pedido esperando o computador; senão de 10 em 10 s (economia do banco)
+const pressa = e => !!e && ((e.pedido && !['feito', 'erro'].includes(e.pedido.status))
+  || (e.numeros || []).some(n => (n.situacao || {}).estado_codigo === 'aguardando_qr'));
+async function atualizar() {
+  if (document.visibilityState === 'visible') {
+    try { estadoAtual = await (await fetch('/whatsapp/estado')).json(); mostrar(estadoAtual); } catch (e) {}
+  }
+  setTimeout(atualizar, pressa(estadoAtual) ? 3000 : 10000);
+}
+setTimeout(atualizar, pressa(estadoAtual) ? 3000 : 10000);
 </script>
 {% endif %}
 {% endblock %}

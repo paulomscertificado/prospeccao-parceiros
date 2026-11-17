@@ -76,6 +76,16 @@ O modo nuvem liga sozinho quando a variável `VERCEL` existe (a Vercel cria) ou 
   WhatsApp só se atualizam com a aba visível; filas de e-mail e WhatsApp trazem só os ids e carregam as tarefas em lotes
   de 10 com o lead junto (`campanhas._em_lotes`); leitura de e-mails pergunta só pelos remetentes
   (`rotinas._EmailsDeLeads`); backup sem as conversas. Para conferir de novo: a consulta acima ordenada por `rows`.
+  **17/11/2026 (consumo alto de novo):** com a tela Conversas aberta, a conversa inteira (até 300 mensagens, ~60 KB
+  nas conversas longas, que passam de 5 mil mensagens) ia a cada 5 s e a lista era refeita a cada 15 s passando por
+  todas as 169 mil mensagens. Agora cada atualização manda a **marca** do que a tela já tem
+  (`conversas._marca`): a conversa confere só as 30 mensagens mais novas (id e status) e o que está saindo; a lista,
+  o maior id de `mensagens_whatsapp` (índice principal) e a versão `wl_conversas_versao` (muda ao ler mensagens ou
+  trocar um nome, `conversas._mudou`). Nada mudou = resposta `{"igual": true}`; tudo de novo só quando muda, ao
+  abrir a conversa e a cada 5 min. A ponte troca a cada 10 s com a tela Conversas aberta (era 5 s; a tela WhatsApp
+  continua 5 s), a tela WhatsApp se atualiza de 10 em 10 s (3 s só com QR code ou pedido esperando), as telas anotam
+  que estão abertas no máximo a cada 10 s (`whatsapp_leads.marcar_tela`) e o status do computador (`wl_status`) só é
+  regravado quando muda ou a cada 50 s (`api._gravar_status`). Teste: `testes/test_economia_banco.py`.
 - **Base da Receita na nuvem.** A tela Configurações > Integrações não importa a base na nuvem: uma importação
   inteira não cabe no limite de 500 MB junto com o resto. Ramo ou região novos entram por importação própria e
   filtrada (como os restaurantes da Região Metropolitana do Recife), feita pelo suporte.
@@ -112,8 +122,11 @@ execução e, se o sistema for fechado no meio, continua ao abrir de novo.
 **Tela WhatsApp** (`rotas/whatsapp.py`, menu "WhatsApp"): a mesma tela do WhatsApp Leads (situação, QR code,
 modo teste, pausar, desligar, regras de envio). Cada botão vira um pedido na tabela `comandos_whatsapp`; a troca
 entrega os pedidos (`comandos`, marcados "retirado") e o retorno devolve o resultado e o status atualizado
-(com o QR code em imagem). Enquanto a tela está aberta (`wl_tela_vista_em` < 20 s), a troca responde
-`intervalo: 3` e o WhatsApp Leads passa a trocar a cada 3 s; fora disso, no ritmo de cima. Só o administrador age.
+(com o QR code em imagem). Enquanto a tela está aberta (`wl_tela_vista_em` < 30 s, anotado no máximo a cada 10 s
+por `whatsapp_leads.marcar_tela`), a troca responde `intervalo: 3` e o WhatsApp Leads passa a trocar a cada 5 s (o
+mínimo dele); com a tela Conversas aberta (`wl_conversas_vista_em`), `intervalo: 10`; fora disso, no ritmo de cima.
+A tela se atualiza de 3 em 3 s só com QR code ou pedido esperando o computador; senão, de 10 em 10 s. Só o
+administrador age.
 
 **Vários números** (`app/conexoes.py`, tabela `conexoes_whatsapp`): cada usuário conecta o próprio número (id
 `u<id do usuário>`; o da MS é `principal`). No WhatsApp Leads cada número é um conector (`whatsapp.Conexoes`,
@@ -206,5 +219,5 @@ esquema guardada em `configuracoes.versao_esquema`).
 - `dados/chamar_cron.ps1`: pula se chamou há menos de 50 s (a tarefa tem 2 gatilhos repetindo a cada minuto) e,
   fora do horário comercial (antes das 07:30, depois das 19:00 e fim de semana), chama só a cada 15 min.
 - Ponte do WhatsApp Leads (`whatsapp-leads/app/ponte_nuvem.py`): parada, troca a cada 60 s no horário comercial e
-  300 s fora dele (mínimo 5 s com a tela aberta); a segunda chamada (`/api/ponte/retorno`) só sai quando há novidade
+  300 s fora dele (5 s com a tela WhatsApp aberta, 10 s com a tela Conversas); a segunda chamada (`/api/ponte/retorno`) só sai quando há novidade
   (ou a cada 10 min).

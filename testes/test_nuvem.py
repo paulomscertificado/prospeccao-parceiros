@@ -210,9 +210,10 @@ def test_tela_whatsapp_na_nuvem_manda_pedidos_pela_ponte(cliente, nuvem):
               "qr": "data:image/png;base64,QRTESTE", "numero": "", "enviadas_hoje": 0, "limite_diario": 200,
               "regras": {"intervalo_min_seg": "8", "intervalo_max_seg": "20", "limite_diario": "200",
                          "horario_inicio": "08:00", "horario_fim": "20:00", "palavras_sair": "SAIR"}}
-    # sem a tela aberta, a ponte troca a cada 30 s
+    # sem a tela aberta (nem a WhatsApp nem a Conversas), a ponte troca a cada 30 s
     with sessao() as db:
         gravar_config(db, "wl_tela_vista_em", "")
+        gravar_config(db, "wl_conversas_vista_em", "")
     assert cliente.post("/api/ponte/troca", json={"status": status}, headers=cab).json()["intervalo"] == 30
     pagina = cliente.get("/whatsapp")
     assert pagina.status_code == 200 and "Conectar com QR code" in pagina.text and "Regras de envio" in pagina.text

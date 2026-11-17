@@ -3,7 +3,8 @@
 Os números ficam ligados no computador da MS (WhatsApp Leads, um conector por número; ver app/conexoes.py).
 Na nuvem, cada botão vira um pedido (tabela comandos_whatsapp, com o id do número) que o WhatsApp Leads busca
 pela ponte; a situação e o QR code de cada número voltam pela ponte. Enquanto esta tela está aberta, a ponte
-troca a cada 3 segundos (ver /api/ponte/troca).
+troca a cada 5 segundos (ver /api/ponte/troca). A tela se atualiza de 3 em 3 s com QR code ou pedido esperando o
+computador e de 10 em 10 s no resto do tempo (economia do banco da nuvem, 17/11/2026).
 """
 
 import json
@@ -14,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import autorizacao, config, conexoes, marca, whatsapp_oficial
-from ..banco import agora, gravar_config, obter_db
+from ..banco import agora, obter_db
 from ..integracoes import whatsapp_cloud, whatsapp_leads
 from ..modelos import ComandoWhatsApp, ConexaoWhatsApp, Usuario
 from ..seguranca import exige, registrar_log, verificar_csrf
@@ -35,11 +36,10 @@ def _cartao(db: Session, usuario: Usuario, c: ConexaoWhatsApp, base: dict, nomes
 
 
 def _estado(db: Session, usuario: Usuario) -> dict:
-    """Situação para a tela (e para a atualização automática a cada 3 s)."""
-    gravar_config(db, "wl_tela_vista_em", agora().isoformat())  # a ponte passa a trocar a cada 3 s
-    db.commit()
+    """Situação para a tela (e para a atualização automática: 3 s com QR code ou pedido esperando, senão 10 s)."""
+    whatsapp_leads.marcar_tela(db, "wl_tela_vista_em")  # a ponte passa a trocar a cada 5 s
     base = whatsapp_leads.status(usar_cache=False)
-    nomes = {u.id: u.nome for u in db.execute(select(Usuario)).scalars()}
+    nomes = dict(db.execute(select(Usuario.id, Usuario.nome)).all())  # só o nome (antes vinha o cadastro inteiro)
     lista = (conexoes.todas(db) if autorizacao.pode(usuario, "whatsapp.compartilhar_todos")
              else conexoes.acessiveis(db, usuario))  # quem compartilha os números de todos vê todos
     cartoes = [_cartao(db, usuario, c, base, nomes) for c in lista]
