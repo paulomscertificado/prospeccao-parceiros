@@ -1275,7 +1275,9 @@ def whatsapp_liberado(db, lead: Lead) -> bool:
 TIPOS_QUE_SAEM_SOZINHOS = ("empresas_novas", "renovacao")
 # Empresas novas (pedido da Maria em 12/11/2026): quem tem WhatsApp e e-mail recebe os dois em cada toque, mas o WhatsApp
 # tem prioridade: o e-mail do toque é marcado para umas 2 h depois dele (cadencias.depois_de) e a fila de e-mail só o
-# solta depois que o WhatsApp da empresa saiu (_whatsapp_da_empresa_pendente). Renovação: igual.
+# solta depois que o WhatsApp da empresa saiu (_whatsapp_da_empresa_pendente). Renovação: igual. E-mail ATRASADO (marcado
+# para um dia que já passou) não espera mais o WhatsApp: com a fila do WhatsApp cheia, os e-mails acumulavam junto
+# (pedido da Maria em 17/11/2026: "soltar os e-mails").
 TIPOS_WHATSAPP_PRIMEIRO = ("empresas_novas", "renovacao")
 NOMES_DOS_TIPOS = {"empresas_novas": "campanha de Empresas novas aprovada",
                    "renovacao": "campanha de Renovação aprovada"}
@@ -1350,11 +1352,12 @@ def _whatsapp_da_empresa_pendente(hoje: date):
     """Condição do banco (fila de e-mail): a mesma empresa tem, na mesma campanha, um WhatsApp marcado para antes (ou
     para a mesma hora) que ainda não saiu e ainda pode sair sozinho (até DIAS_ATRASO_AUTOMATICO de atraso, com o
     campo WhatsApp preenchido). Assim o e-mail das Empresas novas sai depois do WhatsApp; WhatsApp travado (esperando
-    clique) ou sem número não segura o e-mail."""
+    clique) ou sem número não segura o e-mail. E-mail atrasado (de um dia que já passou) não espera (17/11/2026)."""
     zap = aliased(Tarefa)
     dono = aliased(Lead)
     hora_zap, hora = func.coalesce(zap.hora, ""), func.coalesce(Tarefa.hora, "")
     return (select(zap.id).join(dono, dono.id == zap.lead_id).where(
+        Tarefa.data >= hoje,  # o e-mail ainda é de hoje (ou de depois): atrasado sai sem esperar o WhatsApp
         zap.campanha_id == Tarefa.campanha_id, zap.lead_id == Tarefa.lead_id, zap.canal == "whatsapp",
         zap.status == "pendente", zap.id != Tarefa.id, zap.data >= hoje - timedelta(days=DIAS_ATRASO_AUTOMATICO),
         func.trim(func.coalesce(dono.whatsapp, "")) != "",
@@ -1365,7 +1368,8 @@ def emails_que_esperam_whatsapp(db, tarefas, hoje: date | None = None) -> set[in
     """Dos e-mails informados, os de Empresas novas que esperam o WhatsApp da mesma empresa sair primeiro (a mesma
     regra da fila de e-mail, _whatsapp_da_empresa_pendente), para as telas Minha fila e Envios."""
     hoje = hoje or date.today()
-    emails = [t for t in tarefas if t.canal == "email" and t.campanha_id and t.lead_id]
+    # e-mail atrasado (de um dia que já passou) não espera o WhatsApp (17/11/2026)
+    emails = [t for t in tarefas if t.canal == "email" and t.campanha_id and t.lead_id and t.data >= hoje]
     if not emails:
         return set()
     tipos = dict(db.execute(select(Campanha.id, Campanha.tipo).where(

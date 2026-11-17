@@ -760,6 +760,10 @@ def test_minha_fila_mostra_hora_e_envia_agora(cliente, monkeypatch):
     enviados = []
     monkeypatch.setattr(mensagens, "dentro_do_horario", lambda db, momento=None: True)
     monkeypatch.setattr(email_smtp, "enviar", lambda para, assunto, texto, **k: enviados.append(para) or "id-2")
+    # Os outros testes mandam e-mails nesta mesma hora e no mesmo banco: com os limites de e-mail cheios, o "Enviar
+    # agora" era recusado e este teste falhava só na bateria completa (17/11/2026). Limites folgados só aqui.
+    monkeypatch.setattr(mensagens, "limite_diario", lambda db, canal: 0)
+    monkeypatch.setattr(mensagens, "enviadas_na_hora", lambda db, canal, conexao=None: 0)
     with sessao() as db:
         admin = _admin(db)
         lead = _novo_lead(db, "Envio Agora Ltda", email="agora@envioagora.com.br")

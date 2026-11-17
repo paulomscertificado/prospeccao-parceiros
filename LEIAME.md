@@ -76,11 +76,14 @@ Geral > "Mostrar Vendas, Vencimentos e Comissões" = 1 > Salvar.
 
 ### Regras importantes (anti-spam e LGPD)
 - O sistema **nunca dispara mensagens sozinho**. Cada mensagem é enviada por uma pessoa.
-- Há **limite diário** de mensagens e um **intervalo mínimo** entre mensagens para o mesmo lead (Configurações).
-  No WhatsApp, o limite (40 por dia) vale para **cada número** conectado.
-- **Proteção dos números de WhatsApp contra bloqueio:** cada número faz no máximo **20 contatos frios por dia**
-  (mensagem para quem nunca conversou com a MS; vale também para o botão Disparar e para as Empresas novas). Quem já
-  conversou ou autorizou não entra nessa conta. Se **3 pessoas pedirem para sair no mesmo dia**, os contatos frios
+- Há **limites** de mensagens (por hora e, se ligado, por dia) e um **intervalo mínimo** entre mensagens para o mesmo
+  lead (Configurações). No WhatsApp, os limites valem para **cada número** conectado. **Desde 17/11/2026 (decisão da
+  Maria, que aceitou o risco de bloqueio) o WhatsApp não tem limite por dia: só 15 por hora por número**, com as
+  pausas entre uma mensagem e outra; no WhatsApp Leads o limite diário ficou em 300 (Regras de envio).
+- **Proteção dos números de WhatsApp contra bloqueio:** o teto de **contatos frios por número por dia** (era 20;
+  mensagem para quem nunca conversou com a MS) está **desligado desde 17/11/2026** (Configurações > Geral, 0 = sem
+  teto; para religar, ponha o número de volta). Quem já conversou ou autorizou não entra nessa conta. Continua valendo:
+  se **3 pessoas pedirem para sair no mesmo dia**, os contatos frios
   daquele número param até o dia seguinte (e chega um aviso por e-mail). **Resposta automática de robô** ("recebemos
   sua mensagem...") **não conta** como conversa: não libera envio automático. Os dois números se ajustam em
   Configurações > Geral.
@@ -173,8 +176,8 @@ preço nem comissão e não fecha parceria.
 3. Você confere e clica em **APROVAR CAMPANHA** (ou edita/cancela). Nada sai antes disso.
 4. **Aprovou, entrou na fila.** Os e-mails e os WhatsApps saem sozinhos, cada um no seu horário, também para quem
    nunca conversou com a MS (desde 12/11/2026). O WhatsApp sai pelo celular conectado, uma mensagem a cada 3 minutos,
-   só no horário de envio, com os limites por hora e por dia, até 20 contatos frios por número por dia e pausa com 3
-   pedidos de SAIR. Toque atrasado mais de 2 dias espera o clique, para não sair tudo de uma vez, e o toque seguinte
+   só no horário de envio, com o limite por hora (sem limite por dia e sem teto de contatos frios desde 17/11/2026) e
+   pausa com 3 pedidos de SAIR. Toque atrasado mais de 2 dias espera o clique, para não sair tudo de uma vez, e o toque seguinte
    da mesma empresa espera o anterior sair (o "último contato" nunca chega antes da apresentação). A fila nunca manda
    dois WhatsApps para a mesma empresa em menos de 20 horas, mesmo com o intervalo mínimo em 0 nas Configurações.
    LinkedIn: sempre com um clique.
@@ -331,7 +334,7 @@ atraso; nenhum dia é buscado duas vezes e empresa que já entrou em campanha nu
 como leads (origem "Empresas novas (CNPJá)") e monta a campanha **"Empresas novas dd/mm – PE"**, que fica
 **aguardando aprovação**. Depois de aprovada, **tudo sai sozinho, sem clique**: o e-mail e o WhatsApp entram na fila
 e saem cada um no seu horário, um por vez, com as pausas e os limites do número (no máximo 1 a cada 3 minutos,
-15 por hora, 40 por dia por número, só no horário de envio; quem pede SAIR não recebe mais). Toque atrasado mais
+15 por hora por número, sem limite por dia desde 17/11/2026, só no horário de envio; quem pede SAIR não recebe mais). Toque atrasado mais
 de 2 dias não sai sozinho (espera um clique em **Minha fila**), para não sair tudo de uma vez. São 3 toques: dia 1 (boas-vindas + oferta do e-CNPJ), dia 3 (lembrete)
 e dia 7 (último contato). As mensagens podem ser editadas na própria tela. A IA não responde sozinha esses
 leads: as respostas vão para **Oportunidades** e o time conversa.
@@ -340,9 +343,9 @@ leads: as respostas vão para **Oportunidades** e o time conversa.
   50 ou 100; cada 10 gastam 1 crédito) e clique em **Buscar e montar campanha**. A campanha leva **todas** as
   empresas que vierem e puderem entrar: nada pago fica sem uso. O **Máximo de empresas por campanha diária**
   (passo 2) vale só para a busca automática, que pede à CNPJá o dobro desse número e usa esse número.
-- **Muitas empresas de uma vez:** o WhatsApp sai no ritmo seguro do número (no máximo 20 contatos frios por número
-  por dia, contando os lembretes). Com 50 ou 100 empresas, leva vários dias, e o toque atrasado mais de 2 dias
-  espera um clique em **Minha fila**.
+- **Muitas empresas de uma vez:** o WhatsApp sai no ritmo do número (até 15 por hora; o teto de contatos frios por
+  dia está desligado desde 17/11/2026). Com 50 ou 100 empresas, leva algumas horas ou dias, e o toque atrasado mais de
+  2 dias espera um clique em **Minha fila**.
 - **Custo:** cada 10 empresas encontradas gastam 1 crédito. Em PE abrem cerca de 380 empresas por dia
   (≈ 1.100 créditos por mês).
 - Os celulares que a Receita guarda sem o 9 ganham o 9 na frente (é um palpite: confira antes de enviar).
@@ -353,7 +356,8 @@ leads: as respostas vão para **Oportunidades** e o time conversa.
   cada toque ganha a versão por **e-mail**, marcada para umas 2 horas depois do WhatsApp (ou o dia seguinte, se não
   couber no horário). O e-mail só sai **depois** que o WhatsApp da empresa saiu; se ela responder no WhatsApp antes,
   o e-mail não sai. Se o WhatsApp travar (atrasado mais de 2 dias, esperando clique, ou sem número), o e-mail sai
-  assim mesmo. Quem não tem celular recebe só por e-mail. Para não mandar e-mail nenhum, desmarque o canal
+  assim mesmo. E o e-mail que ficou **atrasado** (era de um dia que já passou) sai sem esperar o WhatsApp: assim a
+  fila de e-mail não fica presa quando o WhatsApp está no limite do dia. Quem não tem celular recebe só por e-mail. Para não mandar e-mail nenhum, desmarque o canal
   **E-mail** no passo 4. As campanhas de **parceiros** da IA SDR também saem sozinhas desde 12/11/2026 (o
   administrador pode desligar em cada campanha).
 - **Buscar de novo não gasta à toa:** toda empresa que já veio entra numa lista de exclusão guardada na própria
@@ -426,8 +430,8 @@ renovação novo antes, para entrarem os clientes de janeiro).
 - **WhatsApp primeiro, e-mail depois:** igual às Empresas novas (o e-mail de cada aviso sai umas 2 horas depois do
   WhatsApp). Quem não tem celular na planilha recebe só por e-mail. Sem WhatsApp e sem e-mail na planilha, não recebe
   aviso (aparece no filtro **Sem WhatsApp e e-mail**): o contato vem só da planilha.
-- **No máximo 20 por dia:** o número só faz 20 contatos frios por dia (Configurações > Geral). Por isso a campanha
-  espalha os avisos: no máximo 20 WhatsApps de renovação por dia, quem vence antes recebe antes, todo mundo recebe o
+- **Teto por dia (quando ligado):** com o teto de contatos frios ligado em Configurações > Geral (era 20; desligado
+  desde 17/11/2026, e aí os avisos ficam nos dias certos e saem no ritmo de 15 por hora), a campanha espalha os avisos: no máximo 20 WhatsApps de renovação por dia, quem vence antes recebe antes, todo mundo recebe o
   1º aviso e os lembretes entram nas vagas que sobram. Com 100 clientes, os primeiros avisos levam uma semana.
 - **Renovação antes das Empresas novas:** as duas usam o mesmo número e o mesmo limite. No mesmo dia, a renovação sai
   primeiro (tem prazo). Nos dias cheios de renovação, as Empresas novas esperam.

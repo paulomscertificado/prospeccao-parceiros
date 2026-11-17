@@ -22,7 +22,7 @@ CAMPOS_GERAIS = [
     ("link_parceria", "Link da página de parceria ({{link_parceria}})", "texto"),
     ("texto_comissao", "Texto da comissão nas mensagens ({{comissao}})", "texto"),
     ("programa_parceria", "Descrição do programa de parceria (usada pela IA)", "area"),
-    ("limite_diario_whatsapp", "Limite diário de mensagens de WhatsApp", "numero"),
+    ("limite_diario_whatsapp", "Limite diário de mensagens de WhatsApp (por número; 0 = sem limite)", "numero"),
     ("limite_diario_email", "Limite diário de e-mails", "numero"),
     ("horas_entre_contatos_whatsapp", "WhatsApp: intervalo mínimo entre mensagens para o mesmo lead (horas; vazio = 20)", "numero"),
     ("horas_entre_contatos_email", "E-mail: intervalo mínimo entre e-mails para o mesmo lead (horas; vazio = 20)", "numero"),

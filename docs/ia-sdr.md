@@ -229,7 +229,9 @@ que continue priorizando os disparos de WhatsApp"): quem tem WhatsApp **e** e-ma
 A fila de e-mail (`campanhas.processar_fila`) não solta o e-mail de campanha em `TIPOS_WHATSAPP_PRIMEIRO` enquanto a
 mesma empresa tem, na mesma campanha, WhatsApp pendente marcado para antes ou para a mesma hora
 (`_whatsapp_da_empresa_pendente`). Não seguram: WhatsApp atrasado mais de `DIAS_ATRASO_AUTOMATICO` (espera clique) e
-campo WhatsApp em branco. Resposta no WhatsApp cancela os toques seguintes, inclusive o e-mail. Telas:
+campo WhatsApp em branco. **Desde 17/11/2026 o e-mail atrasado (marcado para um dia que já passou) também não espera**
+(`Tarefa.data >= hoje` na condição; pedido da Maria: com o número do WhatsApp no limite do dia, os e-mails acumulavam
+junto na fila). Resposta no WhatsApp cancela os toques seguintes, inclusive o e-mail. Telas:
 `emails_que_esperam_whatsapp` (parâmetro `espera_whatsapp` de `fila._situacao`): "Sai sozinho depois do WhatsApp
 desta empresa". Campanhas montadas antes: `empresas_novas.incluir_emails(db, camp)` cria os e-mails dos toques de
 WhatsApp que ainda não saíram (texto de e-mail guardado no toque; toque que já teve e-mail, mesmo cancelado, não ganha

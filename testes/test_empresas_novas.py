@@ -492,6 +492,7 @@ def test_fila_de_email_espera_o_whatsapp_das_empresas_novas(cliente, monkeypatch
         com_zap = _lead_teste(db, "Prioridade Zap Ltda", "contato@prioridade-zap-teste.com.br", "81991112222")
         em_branco = _lead_teste(db, "Zap Em Branco Ltda", "contato@zap-em-branco-teste.com.br", "")
         travado = _lead_teste(db, "Zap Travado Ltda", "contato@zap-travado-teste.com.br", "81993334444")
+        de_ontem = _lead_teste(db, "Zap De Ontem Ltda", "contato@zap-de-ontem-teste.com.br", "81995556666")
 
         def toque(lead, canal, data, hora):
             t = Tarefa(tipo="prospeccao", lead_id=lead.id, campanha_id=camp.id, usuario_id=admin.id, canal=canal,
@@ -510,9 +511,11 @@ def test_fila_de_email_espera_o_whatsapp_das_empresas_novas(cliente, monkeypatch
         mail_em_branco = toque(em_branco, "email", hoje, "00:02")
         toque(travado, "whatsapp", hoje - timedelta(days=3), "09:07")  # travado esperando clique: não segura
         mail_travado = toque(travado, "email", hoje - timedelta(days=3), "11:11")
+        toque(de_ontem, "whatsapp", hoje - timedelta(days=1), "09:07")  # WhatsApp de ontem ainda na fila (cheia)
+        mail_de_ontem = toque(de_ontem, "email", hoje - timedelta(days=1), "11:11")  # atrasado: não espera (17/11)
         cid = camp.id
     with sessao() as db:
-        tarefas = [db.get(Tarefa, i) for i in (zap, mail, mail_em_branco, mail_travado)]
+        tarefas = [db.get(Tarefa, i) for i in (zap, mail, mail_em_branco, mail_travado, mail_de_ontem)]
         assert campanhas.emails_que_esperam_whatsapp(db, tarefas) == {mail}
         _, motivo = fila._situacao(db.get(Tarefa, mail), hoje, True, set(), True, True, espera_whatsapp={mail})
         assert "depois do WhatsApp" in motivo
@@ -520,6 +523,7 @@ def test_fila_de_email_espera_o_whatsapp_das_empresas_novas(cliente, monkeypatch
     with sessao() as db:
         assert db.get(Tarefa, mail).status == "pendente"  # o WhatsApp da empresa ainda não saiu: o e-mail espera
         assert db.get(Tarefa, mail_em_branco).status == "feita" and db.get(Tarefa, mail_travado).status == "feita"
+        assert db.get(Tarefa, mail_de_ontem).status == "feita"  # e-mail atrasado saiu sem esperar o WhatsApp de ontem
         db.get(Tarefa, zap).status = "feita"  # o WhatsApp saiu
     with sessao() as db:
         campanhas.processar_fila(db, maximo=500)
