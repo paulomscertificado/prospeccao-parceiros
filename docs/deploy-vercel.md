@@ -139,8 +139,9 @@ diário próprios; só o principal dispara as automações/Atendente IA de lá (
 13/11/2026: ser administrador não basta para disparar pelo número de outra pessoa; o número fixado na campanha só vale
 se for do responsável ou compartilhado com ele, `da_campanha(db, camp, quem)` — sempre um número de verdade antes de
 um em MODO TESTE, `conexoes.em_modo_teste`: o modo teste do WhatsApp Leads só simula; em 11 e 12/11/2026, 14 mensagens
-de campanha saíram pelo principal em modo teste com um número de verdade conectado; só com números em modo teste, sai
-por ele); sem número, a fila espera e
+de campanha saíram pelo principal em modo teste com um número de verdade conectado; só com números em modo teste: em
+produção (`config.PRODUCAO`) o envio espera e avisa como "ainda não conectou" (17/11/2026: 45 mensagens saíram
+simuladas pelo principal depois que o número do Paulo Lucas caiu), fora de produção sai por ele); sem número, a fila espera e
 avisa a pessoa (1 vez por dia). Se o administrador fixou um número na campanha (`Campanha.conexao_id`, passo 4 ou página da
 campanha), ele vale para todos os WhatsApps dela (`conexoes.da_campanha`; desconectado = espera e avisa, não troca de número;
 em modo teste = a página da campanha avisa em vermelho que as mensagens não chegam). Dono e administrador compartilham (`/whatsapp/compartilhar`: toda a equipe ou

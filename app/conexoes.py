@@ -14,7 +14,7 @@ import json
 
 from sqlalchemy import select
 
-from . import autorizacao
+from . import autorizacao, config
 from .integracoes import whatsapp_leads
 from .modelos import Campanha, ConexaoWhatsApp, Lead, Tarefa, Usuario
 
@@ -135,7 +135,9 @@ def para_enviar(db, quem: Usuario | None) -> str:
     (nunca o de outra pessoa sem compartilhar, nem para o administrador: pode_disparar).
     Sempre um número DE VERDADE antes de um em MODO TESTE (que só simula: em 11 e 12/11/2026, 14 mensagens de campanha
     saíram pelo principal em modo teste e não chegaram, com um número de verdade conectado). Só com números em modo
-    teste (sistema em teste ou demonstração), sai pelo de modo teste."""
+    teste: no sistema de verdade (config.PRODUCAO) o envio ESPERA e avisa (em 17/11/2026 o número do Paulo Lucas caiu às
+    13:19 e 45 WhatsApps de campanha "saíram" pelo principal em modo teste até as 19:50, sem chegar); só num sistema
+    de teste ou demonstração sai pelo de modo teste."""
     if quem is None:
         raise SemNumero("Este lead não tem responsável. Defina o vendedor/funcionário do lead.")
     base = whatsapp_leads.status()
@@ -145,7 +147,15 @@ def para_enviar(db, quem: Usuario | None) -> str:
     outros = sorted((c for c in todas(db) if c.id != (proprio.id if proprio else "") and pode_disparar(quem, c)),
                     key=lambda c: (c.id != PRINCIPAL, c.criado_em))
     conectados = [c for c in ([proprio] if proprio else []) + outros if situacao(c.id, base).get("conectado")]
-    escolhido = next((c for c in conectados if not em_modo_teste(c.id, base)), conectados[0] if conectados else None)
+    escolhido = next((c for c in conectados if not em_modo_teste(c.id, base)), None)
+    if escolhido is None and conectados:
+        if config.PRODUCAO:
+            nomes = ", ".join(c.nome for c in conectados)
+            # "ainda não conectou": a fila deixa o toque esperando e avisa a pessoa (campanhas._avisar_para_conectar)
+            raise SemNumero(f"{quem.nome} ainda não conectou um número de verdade: só há número em MODO TESTE "
+                            f"({nomes}), e em modo teste a mensagem NÃO chega. O envio espera: conecte um número em "
+                            "WhatsApp > Meu WhatsApp (ou peça ao administrador para compartilhar um).")
+        escolhido = conectados[0]  # sistema de teste ou demonstração: só simula
     if escolhido is not None:
         return escolhido.id
     raise SemNumero(f"{quem.nome} ainda não conectou o WhatsApp. Conecte em WhatsApp > Meu WhatsApp para enviar "

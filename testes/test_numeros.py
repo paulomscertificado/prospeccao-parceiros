@@ -258,6 +258,27 @@ def test_numero_em_modo_teste_nunca_e_escolhido_se_houver_um_de_verdade(cliente,
         db.delete(db.get(ConexaoWhatsApp, "u77"))
 
 
+def test_em_producao_so_modo_teste_conectado_o_envio_espera(cliente, nuvem, monkeypatch):
+    """17/11/2026: o número do Paulo Lucas (compartilhado) caiu às 13:19 e 45 WhatsApps de campanha "saíram" pelo
+    principal em MODO TESTE até as 19:50, sem chegar. No sistema de verdade, sem número de verdade conectado, o envio
+    espera e avisa (como quem ainda não conectou o WhatsApp); nunca sai simulado."""
+    monkeypatch.setattr(config, "PRODUCAO", True)
+    _status_ponte(cliente, {"principal": {"conectado": True, "tipo": "teste", "estado_codigo": "conectado"}})
+    with sessao() as db:
+        admin = db.execute(select(Usuario).where(Usuario.perfil == "admin").order_by(Usuario.id)).scalars().first()
+        with pytest.raises(conexoes.SemNumero) as erro:
+            conexoes.para_enviar(db, admin)
+        assert "MODO TESTE" in str(erro.value) and "ainda não conectou" in str(erro.value)
+        # com um número de verdade conectado, sai por ele normalmente
+        _status_ponte(cliente, {"principal": {"conectado": True, "tipo": "teste", "estado_codigo": "conectado"},
+                                "u78": {"conectado": True, "tipo": "qr", "estado_codigo": "conectado"}})
+        if db.get(ConexaoWhatsApp, "u78") is None:
+            db.add(ConexaoWhatsApp(id="u78", nome="WhatsApp de verdade (produção)", compartilhada_todos=True))
+            db.flush()
+        assert conexoes.para_enviar(db, admin) == "u78"
+        db.delete(db.get(ConexaoWhatsApp, "u78"))
+
+
 def test_regra_cada_usuario_dispara_pelo_proprio_numero(cliente, nuvem):
     """Regra da Maria (13/11/2026): "cada usuário tem seu disparo, nunca misture os disparos de um usuário com outro
     usuário". O WhatsApp de cada disparo é o da pessoa ou um compartilhado com ela: a administradora vê e cuida de todos
