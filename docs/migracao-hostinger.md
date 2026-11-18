@@ -61,7 +61,9 @@ bash servidor/pc/enviar_configuracao.sh IP
 ssh -i ~/.ssh/ms_servidor root@IP "bash /opt/prospeccao/servidor/modo_ensaio.sh ligar && bash /opt/prospeccao/servidor/instalar_sistema.sh ENDERECO && bash /opt/prospeccao/servidor/migrar_banco.sh /root/migracao/supabase_sessao.url"
 ```
 
-Servidor da MS (17/11/2026): **srv2170631.hstgr.cloud** (IP 187.53.121.102), o endereço escolhido pela Maria. Ensaio
+Servidor da MS (17/11/2026): **srv2170631.hstgr.cloud** (IP 187.53.121.102), o endereço escolhido pela Maria. Desde
+18/11/2026 o endereço do sistema é **https://sistema.mscertificados.com.br** (registro A na Cloudflare, proxy desligado);
+o srv2170631 e o da Vercel levam para ele (`instalar_sistema.sh sistema.mscertificados.com.br srv2170631.hstgr.cloud`). Ensaio
 feito na mesma noite: 47 tabelas iguais (226.098 linhas), cadeado e arte da Renovação funcionando.
 
 Depois: `https://ENDERECO/login` abre com cadeado; a Maria pode entrar e **só olhar** (Dashboard, Leads, Renovação,

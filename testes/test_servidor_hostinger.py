@@ -142,6 +142,9 @@ def test_relogio_e_copias_do_servidor_apontam_para_o_lugar_certo():
     site = (SERVIDOR / "prospeccao.service").read_text(encoding="utf-8")
     assert "api.index:app" in site and "--host 127.0.0.1" in site and "--proxy-headers" in site
     assert "__DOMINIO__" in (SERVIDOR / "Caddyfile.modelo").read_text(encoding="utf-8")
+    # endereços antigos levam para o novo (18/11/2026: srv2170631.hstgr.cloud -> sistema.mscertificados.com.br)
+    assert "__REDIRECIONAMENTOS__" in (SERVIDOR / "Caddyfile.modelo").read_text(encoding="utf-8")
+    assert "redir https://%s{uri} 307" in (SERVIDOR / "instalar_sistema.sh").read_text(encoding="utf-8")
     instalar = (SERVIDOR / "instalar_sistema.sh").read_text(encoding="utf-8")
     assert "enable --now prospeccao-relogio" not in instalar.replace("systemctl enable --now prospeccao-relogio.timer)", "")
     assert "MODO_NUVEM=1" in instalar and "PP_PASTA_DADOS" in instalar

@@ -2,13 +2,16 @@
 # Instala ou atualiza a Prospecção e o WhatsApp Leads no servidor. O código já foi enviado para /opt/prospeccao e
 # /opt/whatsapp-leads (servidor/pc/enviar_codigo.sh) e as configurações para /etc (servidor/pc/enviar_configuracao.sh).
 # Roda NO SERVIDOR, como root. Pode rodar de novo: é também o jeito de publicar uma versão nova.
-# Uso: bash /opt/prospeccao/servidor/instalar_sistema.sh <endereço do sistema, ex.: srv123456.hstgr.cloud>
+# Uso: bash /opt/prospeccao/servidor/instalar_sistema.sh <endereço do sistema> [endereços antigos...]
+#   ex.: ... sistema.mscertificados.com.br srv2170631.hstgr.cloud  (os antigos só levam para o novo, com cadeado)
 #
 # Cuidado (ver docs/migracao-hostinger.md): este roteiro NÃO liga o relógio (filas e envios automáticos) e NÃO liga o
 # WhatsApp Leads pela primeira vez. Os dois só ligam na virada, depois que o computador da MS parou os dele; senão
 # o mesmo envio sairia duas vezes e o mesmo número do WhatsApp ficaria ligado em dois lugares.
 set -euo pipefail
-DOMINIO=${1:?Informe o endereço do sistema, ex.: srv123456.hstgr.cloud}
+DOMINIO=${1:?Informe o endereço do sistema, ex.: sistema.mscertificados.com.br}
+shift
+ANTIGOS=("$@")   # endereços de antes (18/11/2026: srv2170631.hstgr.cloud): levam para o novo, mantendo o caminho
 P=/opt/prospeccao
 W=/opt/whatsapp-leads
 S=$P/servidor
@@ -61,8 +64,12 @@ systemctl daemon-reload
 systemctl enable prospeccao.service prospeccao-copia.timer whatsapp-leads-copia.timer >/dev/null
 systemctl start prospeccao-copia.timer whatsapp-leads-copia.timer
 
-echo "== 5/6 Site com cadeado (Caddy) em https://${DOMINIO}"
-sed "s/__DOMINIO__/${DOMINIO}/g" $S/Caddyfile.modelo > /etc/caddy/Caddyfile
+echo "== 5/6 Site com cadeado (Caddy) em https://${DOMINIO}${ANTIGOS[*]:+ (e ${ANTIGOS[*]} levando para ele)}"
+sed -e "s/__DOMINIO__/${DOMINIO}/g" -e '/^__REDIRECIONAMENTOS__$/d' $S/Caddyfile.modelo > /etc/caddy/Caddyfile
+for antigo in "${ANTIGOS[@]}"; do   # cada endereço antigo leva para o novo, mantendo o caminho
+    [ -n "$antigo" ] && [ "$antigo" != "$DOMINIO" ] || continue
+    printf '\n%s {\n\tredir https://%s{uri} 307\n}\n' "$antigo" "$DOMINIO" >> /etc/caddy/Caddyfile
+done
 install -d -o caddy -g caddy /var/log/caddy
 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null
 # o validate roda como root e cria o arquivo de registro como root: o Caddy (usuário caddy) não conseguia abrir

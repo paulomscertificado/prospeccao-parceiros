@@ -2,6 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "redirects": [
-    { "source": "/(.*)", "destination": "https://srv2170631.hstgr.cloud/$1", "permanent": false }
+    { "source": "/(.*)", "destination": "https://sistema.mscertificados.com.br/$1", "permanent": false }
   ]
 }

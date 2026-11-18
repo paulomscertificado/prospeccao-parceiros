@@ -19,7 +19,7 @@ jobs:
     steps:
       - name: O sistema responde?
         run: |
-          ENDERECO="https://srv2170631.hstgr.cloud/api/saude"
+          ENDERECO="https://sistema.mscertificados.com.br/api/saude"
           for tentativa in 1 2 3; do
             if curl -fsS --max-time 20 "$ENDERECO" | grep -q '"ok":true'; then
               echo "Sistema no ar (tentativa $tentativa)."
