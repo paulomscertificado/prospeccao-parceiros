@@ -134,7 +134,28 @@ endereço, login e senha de app criptografada (Google Workspace: smtp.gmail.com:
 
 ### Agenda de reuniões
 Cada usuário tem um **expediente** (Configurações > Usuários, ex.: `seg-sex 09:00-12:00,14:00-18:00`) e a duração
-da reunião. Os horários oferecidos = expediente − reuniões já marcadas. Integração com Google Calendar: prevista.
+da reunião. Os horários oferecidos = expediente − reuniões já marcadas − feriados da pessoa. Integração com Google
+Calendar: prevista.
+
+### Feriados de cada pessoa (Configurações > Feriados; pedido da Maria em 18/11/2026)
+`app/feriados.py`. Cada pessoa tem **cidade e UF** (`Usuario.cidade`/`uf`; Configurações > Usuários ou Minha conta >
+"Onde eu trabalho"). Os feriados dela = os nacionais (`util.feriados_nacionais`, com Carnaval, Sexta-feira Santa e
+Corpus Christi) + as listas do estado e da cidade escritas pela marca em Configurações > Feriados (chave da AR
+`feriados_locais`, em `banco.CHAVES_DA_AR`: JSON `{"PE": "...", "PE/RECIFE": "..."}`, uma data por linha, `16/07 Nome`
+todo ano ou `20/11/2026 Nome` só naquele ano; `ler_lista`). `da_pessoa(db, pessoa)` junta tudo (cache por sessão).
+Onde vale:
+- **Montagem das campanhas** (todas, não só a Renovação, que já pulava os nacionais): `campanhas._feriados(db, camp)`
+  = feriados de quem é a campanha → `cadencias.aplicar(feriados=)` e a aprovação (`_sem_horario_no_passado`; aprovada
+  depois, a data empurrada também pula o feriado). Renovação: `renovacao.dias_sem_envio(db, pessoa)` (os "Outros
+  feriados" dela + os da pessoa) na montagem, na aprovação e em `remarcar_feriados` (por dono de campanha).
+- **Toques já marcados**: `feriados.remarcar(db)` (rotina de hora em hora; também ao salvar os feriados ou a cidade de
+  alguém) passa o toque em aberto que cai num feriado de quem envia (`conexoes.responsavel`) para o próximo dia de envio
+  dela, sem ficar antes do toque anterior da mesma empresa. Olha só os dias que são feriado para alguém
+  (`_dias_que_podem_ser_feriado`), até 120 dias à frente. A Renovação usa `renovacao.remarcar_feriados`.
+- **Filas** (e-mail, WhatsApp e API oficial), na hora de enviar: `feriados.adiar_se_feriado(db, t)` adia o toque de
+  hoje se hoje é feriado de quem envia (aviso de renovação que só caberia depois do vencimento sai assim mesmo).
+- **Reuniões**: `agenda_horarios.horarios_livres` não oferece horário nos feriados da pessoa.
+Testes: `testes/test_feriados.py`.
 
 ## 5. Como configurar o e-mail (remetente @mscertificados.com.br)
 

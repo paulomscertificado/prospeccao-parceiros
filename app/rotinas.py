@@ -352,6 +352,10 @@ def _rotina_hora() -> None:
         apagadas = apagar_conversas_antigas(db)
         if apagadas:
             log.info("Conversas: %s mensagens antigas saíram da cópia na nuvem (prazo de guarda)", apagadas)
+    from . import feriados
+
+    with sessao() as db:  # toque marcado num feriado de quem envia (nacional, do estado ou da cidade) muda de dia
+        feriados.remarcar(db)
     from . import assertiva
 
     with sessao() as db:  # LGPD: o resultado das consultas da Assertiva fica só 30 dias

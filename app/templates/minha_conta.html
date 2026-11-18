@@ -15,6 +15,20 @@
   </div>
   <button class="btn btn-primario">Salvar empresa</button>
 </form>
+<form class="cartao" id="cidade" method="post" action="/minha-conta/cidade" style="max-width:720px">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>Onde eu trabalho</h2>
+  <p class="pequeno suave">Nos feriados da sua cidade e do seu estado (e nos nacionais), as suas campanhas não enviam nada
+    e a sua agenda não oferece horários de reunião. Os feriados de cada cidade ficam em Configurações &gt; Feriados.</p>
+  <div class="grade-2">
+    <div class="campo"><label for="minha-cidade">Cidade</label><input id="minha-cidade" type="text" name="cidade" maxlength="120" value="{{ usuario.cidade or '' }}" placeholder="Recife"></div>
+    <div class="campo"><label for="minha-uf">UF</label><select id="minha-uf" name="uf"><option value="">—</option>
+      {% for sigla, nome in ufs.items() %}<option value="{{ sigla }}" {{ 'selected' if usuario.uf == sigla }}>{{ sigla }} – {{ nome }}</option>{% endfor %}</select></div>
+  </div>
+  {% if proximos_feriados %}<p class="pequeno">Seus próximos feriados em dia de semana:
+    {% for d, nome in proximos_feriados %}{{ d.strftime('%d/%m') }} ({{ nome }}){{ ', ' if not loop.last }}{% endfor %}.</p>{% endif %}
+  <button class="btn btn-primario">Salvar cidade</button>
+</form>
 <div class="cartao" style="max-width:520px">
   <p><b>{{ usuario.nome }}</b> · {{ usuario.email }} · {{ usuario.perfil_nome }}</p>
   <h2>Trocar senha</h2>

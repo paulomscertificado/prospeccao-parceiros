@@ -236,9 +236,15 @@ def feriados_da_renovacao(db, anos: tuple[int, ...] | None = None) -> dict[date,
     return dias
 
 
-def dias_sem_envio(db) -> frozenset:
-    """Os feriados da Renovação (este ano e o próximo), para as contas de datas (o fim de semana já fica de fora)."""
-    return frozenset(feriados_da_renovacao(db))
+def dias_sem_envio(db, pessoa: Usuario | None = None) -> frozenset:
+    """Os feriados da Renovação (este ano e o próximo), para as contas de datas (o fim de semana já fica de fora). Com
+    `pessoa` (quem é a campanha), também os do estado e da cidade dela (app/feriados.py, 18/11/2026)."""
+    dias = frozenset(feriados_da_renovacao(db))
+    if pessoa is None:
+        return dias
+    from . import feriados
+
+    return dias | feriados.dias_sem_envio(db, pessoa)
 
 
 def proximos_feriados(db, quantos: int = 6) -> list[tuple[date, str]]:
@@ -748,12 +754,13 @@ def _util_anterior(d: date, pular_fds: bool, feriados: frozenset = frozenset()) 
     return _dia_util_antes(d, feriados) if pular_fds else d
 
 
-def primeiro_dia(db) -> date:
+def primeiro_dia(db, pessoa: Usuario | None = None) -> date:
     """O primeiro dia em que ainda dá para enviar: hoje (se o horário de envio de hoje não acabou) ou o próximo dia de
     envio. Montada à noite, a campanha não marca nada para "hoje" (iria tudo para amanhã, acima do teto)."""
     from . import cadencias
 
-    return cadencias.dia_e_hora_futuros(db, date.today(), True, hora_inicio(db), hora_fim(db), dias_sem_envio(db))[0]
+    return cadencias.dia_e_hora_futuros(db, date.today(), True, hora_inicio(db), hora_fim(db),
+                                        dias_sem_envio(db, pessoa))[0]
 
 
 def teto_por_dia(db) -> int:
@@ -938,7 +945,7 @@ def criar_campanha(db, usuario: Usuario, quantidade: int | None = None, ate: dat
     dias_da_janela = janela(db)
     grupos = [(onda, n) for c in escolhidos for n, onda in enumerate(ondas(c, dias_da_janela))]
     ultimo = max(c.data_vencimento for g, _ in grupos for c in g.certificados)
-    datas = datas_da_campanha(db, [g for g, _ in grupos])
+    datas = datas_da_campanha(db, [g for g, _ in grupos], pessoa=usuario)
     from . import conexoes
 
     try:  # o número dos disparos fica gravado na campanha (dá para trocar na página dela): nunca um de modo teste
@@ -978,16 +985,17 @@ def ar_de_quem_monta(db, usuario: Usuario | None) -> int | None:
     return isolamento._id_da_ar(db, "ms")
 
 
-def datas_da_campanha(db, contatos: list[Contato], ignorar_campanha: int | None = None) -> list[list[date | None]]:
+def datas_da_campanha(db, contatos: list[Contato], ignorar_campanha: int | None = None,
+                      pessoa: Usuario | None = None) -> list[list[date | None]]:
     """As datas dos avisos de cada contato (na mesma ordem), com o teto de WhatsApps por dia contando os avisos de
     renovação já marcados nas outras campanhas. Quem só tem e-mail não ocupa vaga do WhatsApp."""
     pular_fds = True  # Renovação: só de segunda a sexta (pedido da Maria em 13/11/2026)
-    inicio = primeiro_dia(db)
+    inicio = primeiro_dia(db, pessoa)
     canais = cfg(db, "renov_canais")
     dias = dias_aviso(db)
     com_zap = ["whatsapp" in canais and bool(c.whatsapp) for c in contatos]
     carga = carga_marcada(db, inicio, ignorar_campanha)
-    sem_envio = dias_sem_envio(db)  # feriados (pedido da Maria em 13/11/2026)
+    sem_envio = dias_sem_envio(db, pessoa)  # feriados (pedido da Maria em 13/11/2026) e os da cidade de quem é
     agendadas = iter(agenda([c.vencimento for c, z in zip(contatos, com_zap) if z], inicio, pular_fds, carga,
                             teto_por_dia(db), dias, sem_envio))
     return [next(agendadas) if z else datas_dos_avisos(c.vencimento, inicio, pular_fds, dias, sem_envio)
@@ -1066,8 +1074,8 @@ def etapa_preparar(campanha_id: int, estado: dict, prazo: float) -> bool:
                 # as datas vêm prontas da criação (agenda com o teto por dia); sem elas, as regras simples
                 datas = ([date.fromisoformat(d) if d else None for d in grupo["datas"]]
                          if isinstance(grupo, dict) and grupo.get("datas") and len(certs) == len(ids)
-                         else datas_dos_avisos(contato.vencimento, primeiro_dia(db), pular_fds, dias_aviso(db),
-                                               dias_sem_envio(db)))
+                         else datas_dos_avisos(contato.vencimento, primeiro_dia(db, usuario), pular_fds,
+                                               dias_aviso(db), dias_sem_envio(db, usuario)))
                 if not any(datas):
                     continue
                 if onda:  # 2ª onda do mesmo contato: o lead é o da 1ª (se ela entrou), com avisos próprios
@@ -1127,7 +1135,7 @@ def montar_ondas(db, camp: Campanha, cadencia, usuario: Usuario, ondas_por_lead:
                               [c for c in camp.canais.split(",") if c], "rascunho", camp.cta, camp.tom,
                               foco_whatsapp=True, datas_por_lead={lid: o["datas"] for lid, o in da_vez.items()},
                               permitir_em_andamento=True, hora_minima=hora_inicio(db),
-                              hora_maxima=hora_fim(db), feriados=dias_sem_envio(db))
+                              hora_maxima=hora_fim(db), feriados=dias_sem_envio(db, usuario))
         db.flush()
         for t in db.execute(select(Tarefa).where(Tarefa.campanha_id == camp.id, Tarefa.id > antes)).scalars():
             t.certificado_id = da_vez[t.lead_id]["cert"]
@@ -1163,8 +1171,9 @@ def reajustar_na_aprovacao(db, camp: Campanha, rascunhos: list[Tarefa]) -> list[
     if not rascunhos or min(t.data for t in rascunhos) >= hoje:
         return rascunhos
     pular_fds = True  # Renovação: só de segunda a sexta
-    sem_envio = dias_sem_envio(db)  # e sem feriados
-    inicio = primeiro_dia(db)
+    dono = db.get(Usuario, camp.usuario_id) if camp.usuario_id else None
+    sem_envio = dias_sem_envio(db, dono)  # e sem feriados (também os da cidade de quem é a campanha)
+    inicio = primeiro_dia(db, dono)
     vencimentos = dict(db.execute(select(Certificado.id, Certificado.data_vencimento)
                                   .where(Certificado.campanha_id == camp.id)).all())
     ordem = {a: i for i, a in enumerate(ANGULOS)}
@@ -1292,13 +1301,20 @@ def remarcar_feriados(db, hoje: date | None = None, aplicar: bool = True) -> dic
     from . import cadencias
 
     hoje = hoje or date.today()
-    sem_envio = dias_sem_envio(db)
-    feito = {"remarcados": 0, "cancelados": 0, "so_email": 0, "mudancas": Counter()}
     abertos = ("pendente", "rascunho")
-    em_feriado = db.execute(select(Tarefa).join(Campanha, Tarefa.campanha_id == Campanha.id).where(
+    # os feriados de quem é cada campanha (nacionais, "Outros feriados" e os do estado e da cidade dela: 18/11/2026)
+    donos = dict(db.execute(select(Campanha.id, Campanha.usuario_id).where(
+        Campanha.tipo == TIPO_CAMPANHA, Campanha.status.in_(("aguardando_aprovacao", "ativa", "pausada")))).all())
+    por_dono = {uid: dias_sem_envio(db, db.get(Usuario, uid) if uid else None) for uid in set(donos.values())}
+    sem_envio_da = {cid: por_dono[uid] for cid, uid in donos.items()}
+    sem_envio = frozenset().union(*por_dono.values()) if por_dono else frozenset()
+    todos_os_dias = sem_envio
+    feito = {"remarcados": 0, "cancelados": 0, "so_email": 0, "mudancas": Counter()}
+    em_feriado = [t for t in db.execute(select(Tarefa).join(Campanha, Tarefa.campanha_id == Campanha.id).where(
         Campanha.tipo == TIPO_CAMPANHA, Campanha.status.in_(("aguardando_aprovacao", "ativa", "pausada")),
         Tarefa.tipo == "prospeccao", Tarefa.status.in_(abertos), Tarefa.data >= hoje,
-        Tarefa.data.in_(sorted(sem_envio)))).scalars().all() if sem_envio else []
+        Tarefa.data.in_(sorted(sem_envio)))).scalars().all()
+        if t.data in sem_envio_da.get(t.campanha_id, frozenset())] if sem_envio else []
     certs = {c.id: c for c in db.execute(select(Certificado).where(
         Certificado.id.in_({t.certificado_id for t in em_feriado if t.certificado_id}))).scalars()} if em_feriado else {}
     if not certs:
@@ -1336,6 +1352,7 @@ def remarcar_feriados(db, hoje: date | None = None, aplicar: bool = True) -> dic
     ondas = sorted({(t.campanha_id, t.lead_id, t.certificado_id) for t in em_feriado if t.certificado_id in certs},
                    key=lambda k: (certs[k[2]].data_vencimento, k[1] or 0, k[0] or 0))  # quem vence antes escolhe antes
     for campanha_id, lead_id, certificado_id in ondas:
+        sem_envio = sem_envio_da.get(campanha_id, todos_os_dias)  # os feriados de quem é esta campanha
         venc = certs[certificado_id].data_vencimento
         avisos: dict[int, dict[str, Tarefa]] = {}
         for t in db.execute(select(Tarefa).where(

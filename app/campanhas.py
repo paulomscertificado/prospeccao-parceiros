@@ -428,12 +428,17 @@ def _hora_maxima(db, camp: Campanha) -> str:
 
 
 def _feriados(db, camp: Campanha) -> frozenset:
-    """Dias em que os toques desta campanha não saem, além do fim de semana (Renovação: os feriados)."""
-    if camp.tipo != "renovacao":
-        return frozenset()
-    from . import renovacao
+    """Dias em que os toques desta campanha não saem, além do fim de semana: os feriados de quem é a campanha
+    (nacionais + estado + cidade dela, app/feriados.py; pedido da Maria em 18/11/2026) e, na Renovação, também os
+    "Outros feriados" da tela dela."""
+    from . import feriados
 
-    return renovacao.dias_sem_envio(db)
+    dono = db.get(Usuario, camp.usuario_id) if camp.usuario_id else None
+    if camp.tipo == "renovacao":
+        from . import renovacao
+
+        return renovacao.dias_sem_envio(db, dono)
+    return feriados.dias_sem_envio(db, dono)
 
 
 def gerar(campanha_id: int) -> None:
@@ -549,12 +554,15 @@ def aprovar(db, camp: Campanha, usuario: Usuario) -> int:
         primeiro = min(t.data for t in rascunhos)
         atraso = 0 if camp.tipo == "renovacao" else max(0, (date.today() - primeiro).days)
         minimo, maximo = _hora_minima(db, camp), _hora_maxima(db, camp)
+        sem_envio = _feriados(db, camp)
         for t in rascunhos:
             t.status = "pendente"
             if (t.hora or "09:00").endswith(":00"):  # campanha montada antes (09:00 do passo): vira horário natural
                 t.hora = cadencias.hora_natural(db, minimo=minimo, maximo=maximo)  # (escolhido à mão, como 10:20, fica)
             t.data = util.proximo_dia_util(t.data + timedelta(days=atraso)) if atraso else t.data
-        _sem_horario_no_passado(db, rascunhos, minimo, maximo, _feriados(db, camp))
+            while atraso and t.data in sem_envio:  # empurrada para frente: nunca para um feriado de quem envia
+                t.data = util.proximo_dia_util(t.data + timedelta(days=1))
+        _sem_horario_no_passado(db, rascunhos, minimo, maximo, sem_envio)
         if camp.tipo == "renovacao":
             from . import renovacao
 
@@ -859,6 +867,7 @@ def _limite_da_campanha(motivo: str) -> bool:
 def processar_fila(db, maximo: int = 25) -> dict:
     """Envia os e-mails automáticos das campanhas aprovadas, respeitando horário, limites e o intervalo de 3 a 4
     minutos entre um e-mail e outro (_vez_do_canal)."""
+    from . import feriados
     from .integracoes import email_smtp
 
     feito = {"enviados": 0, "bloqueados": 0, "erros": 0}
@@ -915,6 +924,9 @@ def processar_fila(db, maximo: int = 25) -> dict:
                 ars_paradas.add(t.tenant_id)
                 continue  # limite do canal (dia/hora) desta AR: só ela espera; as outras ARs seguem
             continue
+        if feriados.adiar_se_feriado(db, t):
+            feito["bloqueados"] += 1
+            continue  # feriado da cidade (ou nacional) de quem envia: o toque passou para o próximo dia de envio
         try:
             conta = conta_do_toque(db, t)
         except contas_email.SemConta as erro:
@@ -1550,6 +1562,7 @@ def _em_lotes(db, ids: list[int], tamanho: int = 10):
 def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
     """Envia pelo WhatsApp conectado (WhatsApp Leads) os passos de WhatsApp das campanhas aprovadas, só para
     leads liberados (ver whatsapp_liberado). Poucos por rodada: a fila de lá ainda aplica pausas e limite diário."""
+    from . import feriados
     from .integracoes import whatsapp_leads
 
     feito = {"enviados": 0, "bloqueados": 0, "erros": 0}
@@ -1618,6 +1631,9 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
             continue  # lead respondeu, saiu ou está com um humano
         if not automatica and not whatsapp_liberado(db, lead):
             continue  # contato frio de campanha de parceiros: fica na Agenda para o clique
+        if feriados.adiar_se_feriado(db, t):
+            feito["bloqueados"] += 1
+            continue  # feriado da cidade (ou nacional) de quem envia: o toque passou para o próximo dia de envio
         try:
             sdr.enviar_whatsapp_conectado(db, t.mensagem, None, lead=lead, tarefa=t)
         except sdr.EnvioRecusado as erro:

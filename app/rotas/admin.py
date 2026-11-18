@@ -1,5 +1,6 @@
 """Configurações (administrador): regras do negócio, pesos do score, usuários, LGPD e logs."""
 
+import logging
 import re
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response
@@ -15,6 +16,7 @@ from ..seguranca import diferencas, exige, problema_na_senha, registrar_log, res
 from ..web import avisar, tela, voltar
 
 rotas = APIRouter()
+log = logging.getLogger(__name__)
 
 CAMPOS_GERAIS = [
     ("mostrar_vendas", "Mostrar Vendas, Vencimentos e Comissões no menu e no Dashboard (1 = sim, 0 = não)", "numero"),
@@ -71,7 +73,7 @@ def _cadastro_no_registro(u: Usuario) -> dict:
     """O que o registro de atividades guarda de uma mudança no cadastro de uma pessoa (sem senha nem 2 etapas)."""
     return {"nome": u.nome, "email": u.email, "papel": u.perfil if not u.papel_id else f"papel {u.papel_id}",
             "ativo": "sim" if u.ativo else "não", "equipe": u.equipe_id or "", "parceiro": u.parceiro_id or "",
-            "expediente": u.expediente or ""}
+            "expediente": u.expediente or "", "cidade": f"{u.cidade or ''} ({u.uf})" if u.uf else ""}
 
 
 def _marca_no_registro(db: Session, ar: int) -> dict:
@@ -121,6 +123,8 @@ def _grupos_de_usuarios(db: Session, request: Request, usuario: Usuario) -> list
 
 @rotas.get("/configuracoes")
 def configuracoes(request: Request, aba: str = "geral", usuario: Usuario = Depends(exige("configuracoes.ver")), db: Session = Depends(obter_db)):
+    from .. import feriados
+
     wl = whatsapp_leads.status(False)  # uma consulta só (antes eram duas a cada abertura da tela)
     from .assertiva import painel as painel_assertiva
 
@@ -130,7 +134,8 @@ def configuracoes(request: Request, aba: str = "geral", usuario: Usuario = Depen
     dominio_dns = (marca.da_ar(db, ar_tela)["dominio_email"] if ar_tela else config.EMAIL_DOMINIO) if aba == "email" else ""
     return tela(request, "configuracoes.html", {
         # white label: quem é de uma AR muda só as configurações da AR (o resto é da plataforma: Admin Master)
-        "aba": aba, "secao": aba,
+        "aba": aba, "secao": aba, "ufs": feriados.UFS,
+        "feriados": feriados.painel(db) if aba == "feriados" else None,
         "grupos_usuarios": _grupos_de_usuarios(db, request, usuario) if aba == "usuarios" else [],
         "campos": [(c, n, t, ler_config(db, c), autorizacao.e_master(usuario)
                                 or (c in CHAVES_DA_AR and c not in CHAVES_SO_MASTER)) for c, n, t in CAMPOS_GERAIS],
@@ -397,7 +402,7 @@ def zerar_2fa(request: Request, uid: int, usuario: Usuario = Depends(exige("usua
 def salvar_usuario(request: Request, uid: int, nome: str = Form(...), email: str = Form(...), perfil: str = Form(...),
                    senha: str = Form(""), parceiro_id: str = Form(""), ativo: str = Form(""),
                    expediente: str = Form(""), duracao_reuniao: str = Form(""), equipe_id: str = Form("manter"),
-                   ar: str = Form(""),
+                   ar: str = Form(""), cidade: str = Form("manter"), uf: str = Form("manter"),
                    usuario: Usuario = Depends(exige("usuarios.gerenciar")), db: Session = Depends(obter_db)):
     destino = "/configuracoes?aba=usuarios"
     u = Usuario() if uid == 0 else db.get(Usuario, uid)
@@ -458,6 +463,14 @@ def salvar_usuario(request: Request, uid: int, nome: str = Form(...), email: str
             return voltar(destino)
         u.expediente = expediente.strip()
     u.duracao_reuniao = util.para_int(duracao_reuniao) or u.duracao_reuniao or 30
+    from .. import feriados  # onde a pessoa trabalha: os feriados do estado e da cidade dela (18/11/2026)
+
+    local_antes = (u.cidade or "", u.uf or "")
+    if cidade != "manter":
+        u.cidade = feriados.normalizar_cidade(cidade)
+    if uf != "manter":
+        u.uf = feriados.normalizar_uf(uf)
+    mudou_local = bool(uid) and (u.cidade or "", u.uf or "") != local_antes
     # white label: a marca da pessoa. Nova pessoa criada pelo Admin Master fora das ARs vai para a marca do quadro em
     # que ele clicou; quem é de uma AR (ou o master dentro dela) cria na própria (isolamento._ar_nas_novas)
     ar_da_tela = marca.ar_da_tela(request, usuario)
@@ -483,8 +496,68 @@ def salvar_usuario(request: Request, uid: int, nome: str = Form(...), email: str
     db.flush()
     registrar_log(db, usuario, "salvou_usuario", "usuario", u.id, f"{u.email} ({papel.nome})", request,
                   mudancas=diferencas(antes, _cadastro_no_registro(u)))
+    movidos = _remarcar_feriados(db, {u.id}) if mudou_local else 0
     db.commit()
-    avisar(request, "Usuário salvo." + (" Envie a senha para a pessoa por um canal seguro." if uid == 0 else ""))
+    avisar(request, "Usuário salvo." + (" Envie a senha para a pessoa por um canal seguro." if uid == 0 else "")
+           + (f" {movidos} toque(s) que caíam num feriado da cidade dela mudaram de dia." if movidos else ""))
+    return voltar(destino)
+
+
+def _remarcar_feriados(db: Session, pessoas: set[int] | None = None) -> int:
+    """Depois de mudar a cidade de alguém ou os feriados: os toques marcados num feriado de quem envia mudam de dia
+    (campanhas e cadências: feriados.remarcar; Renovação: renovacao.remarcar_feriados, com as regras do vencimento)."""
+    from .. import feriados, renovacao
+
+    db.flush()
+    movidos = feriados.remarcar(db, pessoas=pessoas)
+    try:
+        movidos += renovacao.remarcar_feriados(db)["remarcados"]
+    except Exception:  # noqa: BLE001 - a Renovação não pode impedir de salvar (a rotina de hora em hora tenta de novo)
+        log.exception("Feriados: não deu para remarcar os avisos da Renovação")
+    return movidos
+
+
+@rotas.post("/configuracoes/feriados", dependencies=[Depends(verificar_csrf)])
+async def salvar_feriados(request: Request, usuario: Usuario = Depends(exige("configuracoes.alterar")),
+                          db: Session = Depends(obter_db)):
+    """Configurações > Feriados: os feriados do estado e da cidade (de cada marca; os nacionais são automáticos)."""
+    from .. import feriados
+
+    destino = "/configuracoes?aba=feriados"
+    form = await request.form()
+    antes = feriados.locais(db)
+    listas = dict(antes)
+    invalidas: list[str] = []
+    for campo, valor in form.multi_items():
+        if not campo.startswith("local__"):
+            continue
+        chave = campo.removeprefix("local__")
+        uf_, _, cidade_ = chave.partition("/")
+        if feriados.chave_do_local(uf_, cidade_) != chave:
+            continue
+        itens, ruins = feriados.ler_lista(str(valor))
+        invalidas += ruins
+        listas[chave] = feriados.texto_da_lista(itens)
+    if str(form.get("nova_lista") or "").strip():
+        nova = feriados.chave_do_local(str(form.get("nova_uf") or ""), str(form.get("nova_cidade") or ""))
+        if not nova:
+            avisar(request, "Escolha a UF da cidade (ou do estado) dos feriados novos.", "erro")
+            return voltar(destino)
+        itens, ruins = feriados.ler_lista(str(form.get("nova_lista")))
+        invalidas += ruins
+        ja = feriados.ler_lista(listas.get(nova, ""))[0]
+        listas[nova] = feriados.texto_da_lista(ja + [i for i in itens if i[:3] not in {j[:3] for j in ja}])
+    if invalidas:
+        avisar(request, "Não entendi: " + "; ".join(invalidas[:5]) + ". Escreva uma data por linha, como "
+               "\"16/07 Nossa Senhora do Carmo\" (todo ano) ou \"20/11/2026 Ponto facultativo\" (só naquele ano). "
+               "Nada foi salvo.", "erro")
+        return voltar(destino)
+    feriados.gravar_locais(db, listas)
+    movidos = _remarcar_feriados(db)
+    registrar_log(db, usuario, "salvou_feriados", "configuracao", None, request=request,
+                  mudancas=diferencas(antes, feriados.locais(db)))
+    db.commit()
+    avisar(request, "Feriados salvos." + (f" {movidos} toque(s) que caíam num feriado mudaram de dia." if movidos else ""))
     return voltar(destino)
 
 

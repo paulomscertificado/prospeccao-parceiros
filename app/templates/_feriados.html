@@ -1,0 +1,53 @@
+{# Configurações > Feriados (app/feriados.py). Variável: feriados (feriados.painel). #}
+{% set f = feriados %}
+{% set dias_semana = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'] %}
+<div class="cartao" style="max-width:920px">
+  <h2 class="subtitulo-config">Feriados</h2>
+  <p class="suave" style="margin:0">Nos feriados de cada pessoa, as campanhas dela não enviam nada: os toques passam para o
+    próximo dia de envio, e a agenda dela não oferece horários de reunião. Valem os feriados nacionais (automáticos) e os do
+    estado e da cidade onde a pessoa trabalha. A cidade fica no cadastro da pessoa (Usuários) ou em Minha conta.</p>
+</div>
+
+<form class="cartao" method="post" action="/configuracoes/feriados" style="max-width:920px">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>Feriados do estado e da cidade</h2>
+  <p class="pequeno suave">Uma data por linha: <b>16/07 Nossa Senhora do Carmo</b> (todo ano) ou <b>20/11/2026 Ponto
+    facultativo</b> (só naquele ano). Use o botão "Pesquisar" e confira as datas no site da prefeitura ou do governo do estado.</p>
+  {% for q in f.quadros %}
+  <div class="campo" style="margin-top:14px">
+    <label for="local-{{ loop.index }}">{{ q.nome }} · {{ 'feriados da cidade' if q.cidade else 'feriados do estado' }}
+      {% if q.pessoas %}<span class="pequeno suave">({{ q.pessoas|join(', ') }})</span>{% endif %}</label>
+    <textarea id="local-{{ loop.index }}" name="local__{{ q.chave }}" rows="3" style="min-height:70px"
+      placeholder="{{ '16/07 Nossa Senhora do Carmo' if q.cidade else '06/03 Data Magna do estado' }}">{{ q.texto }}</textarea>
+    <a class="btn btn-pequeno" target="_blank" rel="noopener" href="{{ q.busca }}" style="margin-top:4px">Pesquisar os feriados de {{ q.nome }}</a>
+  </div>
+  {% else %}
+  <div class="aviso aviso-alerta">Ninguém da equipe tem a cidade no cadastro ainda: por enquanto só os feriados nacionais
+    valem. Preencha a cidade e a UF de cada pessoa em <a href="/configuracoes?aba=usuarios">Usuários</a> (ou cada um em Minha
+    conta), ou escreva abaixo os feriados de uma cidade.</div>
+  {% endfor %}
+  <h3 style="margin-top:18px">Outra cidade ou estado</h3>
+  <div class="campos">
+    <div><label for="nova-uf">UF</label><select id="nova-uf" name="nova_uf"><option value="">—</option>
+      {% for sigla, nome in f.ufs.items() %}<option value="{{ sigla }}">{{ sigla }} – {{ nome }}</option>{% endfor %}</select></div>
+    <div><label for="nova-cidade">Cidade (em branco: o estado todo)</label><input id="nova-cidade" type="text" name="nova_cidade" maxlength="120" placeholder="Belo Horizonte"></div>
+    <div class="largo"><label for="nova-lista">Feriados</label><textarea id="nova-lista" name="nova_lista" rows="2" style="min-height:56px" placeholder="15/08 Assunção de Nossa Senhora"></textarea></div>
+  </div>
+  <button class="btn btn-primario" style="margin-top:10px">Salvar feriados</button>
+  <p class="ajuda">Ao salvar, os toques das campanhas já marcados para esses dias mudam para o próximo dia de envio de quem envia.</p>
+</form>
+
+<div class="grade-2" style="max-width:920px;gap:16px">
+  <div class="cartao">
+    <h2>Onde cada pessoa trabalha</h2>
+    <table>{% for p in f.pessoas %}<tr><td>{{ p.nome }}</td><td>{{ (p.cidade ~ ' (' ~ p.uf ~ ')') if p.uf and p.cidade else (p.uf or '—') }}</td></tr>
+      {% else %}<tr><td class="vazio">Ninguém ainda.</td></tr>{% endfor %}</table>
+    {% if f.sem_local %}<p class="pequeno suave">Sem cidade no cadastro (só os feriados nacionais): {{ f.sem_local|map(attribute='nome')|join(', ') }}.
+      Ajuste em <a href="/configuracoes?aba=usuarios">Usuários</a>.</p>{% endif %}
+  </div>
+  <div class="cartao">
+    <h2>Feriados nacionais <span class="pequeno suave">(automáticos)</span></h2>
+    <p class="pequeno suave">Com Carnaval, Sexta-feira Santa e Corpus Christi. Os próximos 12 meses:</p>
+    <table>{% for d, nome in f.nacionais %}<tr><td class="nowrap">{{ d.strftime('%d/%m/%Y') }} · {{ dias_semana[d.weekday()] }}</td><td>{{ nome }}</td></tr>{% endfor %}</table>
+  </div>
+</div>

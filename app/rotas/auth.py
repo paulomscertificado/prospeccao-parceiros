@@ -240,7 +240,14 @@ def sair(request: Request):
 def minha_conta(request: Request, usuario: Usuario = Depends(usuario_logado), db: Session = Depends(obter_db)):
     from .. import marca
 
+    from datetime import date
+
+    from .. import feriados
+
+    hoje = date.today()
+    proximos = sorted((d, n) for d, n in feriados.da_pessoa(db, usuario).items() if d >= hoje and d.weekday() < 5)[:6]
     return tela(request, "minha_conta.html", {"restam_codigos": dois_fatores.codigos_restantes(usuario),
+                                              "ufs": feriados.UFS, "proximos_feriados": proximos,
                                               "exige_2fa": dois_fatores.precisa(usuario),
                                               # sem "empresa que eu represento", as mensagens saem pela marca da AR
                                               "marca_padrao": marca.da_ar(db, usuario.tenant_id or marca.ar_padrao(db)),
@@ -266,6 +273,31 @@ async def salvar_empresa(request: Request, usuario: Usuario = Depends(usuario_lo
 
     avisar(request, f"Pronto: suas próximas campanhas e mensagens falam em nome de {marca.da_pessoa(usuario)['nome']}.")
     return voltar("/minha-conta#empresa")
+
+
+@rotas.post("/minha-conta/cidade", dependencies=[Depends(verificar_csrf)])
+def salvar_cidade(request: Request, cidade: str = Form(""), uf: str = Form(""),
+                  usuario: Usuario = Depends(usuario_logado), db: Session = Depends(obter_db)):
+    """Onde a pessoa trabalha: nos feriados do estado e da cidade dela (e nos nacionais) as campanhas dela não enviam
+    e a agenda não oferece reunião (app/feriados.py, pedido da Maria em 18/11/2026)."""
+    from .. import feriados
+    from .admin import _remarcar_feriados
+
+    usuario = db.get(Usuario, usuario.id)
+    antes = (usuario.cidade or "", usuario.uf or "")
+    usuario.cidade, usuario.uf = feriados.normalizar_cidade(cidade), feriados.normalizar_uf(uf)
+    if usuario.cidade and not usuario.uf:
+        db.rollback()
+        avisar(request, "Escolha também a UF da sua cidade.", "erro")
+        return voltar("/minha-conta#cidade")
+    movidos = 0
+    if (usuario.cidade, usuario.uf) != antes:
+        registrar_log(db, usuario, "mudou_cidade", "usuario", usuario.id,
+                      f"{usuario.cidade or '—'} ({usuario.uf or '—'})", request)
+        movidos = _remarcar_feriados(db, {usuario.id})
+    db.commit()
+    avisar(request, "Cidade salva." + (f" {movidos} toque(s) seus que caíam num feriado mudaram de dia." if movidos else ""))
+    return voltar("/minha-conta#cidade")
 
 
 @rotas.post("/minha-conta/senha", dependencies=[Depends(verificar_csrf)])

@@ -17,7 +17,7 @@
 | WhatsApp conectado | `app/integracoes/whatsapp_leads.py` + `sdr.enviar_whatsapp_conectado` / `sincronizar_whatsapp_conectado` | Usa o número conectado no sistema WhatsApp Leads (fila com pausas, horário e limite; respostas e opt-out voltam sozinhos) |
 | WhatsApp | `app/integracoes/whatsapp_cloud.py` | API oficial: templates aprovados, resposta dentro da janela de 24 h, webhook com assinatura |
 | CRM | `app/config.py` (status), pipeline | Novo → Pesquisando → Abordagem criada → Contatado → Aguardando resposta → Respondeu → Interessado → Humano assumiu → Reunião → Negociação → Parceiro → Parceiro ativo / Perdido |
-| Calendar | `app/agenda_horarios.py` | Horários livres = expediente do responsável − reuniões marcadas (nunca inventa horário) |
+| Calendar | `app/agenda_horarios.py` | Horários livres = expediente do responsável − reuniões marcadas − feriados dele (nunca inventa horário) |
 | Human Handoff | `Oportunidade`, `/oportunidades` | Tela "Oportunidades" (Novas, Atendidas, Descartadas, Todas as respostas), a equipe toda vê; botão **Marcar como atendido**, avisos |
 | Analytics | `app/metricas.py` (`inteligencia`) | Painel "Inteligência de Prospecção", ranking de segmentos, sugestões |
 | Knowledge Base | tabela `base_conhecimento`, `/conhecimento` | O que a SDR pode responder sozinha |
@@ -81,7 +81,8 @@ Resultado (reunião, parceiro, vendas) ──► Inteligência de Prospecção �
 - `campanhas` (+): pedido, categorias, cidade, estado, quantidade, canais, objetivo, tom, CTA, status, etapa, aprovado_por, aprovado_em.
 - `mensagens` (+): campanha, categoria, ângulo, respondida — base das métricas "qual mensagem/canal/abordagem funciona".
 - `tarefas` (+): ângulo; status `rascunho` até a aprovação.
-- `usuarios` (+): expediente e duração da reunião.
+- `usuarios` (+): expediente e duração da reunião; cidade e UF (feriados da pessoa, `app/feriados.py`, 18/11/2026: as
+  campanhas não marcam nem mandam toques nos feriados nacionais, do estado e da cidade de quem envia).
 - `base_receita` (+): categoria.
 
 A migração é automática ao abrir o sistema (colunas novas e status antigos → novos).

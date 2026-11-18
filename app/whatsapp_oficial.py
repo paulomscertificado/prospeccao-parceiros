@@ -489,6 +489,10 @@ def processar_fila(db, maximo: int = POR_RODADA) -> dict:
             continue
         if not sdr.automacao_ativa(t.lead) or not (t.mensagem or "").strip():
             continue  # o cliente respondeu, saiu ou está com alguém da equipe
+        from . import feriados
+
+        if feriados.adiar_se_feriado(db, t):
+            continue  # feriado da cidade de quem envia: o aviso passou para o próximo dia de envio
         try:
             enviar_toque(db, t, None, pode_pedir_arte=artes_pedidas < ARTES_POR_RODADA)
         except EsperandoArte:

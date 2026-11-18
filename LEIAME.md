@@ -326,6 +326,25 @@ validação (o "presencial em Recife" é da MS).
 Quem deixa em branco fala pela **marca da sua empresa** no sistema (Configurações > Marca). Mensagens já enviadas
 não mudam; as que ainda vão sair são corrigidas na hora do envio.
 
+### Feriados da cidade de cada pessoa
+
+Nos feriados de quem envia, as campanhas dessa pessoa **não enviam nada** (WhatsApp, e-mail e avisos da Renovação) e a
+agenda dela **não oferece horários de reunião**. Valem:
+- os **feriados nacionais**, automáticos (com Carnaval, Sexta-feira Santa e Corpus Christi);
+- os do **estado** e da **cidade** onde a pessoa trabalha.
+
+Como deixar pronto:
+1. Cada pessoa informa a **cidade e a UF** em **Minha conta > Onde eu trabalho** (ou o administrador, em
+   Configurações > Usuários > Editar).
+2. Em **Configurações > Feriados** aparece um quadro para cada estado e cidade da equipe. Escreva uma data por linha:
+   `16/07 Nossa Senhora do Carmo` vale todo ano; `20/11/2026 Ponto facultativo` vale só naquele ano. O botão
+   "Pesquisar" abre a busca dos feriados daquela cidade (confira no site da prefeitura). Para outra cidade, use
+   "Outra cidade ou estado".
+3. Salve. Os toques já marcados para um feriado **mudam sozinhos para o próximo dia de envio** de quem envia (e o
+   sistema confere de novo de hora em hora e na hora de enviar).
+
+Cada marca tem as suas listas. Quem está sem cidade no cadastro segue só os feriados nacionais.
+
 ### Empresas novas (venda de certificado para empresas recém-abertas)
 
 Menu **Empresas novas**. Todo dia o sistema busca as empresas que acabaram de abrir e monta uma campanha de
@@ -799,7 +818,8 @@ permissão, a conta para de enviar na hora.
 | Campanha com "erro" ao montar | Leia o motivo na campanha. Região sem empresas: confira cidade/bairro e estado (bairro funciona, ex.: "Boa Viagem" / PE). Uma empresa com site quebrado não para mais a campanha: ela segue com os dados da Receita |
 | A campanha não manda e-mails sozinha | Configure o SMTP no `.env` e confira em Configurações se "fila envia e-mails sozinha" = 1; o envio só acontece em dias úteis, no horário configurado |
 | "APROVAÇÃO NECESSÁRIA" não some | Clique em APROVAR CAMPANHA (qualquer pessoa da equipe pode aprovar) |
-| Nenhum horário para reunião | Confira o expediente da pessoa em Configurações > Usuários |
+| Nenhum horário para reunião | Confira o expediente da pessoa em Configurações > Usuários (nos feriados da cidade dela não há horários) |
+| Um toque mudou de dia sozinho | Caía num feriado de quem envia (nacional ou da cidade, em Configurações > Feriados): foi para o próximo dia de envio |
 | "Os servidores do OpenStreetMap estão ocupados" | Tente de novo em alguns minutos ou use a base da Receita |
 | "O limite diário... foi atingido" | Continue amanhã ou aumente o limite em Configurações |
 | "Já houve uma mensagem para este lead há menos de 20 horas" | Controle de frequência: contate amanhã |

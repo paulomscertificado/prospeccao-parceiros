@@ -131,6 +131,9 @@ base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renova
     salvo na tela): `remarcar_feriados(db, aplicar=True)` leva cada um ao dia útil mais perto (antes, se der) com 2 dias
     dos vizinhos, até o vencimento e com vaga no teto de WhatsApps; sem vaga de WhatsApp, só o e-mail; sem dia, cancela.
     O e-mail vai de novo para ~2 h depois do WhatsApp. A tela chama ao salvar um feriado novo.
+    Desde 18/11/2026 valem também os feriados do estado e da cidade de quem é a campanha (`dias_sem_envio(db, pessoa)`,
+    `app/feriados.py`, Configurações > Feriados): na montagem (`criar_campanha` → `datas_da_campanha(pessoa=)`), na
+    aprovação (`reajustar_na_aprovacao`) e em `remarcar_feriados` (cada campanha com os feriados do dono dela).
     `emails_no_prazo(db, camp)` (na montagem e na aprovação): o e-mail que ficaria para depois do vencimento
     (WhatsApp numa sexta à tarde, vence no sábado) sai no mesmo dia e horário do WhatsApp.
     **Aprovar na tela** (pedido da Maria em 13/11/2026): a tela Renovação mostra no topo a campanha

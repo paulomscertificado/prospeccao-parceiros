@@ -119,6 +119,9 @@
   <button class="btn btn-primario">Salvar e recalcular</button>
 </form>
 
+{% elif aba == 'feriados' %}
+{% include "_feriados.html" %}
+
 {% elif aba == 'usuarios' %}
 {% macro opcoes_de_papel(papeis_do_grupo, u=none) %}{% for pa in papeis_do_grupo %}{% set atual = u and (u.papel.codigo if u.papel else u.perfil) == pa.codigo %}{% if atual or sou_master or pa.codigo not in papeis_de_admin %}<option value="{{ pa.codigo }}" {{ 'selected' if atual or (not u and pa.codigo == 'funcionario') }}>{{ pa.nome }}</option>{% endif %}{% endfor %}{% endmacro %}
 {% macro opcoes_de_equipe(equipes_do_grupo, u=none) %}<option value="">—</option>{% for e in equipes_do_grupo %}<option value="{{ e.id }}" {{ 'selected' if u and u.equipe_id == e.id }}>{{ e.nome }}</option>{% endfor %}{% endmacro %}
@@ -153,6 +156,8 @@
       <div><label>Parceiro (só para o papel Parceiro)</label><select name="parceiro_id">{{ opcoes_de_parceiro(g.parceiros) }}</select></div>
       <div><label>Expediente (reuniões)</label><input type="text" name="expediente" value="seg-sex 09:00-12:00,14:00-18:00"></div>
       <div><label>Minutos por reunião</label><input type="number" name="duracao_reuniao" value="30"></div>
+      <div><label>Cidade onde trabalha (feriados)</label><input type="text" name="cidade" maxlength="120" placeholder="Recife"></div>
+      <div><label>UF</label><select name="uf"><option value="">—</option>{% for sigla in ufs %}<option value="{{ sigla }}">{{ sigla }}</option>{% endfor %}</select></div>
       <div><label>Senha inicial</label><input type="password" name="senha" required autocomplete="new-password"></div>
     </div>
     <button class="btn btn-primario">Criar</button> <button type="button" class="btn" data-abrir="nova-{{ chave }}">Cancelar</button>
@@ -181,6 +186,8 @@
           <div><label>Parceiro (só para o papel Parceiro)</label><select name="parceiro_id">{{ opcoes_de_parceiro(g.parceiros, u) }}</select></div>
           <div><label>Expediente (reuniões)</label><input type="text" name="expediente" value="{{ u.expediente }}"></div>
           <div><label>Minutos por reunião</label><input type="number" name="duracao_reuniao" value="{{ u.duracao_reuniao }}"></div>
+          <div><label>Cidade onde trabalha (feriados)</label><input type="text" name="cidade" maxlength="120" value="{{ u.cidade or '' }}" placeholder="Recife"></div>
+          <div><label>UF</label><select name="uf"><option value="">—</option>{% for sigla in ufs %}<option value="{{ sigla }}" {{ 'selected' if u.uf == sigla }}>{{ sigla }}</option>{% endfor %}</select></div>
           <div><label>Nova senha</label><input type="password" name="senha" placeholder="(manter a atual)" autocomplete="new-password"></div>
         </div>
         <label class="marcar"><input type="checkbox" name="ativo" {{ 'checked' if u.ativo }}> Acesso ativo</label>

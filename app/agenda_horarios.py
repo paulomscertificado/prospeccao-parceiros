@@ -59,10 +59,13 @@ def horarios_livres(db, usuario: Usuario, dias: int = 7, quantidade: int = 6,
     minimo = agora() + timedelta(hours=antecedencia_horas)
     hoje = agora().date()
     marcados = ocupados(db, usuario.id, hoje, hoje + timedelta(days=dias))
+    from . import feriados
+
+    sem_reuniao = feriados.da_pessoa(db, usuario)  # feriados nacionais, do estado e da cidade da pessoa (18/11/2026)
     livres = []
     for n in range(dias + 1):
         dia = hoje + timedelta(days=n)
-        if dia.weekday() not in dias_semana:
+        if dia.weekday() not in dias_semana or dia in sem_reuniao:
             continue
         for ini, fim in faixas:
             inicio = datetime.combine(dia, ini)
