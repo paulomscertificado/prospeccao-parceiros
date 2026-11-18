@@ -127,7 +127,8 @@ async def salvar_oficial(request: Request, usuario: Usuario = Depends(exige("wha
     try:
         r = whatsapp_oficial.testar(db, conta)
         db.commit()
-        avisar(request, f"Salvo e conectado: {r['numero']} ({r['nome']}), limite {r['limite']} por dia."
+        avisar(request, ("Salvo. Achado na Meta" if r.get("ativado") is False else "Salvo e conectado")
+               + f": {r['numero']} ({r['nome']}), limite {r['limite']} por dia."
                         + (" O app foi ligado à conta do WhatsApp (as respostas chegam pelo webhook)." if r["app_ligado"] else ""))
         if r["avisos"]:
             avisar(request, " ".join(r["avisos"]), "alerta")
@@ -146,12 +147,42 @@ async def testar_oficial(request: Request, usuario: Usuario = Depends(exige("wha
     try:
         r = whatsapp_oficial.testar(db, conta)
         db.commit()
-        avisar(request, f"Conectado: {r['numero']} ({r['nome']}), qualidade {r['qualidade']}, limite {r['limite']} por dia.")
+        avisar(request, ("Achado na Meta" if r.get("ativado") is False else "Conectado")
+               + f": {r['numero']} ({r['nome']}), qualidade {r['qualidade']}, limite {r['limite']} por dia.")
         if r["avisos"]:
             avisar(request, " ".join(r["avisos"]), "alerta")
     except whatsapp_cloud.ErroWhatsApp as erro:
         avisar(request, f"O teste de conexão falhou: {erro}", "erro")
     return voltar("/whatsapp#oficial")
+
+
+@rotas.post("/whatsapp/oficial/ativar", dependencies=[Depends(verificar_csrf)])
+async def ativar_numero_oficial(request: Request, usuario: Usuario = Depends(exige("whatsapp.gerenciar_todos")),
+                                db: Session = Depends(obter_db)):
+    """Ativa o número novo na API da Meta com a senha de 6 números (o último passo, que a Meta só aceita pela API). A
+    senha não é guardada nem vai para o registro de atividades."""
+    conta, motivo = _conta_oficial_da_tela(request, usuario, db)
+    if motivo:
+        avisar(request, motivo, "erro")
+        return voltar("/whatsapp#ativar")
+    form = await request.form()
+    try:
+        r = whatsapp_oficial.ativar_numero(db, conta, str(form.get("pin", "")), str(form.get("pin2", "")))
+    except whatsapp_cloud.ErroWhatsApp as erro:
+        if erro.codigo:  # chegou à Meta (ela conta as tentativas: 10 a cada 3 dias)
+            registrar_log(db, usuario, "ativar_numero_whatsapp_oficial_recusado", "whatsapp_oficial", conta.id,
+                          f"número {conta.phone_number_id}: {erro}", request, modulo="WhatsApp")
+            db.commit()
+        avisar(request, f"O número não foi ativado: {erro}", "erro")
+        return voltar("/whatsapp#ativar")
+    registrar_log(db, usuario, "ativou_numero_whatsapp_oficial", "whatsapp_oficial", conta.id,
+                  f"número {conta.phone_number_id} ativado na API da Meta", request, modulo="WhatsApp")
+    db.commit()
+    avisar(request, "Número ativado na API da Meta" + (f": {r['numero']} ({r['nome']})" if r.get("numero") else "")
+           + ". Guarde a senha de 6 números num lugar seguro (o sistema não guarda). Próximo passo: o webhook, logo abaixo.")
+    if r.get("avisos"):
+        avisar(request, " ".join(r["avisos"]), "alerta")
+    return voltar("/whatsapp#ativar")
 
 
 @rotas.post("/whatsapp/oficial/teste", dependencies=[Depends(verificar_csrf)])

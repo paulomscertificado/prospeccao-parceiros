@@ -91,7 +91,7 @@
   {% else %}
   {% set s = oficial_situacao %}
   {% if oficial and s %}
-  <div class="aviso aviso-ok">Conectado: <b>{{ s.numero }}</b> ({{ s.nome }}) · qualidade: {{ s.qualidade }} · limite: {{ s.limite }}
+  <div class="aviso {{ 'aviso-alerta' if s.ativado is sameas false else 'aviso-ok' }}">{{ 'Achado na Meta, mas ainda não ativado' if s.ativado is sameas false else 'Conectado' }}: <b>{{ s.numero }}</b> ({{ s.nome }}) · qualidade: {{ s.qualidade }} · limite: {{ s.limite }}
     conversas iniciadas pela empresa por dia{% if oficial.testado_em %} <span class="pequeno">(testado em {{ oficial.testado_em|datahora }})</span>{% endif %}
     <br>{{ 'App ligado à conta do WhatsApp: as respostas chegam pelo webhook.' if s.app_ligado else 'O app ainda não está ligado à conta do WhatsApp: as respostas não chegam (clique em Testar conexão).' }}</div>
   {% for aviso in s.avisos or [] %}<div class="aviso aviso-alerta">{{ aviso }}</div>{% endfor %}
@@ -117,6 +117,20 @@
     <button class="btn btn-primario">Salvar e testar</button>
   </form>
   {% if oficial %}
+  <h3 style="margin:18px 0 6px" id="ativar">Ativar o número na Meta{% if s.ativado %} <span class="selo selo-ok">ativado</span>{% endif %}</h3>
+  <p class="pequeno" style="margin:0 0 8px">O último passo de um <b>número novo</b>, que a Meta só aceita por aqui (não tem botão
+    no site dela). Antes, confirme o número com o código (SMS ou ligação) no Gerenciador do WhatsApp. Escolha uma
+    <b>senha de 6 números</b> (evite 123456 ou 111111); se o número já tiver a verificação em duas etapas, use a senha dela.
+    <b>Anote num lugar seguro:</b> o sistema não guarda, e a Meta pede essa senha para mudar o número de lugar ou apagá-lo.
+    A Meta aceita até 10 tentativas a cada 3 dias.</p>
+  <form method="post" action="/whatsapp/oficial/ativar" autocomplete="off" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div><label class="pequeno" for="pin-oficial">Senha de 6 números</label><input id="pin-oficial" type="text" name="pin" inputmode="numeric" autocomplete="off" pattern="[0-9]{6}" minlength="6" maxlength="6" required style="width:130px"></div>
+    <div><label class="pequeno" for="pin2-oficial">Repita a senha</label><input id="pin2-oficial" type="text" name="pin2" inputmode="numeric" autocomplete="off" pattern="[0-9]{6}" minlength="6" maxlength="6" required style="width:130px"></div>
+    <button class="btn{{ '' if s.ativado else ' btn-verde' }}">{{ 'Ativar de novo' if s.ativado else 'Ativar o número' }}</button>
+  </form>
+  {% if s.ativado %}<p class="pequeno suave" style="margin-top:4px">Este número já está ativado. Só ative de novo se a Meta pedir
+    (por exemplo, depois de aprovar um nome de exibição novo).</p>{% endif %}
   <h3 style="margin:18px 0 6px">Webhook: respostas, SAIR e situação das mensagens</h3>
   <p class="pequeno" style="margin:0 0 8px">No Meta for Developers &gt; seu app &gt; WhatsApp &gt; Configuração, em <b>Webhook</b>, cole:</p>
   <div class="campos">

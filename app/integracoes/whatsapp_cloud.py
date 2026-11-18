@@ -6,7 +6,7 @@ enviar MODELOS (templates) aprovados no Gerenciador do WhatsApp. Texto livre só
 
 Duas formas de usar:
 - por AR (app/whatsapp_oficial.py, tela Configurações > WhatsApp > "API oficial da Meta"): as funções com
-  `phone_number_id` e `token` explícitos (consultar_numero, enviar_modelo, enviar_texto_por, subir_midia) e as dos
+  `phone_number_id` e `token` explícitos (consultar_numero, registro_do_numero e registrar_numero, enviar_modelo, enviar_texto_por, subir_midia) e as dos
   modelos, com o ID da conta do WhatsApp Business (criar_modelo, modelos_da_conta; a imagem de exemplo do modelo
   sobe pelo app do token: app_do_token + subir_exemplo);
 - a antiga, por variável (WHATSAPP_TOKEN e WHATSAPP_PHONE_NUMBER_ID): configurado(), enviar_template(),
@@ -22,7 +22,9 @@ from .. import config, util
 
 
 class ErroWhatsApp(Exception):
-    pass
+    def __init__(self, mensagem: str = "", codigo: int = 0):
+        super().__init__(mensagem)
+        self.codigo = codigo  # o código de erro da Meta (0 = o erro não veio da Meta)
 
 
 CAMPOS_DO_NUMERO = "display_phone_number,verified_name,quality_rating,whatsapp_business_manager_messaging_limit,name_status"
@@ -49,6 +51,13 @@ def _erro_da_meta(r: httpx.Response) -> str:
     return " ".join(x for x in (erro.get("message", ""), detalhe) if x)[:400] or f"erro {r.status_code}"
 
 
+def _codigo_do_erro(r: httpx.Response) -> int:
+    try:
+        return int((r.json().get("error") or {}).get("code") or 0)
+    except (ValueError, TypeError, AttributeError):
+        return 0
+
+
 def _pedir(metodo: str, caminho: str, token: str, versao: str | None = None, **kw) -> dict:
     if not token:
         raise ErroWhatsApp("Falta o token da API oficial (Configurações > WhatsApp > API oficial da Meta).")
@@ -57,7 +66,7 @@ def _pedir(metodo: str, caminho: str, token: str, versao: str | None = None, **k
     except httpx.HTTPError:
         raise ErroWhatsApp("Sem conexão com a API do WhatsApp. Confira a internet.") from None
     if r.status_code >= 400:
-        raise ErroWhatsApp(f"A Meta recusou: {_erro_da_meta(r)}")
+        raise ErroWhatsApp(f"A Meta recusou: {_erro_da_meta(r)}", _codigo_do_erro(r))
     try:
         return r.json()
     except ValueError:
@@ -67,6 +76,27 @@ def _pedir(metodo: str, caminho: str, token: str, versao: str | None = None, **k
 def consultar_numero(phone_number_id: str, token: str, versao: str | None = None) -> dict:
     """Dados do número na Meta: número, nome verificado, qualidade e limite de mensagens (teste de conexão)."""
     return _pedir("GET", phone_number_id, token, versao, params={"fields": CAMPOS_DO_NUMERO})
+
+
+CAMPOS_DO_REGISTRO = "status,platform_type,code_verification_status"
+
+
+def registro_do_numero(phone_number_id: str, token: str, versao: str | None = None) -> dict:
+    """Se o número já está ativado na API (platform_type CLOUD_API, status CONNECTED) e se foi confirmado com o
+    código por SMS ou ligação (code_verification_status VERIFIED). Pedido à parte do teste de conexão: se a Meta
+    recusar estes campos, o teste não cai por isso."""
+    dados = _pedir("GET", phone_number_id, token, versao, params={"fields": CAMPOS_DO_REGISTRO})
+    return dados if isinstance(dados, dict) else {}
+
+
+def registrar_numero(phone_number_id: str, token: str, pin: str, versao: str | None = None) -> bool:
+    """Ativa (registra) o número na API: o último passo de um número novo, que a Meta só aceita pela API (não pelo
+    Gerenciador do WhatsApp nem pelo painel do app). `pin`: 6 números, a verificação em duas etapas do número (se ele
+    já tem uma, precisa ser a mesma; se não tem, passa a ser esta). Limite da Meta: 10 pedidos por número a cada
+    72 h (erro 133016)."""
+    dados = _pedir("POST", f"{phone_number_id}/register", token, versao,
+                   json={"messaging_product": "whatsapp", "pin": pin})
+    return bool(dados.get("success", True)) if isinstance(dados, dict) else True
 
 
 def contas_do_token(token: str, versao: str | None = None) -> list[str]:

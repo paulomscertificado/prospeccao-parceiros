@@ -10,12 +10,12 @@ import json
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from app import config
+from app import config, whatsapp_oficial
 from app.banco import sessao
 from app.integracoes import whatsapp_cloud
 from app.leads_servico import limpar_campos
 from app.main import app
-from app.modelos import ContaWhatsAppOficial, Lead, Mensagem, Tenant, Usuario
+from app.modelos import ContaWhatsAppOficial, Lead, LogAuditoria, Mensagem, Tenant, Usuario
 from app.seguranca import criptografar, descriptografar, limite_pedidos, resumir_senha
 from conftest import SENHA, csrf_de
 
@@ -209,3 +209,83 @@ def test_webhook_resposta_vai_para_o_lead_da_ar_do_numero_e_sair_para_todas(clie
     assert _assinado(cliente, _evento("5581995551234", "SAIR")).status_code == 200
     with sessao() as db:
         assert db.get(Lead, ids[0]).opt_out and db.get(Lead, ids[1]).opt_out  # SAIR vale para todas as ARs
+
+
+# ---------------------------------------------------------------- ativar o número novo (18/11/2026)
+
+SEM_ATIVAR = {"platform_type": "NOT_APPLICABLE", "status": "PENDING", "code_verification_status": "VERIFIED"}
+
+
+def _meta_do_registro(monkeypatch, registro: dict, erro_no_registro: dict | None = None) -> list:
+    """Meta imitada para a ativação: o número com a situação `registro` (platform_type, status,
+    code_verification_status) e o POST /register com sucesso (o número passa a CLOUD_API/CONNECTED) ou com o erro."""
+    chamadas, situacao_do_numero = [], dict(registro)
+
+    def pedir(metodo, url, **kw):
+        chamadas.append((metodo, url, kw))
+        if url.endswith("/register"):
+            if erro_no_registro:
+                return _Resposta({"error": erro_no_registro}, 400)
+            situacao_do_numero.update(platform_type="CLOUD_API", status="CONNECTED")
+            return _Resposta({"success": True})
+        if url.endswith("/subscribed_apps"):
+            return _Resposta({"success": True})
+        if metodo == "GET" and "platform_type" in (kw.get("params") or {}).get("fields", ""):
+            return _Resposta(dict(situacao_do_numero))
+        if metodo == "GET":
+            return _Resposta({"display_phone_number": "+55 81 3333-0000", "verified_name": "Empresa Oficial Teste",
+                              "quality_rating": "UNKNOWN", "whatsapp_business_manager_messaging_limit": "TIER_250"})
+        return _Resposta({"messages": [{"id": "wamid.TESTE456"}]})
+
+    monkeypatch.setattr(whatsapp_cloud.httpx, "request", pedir)
+    return chamadas
+
+
+def test_ativar_o_numero_novo_com_a_senha_de_6_numeros(cliente, monkeypatch):
+    _zerar_limite()
+    _admin(EMAIL_MS, "MS Certificação Digital")
+    _conta_da_ms()
+    chamadas = _meta_do_registro(monkeypatch, SEM_ATIVAR)
+    c = _entrar(EMAIL_MS)
+    tela = c.get("/whatsapp").text
+    r = c.post("/whatsapp/oficial/testar", data={"csrf": csrf_de(tela)})
+    assert "ainda não está ativado na API da Meta" in r.text and "Achado na Meta" in r.text, r.text[:500]
+    with sessao() as db:  # sem o número ativado, a Renovação não liga o envio pela API
+        assert "Ativar o número" in whatsapp_oficial.falta_para_renovacao(db, _ars()[0])
+    # senha fora do padrão ou diferente na repetição: nada vai para a Meta
+    for pin, pin2, esperado in (("12345", "12345", "exatamente 6 números"), ("4829l5", "4829l5", "exatamente 6 números"),
+                                ("482915", "482916", "não são iguais")):
+        r = c.post("/whatsapp/oficial/ativar", data={"csrf": csrf_de(tela), "pin": pin, "pin2": pin2})
+        assert "O número não foi ativado" in r.text and esperado in r.text
+    assert not [u for _, u, _ in chamadas if u.endswith("/register")]
+    r = c.post("/whatsapp/oficial/ativar", data={"csrf": csrf_de(tela), "pin": "482 915", "pin2": "482915"})
+    assert "Número ativado na API da Meta" in r.text, r.text[:500]
+    registro = [(m, u, kw) for m, u, kw in chamadas if u.endswith("/register")]
+    assert len(registro) == 1 and registro[0][0] == "POST" and registro[0][1].endswith(f"/{NUMERO_ID}/register")
+    assert registro[0][2]["json"] == {"messaging_product": "whatsapp", "pin": "482915"}
+    tela = c.get("/whatsapp").text
+    assert "ainda não está ativado" not in tela and "Ativar de novo" in tela and "482915" not in tela
+    with sessao() as db:  # a senha não fica guardada em lugar nenhum
+        conta = db.execute(select(ContaWhatsAppOficial).where(ContaWhatsAppOficial.phone_number_id == NUMERO_ID)
+                           .execution_options(sem_filtro_de_ar=True)).scalar_one()
+        assert "482915" not in (conta.situacao or "") and whatsapp_oficial.situacao(conta)["ativado"] is True
+        logs = db.execute(select(LogAuditoria).where(LogAuditoria.acao == "ativou_numero_whatsapp_oficial")).scalars().all()
+        assert logs and all("482915" not in (log.detalhes or "") for log in logs)
+        assert "Ativar o número" not in whatsapp_oficial.falta_para_renovacao(db, _ars()[0])
+
+
+def test_ativar_o_numero_explica_a_recusa_da_meta(cliente, monkeypatch):
+    _zerar_limite()
+    _admin(EMAIL_MS, "MS Certificação Digital")
+    _conta_da_ms()
+    c = _entrar(EMAIL_MS)
+    tela = c.get("/whatsapp").text
+    for codigo, esperado in ((133005, "não confere com a verificação em duas etapas"), (133016, "10 tentativas")):
+        _meta_do_registro(monkeypatch, SEM_ATIVAR, {"message": f"(#{codigo}) Registro recusado", "code": codigo})
+        r = c.post("/whatsapp/oficial/ativar", data={"csrf": csrf_de(tela), "pin": "731904", "pin2": "731904"})
+        assert "O número não foi ativado" in r.text and esperado in r.text and "Registro recusado" in r.text
+        assert "731904" not in r.text
+    with sessao() as db:  # a tentativa que chegou à Meta fica no registro de atividades, sem a senha
+        logs = db.execute(select(LogAuditoria).where(
+            LogAuditoria.acao == "ativar_numero_whatsapp_oficial_recusado")).scalars().all()
+        assert len(logs) >= 2 and all("731904" not in (log.detalhes or "") for log in logs)

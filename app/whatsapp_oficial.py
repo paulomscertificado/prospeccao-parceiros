@@ -5,8 +5,9 @@ da conta do WhatsApp Business, a "Identificação do número de telefone", o tok
 chave secreta do app (os dois criptografados, nunca voltam para a tela) e o token de verificação do webhook (gerado
 aqui, a pessoa copia para o painel da Meta).
 
-Etapa 1: guardar, testar a conexão, mandar uma mensagem de teste (um modelo aprovado, ex.: hello_world) e receber
-pelo webhook as respostas, o SAIR e a situação das mensagens.
+Etapa 1: guardar, testar a conexão, ativar o número novo na Meta (ativar_numero, com a senha de 6 números), mandar
+uma mensagem de teste (um modelo aprovado, ex.: hello_world) e receber pelo webhook as respostas, o SAIR e a situação
+das mensagens.
 Etapa 2 (16/11/2026, pedido da Maria): os modelos do aviso de vencimento (pedir a aprovação e acompanhar) e os avisos
 da Renovação pelo número oficial (Campanha.envio_oficial): fila própria, a arte do site no cabeçalho e os botões
 Quero renovar / Já renovei / Parar avisos. As outras campanhas continuam pelo WhatsApp Leads (QR code).
@@ -95,6 +96,23 @@ def situacao(conta: ContaWhatsAppOficial | None) -> dict:
 
 
 QUALIDADE = {"GREEN": "Alta", "YELLOW": "Média", "RED": "Baixa", "UNKNOWN": "Ainda sem avaliação"}
+STATUS_DO_NUMERO = {"CONNECTED": "Conectado", "PENDING": "Pendente", "DISCONNECTED": "Desconectado",
+                    "FLAGGED": "Sinalizado pela Meta", "RESTRICTED": "Restrito pela Meta", "BANNED": "Banido",
+                    "RATE_LIMITED": "No limite de envio", "UNVERIFIED": "Não confirmado", "DELETED": "Apagado",
+                    "MIGRATED": "Migrado", "OFFLINE": "Fora do ar", "UNKNOWN": "Desconhecido"}
+AVISO_SEM_ATIVAR = ("O número ainda não está ativado na API da Meta e nada sai por ele: digite uma senha de 6 números "
+                    "em \"Ativar o número\", logo abaixo.")
+AVISO_SEM_CODIGO = ("O número ainda não foi confirmado com o código da Meta: confirme por SMS ou ligação no Gerenciador "
+                    "do WhatsApp > Números de telefone e depois use \"Ativar o número\", logo abaixo.")
+
+
+def numero_ativado(registro: dict) -> bool | None:
+    """O número está ativado na API (registrado na Cloud API)? None = a Meta não disse."""
+    plataforma = str(registro.get("platform_type") or "").upper()
+    if plataforma:
+        return plataforma == "CLOUD_API"
+    status = str(registro.get("status") or "").upper()
+    return (status == "CONNECTED") if status else None
 
 
 def testar(db, conta: ContaWhatsAppOficial) -> dict:
@@ -109,6 +127,16 @@ def testar(db, conta: ContaWhatsAppOficial) -> dict:
                  "limite": limite.replace("TIER_", "").replace("UNLIMITED", "ilimitado") or "—",
                  "nome_aprovado": dados.get("name_status", ""), "app_ligado": False, "avisos": []}
     avisos = resultado["avisos"]
+    try:  # ativado na API? (número novo: falta o "Ativar o número", ativar_numero)
+        registro = whatsapp_cloud.registro_do_numero(conta.phone_number_id, token(conta))
+    except whatsapp_cloud.ErroWhatsApp:
+        registro = {}
+    resultado["ativado"] = numero_ativado(registro)
+    status = str(registro.get("status") or "").upper()
+    resultado["status_numero"] = STATUS_DO_NUMERO.get(status, status)
+    if resultado["ativado"] is False:
+        sem_codigo = str(registro.get("code_verification_status") or "").upper() in ("NOT_VERIFIED", "EXPIRED")
+        avisos.append(AVISO_SEM_CODIGO if sem_codigo else AVISO_SEM_ATIVAR)
     if not conta.waba_id:
         try:
             ids = whatsapp_cloud.contas_do_token(token(conta))
@@ -128,6 +156,51 @@ def testar(db, conta: ContaWhatsAppOficial) -> dict:
             avisos.append(f"Não consegui ligar o app à conta do WhatsApp (as respostas não chegam até isso): {erro}")
     conta.numero = str(resultado["numero"])[:30]
     conta.situacao, conta.testado_em = json.dumps(resultado, ensure_ascii=False), agora()
+    return resultado
+
+
+SENHA_DO_NUMERO = re.compile(r"^\d{6}$")
+ERROS_DA_ATIVACAO = {  # os códigos da Meta no POST /register, explicados para a tela
+    133004: "A Meta está com instabilidade agora. Tente de novo em alguns minutos.",
+    133005: ("A senha não confere com a verificação em duas etapas que o número já tem: use a mesma senha de 6 "
+             "números criada antes (ou troque no Gerenciador do WhatsApp > Números de telefone > o número > "
+             "Verificação em duas etapas)."),
+    133006: ("Antes de ativar, confirme o número com o código (SMS ou ligação) no Gerenciador do WhatsApp > Números de "
+             "telefone."),
+    133008: "Muitas tentativas com a senha errada. Espere o tempo que a Meta pede e tente de novo com a senha certa.",
+    133009: "Tentativas rápidas demais. Espere alguns minutos e tente de novo.",
+    133015: "Este número foi apagado há pouco e a Meta ainda está terminando. Espere alguns minutos e tente de novo.",
+    133016: ("A Meta aceita até 10 tentativas de ativar o número a cada 3 dias e esse limite acabou. Tente de novo "
+             "daqui a 3 dias."),
+}
+
+
+def ativar_numero(db, conta: ContaWhatsAppOficial, senha: str, repeticao: str | None = None) -> dict:
+    """Ativa (registra) o número na API da Meta com a senha de 6 números (a verificação em duas etapas dele) e refaz o
+    teste de conexão para a tela. É o último passo de um número novo e a Meta só aceita pela API (pedido da Maria em
+    18/11/2026). A senha não fica guardada em lugar nenhum (nem no registro de atividades, nem nas mensagens de erro)."""
+    senha = re.sub(r"\s", "", senha or "")
+    if not SENHA_DO_NUMERO.match(senha):
+        raise whatsapp_cloud.ErroWhatsApp("A senha precisa ter exatamente 6 números.")
+    if repeticao is not None and re.sub(r"\s", "", repeticao) != senha:
+        raise whatsapp_cloud.ErroWhatsApp("As duas senhas não são iguais: digite a mesma senha de 6 números nos dois "
+                                          "campos.")
+    try:
+        whatsapp_cloud.registrar_numero(conta.phone_number_id, token(conta), senha)
+    except whatsapp_cloud.ErroWhatsApp as erro:
+        detalhe = str(erro).replace(senha, "******")
+        amigavel = ERROS_DA_ATIVACAO.get(erro.codigo)
+        raise whatsapp_cloud.ErroWhatsApp(f"{amigavel} ({detalhe})" if amigavel else detalhe, erro.codigo) from None
+    try:
+        resultado = testar(db, conta)
+    except whatsapp_cloud.ErroWhatsApp:
+        return {"avisos": []}
+    if resultado.get("ativado") is False:  # a Meta aceitou, mas ainda não mostra o número como ativado
+        resultado["ativado"] = None
+        resultado["avisos"] = [a for a in resultado["avisos"] if a not in (AVISO_SEM_ATIVAR, AVISO_SEM_CODIGO)]
+        resultado["avisos"].append("A Meta aceitou a ativação, mas pode levar alguns minutos para mostrar o número "
+                                   "como conectado: clique em Testar conexão daqui a pouco.")
+        conta.situacao = json.dumps(resultado, ensure_ascii=False)
     return resultado
 
 
@@ -226,6 +299,8 @@ def falta_para_renovacao(db, ar: int | None) -> str:
         return "configure a API oficial da Meta em Configurações > WhatsApp (o número e o token)"
     if not conta.testado_em:
         return "teste a conexão da API oficial em Configurações > WhatsApp"
+    if situacao(conta).get("ativado") is False:  # número novo sem o último passo: a Meta recusaria todo envio
+        return "ative o número na Meta em Configurações > WhatsApp > API oficial da Meta (Ativar o número)"
     if not conta.segredo_cripto:  # sem ela o webhook recusa tudo: as respostas e os botões não chegariam
         return ("cole a chave secreta do app em Configurações > WhatsApp > API oficial da Meta (sem ela as respostas "
                 "e os botões dos avisos não chegam ao sistema)")

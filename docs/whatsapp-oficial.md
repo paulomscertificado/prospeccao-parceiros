@@ -11,6 +11,11 @@ app WhatsApp Business: provavelmente coexistência, o app continua no celular), 
 `1425129957352130`, limite **2.000** conversas iniciadas pela empresa por 24 h (sobe para 10.000 com 1.000 clientes
 únicos em 7 dias com alta qualidade). Cobrança da conta em USD. Esse número não está no WhatsApp Leads.
 
+**17/11/2026:** a conta do Facebook do Paulo Marinho, única administradora do portfólio da MS, tem restrição definitiva
+de publicidade e não liga app nem adiciona pessoas. Decisão da Maria: a API vai para um **portfólio novo no Facebook de
+Carol, com um número novo** (no modelo novo de contas da Meta, número não muda de portfólio). Em 18/11/2026 a Maria
+começou a montar o portfólio pela conta de Carol (passo a passo abaixo); nada salvo ainda no sistema.
+
 ## Regras da Meta que mudam o jeito de prospectar
 
 - **Aceitação (opt-in)**: só pode receber mensagem da empresa quem deu o número e aceitou receber mensagens dela
@@ -42,15 +47,27 @@ app WhatsApp Business: provavelmente coexistência, o app continua no celular), 
 - **Tela**: Configurações > WhatsApp, quadro "API oficial da Meta" (`#oficial`), permissão
   `whatsapp.gerenciar_todos`; o Admin Master configura dentro da AR ("Entrar na AR"). Rotas:
   `POST /whatsapp/oficial` (salvar e testar), `/whatsapp/oficial/testar`, `/whatsapp/oficial/teste` (um modelo
-  aprovado para um número da equipe; padrão `hello_world`/`en_US`, o de exemplo da Meta), `/whatsapp/oficial/remover`.
+  aprovado para um número da equipe; padrão `hello_world`/`en_US`, o de exemplo da Meta), `/whatsapp/oficial/remover`
+  e `/whatsapp/oficial/ativar` (abaixo).
   Token/chave em branco ao salvar = continuam os de antes. O ID da conta do WhatsApp Business pode ficar em branco:
   ao testar, o sistema descobre pelo token (`whatsapp_cloud.contas_do_token`: permissões granulares do
   `debug_token`) e **liga o app à conta** (`whatsapp_cloud.inscrever_app`, `POST /{waba}/subscribed_apps`; sem isso o
   webhook não recebe as respostas da conta). É o que o "Início rápido" do app faria; ele cria um número de teste e,
   para a MS, foi travado pela Meta em 16/11/2026 ("impedido temporariamente"): não é preciso usá-lo. A situação
   guarda `app_ligado` e os `avisos` (mostrados na tela).
+- **Ativar o número** (pedido da Maria em 18/11/2026): número novo precisa ser **registrado** na Cloud API
+  (`POST /{phone_number_id}/register` com `messaging_product` e `pin` de 6 números, a verificação em duas etapas do
+  número). A Meta só aceita pela API, não pelo Gerenciador do WhatsApp nem pelo painel do app, e conta 10 pedidos por
+  número a cada 72 h (erro 133016). Tela: quadro "Ativar o número na Meta" (`#ativar`, senha e repetição) →
+  `POST /whatsapp/oficial/ativar` → `whatsapp_oficial.ativar_numero` (erros da Meta explicados em `ERROS_DA_ATIVACAO`).
+  A senha não é guardada, some das mensagens de erro e não vai para o registro de atividades (que guarda as tentativas
+  que chegaram à Meta). O teste de conexão pergunta à parte `status,platform_type,code_verification_status`
+  (`whatsapp_cloud.registro_do_numero`; se a Meta recusar, o teste não cai) e guarda `ativado` (`numero_ativado`:
+  `CLOUD_API`) e `status_numero`. Sem ativar: a tela avisa ("Achado na Meta, mas ainda não ativado") e a Renovação não
+  liga o envio pela API (`falta_para_renovacao`). Testes: `testes/test_whatsapp_oficial.py`.
 - **Cliente da Meta**: `integracoes/whatsapp_cloud.py` — `consultar_numero` (campos `display_phone_number`,
-  `verified_name`, `quality_rating`, `whatsapp_business_manager_messaging_limit`, `name_status`), `enviar_modelo`,
+  `verified_name`, `quality_rating`, `whatsapp_business_manager_messaging_limit`, `name_status`),
+  `registro_do_numero`, `registrar_numero`, `enviar_modelo`,
   `enviar_texto_por`, `numeros_do_webhook`, `ler_webhook` (com o `phone_number_id` de cada item), `assinatura_confere`.
   Versão da API: `WHATSAPP_API_VERSAO` (padrão `v27.0`). Telefone de destino: 55 + DDD + celular com o 9
   (`util.com_nono_digito`). A forma antiga (variáveis `WHATSAPP_TOKEN`/`WHATSAPP_PHONE_NUMBER_ID`, botão "Enviar pela
@@ -124,17 +141,30 @@ Pedido da Maria em 16/11/2026: "que continue fazendo essa campanha mas que seja 
 
 ## Passo a passo na Meta (o que a AR faz)
 
-1. Meta for Developers (<https://developers.facebook.com/apps>) > Criar app (Empresa) > adicionar o produto
-   **WhatsApp** e ligar ao portfólio da empresa. Não precisa concluir o "Início rápido" (número de teste). Na MS:
-   app "MS API off" (ID 1838539180819325), em modo de desenvolvimento.
-2. Configurações do negócio > Usuários > **Usuários do sistema** > adicionar (Admin) > atribuir o app e a conta do
-   WhatsApp (controle total) > **Gerar token**: o app, validade "Nunca", permissões `whatsapp_business_messaging` e
-   `whatsapp_business_management`.
-3. No sistema: Configurações > WhatsApp > API oficial da Meta: Identificação do número de telefone, token e chave
-   secreta do app (Meta for Developers > app > Configurações do app > Básico); o ID da conta do WhatsApp Business é
-   opcional > **Salvar e testar** (liga o app à conta).
-4. Webhook: Meta for Developers > app > WhatsApp > Configuração: URL de retorno e token de verificação mostrados na
+Revisto em 18/11/2026. No modelo novo de contas da Meta (set-out/2026) a "conta do WhatsApp Business" aparece também
+como "conta de mensagens" (modelos, cobrança e webhooks) e os nomes dos botões mudam com o tempo.
+
+1. **Portfólio**: business.facebook.com > Criar portfólio empresarial. Quem cria precisa de uma conta do Facebook sem
+   restrição (Qualidade da conta) e com autenticação de dois fatores; ponha um segundo administrador. A verificação da
+   empresa (Central de segurança) corre junto: sem ela, até 250 contatos por dia e 2 números no portfólio.
+2. **App**: Meta for Developers (<https://developers.facebook.com/apps>) > Criar app > caso de uso "Conectar-se com
+   clientes pelo WhatsApp" > o portfólio > Começar a usar a API > Criar uma conta do WhatsApp Business. Não precisa do
+   número de teste. (O app antigo da MS, "MS API off", ID 1838539180819325, ficou no portfólio travado.)
+3. **Número**: Configuração da API > Adicionar número de telefone (ou Gerenciador do WhatsApp > Números de telefone):
+   nome de exibição, número que não esteja em nenhum WhatsApp, código por SMS ou ligação.
+4. **Pagamento**: Gerenciador do WhatsApp > Faturamento: cartão da empresa (sem ele nenhum modelo sai, nem o teste).
+5. **App ao vivo**: Configurações do app > Básico (ícone, Política de Privacidade
+   <https://mscertificados.com.br/politica-de-privacidade/>, categoria) > Publicar. Em modo de desenvolvimento o
+   webhook não recebe as mensagens de números reais.
+6. **Token**: Configurações do negócio > Usuários > Usuários do sistema > adicionar (Admin) > atribuir o app e a conta
+   do WhatsApp (controle total) > Gerar token: o app, validade "Nunca", permissões `whatsapp_business_messaging`,
+   `whatsapp_business_management` e `business_management`.
+7. **No sistema**: Configurações > WhatsApp > API oficial da Meta: Identificação do número de telefone, token e chave
+   secreta do app (Meta for Developers > app > Configurações do app > Básico); o ID da conta é opcional > **Salvar e
+   testar** (liga o app à conta).
+8. **Ativar o número** (número novo): senha de 6 números no quadro "Ativar o número na Meta".
+9. **Webhook**: Meta for Developers > app > WhatsApp > Configuração: URL de retorno e token de verificação mostrados na
    tela do sistema; assinar o campo `messages`.
-5. **Enviar teste** para o próprio celular. Forma de pagamento na conta do WhatsApp para os modelos pagos.
-6. Etapa 2: em Configurações > WhatsApp > API oficial, **Enviar os modelos para a Meta aprovar**; aprovado, **Enviar um
-   aviso de exemplo** e ligar o envio pela API na tela Renovação (quadro 4).
+10. **Enviar teste** para o próprio celular (`hello_world`, `en_US`).
+11. Etapa 2: **Enviar os modelos para a Meta aprovar**; aprovado, **Enviar um aviso de exemplo** e ligar o envio pela
+    API na tela Renovação (quadro 4).
