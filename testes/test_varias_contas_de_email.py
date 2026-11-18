@@ -12,7 +12,7 @@ from app.banco import agora, gravar_config, ler_config, sessao
 from app.integracoes import email_imap, email_smtp
 from app.leads_servico import criar_lead
 from app.main import app
-from app.modelos import Campanha, ConexaoWhatsApp, ContaEmail, Lead, Mensagem, Notificacao, Tarefa, Usuario
+from app.modelos import Campanha, ConexaoWhatsApp, ContaEmail, Lead, Mensagem, Notificacao, Tarefa, Tenant, Usuario
 from app.seguranca import criptografar, resumir_senha
 from conftest import csrf_de
 
@@ -63,26 +63,48 @@ def _entrar(c: TestClient, email: str):
 
 
 def test_ordem_da_conta_que_envia(cliente):
-    """Regra da Maria (13/11/2026): "cada usuário tem seu disparo, nunca misture os disparos de um usuário com outro".
-    O e-mail de cada pessoa sai só pela conta do cadastro dela: nunca por uma compartilhada nem pela principal (que é
-    do cadastro do administrador dono dela). Sem conta (ou pausada), o disparo espera."""
+    """O e-mail de cada pessoa sai pela conta do cadastro dela; sem conta própria, por uma que compartilharam com ela
+    (pedido da Maria em 18/11/2026, "Sim, liberar", como no WhatsApp). Nunca pela principal (que é do cadastro do
+    administrador dono dela) nem por conta pausada, de outra AR ou que não foi compartilhada com a pessoa. Conta própria
+    pausada: o disparo espera (não troca para a compartilhada)."""
     with sessao() as db:
-        ana, beto, caio = _pessoa(db, "Ana Ordem"), _pessoa(db, "Beto Ordem"), _pessoa(db, "Caio Ordem")
+        ids_ar = {s: i for i, s in db.execute(select(Tenant.id, Tenant.slug))}
+        ana, beto, caio, dani, edu = (_pessoa(db, n) for n in ("Ana Ordem", "Beto Ordem", "Caio Ordem", "Dani Ordem",
+                                                                "Edu Ordem"))
         propria = _conta(db, ana, "ana.ordem@mscertificados.com.br")
         da_beto = _conta(db, beto, "beto.ordem@mscertificados.com.br", compartilhada_com=json.dumps([ana.id, caio.id]))
         principal = contas_email.garantir_principal(db)
         assert principal.dono_id is not None  # a principal sempre tem dono (o primeiro administrador)
-        assert contas_email.para_enviar(db, ana).id == propria.id          # a própria
+        assert contas_email.para_enviar(db, ana).id == propria.id          # a própria vem antes da compartilhada
         assert contas_email.para_enviar(db, beto).id == da_beto.id
+        assert contas_email.para_enviar(db, caio).id == da_beto.id         # sem conta: a que o Beto compartilhou
         propria.ativa = False
-        with pytest.raises(contas_email.SemConta, match="pausado"):        # pausada: espera (nunca a do Beto)
+        with pytest.raises(contas_email.SemConta, match="pausado"):        # a própria pausada: espera (nunca a do Beto)
             contas_email.para_enviar(db, ana)
-        principal.compartilhada_todos = True
-        with pytest.raises(contas_email.SemConta, match="não tem e-mail próprio"):  # nem compartilhada, nem principal
+        da_beto.ativa = False
+        with pytest.raises(contas_email.SemConta, match="não tem e-mail próprio"):  # a compartilhada pausada não vale
             contas_email.para_enviar(db, caio)
-        dono_antes, principal.dono_id = principal.dono_id, caio.id
-        assert contas_email.para_enviar(db, caio).id == principal.id       # a principal é do cadastro do dono dela
+        principal.compartilhada_todos, principal.compartilhada_com = True, json.dumps([dani.id])
+        with pytest.raises(contas_email.SemConta, match="não tem e-mail próprio"):  # a principal nunca vale
+            contas_email.para_enviar(db, dani)
+        dono_antes, principal.dono_id = principal.dono_id, dani.id
+        assert contas_email.para_enviar(db, dani).id == principal.id       # só para o dono dela
         principal.dono_id = dono_antes
+        # "toda a equipe" vale só dentro da AR da conta (as filas rodam sem o filtro da AR)
+        eli = Usuario(nome="Eli Ordem", email="eli.ordem@grupocerty.com.br", senha_hash=resumir_senha(SENHA),
+                      perfil="admin", empresa_nome="Grupo Certy")
+        db.add(eli)
+        db.flush()
+        da_eli = _conta(db, eli, "eli.ordem@grupocerty.com.br", compartilhada_todos=True)
+        assert (da_eli.tenant_id, dani.tenant_id) == (ids_ar["grupo-certy"], ids_ar["ms"])
+        with pytest.raises(contas_email.SemConta):
+            contas_email.para_enviar(db, dani)
+        # na mesma AR: vale a de toda a equipe; a compartilhada com a pessoa pelo nome vem antes dela
+        da_edu = _conta(db, edu, "edu.ordem@mscertificados.com.br", compartilhada_todos=True)
+        assert contas_email.para_enviar(db, dani).id == da_edu.id
+        da_beto.ativa, da_beto.compartilhada_com = True, json.dumps([dani.id])
+        assert contas_email.para_enviar(db, dani).id == da_beto.id
+        da_eli.compartilhada_todos = da_edu.compartilhada_todos = False  # não valer para as pessoas dos outros testes
         assert contas_email.credenciais(propria).senha == "abcdefghijklmnop"  # guardada criptografada
         assert propria.senha_cripto != "abcdefghijklmnop"
 
@@ -122,8 +144,8 @@ def test_fila_sai_pela_conta_do_responsavel_e_erro_pausa_so_ela(cliente, monkeyp
     quebrada.add("carla.fila@mscertificados.com.br")
     with sessao() as db:
         campanhas.processar_fila(db)
-    # a conta da Carla falhou e pausou (só ela); o Davi não tem e-mail próprio: o lead dele espera, nada sai pela
-    # principal (regra de 13/11/2026: cada pessoa dispara só pelo próprio e-mail) e ele é avisado
+    # a conta da Carla falhou e pausou (só ela); o Davi não tem e-mail próprio nem compartilhado: o lead dele espera,
+    # nada sai pela principal (regra de 13/11/2026: ninguém dispara pelo e-mail de outra pessoa) e ele é avisado
     assert not saidas
     with sessao() as db:
         assert db.execute(select(Notificacao).where(Notificacao.usuario_id == davi_id)).first() is not None
@@ -136,6 +158,15 @@ def test_fila_sai_pela_conta_do_responsavel_e_erro_pausa_so_ela(cliente, monkeyp
     assert ("lead1@contasfila.com.br", "carla.fila@mscertificados.com.br") in saidas
     with sessao() as db:
         msg = db.execute(select(Mensagem).where(Mensagem.lead_id == ids["lead1@contasfila.com.br"],
+                                                Mensagem.status == "enviada")).scalars().one()
+        assert msg.conexao == f"email:{conta_id}"
+        # 18/11/2026: a Carla compartilha a conta dela com o Davi e o lead dele sai por ela
+        db.get(ContaEmail, conta_id).compartilhada_com = json.dumps([davi_id])
+    with sessao() as db:
+        campanhas.processar_fila(db)
+    assert ("lead3@contasfila.com.br", "carla.fila@mscertificados.com.br") in saidas
+    with sessao() as db:
+        msg = db.execute(select(Mensagem).where(Mensagem.lead_id == ids["lead3@contasfila.com.br"],
                                                 Mensagem.status == "enviada")).scalars().one()
         assert msg.conexao == f"email:{conta_id}"
 
@@ -208,10 +239,11 @@ def test_gestor_compartilha_email_e_whatsapp_e_vendedor_nao(cliente):
         assert contas_email.compartilhada_com(db.get(ContaEmail, conta_id)) == [ivo_id]
         assert json.loads(db.get(ConexaoWhatsApp, numero).compartilhada_com) == [ivo_id]
         ivo = db.get(Usuario, ivo_id)
-        # regra de 13/11/2026: o e-mail compartilhado não vale para os disparos do vendedor (só o do cadastro dele);
-        # o WhatsApp compartilhado com ele vale
+        # o e-mail e o WhatsApp compartilhados com o vendedor valem para os disparos dele (o e-mail desde 18/11/2026,
+        # pedido da Maria); o gestor que compartilhou não dispara por eles (regra de 13/11/2026)
+        assert contas_email.para_enviar(db, ivo).id == conta_id
         with pytest.raises(contas_email.SemConta):
-            contas_email.para_enviar(db, ivo)
+            contas_email.para_enviar(db, db.get(Usuario, gil_id))
         from app import conexoes
 
         assert conexoes.pode_disparar(ivo, db.get(ConexaoWhatsApp, numero))

@@ -1,6 +1,7 @@
 """Tela E-mail: cada pessoa cadastra o PRÓPRIO e-mail @mscertificados.com.br (gestor e admin também podem usar o
 próprio domínio e servidor: permissão email.outro_dominio); o dono, o administrador e o gestor
-compartilham as contas (inclusive a principal da MS) com a equipe ou com pessoas escolhidas. Ver app/contas_email.py.
+compartilham as contas (inclusive a principal da MS) com a equipe ou com pessoas escolhidas. Conta compartilhada vale
+para os disparos de quem não tem e-mail próprio (menos a principal; 18/11/2026). Ver app/contas_email.py.
 """
 
 import ipaddress
@@ -41,10 +42,13 @@ def tela_email(request: Request, usuario: Usuario = Depends(exige("email.ver")),
     db.commit()  # a principal é criada no primeiro acesso
     equipe_ = [{"id": u.id, "nome": u.nome} for u in db.execute(
         select(Usuario).where(Usuario.perfil != "parceiro", Usuario.ativo.is_(True)).order_by(Usuario.nome)).scalars()]
+    por_onde, por_onde_id, por_onde_de = "", None, ""
     try:
-        por_onde = contas_email.credenciais(contas_email.para_enviar(db, usuario)).endereco
+        conta_envio = contas_email.para_enviar(db, usuario)
+        por_onde, por_onde_id = contas_email.credenciais(conta_envio).endereco, conta_envio.id
+        if not conta_envio.principal and conta_envio.dono_id != usuario.id:
+            por_onde_de = nomes.get(conta_envio.dono_id, "")  # conta que compartilharam com a pessoa (18/11/2026)
     except contas_email.SemConta as erro:
-        por_onde = ""
         avisar(request, str(erro), "alerta")
     minha = contas_email.minha(db, usuario)
     dominio_minha = util.dominio(minha.endereco) if minha else ""
@@ -53,7 +57,8 @@ def tela_email(request: Request, usuario: Usuario = Depends(exige("email.ver")),
            else None)  # o domínio do e-mail principal é conferido em Configurações > E-mail
     return tela(request, "email_contas.html", {"secao": "contas_email", "contas": contas, "equipe": equipe_, "dominio": dominio or "suaempresa.com.br",
                                                "quem_fala": marca.da_pessoa(usuario, db=db),
-                                               "minha": minha, "por_onde": por_onde, "dns": dns,
+                                               "minha": minha, "por_onde": por_onde, "por_onde_id": por_onde_id,
+                                               "por_onde_de": por_onde_de, "dns": dns,
                                                "dominio_minha": dominio_minha,
                                                "outro_provedor": bool(minha and minha.smtp_host != "smtp.gmail.com")})
 

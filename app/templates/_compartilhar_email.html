@@ -5,13 +5,16 @@
   <form method="post" action="/email/compartilhar">
     <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="conta" value="{{ conta.id }}">
     <div class="campo" style="margin-top:8px"><label>Nome da conta</label><input type="text" name="nome" value="{{ conta.nome }}" maxlength="120"></div>
-    <label class="marcar"><input type="checkbox" name="todos" {{ 'checked' if conta.compartilhada_todos }}> <b>Toda a equipe</b> pode enviar por esta conta</label>
+    <label class="marcar"><input type="checkbox" name="todos" {{ 'checked' if conta.compartilhada_todos }}> <b>Toda a equipe</b> {{ 'vê esta conta' if conta.principal else 'pode enviar por esta conta' }}</label>
     <p class="pequeno suave" style="margin:6px 0 0">Ou escolha as pessoas:</p>
     <div class="lista-pessoas">
       {% for p in equipe if p.nome != conta.dono or conta.principal %}<label class="marcar"><input type="checkbox" name="usuarios" value="{{ p.id }}" {{ 'checked' if p.id in conta.compartilhada_com }}> {{ p.nome }}</label>{% endfor %}
     </div>
-    <p class="pequeno suave">Regra do sistema: os disparos de cada pessoa saem só pelo e-mail cadastrado dela. Compartilhar
-      mostra a conta para a pessoa, mas os disparos dela não saem por aqui.</p>
+    {% if conta.principal %}<p class="pequeno suave">Regra do sistema: o e-mail principal não vale para os disparos de outras
+      pessoas. Compartilhar mostra a conta para a pessoa; os disparos dela saem pelo e-mail dela ou por um que
+      compartilharam com ela.</p>
+    {% else %}<p class="pequeno suave">Quem não tem e-mail próprio passa a disparar as campanhas por esta conta, e as respostas
+      chegam nesta caixa. Quem tem e-mail próprio continua disparando só pelo dele.</p>{% endif %}
     <button class="btn btn-pequeno btn-primario">Salvar compartilhamento</button>
   </form>
 </details>

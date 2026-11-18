@@ -749,8 +749,10 @@ número (ou no e-mail) de um administrador: isso só o dono ou o admin master.
 lateral para quem não vê as Configurações), cada um pode cadastrar o próprio e-mail @mscertificados.com.br
 (com a senha de app do Google, 16 letras) e clicar em **Enviar e-mail de teste**. Os e-mails das campanhas dos leads
 de cada pessoa saem pelo e-mail dela, e as respostas chegam na caixa dela (a IA SDR lê todas as caixas marcadas).
-Sem e-mail próprio cadastrado, os e-mails dos leads dela **esperam** (não saem por uma conta compartilhada nem pelo
-**e-mail principal da MS**, que é do cadastro do administrador dono dele) e ela recebe um aviso para cadastrar. Os limites de envio por hora e por dia continuam
+Sem e-mail próprio cadastrado, os e-mails dos leads dela saem por um **e-mail que compartilharam com ela** (o dono
+da conta, o administrador ou o gestor escolhe com quem compartilhar, no cartão da conta) e as respostas chegam nessa
+caixa. Sem nenhum dos dois, os e-mails **esperam** e ela recebe um aviso para cadastrar. O **e-mail principal da MS**
+nunca é usado para os disparos de outras pessoas, mesmo compartilhado (ele é do cadastro do administrador dono dele). Os limites de envio por hora e por dia continuam
 valendo para a MS inteira.
 
 **Gestor com o domínio da própria empresa:** o gestor (e o administrador) pode cadastrar um e-mail de outro domínio,

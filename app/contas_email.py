@@ -4,8 +4,9 @@ Funciona como os números de WhatsApp (app/conexoes.py):
 - cada pessoa cadastra o PRÓPRIO e-mail @mscertificados.com.br (tela E-mail); quem tem email.outro_dominio
   (gestor e admin) pode usar o próprio domínio e servidor (Google, Microsoft 365 ou outro SMTP/IMAP);
 - o dono, o administrador e o gestor compartilham uma conta com toda a equipe ou com pessoas escolhidas;
-- o e-mail de um lead sai pela conta do responsável; sem conta própria, por uma compartilhada com ele; por último
-  pela principal, se ela estiver liberada para ele (começa liberada para toda a equipe).
+- o e-mail de um lead sai pela conta do responsável; sem conta própria, por uma que compartilharam com ele (da mesma
+  AR; pedido da Maria em 18/11/2026, como no WhatsApp). A principal da MS só vale para os disparos do dono dela:
+  compartilhada, ela aparece para a pessoa, mas os disparos dela não saem por ali (para_enviar).
 Os limites de envio (por hora, dia e domínio) continuam valendo para a MS inteira: todas as contas são do mesmo
 domínio e dividem a mesma reputação.
 """
@@ -166,11 +167,41 @@ def principal_pronta() -> bool:
     return email_smtp.configurado()
 
 
+def _ar_da_conta(db, c: ContaEmail):
+    """AR da conta: a gravada nela ou, se ainda vazia, a do dono."""
+    if c.tenant_id:
+        return c.tenant_id
+    dono = db.get(Usuario, c.dono_id) if c.dono_id else None
+    return dono.tenant_id if dono is not None else None
+
+
+def compartilhadas_para_disparo(db, quem: Usuario) -> list[ContaEmail]:
+    """Contas de outras pessoas que valem para os disparos de `quem`: o dono (ou o administrador/gestor) compartilhou
+    com ele ou com toda a equipe, a conta está ligada e é da mesma AR. Nunca a principal. Primeiro as compartilhadas
+    com a pessoa pelo nome, depois as de toda a equipe; entre elas, a mais antiga. As filas rodam sem o filtro da AR
+    (white label): por isso a AR é conferida aqui, senão o "toda a equipe" de uma AR valeria para as outras."""
+    ar = getattr(quem, "tenant_id", None)
+    if not ar:
+        return []
+    contas = db.execute(select(ContaEmail).where(ContaEmail.principal.is_(False), ContaEmail.ativa.is_(True))
+                        .order_by(ContaEmail.criado_em, ContaEmail.id)).scalars().all()
+    escolhidas = [c for c in contas if c.dono_id != quem.id and (c.compartilhada_todos or quem.id in compartilhada_com(c))
+                  and _ar_da_conta(db, c) == ar]
+    return sorted(escolhidas, key=lambda c: quem.id not in compartilhada_com(c))  # sorted é estável: mantém a idade
+
+
 def para_enviar(db, quem: Usuario | None) -> ContaEmail:
-    """Conta por onde sai o e-mail de `quem`: só a do cadastro dele (regra da Maria em 13/11/2026: "cada usuário tem
-    seu disparo, nunca misture os disparos de um usuário com outro"). A principal da MS conta como do cadastro de quem
-    é dono dela. Sem conta própria (ou pausada), o disparo espera e a pessoa é avisada; não usa conta compartilhada nem
-    a principal. Sem responsável (envio do sistema): a principal."""
+    """Conta por onde sai o e-mail de `quem` (campanhas, filas, Minha fila, envio pela ficha do lead):
+    1. a do cadastro dele (a principal da MS conta como do cadastro de quem é dono dela);
+    2. sem conta própria, uma conta de outra pessoa compartilhada com ele (compartilhadas_para_disparo). Pedido da Maria
+       em 18/11/2026 ("Sim, liberar"), como já era no WhatsApp: a Thamires compartilhou o e-mail dela com a Maria
+       Eduarda e os e-mails da campanha da Maria Eduarda continuavam parados.
+    Continua valendo a regra de 13/11/2026 ("cada usuário tem seu disparo, nunca misture os disparos de um usuário com
+    outro"): ninguém dispara pelo e-mail de outra pessoa sem que ela (ou o administrador/gestor) compartilhe, e ser
+    administrador não basta. A principal nunca vale para os disparos de outra pessoa: ela é compartilhada com toda a
+    equipe, e os e-mails de todo mundo sem conta passariam a sair por ela. Conta própria pausada: os disparos esperam
+    (não troca para uma compartilhada). Sem conta: o disparo espera e a pessoa é avisada. Sem responsável (envio do
+    sistema): a principal."""
     principal = garantir_principal(db)
     if quem is None:
         return principal
@@ -178,12 +209,16 @@ def para_enviar(db, quem: Usuario | None) -> ContaEmail:
     if proprio is not None:
         if proprio.ativa:
             return proprio
-        raise SemConta(f"O e-mail de {quem.nome} está pausado em Contas de e-mail: os disparos dele esperam até ligar de "
-                       "novo (pela regra do sistema, os disparos de cada pessoa saem só pelo e-mail dela).")
+        raise SemConta(f"O e-mail de {quem.nome} está pausado em Contas de e-mail: os disparos de {quem.nome} esperam até "
+                       "ligar de novo (quem tem e-mail próprio dispara só por ele).")
     if principal.dono_id == quem.id:
         return principal
-    raise SemConta(f"{quem.nome} não tem e-mail próprio cadastrado: cadastre o seu em Contas de e-mail. Pela regra do sistema, "
-                   "os disparos de cada pessoa saem só pelo e-mail dela (não por um compartilhado nem pelo principal).")
+    compartilhadas = compartilhadas_para_disparo(db, quem)
+    if compartilhadas:
+        return compartilhadas[0]
+    raise SemConta(f"{quem.nome} não tem e-mail próprio cadastrado nem um e-mail compartilhado: cadastre o seu em Contas de "
+                   "e-mail ou peça a quem tem um para compartilhar. Pela regra do sistema, os disparos de cada pessoa saem "
+                   "só pelo e-mail dela ou por um que compartilharam com ela (nunca pelo principal).")
 
 
 def para_ler(db) -> list[ContaEmail]:
