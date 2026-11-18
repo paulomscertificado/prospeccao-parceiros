@@ -71,6 +71,7 @@ for antigo in "${ANTIGOS[@]}"; do   # cada endereço antigo leva para o novo, ma
     printf '\n%s {\n\tredir https://%s{uri} 307\n}\n' "$antigo" "$DOMINIO" >> /etc/caddy/Caddyfile
 done
 install -d -o caddy -g caddy /var/log/caddy
+install -d /etc/caddy/extras   # o Caddyfile importa /etc/caddy/extras/*.caddy (assinador-ms/servidor/instalar.sh põe o dele)
 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null
 # o validate roda como root e cria o arquivo de registro como root: o Caddy (usuário caddy) não conseguia abrir
 # e não ligava (17/11/2026, 1ª instalação)

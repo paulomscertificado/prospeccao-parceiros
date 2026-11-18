@@ -3,6 +3,8 @@
 # para ele (instalar_sistema.sh <endereço> [endereços antigos...]).
 __DOMINIO__ {
 	encode zstd gzip
+	# Outros serviços no mesmo endereço (ex.: /assinaturas* = validação online do Assinador MS, assinador-ms/servidor/)
+	import /etc/caddy/extras/*.caddy
 	reverse_proxy 127.0.0.1:8001
 	log {
 		output file /var/log/caddy/acesso.log {
