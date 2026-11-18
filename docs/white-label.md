@@ -83,7 +83,11 @@ trabalham para todas as ARs. O que existe uma vez só e é da plataforma (númer
 `.execution_options(sem_filtro_de_ar=True)`, senão a tela de outra AR tentaria criar de novo.
 
 **AR nas linhas novas** (evento `before_flush`): a da sessão; sem ela, a do registro "pai" (lead, campanha, cliente...)
-ou do dono (Admin Master como dono → AR MS); conversas e mensagens da ponte, a do número (`conexao`); sem nada, AR MS.
+ou do dono (Admin Master como dono → AR MS); conversas e mensagens da ponte, a do número (`conexao`); sem nada, a do
+trabalho em segundo plano que está rodando (`isolamento.no_trabalho_da_ar`, ligado em `trabalhos.executar` com a AR da
+campanha ou da busca: `trabalhos.ar_do_trabalho`) e, fora de um trabalho, AR MS. Em 17/11/2026 o lead e os avisos da
+campanha de renovação que a administradora do Grupo Certy montou foram parar na MS (o lead criado por administrador
+nasce sem vendedor): a campanha ficou vazia na tela dela e a aprovação não achou os avisos (`testes/test_renovacao_ar.py`).
 Pessoa nova: a da tela de quem criou ou, pelo sistema, a da empresa representada. Notificações e registros de ação: a
 da pessoa (as do Admin Master ficam vazias). A rotina de hora em hora (`ars.preencher_novos`) segue de rede de segurança.
 

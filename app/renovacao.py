@@ -571,16 +571,20 @@ def agrupar(certificados) -> tuple[list[Contato], list[Certificado]]:
     return sorted((Contato(k, v) for k, v in grupos.items()), key=lambda c: (c.vencimento, c.chave)), sem_contato
 
 
-def a_avisar(db, hoje: date | None = None, ate: date | None = None) -> list[Certificado]:
+def a_avisar(db, hoje: date | None = None, ate: date | None = None, ar: int | None = None) -> list[Certificado]:
     """Certificados que podem entrar numa campanha: da planilha, ativos, fora de campanha e vencendo até o dia do 1º
     aviso (ex.: 30 ou 12 dias) ou até `ate` (campanha do piloto: até 31/12), de amanhã em diante (o que vence hoje já
-    não dá tempo de avisar)."""
+    não dá tempo de avisar). `ar`: só os dessa AR (a rodada diária roda sem tela e enxerga todas as ARs: sem o filtro,
+    a campanha automática da MS levava os clientes da planilha do Grupo Certy)."""
     hoje = hoje or date.today()
     ate = ate or hoje + timedelta(days=janela(db))
-    return db.execute(select(Certificado).where(
+    consulta = select(Certificado).where(
         Certificado.origem == ORIGEM, Certificado.status == "Ativo", Certificado.campanha_id.is_(None),
         func.coalesce(Certificado.fora_motivo, "") == "", Certificado.data_vencimento > hoje,
-        Certificado.data_vencimento <= ate)).scalars().all()
+        Certificado.data_vencimento <= ate)
+    if ar:
+        consulta = consulta.where(Certificado.tenant_id == ar)
+    return db.execute(consulta).scalars().all()
 
 
 def _formas_do_celular(numero: str) -> set[str]:
@@ -590,20 +594,24 @@ def _formas_do_celular(numero: str) -> set[str]:
     return formas
 
 
-def lead_do_contato(db, chave: str) -> Lead | None:
+def lead_do_contato(db, chave: str, ar: int | None = None) -> Lead | None:
     """Lead que já existe para o contato. WhatsApp: qualquer lead com o número (dois leads no mesmo número embaralham
-    as respostas). Só e-mail: só um lead de renovação (o contato vem só da planilha)."""
+    as respostas). Só e-mail: só um lead de renovação (o contato vem só da planilha). `ar`: só um lead dessa AR (a
+    montagem roda em segundo plano e enxerga todas: o cliente do Grupo Certy não pode virar o lead da MS; o mesmo
+    número em duas ARs é permitido e a resposta vai para a AR do número que recebeu)."""
     tipo, valor = chave.split(":", 1)
     if tipo == "whatsapp":
         formas = _formas_do_celular(valor)
         consulta = select(Lead).where(or_(Lead.chave_whatsapp.in_(formas), Lead.chave_telefone.in_(formas)))
     else:
         consulta = select(Lead).where(Lead.chave_email == valor, Lead.origem == ORIGEM_LEAD)
+    if ar:
+        consulta = consulta.where(Lead.tenant_id == ar)
     leads = db.execute(consulta.order_by(Lead.id)).scalars().all()
     return next((l for l in leads if l.origem == ORIGEM_LEAD), leads[0] if leads else None)
 
 
-def _leads_dos_contatos(db, contatos: list[Contato]) -> dict[str, Lead]:
+def _leads_dos_contatos(db, contatos: list[Contato], ar: int | None = None) -> dict[str, Lead]:
     """lead_do_contato de muitos contatos de uma vez (duas consultas, não uma por contato: a tela abre rápido)."""
     formas: dict[str, str] = {}
     emails: dict[str, str] = {}
@@ -614,14 +622,15 @@ def _leads_dos_contatos(db, contatos: list[Contato]) -> dict[str, Lead]:
         else:
             emails[valor] = contato.chave
     achados: dict[str, list[Lead]] = {}
+    da_ar = [Lead.tenant_id == ar] if ar else []
     if formas:
-        for lead in db.execute(select(Lead).where(or_(Lead.chave_whatsapp.in_(formas), Lead.chave_telefone.in_(formas)))
-                               .order_by(Lead.id)).scalars():
+        for lead in db.execute(select(Lead).where(or_(Lead.chave_whatsapp.in_(formas), Lead.chave_telefone.in_(formas)),
+                                                  *da_ar).order_by(Lead.id)).scalars():
             chave = formas.get(lead.chave_whatsapp) or formas.get(lead.chave_telefone)
             if chave:
                 achados.setdefault(chave, []).append(lead)
     if emails:
-        for lead in db.execute(select(Lead).where(Lead.chave_email.in_(emails), Lead.origem == ORIGEM_LEAD)
+        for lead in db.execute(select(Lead).where(Lead.chave_email.in_(emails), Lead.origem == ORIGEM_LEAD, *da_ar)
                                .order_by(Lead.id)).scalars():
             achados.setdefault(emails[lead.chave_email], []).append(lead)
     return {k: next((l for l in v if l.origem == ORIGEM_LEAD), v[0]) for k, v in achados.items()}
@@ -644,14 +653,15 @@ def motivo_de_fora(db, lead: Lead) -> str:
 
 
 def contatos_para_campanha(db, hoje: date | None = None, marcar_saida: bool = False,
-                           ate: date | None = None) -> tuple[list[Contato], dict]:
+                           ate: date | None = None, ar: int | None = None) -> tuple[list[Contato], dict]:
     """Contatos que podem entrar numa campanha agora (do que vence primeiro ao último) e quantos certificados ficam de
-    fora por motivo. marcar_saida=True grava nos certificados de quem pediu SAIR (vale até alguém reabrir)."""
-    contatos, sem_contato = agrupar(a_avisar(db, hoje, ate))
+    fora por motivo. marcar_saida=True grava nos certificados de quem pediu SAIR (vale até alguém reabrir). `ar`: só os
+    certificados e os leads dessa AR (ver a_avisar)."""
+    contatos, sem_contato = agrupar(a_avisar(db, hoje, ate, ar))
     fora: dict[str, int] = {}
     if sem_contato:
         fora["sem WhatsApp e sem e-mail na planilha"] = len(sem_contato)
-    leads = _leads_dos_contatos(db, contatos)
+    leads = _leads_dos_contatos(db, contatos, ar)
     livres = []
     for contato in contatos:
         lead = leads.get(contato.chave)
@@ -918,7 +928,8 @@ def criar_campanha(db, usuario: Usuario, quantidade: int | None = None, ate: dat
     from . import trabalhos
 
     hoje = date.today()
-    contatos, _ = contatos_para_campanha(db, hoje, marcar_saida=True, ate=ate)
+    ar = ar_de_quem_monta(db, usuario)
+    contatos, _ = contatos_para_campanha(db, hoje, marcar_saida=True, ate=ate, ar=ar)
     limite = quantidade or (None if ate else util.para_int(cfg(db, "renov_maximo_dia")) or 40)
     escolhidos = contatos[:limite] if limite else contatos
     if not escolhidos:
@@ -932,9 +943,14 @@ def criar_campanha(db, usuario: Usuario, quantidade: int | None = None, ate: dat
 
     try:  # o número dos disparos fica gravado na campanha (dá para trocar na página dela): nunca um de modo teste
         numero = numero_do_envio(db, usuario)
-    except conexoes.SemNumero:  # computador desligado agora: vale o escolhido na tela (ou o automático no envio)
-        numero = cfg(db, "renov_conexao")
-    camp = Campanha(nome=(nome or f"Renovação {hoje:%d/%m} – vencem até {ultimo:%d/%m}")[:160], tipo=TIPO_CAMPANHA,
+    except conexoes.SemNumero:  # sem número agora: vale o escolhido na tela se for de quem monta (ou compartilhado com
+        # ele); senão, o automático na hora do envio. Em 17/11/2026 a campanha da Thamires (Grupo Certy) ficou gravada
+        # com o número do Paulo Lucas (MS), o da configuração da Renovação
+        escolhido = cfg(db, "renov_conexao")
+        fixo = db.get(conexoes.ConexaoWhatsApp, escolhido) if escolhido else None
+        numero = fixo.id if fixo is not None and conexoes.pode_disparar(usuario, fixo) else ""
+    camp = Campanha(tenant_id=ar, nome=(nome or f"Renovação {hoje:%d/%m} – vencem até {ultimo:%d/%m}")[:160],
+                    tipo=TIPO_CAMPANHA,
                     objetivo="Renovar o certificado digital dos clientes", quantidade=len(escolhidos),
                     canais=cfg(db, "renov_canais"), status="gerando", usuario_id=usuario.id, inicio=hoje,
                     cadencia_id=garantir_cadencia(db).id, conexao_id=numero or "",
@@ -947,6 +963,19 @@ def criar_campanha(db, usuario: Usuario, quantidade: int | None = None, ate: dat
         {"ids": [c.id for c in g.certificados], "datas": [d.isoformat() if d else None for d in ds], "onda": n}
         for (g, n), ds in zip(grupos, datas)]})
     return camp
+
+
+def ar_de_quem_monta(db, usuario: Usuario | None) -> int | None:
+    """A AR da campanha de renovação: a da tela (inclusive a do Admin Master dentro de uma AR); sem tela (rodada
+    diária), a de quem monta (o dono da Renovação); o Admin Master fora de uma AR: a AR MS (ars.PADRAO)."""
+    from . import isolamento
+
+    ar = isolamento.ar_da_sessao(db)
+    if ar and ar > 0:
+        return ar
+    if usuario is not None and getattr(usuario, "tenant_id", None):
+        return usuario.tenant_id
+    return isolamento._id_da_ar(db, "ms")
 
 
 def datas_da_campanha(db, contatos: list[Contato], ignorar_campanha: int | None = None) -> list[list[date | None]]:
@@ -973,12 +1002,12 @@ def _nome_do_contato(contato: Contato) -> str:
     return f"{base} ({len(contato.certificados)} certificados)"[:200]
 
 
-def _lead_para_o_contato(db, contato: Contato, usuario: Usuario) -> tuple[Lead | None, str]:
-    """Lead do contato: o que já existe (completando o que faltar com a planilha) ou um novo. (None, motivo) = fica de
-    fora agora."""
+def _lead_para_o_contato(db, contato: Contato, usuario: Usuario, ar: int | None = None) -> tuple[Lead | None, str]:
+    """Lead do contato: o que já existe na AR da campanha (completando o que faltar com a planilha) ou um novo.
+    (None, motivo) = fica de fora agora."""
     from .leads_servico import criar_lead, historico, limpar_campos
 
-    lead = lead_do_contato(db, contato.chave)
+    lead = lead_do_contato(db, contato.chave, ar)
     if lead is not None:
         motivo = motivo_de_fora(db, lead)
         if motivo:
@@ -1042,7 +1071,7 @@ def etapa_preparar(campanha_id: int, estado: dict, prazo: float) -> bool:
                 if not any(datas):
                     continue
                 if onda:  # 2ª onda do mesmo contato: o lead é o da 1ª (se ela entrou), com avisos próprios
-                    lead = lead_do_contato(db, contato.chave)
+                    lead = lead_do_contato(db, contato.chave, camp.tenant_id)
                     if lead is None or lead.id not in estado["escolhidos"]:
                         continue
                     for c in certs:
@@ -1051,7 +1080,7 @@ def etapa_preparar(campanha_id: int, estado: dict, prazo: float) -> bool:
                         {"textos": textos_do_contato(db, contato, usuario), "cert": certs[0].id,
                          "datas": [d.isoformat() if d else None for d in datas]})
                     continue
-                lead, motivo = _lead_para_o_contato(db, contato, usuario)
+                lead, motivo = _lead_para_o_contato(db, contato, usuario, camp.tenant_id)
                 if lead is None or lead.id in estado["escolhidos"]:
                     if motivo:
                         estado["fora"][motivo] = estado["fora"].get(motivo, 0) + len(certs)

@@ -8,13 +8,16 @@ Como funciona:
   (`_filtrar`, evento do_orm_execute + with_loader_criteria). Tabelas com modelo da plataforma (vazio = de todos):
   a linha da AR OU a da plataforma.
 - Tudo que é criado ganha a AR (`_ar_nas_novas`, evento before_flush): a da sessão; sem ela (rotinas, ponte do
-  WhatsApp, Admin Master), a do registro "pai" (lead, campanha, número...) ou a do dono; sem nada, a AR MS (mesma regra
-  da migração, app/ars.py). Rotinas e a ponte (sessões sem AR) continuam vendo tudo: trabalham para todas as ARs.
+  WhatsApp, Admin Master), a do registro "pai" (lead, campanha, número...) ou a do dono; sem nada, a do trabalho em
+  segundo plano que está rodando (`no_trabalho_da_ar`) ou, fora de um trabalho, a AR MS (mesma regra da migração,
+  app/ars.py). Rotinas e a ponte (sessões sem AR) continuam vendo tudo: trabalham para todas as ARs.
 A rotina de hora em hora (ars.preencher_novos) segue como rede de segurança.
 """
 from __future__ import annotations
 
+import contextvars
 import logging
+from contextlib import contextmanager
 
 from sqlalchemy import event, inspect, or_, select
 from sqlalchemy.orm import Session, with_loader_criteria
@@ -51,6 +54,28 @@ def ligar(db: Session, usuario, ar_entrada: int | None = None) -> None:
 
 def ar_da_sessao(db: Session) -> int | None:
     return db.info.get("ar") if db.info.get("ar_ligado") else None
+
+
+# AR do trabalho em segundo plano que está rodando (trabalhos.executar). As etapas abrem sessões sem AR (veem tudo), e
+# a linha nova sem pai nem dono ia para a AR MS: em 17/11/2026 o lead e os avisos da campanha de renovação que a
+# Thamires (administradora do Grupo Certy) montou foram parar na MS, porque o lead criado por um administrador nasce
+# sem vendedor. A campanha ficou vazia na tela do Grupo Certy e a aprovação não achou os avisos.
+_ar_do_trabalho: contextvars.ContextVar = contextvars.ContextVar("ar_do_trabalho", default=None)
+
+
+@contextmanager
+def no_trabalho_da_ar(ar: int | None):
+    """Enquanto roda um trabalho em segundo plano: a linha nova sem pai nem dono fica na AR `ar` (e não na MS)."""
+    marca = _ar_do_trabalho.set(ar if ar and ar > 0 else None)
+    try:
+        yield
+    finally:
+        _ar_do_trabalho.reset(marca)
+
+
+def _ar_sem_dono(db: Session) -> int | None:
+    """AR da linha nova sem pai nem dono: a do trabalho em segundo plano que está rodando; fora dele, a AR MS."""
+    return _ar_do_trabalho.get() or _id_da_ar(db, "ms")
 
 
 def _classes():
@@ -155,7 +180,7 @@ def _ar_do_pai(db: Session, obj, cache: dict) -> int | None:
                 dono_master = True
             elif ar is not None:
                 return ar
-    return _id_da_ar(db, "ms") if dono_master else None
+    return _ar_sem_dono(db) if dono_master else None
 
 
 @event.listens_for(Session, "before_flush")
@@ -202,4 +227,4 @@ def _ar_nas_novas(db: Session, _contexto, _instancias) -> None:
                                 .execution_options(sem_filtro_de_ar=True)).scalar()
         if ar is None:
             ar = _ar_do_pai(db, obj, cache)
-        obj.tenant_id = ar if ar is not None else _id_da_ar(db, "ms")  # sem dono nenhum: AR MS (ars.PADRAO)
+        obj.tenant_id = ar if ar is not None else _ar_sem_dono(db)  # sem dono: a do trabalho, senão a MS (ars.PADRAO)

@@ -89,17 +89,21 @@ def executar(trabalho_id: int, segundos: float) -> str:
             if t is None or t.status != "na_fila":
                 return t.status if t else "erro"
             tipo_, ref_id, usuario_id, estado = t.tipo, t.ref_id, t.usuario_id, json.loads(t.estado or "{}")
+            ar = ar_do_trabalho(db, t)
         etapa, ao_falhar = TIPOS[tipo_]
-        try:
-            terminou = etapa(ref_id, usuario_id, estado, time.monotonic() + segundos)
-            novo_status, erro = ("feito" if terminou else "na_fila"), ""
-        except Exception as e:  # noqa: BLE001 - um trabalho com erro não pode travar os outros
-            log.exception("Erro no trabalho %s (%s %s)", trabalho_id, tipo_, ref_id)
-            novo_status, erro = "erro", str(e)[:500] or e.__class__.__name__
+        from .isolamento import no_trabalho_da_ar
+
+        with no_trabalho_da_ar(ar):  # o que o trabalho cria sem dono fica na AR dele (não na MS)
             try:
-                ao_falhar(ref_id, erro)
-            except Exception:  # noqa: BLE001
-                log.exception("Erro ao registrar a falha do trabalho %s", trabalho_id)
+                terminou = etapa(ref_id, usuario_id, estado, time.monotonic() + segundos)
+                novo_status, erro = ("feito" if terminou else "na_fila"), ""
+            except Exception as e:  # noqa: BLE001 - um trabalho com erro não pode travar os outros
+                log.exception("Erro no trabalho %s (%s %s)", trabalho_id, tipo_, ref_id)
+                novo_status, erro = "erro", str(e)[:500] or e.__class__.__name__
+                try:
+                    ao_falhar(ref_id, erro)
+                except Exception:  # noqa: BLE001
+                    log.exception("Erro ao registrar a falha do trabalho %s", trabalho_id)
         with sessao() as db:
             t = db.get(Trabalho, trabalho_id)
             t.estado, t.status, t.erro = json.dumps(estado, ensure_ascii=False), novo_status, erro
@@ -108,6 +112,20 @@ def executar(trabalho_id: int, segundos: float) -> str:
         return "continua" if novo_status == "na_fila" else novo_status
     finally:
         soltar_trava(nome_trava)
+
+
+def ar_do_trabalho(db, t: Trabalho) -> int | None:
+    """A AR do que o trabalho monta: a da campanha ou da busca (criadas na tela, já com a AR certa, inclusive a do
+    Admin Master dentro de uma AR); senão a do próprio trabalho (a de quem o começou)."""
+    from .modelos import Busca, Campanha
+
+    modelo = {"campanha": Campanha, "personalizar": Campanha, "busca": Busca}.get(t.tipo)
+    if modelo is not None:
+        ar = db.execute(select(modelo.tenant_id).where(modelo.id == t.ref_id)
+                        .execution_options(sem_filtro_de_ar=True)).scalar()
+        if ar:
+            return ar
+    return t.tenant_id
 
 
 def rodar_pendentes(prazo: float) -> int:

@@ -25,6 +25,13 @@ base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renova
    em etapas (`campanhas.etapa_gerar`, fase `"renovacao"` → `etapa_preparar`) cria ou reaproveita o lead do contato
    (origem `"Renovação (planilha)"`; lead que já existe com o mesmo WhatsApp é reaproveitado, para as respostas não
    embaralharem), prende os certificados (`campanha_id`, `lead_id`) e calcula datas e textos.
+   **Cada AR só com o que é dela** (18/11/2026, `testes/test_renovacao_ar.py`): a campanha fica na AR de quem monta
+   (`ar_de_quem_monta`: a da tela, inclusive a do Admin Master dentro de uma AR; na `rodada_diaria`, a do dono da
+   Renovação), e `a_avisar`/`contatos_para_campanha`/`lead_do_contato` só pegam certificados e leads dessa AR (a rodada
+   diária roda sem tela e enxergava todas: a campanha automática da MS levaria os clientes da planilha do Grupo Certy;
+   o cliente do Grupo Certy com o mesmo celular de um lead da MS ganha um lead próprio). O lead e os avisos criados em
+   segundo plano ficam na AR da campanha (`isolamento.no_trabalho_da_ar`). O número gravado na campanha só é o da
+   configuração (`renov_conexao`) se quem monta puder disparar por ele; senão fica no automático.
 4. **Avisos** (`datas_dos_avisos`): 30, 15, 5 e 1 dia antes do vencimento do PRIMEIRO certificado do contato. Fim de
    semana vem para a sexta antes. Quem entra tarde: 1º aviso hoje (ou no próximo dia útil) e só os seguintes que
    cabem com pelo menos 2 dias entre eles (`INTERVALO_MINIMO_DIAS`). As datas vão prontas para `cadencias.aplicar`
