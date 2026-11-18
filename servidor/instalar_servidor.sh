@@ -35,7 +35,8 @@ echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] https://d
     > /etc/apt/sources.list.d/google-chrome.list
 
 $APT update -qq
-$APT install -y -qq postgresql-17 postgresql-client-17 caddy google-chrome-stable fonts-liberation fonts-dejavu-core
+# ffmpeg: o WhatsApp Leads (neonize) usa para áudio, vídeo e miniaturas (faltou na 1ª instalação, 17/11/2026)
+$APT install -y -qq postgresql-17 postgresql-client-17 caddy google-chrome-stable fonts-liberation fonts-dejavu-core ffmpeg
 
 echo "== 5/8 Banco de dados (só o próprio servidor acessa)"
 install -d -m 755 /etc/prospeccao

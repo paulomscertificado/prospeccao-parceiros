@@ -113,6 +113,17 @@ Portão da virada (todos):
   site novo pela internet. Basta voltar a versão antiga da tarefa (religa o WhatsApp Leads daqui) com
   `prospeccao_nuvem.json` do WhatsApp Leads apontando para `https://ENDERECO`.
 
+## Como foi a virada (17/11/2026)
+
+Feita na mesma noite do ensaio, das 23:28 às 23:45, com o portão completo: cópia final igual (47 tabelas, 226.098
+linhas), WhatsApp Leads no servidor (principal e Lucas Pinheiro em modo teste, Maria Eduarda conectado, Paulo Lucas
+desconectado de propósito por causa da restrição do WhatsApp), relógio sem falha, e-mail conferido entrando no SMTP e
+no IMAP sem enviar nada (o teste da Renovação não rodou: quem assina, o Paulo Lucas, não tem conta de e-mail, e a MS
+estava sem número de verdade conectado), arte desenhada no servidor. Endereço antigo redirecionando (307) desde 23:45.
+Ajustes da noite: Caddy não ligava (arquivo de registro criado pelo root; corrigido no `instalar_sistema.sh`), faltava
+o ffmpeg (instalado; agora no `instalar_servidor.sh`) e o CRON_SECRET foi trocado no servidor e no `dados/agendador.txt`
+porque apareceu na conversa ao listar processos (a linha do curl do relógio mostra o segredo: não listar com `ps`).
+
 ## Depois da virada
 
 - **Publicar** uma versão nova: testes, commit e push (a Vercel só redireciona), depois `bash servidor/pc/enviar_codigo.sh
