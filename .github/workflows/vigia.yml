@@ -1,0 +1,32 @@
+# Vigia de fora do servidor (plano Hostinger, 18/11/2026): o GitHub confere se o sistema responde. Se o servidor inteiro
+# cair, este teste falha e o GitHub manda e-mail para a conta dona do repositório (avisos de "workflow falhou").
+# Os avisos de dentro do sistema (app/alertas.py) continuam cuidando do resto (fila parada, cópia que falhou...).
+# Custo: cerca de 1.150 minutos de Actions por mês, dentro dos 2.000 grátis do repositório privado.
+name: Vigia do sistema
+
+on:
+  schedule:
+    - cron: "*/30 10-23 * * *"   # das 07:00 às 20:59 de Brasília: a cada 30 minutos
+    - cron: "15 0-9 * * *"        # de madrugada: 1 vez por hora
+  workflow_dispatch: {}
+
+permissions: {}
+
+jobs:
+  vigiar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: O sistema responde?
+        run: |
+          ENDERECO="https://srv2170631.hstgr.cloud/api/saude"
+          for tentativa in 1 2 3; do
+            if curl -fsS --max-time 20 "$ENDERECO" | grep -q '"ok":true'; then
+              echo "Sistema no ar (tentativa $tentativa)."
+              exit 0
+            fi
+            echo "Sem resposta na tentativa $tentativa; tento de novo em 60 segundos."
+            sleep 60
+          done
+          echo "::error::O sistema da MS não respondeu em $ENDERECO (3 tentativas, 2 minutos). Confira o servidor da Hostinger."
+          exit 1

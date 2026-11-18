@@ -126,6 +126,12 @@ porque apareceu na conversa ao listar processos (a linha do curl do relógio mos
 
 ## Depois da virada
 
+- **Vigia de fora do servidor** (18/11/2026): `.github/workflows/vigia.yml` confere `https://ENDERECO/api/saude` no
+  GitHub a cada 30 minutos (de madrugada, a cada hora); se o sistema não responder em 3 tentativas, o workflow falha
+  e o GitHub manda e-mail para a conta dona do repositório. Ao trocar de endereço, trocar também ali.
+- O servidor foi reiniciado na noite da virada por uma atualização do sistema (libc6): tudo voltou sozinho em menos
+  de 1 minuto. Atualização que pede reinício: `ls /var/run/reboot-required`; reiniciar de madrugada.
+
 - **Publicar** uma versão nova: testes, commit e push (a Vercel só redireciona), depois `bash servidor/pc/enviar_codigo.sh
   IP` e `ssh root@IP "bash /opt/prospeccao/servidor/instalar_sistema.sh ENDERECO"`.
 - Registros: `journalctl -u prospeccao`, `-u prospeccao-relogio`, `-u whatsapp-leads`; acessos em `/var/log/caddy/`.
