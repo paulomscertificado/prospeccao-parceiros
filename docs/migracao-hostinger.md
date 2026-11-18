@@ -38,7 +38,7 @@ schema public: a cópia por `pg_dump`/`pg_restore` é exata (sequências inclusi
 
 ## O que a Maria faz (antes das 22h; quanto antes, melhor)
 
-1. Contratar na Hostinger o **VPS KVM 2 por 24 meses**: local **Brasil**, sistema **Ubuntu 24.04** sem painel. Criar a
+1. Contratar na Hostinger o **VPS KVM 2 por 24 meses**: local **Brasil**, sistema **Ubuntu 24.04** sem painel (o da MS veio com o **Ubuntu 26.04**, Python 3.14: funcionou igual). Criar a
    senha de root e guardar só com ela. Colar a chave SSH (está no doc do plano e em
    `whatsapp-leads/docs/servidor-nuvem-passo-a-passo.md`).
 2. Mandar o **IP** e o **nome do servidor** (hostname, algo como `srv123456.hstgr.cloud`), que aparecem no painel do VPS.
@@ -60,6 +60,9 @@ bash servidor/pc/enviar_codigo.sh IP
 bash servidor/pc/enviar_configuracao.sh IP
 ssh -i ~/.ssh/ms_servidor root@IP "bash /opt/prospeccao/servidor/modo_ensaio.sh ligar && bash /opt/prospeccao/servidor/instalar_sistema.sh ENDERECO && bash /opt/prospeccao/servidor/migrar_banco.sh /root/migracao/supabase_sessao.url"
 ```
+
+Servidor da MS (17/11/2026): **srv2170631.hstgr.cloud** (IP 187.53.121.102), o endereço escolhido pela Maria. Ensaio
+feito na mesma noite: 47 tabelas iguais (226.098 linhas), cadeado e arte da Renovação funcionando.
 
 Depois: `https://ENDERECO/login` abre com cadeado; a Maria pode entrar e **só olhar** (Dashboard, Leads, Renovação,
 Conversas). Com o modo ensaio o servidor não manda nem lê e-mail, o relógio e o WhatsApp Leads do servidor estão

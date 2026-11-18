@@ -65,6 +65,9 @@ echo "== 5/6 Site com cadeado (Caddy) em https://${DOMINIO}"
 sed "s/__DOMINIO__/${DOMINIO}/g" $S/Caddyfile.modelo > /etc/caddy/Caddyfile
 install -d -o caddy -g caddy /var/log/caddy
 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null
+# o validate roda como root e cria o arquivo de registro como root: o Caddy (usuário caddy) não conseguia abrir
+# e não ligava (17/11/2026, 1ª instalação)
+chown -R caddy:caddy /var/log/caddy
 systemctl reload caddy || systemctl restart caddy
 
 echo "== 6/6 Ligando o que já pode ligar"
