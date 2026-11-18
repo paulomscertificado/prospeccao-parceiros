@@ -1,13 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "functions": {
-    "api/index.py": { "maxDuration": 300 }
-  },
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/api/index" }
-  ],
-  "crons": [
-    { "path": "/api/cron", "schedule": "0 11 * * *" }
+  "redirects": [
+    { "source": "/(.*)", "destination": "https://srv2170631.hstgr.cloud/$1", "permanent": false }
   ]
 }
