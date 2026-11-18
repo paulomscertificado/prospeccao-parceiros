@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block titulo %}Consulta Assertiva{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <div><h1>Consulta Assertiva</h1>
+    <div class="suave">Telefones (com aviso de WhatsApp e de "não perturbe"), e-mails, endereços e sócios a partir de um
+      CNPJ, CPF, telefone, e-mail ou nome. Cada consulta é cobrada pela Assertiva; a mesma consulta dos últimos
+      {{ dias_guarda }} dias aparece de novo sem cobrar.</div></div>
+</div>
+
+{% if motivo %}<div class="aviso aviso-info">{{ motivo }}</div>
+{% elif not configurada %}<div class="aviso aviso-alerta">Esta marca ainda não tem as credenciais da Assertiva.
+  {% if pode('configuracoes.alterar') %}Coloque em <a href="/configuracoes?aba=integracoes#assertiva">Configurações &gt; Integrações</a>.
+  {% else %}Peça ao administrador para colocar em Configurações &gt; Integrações.{% endif %}</div>
+{% else %}
+<div class="cartao">
+  <h2>Por CNPJ, CPF, telefone ou e-mail</h2>
+  <form method="post" action="/assertiva/consultar" class="filtros" data-confirmar="Fazer esta consulta na Assertiva? Se não houver uma igual dos últimos {{ dias_guarda }} dias, ela é cobrada.">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <select name="tipo" aria-label="Tipo de consulta">{% for codigo, nome in tipos.items() if codigo != 'nome' %}
+      <option value="{{ codigo }}" {{ 'selected' if tipo == codigo }}>{{ nome }}</option>{% endfor %}</select>
+    <input type="text" name="valor" required style="flex:1;min-width:220px" aria-label="O que consultar"
+           placeholder="Digite o CNPJ, o CPF, o telefone com DDD ou o e-mail">
+    <button class="btn btn-primario">Consultar</button>
+  </form>
+</div>
+<div class="cartao">
+  <h2>Por nome (pessoa ou empresa)</h2>
+  <form method="post" action="/assertiva/consultar" class="filtros" data-confirmar="Fazer esta consulta na Assertiva? Se não houver uma igual dos últimos {{ dias_guarda }} dias, ela é cobrada.">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="tipo" value="nome">
+    <select name="buscar_por" aria-label="Buscar">{% for codigo, nome in buscar_por.items() %}
+      <option value="{{ codigo }}">{{ nome }}</option>{% endfor %}</select>
+    <input type="text" name="nome" required minlength="3" style="flex:1;min-width:220px" aria-label="Nome ou razão social"
+           placeholder="Nome da pessoa ou razão social da empresa">
+    <select name="uf" aria-label="Estado"><option value="">Estado (opcional)</option>{% for uf in ufs %}<option value="{{ uf }}">{{ uf }}</option>{% endfor %}</select>
+    <input type="text" name="cidade" aria-label="Cidade" placeholder="Cidade (opcional)">
+    <button class="btn btn-primario">Consultar</button>
+  </form>
+  <p class="ajuda">Vem uma lista de pessoas e empresas com esse nome; dela dá para consultar o CPF ou o CNPJ de quem for o
+    certo (outra consulta, cobrada). Finalidade (LGPD) que vai junto: <b>{{ finalidade }}</b>
+    {% if pode('configuracoes.alterar') %}(muda em <a href="/configuracoes?aba=integracoes#assertiva">Configurações &gt; Integrações</a>){% endif %}.</p>
+</div>
+{% endif %}
+
+{% if ultimas %}<div class="cartao">
+  <h2>Últimas consultas desta marca</h2>
+  <div class="tabela-rolagem"><table>
+    <tr><th>Quando</th><th>Tipo</th><th>O que foi consultado</th><th>Quem</th><th></th></tr>
+    {% for c in ultimas %}<tr><td class="nowrap">{{ c.criado_em|datahora }}</td><td>{{ tipos.get(c.tipo, c.tipo) }}</td>
+      <td>{{ mascarar(c.tipo, c.chave) }}</td><td>{{ pessoas.get(c.usuario_id, '—') }}</td>
+      <td><a class="btn btn-pequeno" href="/assertiva/consulta/{{ c.id }}{% if c.lead_id %}?lead={{ c.lead_id }}{% endif %}">Ver</a></td></tr>{% endfor %}
+  </table></div>
+  <p class="ajuda">Os resultados ficam guardados por {{ dias_guarda }} dias e depois são apagados (LGPD). Ver de novo não é
+    cobrado.</p>
+</div>{% endif %}
+{% endblock %}

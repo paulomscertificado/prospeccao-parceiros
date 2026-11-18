@@ -208,6 +208,12 @@
        {% if lead.linkedin %}LinkedIn: <a href="{{ lead.linkedin }}" target="_blank" rel="noopener">abrir perfil</a><br>{% endif %}</p>
     <form method="post" action="/leads/{{ lead.id }}/enriquecer"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-pequeno">Buscar dados públicos (site e CNPJ)</button></form>
     <p class="ajuda">Lê o site do escritório e os dados abertos da Receita (BrasilAPI). Só preenche campos vazios.</p>
+    {% if pode('assertiva.consultar') and pode('leads.editar') %}{% if lead.cnpj %}
+    <form method="post" action="/leads/{{ lead.id }}/assertiva" style="margin-top:8px" data-confirmar="Consultar o CNPJ deste lead na Assertiva? Se não houver uma consulta igual dos últimos 30 dias, ela é cobrada.">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-pequeno">Buscar contatos na Assertiva</button></form>
+    <p class="ajuda">Telefones (com aviso de WhatsApp), e-mails e sócios pelo CNPJ; você escolhe o que entra no lead. Cada
+      consulta é cobrada da marca.</p>
+    {% else %}<p class="ajuda">Com o CNPJ preenchido, dá para buscar telefones e e-mails na Assertiva.</p>{% endif %}{% endif %}
   </div>
 
   <div class="cartao">

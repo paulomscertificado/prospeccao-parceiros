@@ -352,6 +352,12 @@ def _rotina_hora() -> None:
         apagadas = apagar_conversas_antigas(db)
         if apagadas:
             log.info("Conversas: %s mensagens antigas saíram da cópia na nuvem (prazo de guarda)", apagadas)
+    from . import assertiva
+
+    with sessao() as db:  # LGPD: o resultado das consultas da Assertiva fica só 30 dias
+        apagadas = assertiva.apagar_antigas(db)
+        if apagadas:
+            log.info("Assertiva: %s consultas com mais de %s dias apagadas", apagadas, assertiva.DIAS_GUARDA)
 
 
 def rodada(numero: int | None) -> None:

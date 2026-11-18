@@ -122,6 +122,10 @@ def _grupos_de_usuarios(db: Session, request: Request, usuario: Usuario) -> list
 @rotas.get("/configuracoes")
 def configuracoes(request: Request, aba: str = "geral", usuario: Usuario = Depends(exige("configuracoes.ver")), db: Session = Depends(obter_db)):
     wl = whatsapp_leads.status(False)  # uma consulta só (antes eram duas a cada abertura da tela)
+    from .assertiva import painel as painel_assertiva
+
+    # Assertiva: as credenciais são de cada marca (a da tela); o quadro e a linha do resumo só na aba Integrações
+    assertiva_painel = painel_assertiva(request, usuario, db) if aba == "integracoes" else None
     ar_tela = marca.ar_da_tela(request, usuario)
     dominio_dns = (marca.da_ar(db, ar_tela)["dominio_email"] if ar_tela else config.EMAIL_DOMINIO) if aba == "email" else ""
     return tela(request, "configuracoes.html", {
@@ -146,6 +150,8 @@ def configuracoes(request: Request, aba: str = "geral", usuario: Usuario = Depen
             ("E-mail (SMTP)", email_smtp.configurado(), "SMTP_HOST, SMTP_USUARIO, SMTP_SENHA e SMTP_REMETENTE no .env"),
             ("Respostas por e-mail (IMAP)", email_imap.configurado(), "IMAP_HOST, IMAP_USUARIO e IMAP_SENHA no .env"),
             ("CNPJá (Empresas novas)", bool(_chave_cnpja()), "Chave da API: no quadro CNPJá abaixo"),
+            ("Assertiva (consultas, desta marca)", bool(assertiva_painel and assertiva_painel["configurada"]),
+             "Client ID e Client Secret da marca: no quadro Assertiva abaixo"),
             ("Google Places", bool(config.GOOGLE_PLACES_API_KEY), "GOOGLE_PLACES_API_KEY no .env"),
             ("OpenStreetMap", True, "Gratuito, já funciona"),
             ("BrasilAPI (CNPJ)", True, "Gratuito, já funciona"),
@@ -155,6 +161,7 @@ def configuracoes(request: Request, aba: str = "geral", usuario: Usuario = Depen
         "listas": bases_importadas.listas(db) if aba == "integracoes" else [],
         "receita_oculta": bases_importadas.receita_oculta(db),
         "tem_chave_cnpja": bool(_chave_cnpja()) if aba == "integracoes" else False,
+        "assertiva": assertiva_painel,
         "painel_avisos": {"ativos": alertas.ativos(db), "para": alertas.destinatarios(db), "ligado": alertas.ligado(),
                    "email_ok": email_smtp.configurado(), "banco_mb": alertas.tamanho_do_banco_mb(db),
                    "banco_limite": int(float(ler_config(db, "limite_banco_mb") or 0) or 0),

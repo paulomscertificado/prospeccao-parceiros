@@ -331,6 +331,42 @@
     <button class="btn">Testar a chave (ver saldo, não gasta crédito)</button></form>{% endif %}
   <p class="ajuda">A chave fica guardada criptografada e nunca aparece na tela. Para trocar, cole a nova e salve.</p>
 </div>
+{% if assertiva %}<div class="cartao" style="max-width:860px" id="assertiva"><h2>Assertiva (consultas de CPF, CNPJ, telefone e e-mail)</h2>
+  <p>A <b>Assertiva</b> (Localize) traz telefones (com aviso de WhatsApp e de "não perturbe"), e-mails, endereços e
+    sócios a partir de um CNPJ, CPF, telefone, e-mail ou nome. <b>Cada marca usa as próprias credenciais</b> e paga as
+    próprias consultas. As consultas ficam no menu <a href="/assertiva">Consulta Assertiva</a> e na ficha do lead
+    ("Buscar contatos na Assertiva").</p>
+  {% if assertiva.motivo %}<p class="aviso aviso-info">{{ assertiva.motivo }}</p>{% else %}
+  <p>Credenciais desta marca: {% if assertiva.configurada %}<span class="selo selo-ok">salvas</span>
+    <span class="pequeno suave">Client ID {{ assertiva.id_mascarado }}</span>{% else %}<span class="selo selo-erro">faltam</span>{% endif %}
+    {% if assertiva.testado_em %} · teste de {{ assertiva.testado_em.strftime('%d/%m às %H:%M') }}:
+      {% if assertiva.situacao.ok %}<span class="selo selo-ok">funcionando</span>{% else %}<span class="selo selo-erro">falhou</span>
+      <span class="pequeno">{{ assertiva.situacao.erro }}</span>{% endif %}{% endif %}</p>
+  {% if pode('configuracoes.alterar') %}
+  <form method="post" action="/configuracoes/assertiva" class="campos">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div><label for="assertiva_id">Client ID</label>
+      <input id="assertiva_id" type="password" name="client_id" autocomplete="off"
+             placeholder="{{ 'Em branco: continua o atual' if assertiva.configurada else 'Cole o Client ID' }}"></div>
+    <div><label for="assertiva_segredo">Client Secret</label>
+      <input id="assertiva_segredo" type="password" name="segredo" autocomplete="off"
+             placeholder="{{ 'Em branco: continua o atual' if assertiva.configurada else 'Cole o Client Secret' }}"></div>
+    <div><label for="assertiva_finalidade">Finalidade das consultas (LGPD)</label>
+      <select id="assertiva_finalidade" name="finalidade">{% for n, nome in assertiva.finalidades.items() %}
+        <option value="{{ n }}" {{ 'selected' if assertiva.finalidade == n }}>{{ n }} - {{ nome }}</option>{% endfor %}</select></div>
+    <div><button class="btn btn-primario">Salvar credenciais</button></div>
+  </form>
+  {% if assertiva.configurada %}<div class="grupo-btn" style="margin-top:8px">
+    <form class="inline" method="post" action="/configuracoes/assertiva/testar"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn">Testar as credenciais (não gasta consulta)</button></form>
+    <form class="inline" method="post" action="/configuracoes/assertiva/apagar" data-confirmar="Apagar as credenciais da Assertiva desta marca? As consultas param até salvar outras.">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-perigo btn-pequeno">Apagar credenciais</button></form></div>{% endif %}
+  {% endif %}
+  <p class="ajuda">Pegue o Client ID e o Client Secret no portal da Assertiva (Integração > Credenciais). Eles ficam
+    guardados criptografados e nunca aparecem na tela; para trocar, cole os novos e salve. A finalidade vai junto em
+    toda consulta, como a LGPD pede ("Legítimo interesse" serve para prospecção).</p>
+  {% endif %}
+</div>{% endif %}
 <div class="cartao" style="max-width:860px" id="receita"><h2>Base de CNPJs da Receita Federal</h2>
   {% if receita.total %}<p><b>{{ receita.total }}</b> escritórios de contabilidade ativos na base local · atualizada em {{ receita.atualizada_em }}.</p>
   {% else %}<p>A base ainda não foi importada. Ela é a melhor fonte para "Encontrar novos parceiros": traz <b>todos</b> os escritórios de contabilidade ativos do Brasil, com CNPJ, endereço, telefone e e-mail informados à Receita.</p>{% endif %}

@@ -69,6 +69,9 @@ CATALOGO = [
     Permissao("leads.excluir", "Leads", "Excluir dados do lead (LGPD)", padrao="G"),
     Permissao("leads.liberar_contato", "Leads", "Desfazer opt-out (contato autorizou de novo)", padrao="G"),
     Permissao("prospeccao.buscar", "Leads", "Buscar empresas (Prospecção)", True, "prospeccao", padrao="E"),
+    # Assertiva (18/11/2026): cada consulta é cobrada da marca; administrador e gestor por padrão
+    Permissao("assertiva.consultar", "Leads", "Consultar na Assertiva (CPF, CNPJ, telefone, e-mail; cobrado por consulta)",
+              modulo="assertiva", padrao="G"),
 
     # Sem alcance desde 16/11/2026 (pedido da Maria): a equipe toda vê e atende todas as respostas da AR
     Permissao("oportunidades.ver", "IA SDR", "Ver e atender as oportunidades (todas: a equipe toda vê)", padrao="E"),
@@ -155,6 +158,7 @@ MODULOS = {
     "agenda": ("Agenda de prospecção", "mostrar_agenda"),
     "campanhas": ("IA SDR (campanhas)", "modulo_campanhas"),
     "prospeccao": ("Prospecção (buscar empresas)", "modulo_prospeccao"),
+    "assertiva": ("Consultas na Assertiva (CPF, CNPJ, telefone, e-mail)", "modulo_assertiva"),
     "conversas": ("Conversas de WhatsApp", "modulo_conversas"),
     "ia_comercial": ("IA Comercial", "modulo_ia_comercial"),
     "portal": ("Portal do parceiro", "modulo_portal"),

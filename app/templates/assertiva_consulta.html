@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block titulo %}Consulta Assertiva{% endblock %}
+{% block conteudo %}
+<div class="cabecalho">
+  <div><h1>{{ r.titulo or (r.rotulo ~ ' ' ~ mascarar(c.tipo, c.chave)) }}</h1>
+    <div class="suave">{{ r.rotulo }}{% if r.documento %} {{ r.documento }}{% endif %} · consulta de {{ c.criado_em|datahora }}{% if quem %} por {{ quem.nome }}{% endif %}
+      · finalidade: {{ finalidade }}{% if c.protocolo %} · protocolo {{ c.protocolo }}{% endif %}</div></div>
+  <div class="grupo-btn">{% if lead %}<a class="btn" href="/leads/{{ lead.id }}">Voltar ao lead</a>{% endif %}
+    <a class="btn" href="/assertiva">Nova consulta</a></div>
+</div>
+{% if lead %}<div class="aviso aviso-info">Lead: <b>{{ lead.empresa }}</b>. Use os botões ao lado de cada telefone, e-mail ou
+  sócio para colocar no lead (o que já estava preenchido fica no histórico).</div>{% endif %}
+
+{% if r.vazio %}<div class="cartao"><p>A Assertiva não trouxe dados para esta consulta.</p></div>{% endif %}
+
+{% if r.dados %}<div class="cartao"><h2>Dados cadastrais</h2>
+  <table>{% for rotulo, valor in r.dados %}<tr><td class="suave" style="width:180px">{{ rotulo }}</td><td>{{ valor }}</td></tr>{% endfor %}</table>
+</div>{% endif %}
+
+{% if r.telefones %}<div class="cartao"><h2>Telefones</h2>
+  <div class="tabela-rolagem"><table>
+    <tr><th>Número</th><th>Tipo</th><th>WhatsApp</th><th>Observação</th>{% if lead %}<th></th>{% endif %}</tr>
+    {% for t in r.telefones %}<tr>
+      <td class="nowrap"><b>{{ t.numero }}</b></td>
+      <td>{{ 'Celular' if t.celular else 'Fixo' }}{% if t.relacao %} · {{ t.relacao }}{% endif %}{% if t.adicionado %} · <span class="pequeno suave">anotado na Assertiva</span>{% endif %}</td>
+      <td>{% if t.whatsapp %}<span class="selo selo-ok">tem WhatsApp</span>{% endif %}</td>
+      <td>{% if t.nao_perturbe %}<span class="selo selo-erro" title="Número no cadastro de quem não quer receber ligações de venda">não perturbe</span> {% endif %}<span class="pequeno suave">{{ t.ultimo_contato }}</span></td>
+      {% if lead %}<td class="nowrap">
+        {% if t.celular %}<form class="inline" method="post" action="/leads/{{ lead.id }}/assertiva/usar"><input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="consulta" value="{{ c.id }}"><input type="hidden" name="campo" value="whatsapp"><input type="hidden" name="valor" value="{{ t.digitos }}">
+          <button class="btn btn-pequeno">Usar como WhatsApp</button></form>{% endif %}
+        <form class="inline" method="post" action="/leads/{{ lead.id }}/assertiva/usar"><input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="consulta" value="{{ c.id }}"><input type="hidden" name="campo" value="telefone"><input type="hidden" name="valor" value="{{ t.digitos }}">
+          <button class="btn btn-pequeno">Usar como telefone</button></form></td>{% endif %}
+    </tr>{% endfor %}
+  </table></div>
+  <p class="ajuda">"Não perturbe": o número está no cadastro de quem não quer receber ligações de venda. Evite usar esse
+    número para prospecção.</p>
+</div>{% endif %}
+
+{% if r.emails %}<div class="cartao"><h2>E-mails</h2>
+  <table>{% for e in r.emails %}<tr><td><b>{{ e }}</b></td>
+    {% if lead %}<td class="nowrap"><form class="inline" method="post" action="/leads/{{ lead.id }}/assertiva/usar"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="consulta" value="{{ c.id }}"><input type="hidden" name="campo" value="email"><input type="hidden" name="valor" value="{{ e }}">
+      <button class="btn btn-pequeno">Usar como e-mail</button></form></td>{% endif %}</tr>{% endfor %}</table>
+</div>{% endif %}
+
+{% if r.socios %}<div class="cartao"><h2>Sócios</h2>
+  <table>{% for s in r.socios %}<tr><td><b>{{ s.nome }}</b></td><td class="suave">{{ s.documento }}</td><td class="pequeno suave">{% if s.entrada %}desde {{ s.entrada }}{% endif %}</td>
+    {% if lead %}<td class="nowrap"><form class="inline" method="post" action="/leads/{{ lead.id }}/assertiva/usar"><input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="consulta" value="{{ c.id }}"><input type="hidden" name="campo" value="responsavel"><input type="hidden" name="valor" value="{{ s.nome }}">
+      <button class="btn btn-pequeno">Usar como responsável</button></form></td>{% endif %}</tr>{% endfor %}</table>
+</div>{% endif %}
+
+{% if r.enderecos %}<div class="cartao"><h2>Endereços</h2>
+  <ul>{% for e in r.enderecos %}<li>{{ e }}</li>{% endfor %}</ul>
+</div>{% endif %}
+
+{% if r.pessoas %}<div class="cartao"><h2>Encontrados</h2>
+  <div class="tabela-rolagem"><table>
+    <tr><th>Nome ou razão social</th><th>Documento</th><th>Detalhes</th><th></th></tr>
+    {% for p in r.pessoas %}<tr><td><b>{{ p.nome }}</b></td><td class="nowrap">{{ p.documento_tela }}</td><td class="pequeno">{{ p.detalhe }}</td>
+      <td class="nowrap">{% if p.documento %}<form class="inline" method="post" action="/assertiva/consultar" data-confirmar="Consultar {{ 'este CNPJ' if p.tipo == 'cnpj' else 'este CPF' }} na Assertiva? Se não houver uma consulta igual dos últimos {{ dias_guarda }} dias, ela é cobrada.">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="tipo" value="{{ p.tipo }}"><input type="hidden" name="valor" value="{{ p.documento }}">
+        <button class="btn btn-pequeno">Consultar {{ 'o CNPJ' if p.tipo == 'cnpj' else 'o CPF' }}</button></form>{% endif %}</td></tr>{% endfor %}
+  </table></div>
+</div>{% endif %}
+
+<div class="cartao">
+  <p class="ajuda">O resultado fica guardado por {{ dias_guarda }} dias e depois é apagado (LGPD); ver de novo não é cobrado.
+    Para buscar dados novos na Assertiva (cobrado):</p>
+  <form class="inline" method="post" action="{{ '/leads/' ~ lead.id ~ '/assertiva' if lead and c.tipo == 'cnpj' else '/assertiva/consultar' }}"
+        data-confirmar="Consultar de novo na Assertiva? Esta consulta é cobrada.">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="de_novo" value="1">
+    <input type="hidden" name="tipo" value="{{ c.tipo }}">
+    {% if c.tipo == 'nome' %}{% for campo, valor in de_novo_nome.items() %}<input type="hidden" name="{{ campo }}" value="{{ valor }}">{% endfor %}
+    {% else %}<input type="hidden" name="valor" value="{{ c.chave }}">{% endif %}
+    <button class="btn">Consultar de novo (cobrado)</button></form>
+</div>
+{% endblock %}

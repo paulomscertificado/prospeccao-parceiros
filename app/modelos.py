@@ -235,6 +235,37 @@ class ModeloWhatsAppOficial(DaAR, Base):
     atualizado_em: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
+class ContaAssertiva(DaAR, Base):
+    """Credenciais da API da Assertiva (Localize: consultas de CPF, CNPJ, telefone, e-mail e nome/endereço) de UMA AR
+    (pedido da Maria em 18/11/2026: cada marca usa a sua). Client ID e Client Secret criptografados, nunca voltam
+    para a tela. A AR vem da tela de quem salva (app/isolamento.py)."""
+    __tablename__ = "contas_assertiva"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    client_id_cripto: Mapped[str] = mapped_column(Text, default="")
+    segredo_cripto: Mapped[str] = mapped_column(Text, default="")
+    # finalidade (LGPD) que vai em cada consulta: 1 identidade, 2 crédito, 5 legítimo interesse (app/assertiva.py)
+    finalidade: Mapped[int] = mapped_column(Integer, default=5)
+    situacao: Mapped[str] = mapped_column(Text, default="")  # JSON do último teste das credenciais
+    testado_em: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
+    atualizado_em: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class ConsultaAssertiva(DaAR, Base):
+    """Cada consulta feita na Assertiva (é cobrada por consulta): quem, o quê, quando e o resultado, para ver de novo
+    sem pagar. Guardada por 30 dias e depois apagada (LGPD: app/assertiva.apagar_antigas, de hora em hora)."""
+    __tablename__ = "consultas_assertiva"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    usuario_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
+    lead_id: Mapped[int | None] = mapped_column(ForeignKey("leads.id", ondelete="SET NULL"), nullable=True, index=True)
+    tipo: Mapped[str] = mapped_column(String(20))  # cpf, cnpj, telefone, email, nome
+    chave: Mapped[str] = mapped_column(String(300), default="", index=True)  # o que foi consultado, normalizado
+    finalidade: Mapped[int] = mapped_column(Integer, default=5)
+    protocolo: Mapped[str] = mapped_column(String(80), default="")
+    resultado: Mapped[str] = mapped_column(Text, default="")  # JSON da "resposta" da Assertiva
+    criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, index=True)
+
+
 class ContaEmail(DaAR, Base):
     """Uma conta de e-mail para as campanhas: a principal da MS (dados em Configurações > E-mail) ou a de um
     usuário (dados aqui, senha criptografada). Ver app/contas_email.py."""

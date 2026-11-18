@@ -554,6 +554,27 @@ Muitos e-mails da base da Receita estão desatualizados. O sistema tira esses en
 Obs.: a conferência do domínio não descobre se uma caixa específica existe (ex.: `fulano@hotmail.com`). Isso
 só se sabe quando a devolução chega, e aí o sistema tira o e-mail sozinho.
 
+### Consulta Assertiva (telefones, e-mails e sócios por CNPJ, CPF, telefone, e-mail ou nome)
+
+A **Assertiva** encontra telefones (avisando se têm WhatsApp e se estão no cadastro "não perturbe"), e-mails,
+endereços e sócios. **Cada marca usa as próprias credenciais e paga as próprias consultas.**
+
+1. **Credenciais (o administrador, uma vez):** em **Configurações > Integrações**, quadro **Assertiva**, cole o
+   **Client ID** e o **Client Secret** (portal da Assertiva > Integração > Credenciais), escolha a **finalidade** das
+   consultas (para prospecção, "Legítimo interesse") e clique em **Salvar credenciais**. Depois, **Testar as
+   credenciais** (não gasta consulta). As credenciais ficam guardadas criptografadas e nunca aparecem na tela. O
+   Admin Master configura cada marca depois de "Entrar na AR".
+2. **Consultar:** no menu **Consulta Assertiva**, escolha CNPJ, CPF, telefone ou e-mail e digite; ou busque por
+   **nome** (com estado e cidade, se quiser). Na ficha do lead com CNPJ, use **Buscar contatos na Assertiva**.
+3. **No lead:** no resultado aberto pela ficha, cada telefone, e-mail e sócio tem um botão (**Usar como WhatsApp**,
+   **Usar como telefone**, **Usar como e-mail**, **Usar como responsável**). Só entra o que veio da Assertiva, e o
+   valor de antes fica no histórico do lead.
+
+**Custos:** cada consulta é cobrada pela Assertiva. A mesma consulta feita pela marca nos últimos **30 dias** aparece
+de novo **sem cobrar**; "Consultar de novo" cobra outra. Os resultados ficam guardados 30 dias e depois são apagados
+(LGPD). Quem pode consultar: administrador e gestor (o administrador libera para outros em Papéis e permissões,
+"Consultar na Assertiva"). Telefone com o selo **não perturbe**: evite usar para prospecção.
+
 ### API oficial do WhatsApp (Meta)
 
 O número oficial da empresa na Meta (Plataforma do WhatsApp Business) não tem o risco de bloqueio do QR code, mas a
