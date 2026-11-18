@@ -135,7 +135,8 @@ def configuracoes(request: Request, aba: str = "geral", usuario: Usuario = Depen
     return tela(request, "configuracoes.html", {
         # white label: quem é de uma AR muda só as configurações da AR (o resto é da plataforma: Admin Master)
         "aba": aba, "secao": aba, "ufs": feriados.UFS,
-        "feriados": feriados.painel(db) if aba == "feriados" else None,
+        "feriados": feriados.painel(db, request.query_params.get("uf", ""), request.query_params.get("cidade", ""))
+        if aba == "feriados" else None,
         "grupos_usuarios": _grupos_de_usuarios(db, request, usuario) if aba == "usuarios" else [],
         "campos": [(c, n, t, ler_config(db, c), autorizacao.e_master(usuario)
                                 or (c in CHAVES_DA_AR and c not in CHAVES_SO_MASTER)) for c, n, t in CAMPOS_GERAIS],
@@ -466,10 +467,11 @@ def salvar_usuario(request: Request, uid: int, nome: str = Form(...), email: str
     from .. import feriados  # onde a pessoa trabalha: os feriados do estado e da cidade dela (18/11/2026)
 
     local_antes = (u.cidade or "", u.uf or "")
-    if cidade != "manter":
-        u.cidade = feriados.normalizar_cidade(cidade)
     if uf != "manter":
         u.uf = feriados.normalizar_uf(uf)
+    aviso_cidade = ""
+    if cidade != "manter":  # o nome como o IBGE escreve (a base de feriados é por município)
+        u.cidade, aviso_cidade = feriados.conferir_cidade(u.uf, cidade)
     mudou_local = bool(uid) and (u.cidade or "", u.uf or "") != local_antes
     # white label: a marca da pessoa. Nova pessoa criada pelo Admin Master fora das ARs vai para a marca do quadro em
     # que ele clicou; quem é de uma AR (ou o master dentro dela) cria na própria (isolamento._ar_nas_novas)
@@ -500,6 +502,8 @@ def salvar_usuario(request: Request, uid: int, nome: str = Form(...), email: str
     db.commit()
     avisar(request, "Usuário salvo." + (" Envie a senha para a pessoa por um canal seguro." if uid == 0 else "")
            + (f" {movidos} toque(s) que caíam num feriado da cidade dela mudaram de dia." if movidos else ""))
+    if aviso_cidade:
+        avisar(request, aviso_cidade, "alerta")
     return voltar(destino)
 
 

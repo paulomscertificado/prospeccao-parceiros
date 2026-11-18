@@ -139,10 +139,17 @@ Calendar: prevista.
 
 ### Feriados de cada pessoa (Configurações > Feriados; pedido da Maria em 18/11/2026)
 `app/feriados.py`. Cada pessoa tem **cidade e UF** (`Usuario.cidade`/`uf`; Configurações > Usuários ou Minha conta >
-"Onde eu trabalho"). Os feriados dela = os nacionais (`util.feriados_nacionais`, com Carnaval, Sexta-feira Santa e
-Corpus Christi) + as listas do estado e da cidade escritas pela marca em Configurações > Feriados (chave da AR
-`feriados_locais`, em `banco.CHAVES_DA_AR`: JSON `{"PE": "...", "PE/RECIFE": "..."}`, uma data por linha, `16/07 Nome`
-todo ano ou `20/11/2026 Nome` só naquele ano; `ler_lista`). `da_pessoa(db, pessoa)` junta tudo (cache por sessão).
+"Onde eu trabalho"; `conferir_cidade` grava o nome como o IBGE escreve e avisa com o mais parecido quando não acha). Os
+feriados dela = os nacionais (`util.feriados_nacionais`, com Carnaval, Sexta-feira Santa e Corpus Christi) + os do
+estado e da cidade da **base de todo o Brasil** (`app/feriados_brasil.json`, ~450 KB: 23 UFs com feriado e os 5.570
+municípios, 3.838 com feriado; chaves "PE" e "PE/RECIFE" = `chave_do_local`; montada em 18/11/2026 com os JSON públicos
+de github.com/joaopbini/feriados-brasil, licença MIT em `app/feriados_brasil_LICENSE.txt`: data repetida em 2 ou mais
+dos anos 2024-2026 = todo ano, só em 2026 = só em 2026, nacionais de fora) + os acertos da marca em Configurações >
+Feriados (chave da AR `feriados_locais`, em `banco.CHAVES_DA_AR`: JSON `{"PE": "...", "PE/RECIFE": "..."}`, uma data por
+linha, `16/07 Nome` todo ano, `20/11/2026 Nome` só naquele ano e `-16/07` tira da base; um nacional nunca sai;
+`ler_lista`). `da_pessoa(db, pessoa)` junta tudo (cache por sessão). Para atualizar a base (quando o repositório
+ganhar 2027): baixar os JSON de `dados/feriados/{estadual,municipal}/json/<ano>.json` e
+`dados/localizacao/municipios/municipios.json` e montar de novo com a mesma regra.
 Onde vale:
 - **Montagem das campanhas** (todas, não só a Renovação, que já pulava os nacionais): `campanhas._feriados(db, camp)`
   = feriados de quem é a campanha → `cadencias.aplicar(feriados=)` e a aprovação (`_sem_horario_no_passado`; aprovada
@@ -150,8 +157,10 @@ Onde vale:
   feriados" dela + os da pessoa) na montagem, na aprovação e em `remarcar_feriados` (por dono de campanha).
 - **Toques já marcados**: `feriados.remarcar(db)` (rotina de hora em hora; também ao salvar os feriados ou a cidade de
   alguém) passa o toque em aberto que cai num feriado de quem envia (`conexoes.responsavel`) para o próximo dia de envio
-  dela, sem ficar antes do toque anterior da mesma empresa. Olha só os dias que são feriado para alguém
+  dela, sem ficar antes do toque anterior da mesma empresa. Olha só os dias que são feriado para alguém da equipe
   (`_dias_que_podem_ser_feriado`), até 120 dias à frente. A Renovação usa `renovacao.remarcar_feriados`.
+- **Tela** (Configurações > Feriados): consulta de qualquer cidade (`painel(db, uf, cidade)`), um quadro por estado e
+  cidade da equipe com os feriados da base e os acertos da marca, e os nacionais dos próximos 12 meses.
 - **Filas** (e-mail, WhatsApp e API oficial), na hora de enviar: `feriados.adiar_se_feriado(db, t)` adia o toque de
   hoje se hoje é feriado de quem envia (aviso de renovação que só caberia depois do vencimento sai assim mesmo).
 - **Reuniões**: `agenda_horarios.horarios_livres` não oferece horário nos feriados da pessoa.

@@ -4,21 +4,48 @@
 <div class="cartao" style="max-width:920px">
   <h2 class="subtitulo-config">Feriados</h2>
   <p class="suave" style="margin:0">Nos feriados de cada pessoa, as campanhas dela não enviam nada: os toques passam para o
-    próximo dia de envio, e a agenda dela não oferece horários de reunião. Valem os feriados nacionais (automáticos) e os do
-    estado e da cidade onde a pessoa trabalha. A cidade fica no cadastro da pessoa (Usuários) ou em Minha conta.</p>
+    próximo dia de envio, e a agenda dela não oferece horários de reunião. Valem os feriados nacionais e os do estado e da
+    cidade onde a pessoa trabalha. A cidade fica no cadastro da pessoa (Usuários) ou em Minha conta.</p>
+  <p class="pequeno" style="margin:8px 0 0">Os feriados de <b>todos os estados e dos {{ '{:,}'.format(f.municipios).replace(',', '.') }}
+    municípios do Brasil</b> já vêm prontos ({{ '{:,}'.format(f.com_feriado).replace(',', '.') }} municípios têm feriado próprio na base).
+    Aqui você só acrescenta o que faltar ou tira o que não vale.</p>
+  <p class="pequeno suave" style="margin:4px 0 0">Fonte da base: {{ f.fonte }}</p>
 </div>
+
+<form class="cartao" method="get" action="/configuracoes" style="max-width:920px">
+  <input type="hidden" name="aba" value="feriados">
+  <h2>Consultar os feriados de uma cidade</h2>
+  <div class="campos">
+    <div><label for="consulta-uf">UF</label><select id="consulta-uf" name="uf" required><option value="">—</option>
+      {% for sigla, nome in f.ufs.items() %}<option value="{{ sigla }}" {{ 'selected' if f.consulta and f.consulta.uf == sigla }}>{{ sigla }} – {{ nome }}</option>{% endfor %}</select></div>
+    <div><label for="consulta-cidade">Cidade (em branco: só o estado)</label><input id="consulta-cidade" type="text" name="cidade" maxlength="120" value="{{ f.consulta.cidade if f.consulta else '' }}" placeholder="Caruaru"></div>
+  </div>
+  <button class="btn btn-pequeno" style="margin-top:8px">Consultar</button>
+  {% if f.consulta %}<div style="margin-top:10px">
+    {% if f.consulta.aviso %}<div class="aviso aviso-alerta">{{ f.consulta.aviso }}</div>{% endif %}
+    <p><b>{{ f.consulta.nome }}</b>:
+      {% for d, nome in f.consulta.base %}<b>{{ d }}</b> {{ nome }}{{ '; ' if not loop.last }}{% else %}nenhum feriado próprio na base{% endfor %}.</p>
+    {% if f.consulta.estado %}<p class="pequeno">Do estado: {% for d, nome in f.consulta.estado %}<b>{{ d }}</b> {{ nome }}{{ '; ' if not loop.last }}{% endfor %}.</p>{% endif %}
+    <p class="pequeno suave">Mais os nacionais. Datas com o ano (ex.: 24/06/2026) valem só naquele ano; as outras, todo ano.</p>
+  </div>{% endif %}
+</form>
 
 <form class="cartao" method="post" action="/configuracoes/feriados" style="max-width:920px">
   <input type="hidden" name="csrf" value="{{ csrf }}">
-  <h2>Feriados do estado e da cidade</h2>
-  <p class="pequeno suave">Uma data por linha: <b>16/07 Nossa Senhora do Carmo</b> (todo ano) ou <b>20/11/2026 Ponto
-    facultativo</b> (só naquele ano). Use o botão "Pesquisar" e confira as datas no site da prefeitura ou do governo do estado.</p>
+  <h2>Feriados das cidades e dos estados da equipe</h2>
+  <p class="pequeno suave">Em cada quadro, os feriados que já vêm da base. Para acertar, escreva uma data por linha:
+    <b>16/07 Nossa Senhora do Carmo</b> acrescenta (todo ano), <b>20/11/2026 Ponto facultativo</b> acrescenta só naquele ano
+    e <b>-16/07</b> tira um feriado da base. Na dúvida, use "Pesquisar" e confira no site da prefeitura ou do governo do estado.</p>
   {% for q in f.quadros %}
   <div class="campo" style="margin-top:14px">
     <label for="local-{{ loop.index }}">{{ q.nome }} · {{ 'feriados da cidade' if q.cidade else 'feriados do estado' }}
       {% if q.pessoas %}<span class="pequeno suave">({{ q.pessoas|join(', ') }})</span>{% endif %}</label>
+    {% if not q.conhecida %}<div class="aviso aviso-alerta" style="margin:4px 0">Esta cidade não está na lista de municípios do IBGE:
+      confira a grafia no cadastro da pessoa. Por enquanto, só os feriados do estado e os nacionais valem para ela.</div>
+    {% elif q.base %}<div class="pequeno" style="margin:2px 0 4px">Da base: {% for d, nome in q.base %}<b>{{ d }}</b> {{ nome }}{{ '; ' if not loop.last }}{% endfor %}.</div>
+    {% else %}<div class="pequeno suave" style="margin:2px 0 4px">Nenhum feriado próprio na base.</div>{% endif %}
     <textarea id="local-{{ loop.index }}" name="local__{{ q.chave }}" rows="3" style="min-height:70px"
-      placeholder="{{ '16/07 Nossa Senhora do Carmo' if q.cidade else '06/03 Data Magna do estado' }}">{{ q.texto }}</textarea>
+      placeholder="Acertos da sua marca (opcional): 20/11/2026 Ponto facultativo, -16/07 ...">{{ q.texto }}</textarea>
     <a class="btn btn-pequeno" target="_blank" rel="noopener" href="{{ q.busca }}" style="margin-top:4px">Pesquisar os feriados de {{ q.nome }}</a>
   </div>
   {% else %}

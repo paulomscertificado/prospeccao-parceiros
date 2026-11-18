@@ -285,11 +285,11 @@ def salvar_cidade(request: Request, cidade: str = Form(""), uf: str = Form(""),
 
     usuario = db.get(Usuario, usuario.id)
     antes = (usuario.cidade or "", usuario.uf or "")
-    usuario.cidade, usuario.uf = feriados.normalizar_cidade(cidade), feriados.normalizar_uf(uf)
-    if usuario.cidade and not usuario.uf:
-        db.rollback()
+    if feriados.normalizar_cidade(cidade) and not feriados.normalizar_uf(uf):
         avisar(request, "Escolha também a UF da sua cidade.", "erro")
         return voltar("/minha-conta#cidade")
+    usuario.uf = feriados.normalizar_uf(uf)
+    usuario.cidade, aviso_cidade = feriados.conferir_cidade(usuario.uf, cidade)  # o nome como o IBGE escreve
     movidos = 0
     if (usuario.cidade, usuario.uf) != antes:
         registrar_log(db, usuario, "mudou_cidade", "usuario", usuario.id,
@@ -297,6 +297,8 @@ def salvar_cidade(request: Request, cidade: str = Form(""), uf: str = Form(""),
         movidos = _remarcar_feriados(db, {usuario.id})
     db.commit()
     avisar(request, "Cidade salva." + (f" {movidos} toque(s) seus que caíam num feriado mudaram de dia." if movidos else ""))
+    if aviso_cidade:
+        avisar(request, aviso_cidade, "alerta")
     return voltar("/minha-conta#cidade")
 
 

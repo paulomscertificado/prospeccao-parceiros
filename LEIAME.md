@@ -331,19 +331,23 @@ não mudam; as que ainda vão sair são corrigidas na hora do envio.
 Nos feriados de quem envia, as campanhas dessa pessoa **não enviam nada** (WhatsApp, e-mail e avisos da Renovação) e a
 agenda dela **não oferece horários de reunião**. Valem:
 - os **feriados nacionais**, automáticos (com Carnaval, Sexta-feira Santa e Corpus Christi);
-- os do **estado** e da **cidade** onde a pessoa trabalha.
+- os do **estado** e da **cidade** onde a pessoa trabalha. Os de **todo o Brasil já vêm prontos**: todos os estados e
+  os 5.570 municípios (3.838 têm feriado próprio na base, montada com dados públicos de 2024 a 2026).
 
 Como deixar pronto:
 1. Cada pessoa informa a **cidade e a UF** em **Minha conta > Onde eu trabalho** (ou o administrador, em
-   Configurações > Usuários > Editar).
-2. Em **Configurações > Feriados** aparece um quadro para cada estado e cidade da equipe. Escreva uma data por linha:
-   `16/07 Nossa Senhora do Carmo` vale todo ano; `20/11/2026 Ponto facultativo` vale só naquele ano. O botão
-   "Pesquisar" abre a busca dos feriados daquela cidade (confira no site da prefeitura). Para outra cidade, use
-   "Outra cidade ou estado".
-3. Salve. Os toques já marcados para um feriado **mudam sozinhos para o próximo dia de envio** de quem envia (e o
-   sistema confere de novo de hora em hora e na hora de enviar).
+   Configurações > Usuários > Editar). O sistema confere o nome na lista do IBGE e avisa se não achar ("Você quis
+   dizer...?").
+2. Pronto: os feriados da cidade e do estado dela já valem. Em **Configurações > Feriados** dá para consultar os
+   feriados de qualquer cidade e ver, em cada quadro, os que vêm da base.
+3. Se faltar ou sobrar algum, acerte no quadro da cidade (uma data por linha): `16/07 Nossa Senhora do Carmo`
+   acrescenta (todo ano), `20/11/2026 Ponto facultativo` acrescenta só naquele ano e `-16/07` tira um feriado da base.
+   Um feriado nacional não sai. Ao salvar, os toques já marcados para um feriado **mudam sozinhos para o próximo dia de
+   envio** de quem envia (e o sistema confere de novo de hora em hora e na hora de enviar).
 
-Cada marca tem as suas listas. Quem está sem cidade no cadastro segue só os feriados nacionais.
+Cada marca tem os seus acertos. Quem está sem cidade no cadastro segue só os feriados nacionais (e os do estado, se
+tiver a UF). A base tem os anos 2024 a 2026: o feriado que caiu no mesmo dia nesses anos vale todo ano; o que mudou de
+dia (decreto de um ano só) vale só em 2026. Feriado municipal novo ou mudado por decreto: acrescente no quadro.
 
 ### Empresas novas (venda de certificado para empresas recém-abertas)
 
