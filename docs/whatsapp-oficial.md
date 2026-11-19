@@ -52,7 +52,13 @@ começou a montar o portfólio pela conta de Carol (passo a passo abaixo); nada 
   Token/chave em branco ao salvar = continuam os de antes. O ID da conta do WhatsApp Business pode ficar em branco:
   ao testar, o sistema descobre pelo token (`whatsapp_cloud.contas_do_token`: permissões granulares do
   `debug_token`) e **liga o app à conta** (`whatsapp_cloud.inscrever_app`, `POST /{waba}/subscribed_apps`; sem isso o
-  webhook não recebe as respostas da conta). É o que o "Início rápido" do app faria; ele cria um número de teste e,
+  webhook não recebe as respostas da conta). No modelo novo da Meta essa conta é a
+  **conta de mensagens** (Configurações do negócio > Contas > Contas de mensagens). O token de um usuário do sistema
+  **administrador** vale para todos os ativos e vem sem contas nas permissões granulares: aí o sistema procura nas
+  contas atribuídas a ele (`whatsapp_cloud.contas_atribuidas`, `GET /{usuário}/assigned_whatsapp_business_accounts`) e,
+  com mais de uma, fica com a que tem o número (`numeros_da_conta`; a de teste sai) — `whatsapp_oficial.conta_do_numero`
+  (caso real da MS em 19/11/2026). O ID preenchido na tela de uma conta sem o número é avisado (`numero_fora_da_conta`)
+  e o webhook completa a conta que estiver sem ID (`contas_por_numero`: o `entry.id` de cada evento). É o que o "Início rápido" do app faria; ele cria um número de teste e,
   para a MS, foi travado pela Meta em 16/11/2026 ("impedido temporariamente"): não é preciso usá-lo. A situação
   guarda `app_ligado` e os `avisos` (mostrados na tela).
 - **Ativar o número** (pedido da Maria em 18/11/2026): número novo precisa ser **registrado** na Cloud API
@@ -157,7 +163,7 @@ como "conta de mensagens" (modelos, cobrança e webhooks) e os nomes dos botões
    <https://mscertificados.com.br/politica-de-privacidade/>, categoria) > Publicar. Em modo de desenvolvimento o
    webhook não recebe as mensagens de números reais.
 6. **Token**: Configurações do negócio > Usuários > Usuários do sistema > adicionar (Admin) > atribuir o app e a conta
-   do WhatsApp (controle total) > Gerar token: o app, validade "Nunca", permissões `whatsapp_business_messaging`,
+   de mensagens do número (controle total; Contas > Contas de mensagens) > Gerar token: o app, validade "Nunca", permissões `whatsapp_business_messaging`,
    `whatsapp_business_management` e `business_management`.
 7. **No sistema**: Configurações > WhatsApp > API oficial da Meta: Identificação do número de telefone, token e chave
    secreta do app (Meta for Developers > app > Configurações do app > Básico); o ID da conta é opcional > **Salvar e

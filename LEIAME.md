@@ -615,14 +615,15 @@ Como ligar (o administrador da AR; o Admin Master, dentro da AR):
    Faturamento): sem ela nenhuma mensagem sai, nem o teste.
 3. **Publique o app**: Configurações do app > Básico (ícone, Política de Privacidade do site, categoria) >
    **Publicar**. Sem isso as respostas dos clientes não chegam ao sistema.
-4. **Configurações do negócio** > Usuários > **Usuários do sistema** > Adicionar (Admin) > atribua o app e a conta do
-   WhatsApp (controle total) > **Gerar token** (validade "Nunca", permissões `whatsapp_business_messaging`,
+4. **Configurações do negócio** > Usuários > **Usuários do sistema** > Adicionar (Admin) > atribua o app e a conta de
+   mensagens do número (Contas > Contas de mensagens; controle total) > **Gerar token** (validade "Nunca", permissões `whatsapp_business_messaging`,
    `whatsapp_business_management` e `business_management`). **Não mande o token para ninguém**: ele vai só na tela do
    sistema.
 5. No sistema: **Configurações > WhatsApp > API oficial da Meta**. Preencha a Identificação do número de telefone
    (Gerenciador do WhatsApp > Números de telefone > clique no número), o token e
    a chave secreta do app (Meta for Developers > seu app > Configurações do app > Básico) e clique em
-   **Salvar e testar**. O ID da conta do WhatsApp Business pode ficar em branco: o sistema descobre pelo token. O
+   **Salvar e testar**. O ID da conta de mensagens pode ficar em branco: o sistema descobre pelo token (se não achar, a tela diz o que
+   fazer). O
    token e a chave ficam guardados protegidos e não aparecem mais na tela; para trocar, cole de novo.
 6. **Ativar o número** (número novo): no quadro **Ativar o número na Meta**, digite duas vezes uma senha de 6 números
    e clique em **Ativar o número**. A Meta só aceita esse passo pelo sistema. **Anote a senha num lugar seguro**: o

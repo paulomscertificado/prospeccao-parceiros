@@ -64,6 +64,10 @@ async def webhook_receber(request: Request):
             return JSONResponse({"erro": "assinatura inválida"}, status_code=403)
         if not isinstance(dados, dict):
             return JSONResponse({"erro": "json inválido"}, status_code=400)
+        for numero_id, conta_id in whatsapp_cloud.contas_por_numero(dados).items():
+            oficial = contas.get(numero_id)  # a conta de mensagens vem em cada evento (entry.id): completa a que não tem
+            if oficial is not None and not oficial.waba_id:
+                oficial.waba_id = conta_id
         recebidas, status = whatsapp_cloud.ler_webhook(dados)
         situacoes = {"sent": "enviada", "delivered": "entregue", "read": "lida", "failed": "falhou"}
         for s in status:

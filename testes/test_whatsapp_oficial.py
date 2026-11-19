@@ -66,6 +66,10 @@ def _meta_falsa(monkeypatch) -> list:
                 {"scope": "whatsapp_business_messaging", "target_ids": ["998877"]}]}})
         if url.endswith("/subscribed_apps"):
             return _Resposta({"success": True})
+        if url.endswith("/phone_numbers"):  # a conta 998877 tem o número
+            return _Resposta({"data": [{"id": NUMERO_ID}]})
+        if url.endswith("/assigned_whatsapp_business_accounts"):
+            return _Resposta({"data": []})
         if metodo == "GET":
             return _Resposta({"display_phone_number": "+55 81 8343-0717", "verified_name": "Empresa Oficial Teste",
                               "quality_rating": "GREEN", "whatsapp_business_manager_messaging_limit": "TIER_2K",
@@ -289,3 +293,79 @@ def test_ativar_o_numero_explica_a_recusa_da_meta(cliente, monkeypatch):
         logs = db.execute(select(LogAuditoria).where(
             LogAuditoria.acao == "ativar_numero_whatsapp_oficial_recusado")).scalars().all()
         assert len(logs) >= 2 and all("731904" not in (log.detalhes or "") for log in logs)
+
+
+# ---------------------------------------------------------------- achar a conta de mensagens (19/11/2026)
+
+def _meta_do_admin(monkeypatch, atribuidas: list[str], numeros: dict[str, list[str]]) -> list:
+    """Meta imitada com o token de um usuário do sistema ADMINISTRADOR: as permissões granulares vêm sem as contas
+    (vale para todos os ativos) e as contas de mensagens aparecem em assigned_whatsapp_business_accounts."""
+    chamadas = []
+
+    def pedir(metodo, url, **kw):
+        chamadas.append((metodo, url, kw))
+        if url.endswith("/debug_token"):
+            return _Resposta({"data": {"type": "SYSTEM_USER", "granular_scopes": [
+                {"scope": "whatsapp_business_management"}, {"scope": "whatsapp_business_messaging"}]}})
+        if url.endswith("/me"):
+            return _Resposta({"id": "555000111"})
+        if url.endswith("/555000111/assigned_whatsapp_business_accounts"):
+            return _Resposta({"data": [{"id": i} for i in atribuidas]})
+        if url.endswith("/phone_numbers"):
+            return _Resposta({"data": [{"id": n} for n in numeros.get(url.rsplit("/", 2)[-2], [])]})
+        if url.endswith("/subscribed_apps"):
+            return _Resposta({"success": True})
+        if metodo == "GET":
+            return _Resposta({"display_phone_number": "+55 81 3333-0000", "verified_name": "Empresa Oficial Teste",
+                              "quality_rating": "UNKNOWN", "whatsapp_business_manager_messaging_limit": "TIER_250",
+                              "platform_type": "CLOUD_API", "status": "CONNECTED"})
+        return _Resposta({"messages": [{"id": "wamid.TESTE789"}]})
+
+    monkeypatch.setattr(whatsapp_cloud.httpx, "request", pedir)
+    return chamadas
+
+
+def _waba(valor: str | None = None) -> str:
+    """Lê (e, com `valor`, troca) o ID da conta de mensagens guardado na conta oficial da AR MS."""
+    with sessao() as db:
+        conta = db.execute(select(ContaWhatsAppOficial).where(ContaWhatsAppOficial.phone_number_id == NUMERO_ID)
+                           .execution_options(sem_filtro_de_ar=True)).scalar_one()
+        if valor is not None:
+            conta.waba_id = valor
+        return conta.waba_id
+
+
+def test_conta_de_mensagens_achada_pelas_contas_do_usuario_do_sistema(cliente, monkeypatch):
+    _zerar_limite()
+    _admin(EMAIL_MS, "MS Certificação Digital")
+    _conta_da_ms()
+    _waba("")  # em branco: o sistema procura
+    chamadas = _meta_do_admin(monkeypatch, ["111", "222"], {"111": ["999"], "222": [NUMERO_ID]})
+    c = _entrar(EMAIL_MS)
+    tela = c.get("/whatsapp").text
+    assert "Contas de mensagens" in tela  # a ajuda da tela já fala da conta de mensagens
+    r = c.post("/whatsapp/oficial/testar", data={"csrf": csrf_de(tela)})
+    assert "Conectado" in r.text, r.text[:500]
+    assert _waba() == "222"  # a conta que tem o número (a 111, de teste, fica de fora)
+    assert [u for _, u, _ in chamadas if u.endswith("/subscribed_apps")][-1].endswith("/222/subscribed_apps")
+    # nenhuma conta dada ao usuário do sistema: a tela ensina onde dar
+    _waba("")
+    _meta_do_admin(monkeypatch, [], {})
+    r = c.post("/whatsapp/oficial/testar", data={"csrf": csrf_de(tela)})
+    assert "Contas de mensagens" in r.text and "Atribuir pessoas" in r.text and _waba() == ""
+    # o ID preenchido é de uma conta sem o número (ex.: a de teste): avisa
+    _waba("111")
+    _meta_do_admin(monkeypatch, [], {"111": ["999"]})
+    r = c.post("/whatsapp/oficial/testar", data={"csrf": csrf_de(tela)})
+    assert "não está na conta de mensagens informada" in r.text
+    _waba("998877")
+
+
+def test_webhook_completa_a_conta_de_mensagens(cliente):
+    _conta_da_ms()
+    _waba("")
+    evento = _evento("5581995559999", "Bom dia")
+    evento["entry"][0]["id"] = "333444555"  # a Meta manda a conta de mensagens em cada evento
+    assert _assinado(cliente, evento).status_code == 200
+    assert _waba() == "333444555"
+    _waba("998877")

@@ -110,6 +110,24 @@ def contas_do_token(token: str, versao: str | None = None) -> list[str]:
     return ids
 
 
+def contas_atribuidas(token: str, versao: str | None = None) -> list[str]:
+    """IDs das contas de mensagens (as antigas "contas do WhatsApp Business") atribuídas ao usuário do sistema dono do
+    token. Serve quando o token vale para todos os ativos (usuário do sistema administrador): aí as permissões
+    granulares vêm sem as contas e contas_do_token não acha nada (caso real da MS em 19/11/2026)."""
+    eu = _pedir("GET", "me", token, versao, params={"fields": "id"})
+    if not isinstance(eu, dict) or not eu.get("id"):
+        return []
+    dados = _pedir("GET", f"{eu['id']}/assigned_whatsapp_business_accounts", token, versao,
+                   params={"fields": "id", "limit": 100})
+    return [str(x["id"]) for x in (dados.get("data") or []) if isinstance(x, dict) and x.get("id")]
+
+
+def numeros_da_conta(waba_id: str, token: str, versao: str | None = None) -> list[str]:
+    """As "Identificações do número de telefone" de uma conta de mensagens (para saber qual conta tem o número)."""
+    dados = _pedir("GET", f"{waba_id}/phone_numbers", token, versao, params={"fields": "id", "limit": 100})
+    return [str(x["id"]) for x in (dados.get("data") or []) if isinstance(x, dict) and x.get("id")]
+
+
 def inscrever_app(waba_id: str, token: str, versao: str | None = None) -> bool:
     """Liga o app do token à conta do WhatsApp Business (o que o "Início rápido" da Meta faria): sem isso, as
     respostas e a situação das mensagens da conta não chegam ao webhook do app."""
@@ -261,6 +279,18 @@ def numeros_do_webhook(dados: dict) -> set[str]:
     """As "Identificações do número de telefone" (phone_number_id) que aparecem no webhook: dizem de qual AR ele é."""
     return {str(((m.get("value") or {}).get("metadata") or {}).get("phone_number_id") or "")
             for e in dados.get("entry", []) for m in e.get("changes", [])} - {""}
+
+
+def contas_por_numero(dados: dict) -> dict[str, str]:
+    """{phone_number_id: ID da conta de mensagens} dos eventos do webhook (o `entry.id` de cada evento é a conta)."""
+    saida: dict[str, str] = {}
+    for entrada in dados.get("entry", []) or []:
+        conta_id = str(entrada.get("id") or "")
+        for mudanca in entrada.get("changes", []) or []:
+            numero_id = str(((mudanca.get("value") or {}).get("metadata") or {}).get("phone_number_id") or "")
+            if numero_id and conta_id.isdigit():
+                saida[numero_id] = conta_id
+    return saida
 
 
 def ler_webhook(dados: dict) -> tuple[list[dict], list[dict]]:

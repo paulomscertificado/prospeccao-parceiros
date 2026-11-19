@@ -102,13 +102,15 @@
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <div class="campos">
       <div><label>Nome (para a equipe)</label><input type="text" name="nome" maxlength="120" value="{{ oficial.nome if oficial else '' }}" placeholder="Nome da empresa no WhatsApp"></div>
-      <div><label>ID da conta do WhatsApp Business</label><input type="text" inputmode="numeric" name="waba_id" value="{{ oficial.waba_id if oficial else '' }}" placeholder="Em branco: o sistema descobre pelo token">
-        <p class="ajuda">Pode deixar em branco: o sistema acha pelo token.</p></div>
+      <div><label>ID da conta de mensagens (WhatsApp Business)</label><input type="text" inputmode="numeric" name="waba_id" value="{{ oficial.waba_id if oficial else '' }}" placeholder="Em branco: o sistema descobre pelo token">
+        <p class="ajuda">Pode deixar em branco: o sistema acha pelo token (dê ao usuário do sistema a conta de mensagens do
+          número). Na Meta: Configurações do negócio &gt; Contas &gt; Contas de mensagens.</p></div>
       <div><label>Identificação do número de telefone</label><input type="text" inputmode="numeric" name="phone_number_id" value="{{ oficial.phone_number_id if oficial else '' }}">
         <p class="ajuda">Gerenciador do WhatsApp &gt; Números de telefone &gt; clique no número.</p></div>
       <div class="largo"><label>Token permanente (usuário do sistema)</label>
         <input type="password" name="token" autocomplete="new-password" placeholder="{{ 'Guardado ✓ — deixe em branco para manter' if oficial and oficial.token_cripto else 'Cole aqui o token' }}">
-        <p class="ajuda">Configurações do negócio &gt; Usuários do sistema &gt; Gerar token (permissões whatsapp_business_messaging e
+        <p class="ajuda">Configurações do negócio &gt; Usuários do sistema: dê ao usuário do sistema o app e a conta de mensagens
+          do número (controle total) e clique em Gerar token (permissões whatsapp_business_messaging e
           whatsapp_business_management, validade "Nunca"). Fica guardado protegido e não aparece mais na tela.</p></div>
       <div class="largo"><label>Chave secreta do app (App Secret)</label>
         <input type="password" name="segredo" autocomplete="new-password" placeholder="{{ 'Guardada ✓ — deixe em branco para manter' if oficial and oficial.segredo_cripto else 'Cole aqui a chave secreta do app' }}">

@@ -106,6 +106,60 @@ AVISO_SEM_CODIGO = ("O número ainda não foi confirmado com o código da Meta: 
                     "do WhatsApp > Números de telefone e depois use \"Ativar o número\", logo abaixo.")
 
 
+ONDE_FICA_A_CONTA = "Configurações do negócio > Contas > Contas de mensagens"
+AVISO_SEM_CONTA = ("Não consegui descobrir a conta de mensagens do número pelo token. Na Meta, dê essa conta ao usuário "
+                   f"do sistema ({ONDE_FICA_A_CONTA} > a conta do número > Atribuir pessoas > o usuário do sistema, "
+                   "controle total) e clique em Testar conexão, ou cole o ID dela na tela.")
+AVISO_CONTAS_SEM_O_NUMERO = ("Nenhuma das contas de mensagens que o token alcança tem este número (pode ser só a de "
+                             "teste). Na Meta, dê ao usuário do sistema a conta de mensagens do número "
+                             f"({ONDE_FICA_A_CONTA} > Atribuir pessoas, controle total) e clique em Testar conexão, ou "
+                             "cole o ID dela na tela.")
+AVISO_VARIAS_CONTAS = ("O token alcança mais de uma conta de mensagens e não consegui saber qual tem o número: cole o ID "
+                       f"da conta certa na tela ({ONDE_FICA_A_CONTA}).")
+AVISO_NUMERO_FORA = ("O número não está na conta de mensagens informada (pode ser a conta de teste): cole o ID da conta "
+                     f"do número na tela ({ONDE_FICA_A_CONTA}) ou deixe o campo em branco para o sistema procurar.")
+
+
+def conta_do_numero(conta: ContaWhatsAppOficial) -> tuple[str, str]:
+    """Acha a conta de mensagens (a antiga "conta do WhatsApp Business", WABA) do número pelo token: as contas das
+    permissões granulares do token e as atribuídas ao usuário do sistema (o token de um administrador vale para todos
+    os ativos e vem sem contas nas permissões). Com mais de uma, fica a que tem o número (a de teste sai).
+    Devolve (id, aviso para a tela); id vazio = não achou."""
+    chave, candidatas = token(conta), []
+    for buscar in (whatsapp_cloud.contas_do_token, whatsapp_cloud.contas_atribuidas):
+        try:
+            candidatas += [c for c in buscar(chave) if c not in candidatas]
+        except whatsapp_cloud.ErroWhatsApp:
+            pass
+    if not candidatas:
+        return "", AVISO_SEM_CONTA
+    com_o_numero, conferidas = [], 0
+    for candidata in candidatas:
+        try:
+            numeros = whatsapp_cloud.numeros_da_conta(candidata, chave)
+        except whatsapp_cloud.ErroWhatsApp:
+            continue
+        conferidas += 1
+        if conta.phone_number_id in numeros:
+            com_o_numero.append(candidata)
+    if len(com_o_numero) == 1:
+        return com_o_numero[0], ""
+    if len(candidatas) == 1 and not conferidas:  # não deu para conferir os números: fica a única
+        return candidatas[0], ""
+    if conferidas and not com_o_numero:
+        return "", AVISO_CONTAS_SEM_O_NUMERO
+    return "", AVISO_VARIAS_CONTAS
+
+
+def numero_fora_da_conta(conta: ContaWhatsAppOficial) -> bool:
+    """A conta de mensagens preenchida na tela não tem o número (ex.: a de teste)? False quando não deu para conferir."""
+    try:
+        numeros = whatsapp_cloud.numeros_da_conta(conta.waba_id, token(conta))
+    except whatsapp_cloud.ErroWhatsApp:
+        return False
+    return bool(numeros) and conta.phone_number_id not in numeros
+
+
 def numero_ativado(registro: dict) -> bool | None:
     """O número está ativado na API (registrado na Cloud API)? None = a Meta não disse."""
     plataforma = str(registro.get("platform_type") or "").upper()
@@ -137,18 +191,12 @@ def testar(db, conta: ContaWhatsAppOficial) -> dict:
     if resultado["ativado"] is False:
         sem_codigo = str(registro.get("code_verification_status") or "").upper() in ("NOT_VERIFIED", "EXPIRED")
         avisos.append(AVISO_SEM_CODIGO if sem_codigo else AVISO_SEM_ATIVAR)
-    if not conta.waba_id:
-        try:
-            ids = whatsapp_cloud.contas_do_token(token(conta))
-        except whatsapp_cloud.ErroWhatsApp:
-            ids = []
-        if len(ids) == 1:
-            conta.waba_id = ids[0]
-        elif ids:
-            avisos.append("O token alcança mais de uma conta do WhatsApp Business: preencha o ID da conta na tela.")
-        else:
-            avisos.append("Não consegui descobrir o ID da conta do WhatsApp Business pelo token: preencha na tela "
-                          "(Configurações do negócio > Contas > Contas do WhatsApp).")
+    if not conta.waba_id:  # a conta de mensagens (antigo WABA): o sistema procura pelo token
+        conta.waba_id, aviso = conta_do_numero(conta)
+        if aviso:
+            avisos.append(aviso)
+    elif numero_fora_da_conta(conta):
+        avisos.append(AVISO_NUMERO_FORA)
     if conta.waba_id:
         try:
             resultado["app_ligado"] = whatsapp_cloud.inscrever_app(conta.waba_id, token(conta))
@@ -362,8 +410,8 @@ def pedir_modelos_renovacao(db, conta: ContaWhatsAppOficial) -> list[str]:
     from . import marca
 
     if not conta.waba_id:
-        return ["Falta o ID da conta do WhatsApp Business: clique em Testar conexão (o sistema descobre pelo token) "
-                "ou preencha na tela."]
+        return ["Falta a conta de mensagens do número: clique em Testar conexão (o sistema procura pelo token) ou "
+                "cole o ID dela na tela."]
     try:
         atualizar_modelos(db, conta)  # pode já existir na Meta (criado antes ou à mão)
     except whatsapp_cloud.ErroWhatsApp as erro:
