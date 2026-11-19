@@ -33,16 +33,31 @@ base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renova
    segundo plano ficam na AR da campanha (`isolamento.no_trabalho_da_ar`). O número gravado na campanha só é o da
    configuração (`renov_conexao`) se quem monta puder disparar por ele; senão fica no automático.
 4. **Avisos** (`datas_dos_avisos`): 30, 15, 5 e 1 dia antes do vencimento do PRIMEIRO certificado do contato. Fim de
-   semana vem para a sexta antes. Quem entra tarde: 1º aviso hoje (ou no próximo dia útil) e só os seguintes que
-   cabem com pelo menos 2 dias entre eles (`INTERVALO_MINIMO_DIAS`). As datas vão prontas para `cadencias.aplicar`
+   semana vem para a sexta antes. Quem entra tarde começa pelo aviso da **etapa dos dias que faltam** (pedido da
+   Maria em 19/11/2026: "se o certificado vence dia 20/11, não envie a primeira mensagem, mas a de acordo com os dias
+   que faltam"), hoje (ou no próximo dia útil), e recebe só os seguintes que cabem com pelo menos 2 dias entre eles
+   (`INTERVALO_MINIMO_DIAS`). A etapa (`etapa_do_dia`) é a mais adiantada entre o último aviso cujo dia já chegou (como
+   para quem está desde o começo) e a dos dias que faltam (12, 6, 3 e 1: faltam 7 a 12 = 1º aviso, 4 a 6 = lembrete, 2
+   ou 3 = "Faltam poucos dias", 1 ou vence hoje = "Último aviso"); quem recebe cada aviso no dia certo fica sempre com
+   o próprio aviso. Começando por outro aviso, o primeiro WhatsApp leva a frase do SAIR do 1º aviso (`linha_do_sair`,
+   `_com_sair_no_primeiro`). As datas vão prontas para `cadencias.aplicar`
    (`datas_por_lead`); o "dia" dos passos da cadência só ordena. Cada tarefa guarda em `certificado_id` o certificado
    que define as datas (`depois_de_montar`).
    **Teto por dia** (`agenda`, `datas_da_campanha`): com a planilha de 12/11/2026, 100 contatos teriam o 1º aviso no
    mesmo dia e o número só faz `limite_frios_whatsapp` (20) contatos frios por dia (o excesso atrasaria mais de 2 dias
    e ficaria esperando clique). A agenda põe no máximo `teto_por_dia` WhatsApps de renovação por dia, contando os já
-   marcados nas outras campanhas de renovação (`carga_marcada`): 1ª passada, o 1º aviso de cada contato no primeiro
-   dia com vaga (quem vence antes escolhe antes); 2ª passada, os lembretes nas vagas que sobram, no dia certo ou alguns
-   dias antes (sem vaga, o lembrete não vai). Sem vaga nenhuma até o vencimento, o 1º aviso vai no dia menos cheio.
+   marcados nas outras campanhas de renovação (`carga_marcada`): 1ª passada, o primeiro aviso de cada contato (o da
+   etapa dele, e o da etapa do dia em que coube) no primeiro dia com vaga (quem vence antes escolhe antes); 2ª passada,
+   os seguintes nas vagas que sobram, no dia certo ou alguns dias antes (sem vaga, aquele não vai). Sem vaga nenhuma
+   até o vencimento, o primeiro aviso vai no dia menos cheio.
+   **Na hora do envio** (`ajustar_a_etapa`, chamado pelas filas de WhatsApp e de e-mail, Minha fila, Disparar, Agenda e
+   API oficial): aviso que atrasou (número desconectado, fila parada, e-mail esperando a conta) e cuja etapa já passou
+   sai com o texto, o assunto e o tipo (`angulo`, `acao`, `passo_id`) do aviso de agora; os avisos do mesmo canal que
+   ele substitui são cancelados ("o aviso anterior atrasou e saiu já com o texto desta etapa"), e o seguinte também, se
+   ficaria a menos de 2 dias. Se o aviso desta etapa (ou um depois dela) já saiu por aquele canal, o atrasado é
+   cancelado e não sai. O primeiro WhatsApp do contato na campanha sem a frase do SAIR ganha a frase. Campanha
+   aprovada depois (`reajustar_na_aprovacao`): os avisos de etapas que passaram são cancelados ("a etapa deste aviso
+   já passou") e o primeiro que fica ganha a frase do SAIR.
    Começa em `primeiro_dia` (hoje, se o horário de envio de hoje não acabou). Quem só tem e-mail não ocupa vaga.
 5. **Textos** (`textos_do_contato`, editáveis na tela, `renov_mensagens`): `{vencimentos}` vira a frase do certificado
    ("O certificado digital e-CNPJ A1 em nome de X vence no dia dd/mm/aaaa." / "O seu certificado..." no e-CPF do

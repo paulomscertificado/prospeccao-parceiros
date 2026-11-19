@@ -460,8 +460,11 @@ renovação novo antes, para entrarem os clientes de janeiro).
 - **Uma mensagem por contato:** se o mesmo WhatsApp aparece em vários certificados (ex.: um grupo de empresas com o
   mesmo telefone), ele recebe **uma** mensagem em cada aviso, com a lista dos certificados (até 5; com mais, um
   resumo: "57 certificados digitais que você acompanha vencem entre..."). Nunca uma mensagem por certificado.
-- **Datas:** 30, 15, 5 e 1 dia antes do vencimento. Quem entra mais tarde recebe o 1º aviso na hora e só os
-  seguintes que ainda cabem (nunca em dias seguidos). Aviso que cairia no sábado ou no domingo vem para a sexta antes;
+- **Datas:** 30, 15, 5 e 1 dia antes do vencimento. Quem entra mais tarde começa pelo aviso que combina com os
+  **dias que faltam** (ex.: com 12, 6, 3 e 1 dia, quem vence amanhã recebe só o **Último aviso**, nunca o 1º; faltando
+  2 ou 3 dias, o **Faltam poucos dias**), já com a frase do SAIR, e depois só os seguintes que ainda cabem (nunca em
+  dias seguidos). Aviso que atrasou (número desconectado, fila parada) também sai com o texto dos dias que faltam no
+  dia em que sai, e os avisos repetidos são cancelados sozinhos. Aviso que cairia no sábado ou no domingo vem para a sexta antes;
   quem vence no fim de semana tem o último aviso na sexta (se preciso, o aviso anterior vem um dia antes para caber).
 - **WhatsApp primeiro, e-mail depois:** igual às Empresas novas (o e-mail de cada aviso sai umas 2 horas depois do
   WhatsApp). Quem não tem celular na planilha recebe só por e-mail. Sem WhatsApp e sem e-mail na planilha, não recebe

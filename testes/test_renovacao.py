@@ -125,13 +125,14 @@ def test_datas_dos_avisos_30_15_5_e_1_dia_antes():
     # longe: os 4 avisos; sábado/domingo vêm para a sexta antes (nunca para depois do vencimento)
     assert renovacao.datas_dos_avisos(date(2026, 12, 20), hoje) == [
         date(2026, 11, 20), date(2026, 12, 4), date(2026, 12, 15), date(2026, 12, 18)]
-    # entrou tarde (vence em 8 dias): 1º aviso hoje; o de 5 dias cairia amanhã (dias seguidos): fica o de 1 dia
-    assert renovacao.datas_dos_avisos(date(2026, 11, 20), hoje) == [hoje, None, None, date(2026, 11, 19)]
-    # vence amanhã: só o 1º aviso
-    assert renovacao.datas_dos_avisos(date(2026, 11, 13), hoje) == [hoje, None, None, None]
-    # num sábado: o 1º aviso vai para a segunda; o de 5 dias cairia no dia seguinte; o de 1 dia (sábado) vem para a
-    # sexta
-    assert renovacao.datas_dos_avisos(date(2026, 11, 22), date(2026, 11, 14)) == [date(2026, 11, 16), None, None,
+    # entrou tarde (vence em 8 dias): o dia do 1º aviso (30 dias antes) e o do lembrete (15) já passaram, então
+    # começa pelo lembrete, hoje (pedido da Maria em 19/11/2026); o de 5 dias cairia amanhã (dias seguidos): fica o de 1
+    assert renovacao.datas_dos_avisos(date(2026, 11, 20), hoje) == [None, hoje, None, date(2026, 11, 19)]
+    # vence amanhã: só o último aviso (nunca o 1º)
+    assert renovacao.datas_dos_avisos(date(2026, 11, 13), hoje) == [None, None, None, hoje]
+    # num sábado: o primeiro aviso vai para a segunda (o lembrete: faltam 6 dias); o de 5 dias cairia no dia seguinte;
+    # o de 1 dia (sábado) vem para a sexta
+    assert renovacao.datas_dos_avisos(date(2026, 11, 22), date(2026, 11, 14)) == [None, date(2026, 11, 16), None,
                                                                                     date(2026, 11, 20)]
     # já passou do vencimento: nenhum aviso
     assert renovacao.datas_dos_avisos(date(2026, 11, 10), hoje) == [None] * 4
@@ -144,12 +145,15 @@ def test_agenda_respeita_o_teto_de_whatsapps_por_dia():
     hoje = date(2026, 11, 16)  # segunda-feira
     vencimentos = [date(2026, 11, 20)] * 3 + [date(2026, 12, 10)] * 3
     datas = renovacao.agenda(vencimentos, hoje, True, Counter(), teto=2)
-    assert [d[0] for d in datas] == [date(2026, 11, 16)] * 2 + [date(2026, 11, 17)] * 2 + [date(2026, 11, 18)] * 2
+    primeiros = [next(x for x in d if x) for d in datas]  # o primeiro aviso de cada um (o da etapa em que está)
+    assert primeiros == [date(2026, 11, 16)] * 2 + [date(2026, 11, 17)] * 2 + [date(2026, 11, 18)] * 2
+    # quem vence em 20/11 (faltam 4 dias) começa por "Faltam poucos dias"; quem vence em 10/12, pelo 1º aviso
+    assert [d.index(p) for d, p in zip(datas, primeiros)] == [2, 2, 2, 0, 0, 0]
     assert max(Counter(d for ds in datas for d in ds if d).values()) <= 2
     assert datas[0][3] == date(2026, 11, 19) and datas[2][3] is None  # sem vaga (e sem dias entre eles): fica sem
-    assert all(d[0] is not None for d in datas)
+    assert all(any(d) for d in datas)
     # carga de outras campanhas conta; sem teto, valem só as datas certas
-    assert renovacao.agenda([date(2026, 11, 20)], hoje, True, Counter({date(2026, 11, 16): 2}), 2)[0][0] == date(2026, 11, 17)
+    assert renovacao.agenda([date(2026, 11, 20)], hoje, True, Counter({date(2026, 11, 16): 2}), 2)[0][2] == date(2026, 11, 17)
     assert renovacao.agenda(vencimentos, hoje, True, Counter(), 0) == [renovacao.datas_dos_avisos(v, hoje)
                                                                        for v in vencimentos]
 
@@ -303,7 +307,8 @@ def test_aviso_de_certificado_vencido_ou_renovado_nao_sai(cliente):
 
 
 def test_aprovada_depois_conta_as_datas_do_vencimento(cliente):
-    """Aprovada 5 dias depois de montada: nada vai para depois do vencimento (nas outras campanhas tudo é empurrado)."""
+    """Aprovada 5 dias depois de montada: nada vai para depois do vencimento (nas outras campanhas tudo é empurrado), e
+    o cliente começa pelo aviso da etapa de agora (faltam 4 dias: o 1º aviso e o lembrete não saem mais; 19/11/2026)."""
     with sessao() as db:
         camp, cert, aviso = _cenario(db, 4, "9100001", "(81) 98333-0001")
         camp.status, camp.aprovado_em = "aguardando_aprovacao", None
@@ -319,8 +324,11 @@ def test_aprovada_depois_conta_as_datas_do_vencimento(cliente):
         esperado = renovacao.datas_dos_avisos(cert.data_vencimento, renovacao.primeiro_dia(db))
         pendentes = [t for t in [aviso, *extras.values()] if t.status == "pendente"]
         assert pendentes and all(t.data <= cert.data_vencimento for t in pendentes)
-        assert aviso.status == "pendente" and aviso.data >= date.today()
-        assert (extras["renov_lembrete"].status == "cancelada") == (esperado[1] is None)
+        avisos = [aviso, extras["renov_lembrete"], extras["renov_reforco"], extras["renov_ultimo"]]
+        primeira = next(i for i, d in enumerate(esperado) if d is not None)
+        assert primeira >= 2 and all(t.status == "cancelada" and "etapa" in t.resultado for t in avisos[:primeira])
+        assert avisos[primeira].status == "pendente" and avisos[primeira].data >= date.today()
+        assert "SAIR" in avisos[primeira].mensagem  # o primeiro WhatsApp do cliente leva a frase do SAIR
         db.rollback()
 
 
@@ -977,9 +985,9 @@ def test_vence_no_fim_de_semana_ultimo_aviso_na_sexta():
             datas = renovacao.datas_dos_avisos(venc, hoje, True, padrao)
             assert datas[-1] == venc - timedelta(days=venc.weekday() - 4)  # a sexta antes
             assert all(d is None or (d.weekday() < 5 and d < venc) for d in datas)
-    # vence amanhã (sábado) e hoje é sexta: o aviso é hoje
+    # vence amanhã (sábado) e hoje é sexta: o aviso é hoje, e é o último
     assert renovacao.datas_dos_avisos(date(2026, 11, 14), date(2026, 11, 13), True, dias) == [
-        date(2026, 11, 13), None, None, None]
+        None, None, None, date(2026, 11, 13)]
 
 
 def test_tela_salva_ate_que_horas_os_avisos_saem(cliente, csrf):
@@ -1329,3 +1337,156 @@ def test_certificado_vencido_tambem_pode_ser_marcado_renovado(cliente, csrf):
         assert db.get(Certificado, outro).status == "Não renovará"
         _limpar(db)
         db.commit()
+
+
+# ---------------------------------------------------------------- Etapa dos dias que faltam (pedido da Maria, 19/11/2026)
+
+def test_etapa_do_dia_pelos_dias_que_faltam():
+    """"Se o certificado do cliente X vence dia 20/11, não envie a primeira mensagem da campanha de renovação, mas a de
+    acordo com os dias que faltam" (Maria, 19/11/2026). Avisos 12, 6, 3 e 1 dia antes."""
+    dias = (12, 6, 3, 1)
+    vence = date(2026, 11, 20)  # sexta-feira
+    assert renovacao.etapa_do_dia(vence, date(2026, 11, 19), True, dias) == 3  # vence amanhã: o último aviso
+    assert renovacao.etapa_do_dia(vence, date(2026, 11, 20), True, dias) == 3  # vence hoje: também
+    assert renovacao.etapa_do_dia(vence, date(2026, 11, 18), True, dias) == 2  # faltam 2: "Faltam poucos dias"
+    assert renovacao.etapa_do_dia(vence, date(2026, 11, 17), True, dias) == 2  # faltam 3
+    assert renovacao.etapa_do_dia(vence, date(2026, 11, 16), True, dias) == 1  # faltam 4: o lembrete
+    assert renovacao.etapa_do_dia(vence, date(2026, 11, 10), True, dias) == 0  # faltam 10: o 1º aviso
+    assert renovacao.etapa_do_dia(vence, date(2026, 11, 2), True, dias) == 0  # cedo: o 1º aviso
+    # entra na campanha em 19/11: só o "Último aviso", no mesmo dia
+    assert renovacao.datas_dos_avisos(vence, date(2026, 11, 19), True, dias) == [None, None, None, date(2026, 11, 19)]
+    # vence na segunda e entra na sexta antes: "Faltam poucos dias" (o de 1 dia antes cairia na mesma sexta)
+    assert renovacao.datas_dos_avisos(date(2026, 11, 23), date(2026, 11, 20), True, dias) == [
+        None, None, date(2026, 11, 20), None]
+    # quem recebe cada aviso no dia certo continua com o próprio aviso: só o atrasado (ou quem entra tarde) muda
+    longe = date(2026, 9, 1)
+    for venc in (date(2026, 11, 16) + timedelta(days=n) for n in range(60)):
+        for padrao in (dias, renovacao.DIAS_AVISO):
+            for i, d in enumerate(renovacao.datas_dos_avisos(venc, longe, True, padrao)):
+                if d is not None:
+                    assert renovacao.etapa_do_dia(venc, d, True, padrao) == i, (venc, padrao, i, d)
+
+
+def test_quem_entra_tarde_comeca_pelo_aviso_da_etapa(cliente, monkeypatch):
+    """Vence em 3 dias: a campanha não manda o 1º aviso nem o lembrete; começa por "Faltam poucos dias" (ou pelo último
+    aviso), e esse primeiro WhatsApp leva a frase do SAIR (que só o 1º aviso tem)."""
+    from app import trabalhos
+
+    monkeypatch.setattr(trabalhos.threading, "Thread", _SemLinha)
+    linhas = [_linha(3, "8100001", "e-CNPJ A1 12 meses", "PERTO DO FIM LTDA", "55666777000108", "PAULA PERTO",
+                     "22233344455", "paula@pertodofim.com.br", "81987651001")]
+    with sessao() as db:
+        _limpar(db)
+        admin = _admin(db)
+        renovacao.importar(db, renovacao.ler_planilha("r.xlsx", _planilha(linhas))[0], admin)
+        cid = renovacao.criar_campanha(db, admin, quantidade=10).id
+    _montar(cid)
+    with sessao() as db:
+        tarefas = db.execute(select(Tarefa).where(Tarefa.campanha_id == cid)).scalars().all()
+        zaps = sorted((t for t in tarefas if t.canal == "whatsapp"), key=lambda t: (t.data, t.hora))
+        venc = date.today() + timedelta(days=3)
+        esperado = renovacao.datas_dos_avisos(venc, renovacao.primeiro_dia(db), True, renovacao.dias_aviso(db),
+                                              renovacao.dias_sem_envio(db))
+        primeira = next(i for i, d in enumerate(esperado) if d is not None)
+        angulos = list(renovacao.ANGULOS)
+        assert primeira >= 2 and zaps and zaps[0].angulo == angulos[primeira]
+        assert not any(t.angulo in ("renov_aviso", "renov_lembrete") for t in tarefas)
+        assert "SAIR" in zaps[0].mensagem and all("SAIR" not in t.mensagem for t in zaps[1:])
+        assert "PERTO DO FIM LTDA" in zaps[0].mensagem
+        _limpar(db)
+        db.commit()
+
+
+def test_aviso_atrasado_sai_com_o_texto_da_etapa(cliente, monkeypatch):
+    """O 1º aviso atrasou (número desconectado, fila parada) e o certificado vence amanhã: sai o "Último aviso", com a
+    frase do SAIR (é o primeiro WhatsApp do cliente), e os avisos repetidos do mesmo canal são cancelados."""
+    from app.integracoes import whatsapp_leads
+
+    enviados = []
+    monkeypatch.setattr(whatsapp_leads, "configurado", lambda: True)
+    monkeypatch.setattr(whatsapp_leads, "status", lambda: {"disponivel": True})
+    monkeypatch.setattr(campanhas.mensagens, "dentro_do_horario", lambda db: True)
+    monkeypatch.setattr(renovacao, "fora_do_horario", lambda db, momento=None, margem_minutos=0: "")
+    monkeypatch.setattr(sdr, "enviar_whatsapp_conectado",
+                        lambda db, texto, u, lead=None, tarefa=None: enviados.append((lead.empresa, texto)))
+    with sessao() as db:
+        gravar_config(db, "enviar_whatsapp_automatico", "1")
+        camp, cert, aviso = _cenario(db, 1, "9300001", "(81) 98555-0001")
+        aviso.data = date.today() - timedelta(days=1)  # atrasou um dia
+        outros = {}
+        for angulo in ("renov_lembrete", "renov_reforco", "renov_ultimo"):
+            outros[angulo] = Tarefa(tipo="prospeccao", lead_id=aviso.lead_id, campanha_id=camp.id,
+                                    certificado_id=cert.id, canal="whatsapp", data=date.today(), hora="23:59",
+                                    status="pendente", angulo=angulo, mensagem="Olá! Outro aviso.")
+            db.add(outros[angulo])
+        db.flush()
+        campanhas.processar_fila_whatsapp(db, maximo=1000)
+        meus = [texto for empresa, texto in enviados if empresa == "CLIENTE 9300001 LTDA"]
+        assert len(meus) == 1 and meus[0].startswith("Olá! Último aviso:") and "SAIR" in meus[0]
+        assert f"vence no dia {cert.data_vencimento:%d/%m/%Y}" in meus[0]
+        assert aviso.angulo == "renov_ultimo" and aviso.mensagem == meus[0]
+        assert all(t.status == "cancelada" and t.resultado == renovacao.JUNTADO_AO_ATRASADO for t in outros.values())
+        db.rollback()
+
+
+def test_email_atrasado_e_etapa_que_ja_saiu(cliente):
+    """E-mail do 1º aviso atrasado, faltando 2 dias: sai com o assunto e o texto da etapa de agora (sem a frase do SAIR:
+    o e-mail tem o descadastro); os e-mails repetidos e o de amanhã (dias seguidos) são cancelados. WhatsApp atrasado
+    cuja etapa já saiu por WhatsApp não sai mais."""
+    with sessao() as db:
+        camp, cert, zap = _cenario(db, 2, "9300002", "(81) 98555-0002")
+
+        def email(angulo, dias):
+            t = Tarefa(tipo="prospeccao", lead_id=zap.lead_id, campanha_id=camp.id, certificado_id=cert.id,
+                       canal="email", data=date.today() + timedelta(days=dias), hora="10:00", status="pendente",
+                       angulo=angulo, assunto="Vencimento", mensagem="Olá! Aviso.", mensagem_email="Olá! Aviso.",
+                       assunto_email="Vencimento")
+            db.add(t)
+            return t
+
+        primeiro, lembrete, ultimo = email("renov_aviso", -3), email("renov_lembrete", -1), email("renov_ultimo", 1)
+        db.flush()
+        dono = _admin(db)
+        etapa = renovacao.etapa_do_dia(cert.data_vencimento, date.today(), True, renovacao.dias_aviso(db),
+                                       renovacao.dias_sem_envio(db, dono))
+        novo = list(renovacao.ANGULOS)[etapa]
+        texto = renovacao.textos_do_contato(db, renovacao.Contato(renovacao.chave_do_contato(cert), [cert]), dono)[novo]
+        assert etapa >= 2 and renovacao.ajustar_a_etapa(db, primeiro)
+        assert primeiro.angulo == novo and (primeiro.assunto, primeiro.mensagem) == (texto["assunto"], texto["email"])
+        assert primeiro.mensagem_email == texto["email"] and primeiro.assunto_email == texto["assunto"]
+        assert "SAIR" not in primeiro.mensagem
+        assert lembrete.status == "cancelada" and lembrete.resultado == renovacao.JUNTADO_AO_ATRASADO
+        assert ultimo.status == "cancelada"  # amanhã: nunca dois avisos em dias seguidos
+        zap.data = date.today() - timedelta(days=3)
+        db.add(Tarefa(tipo="prospeccao", lead_id=zap.lead_id, campanha_id=camp.id, certificado_id=cert.id,
+                      canal="whatsapp", data=date.today() - timedelta(days=1), hora="10:00", status="feita",
+                      angulo=novo, mensagem="Olá! Já saiu."))
+        db.flush()
+        assert not renovacao.ajustar_a_etapa(db, zap)
+        assert zap.status == "cancelada" and zap.resultado == renovacao.ETAPA_JA_SAIU
+        db.rollback()
+
+
+def test_aviso_no_dia_certo_nao_muda_e_enviar_agora_volta_se_falhar(cliente, monkeypatch):
+    """Aviso no dia dele: o texto e o tipo ficam (só ganha a frase do SAIR se for o primeiro WhatsApp e não tiver).
+    "Enviar agora" que não sai devolve o aviso como estava (texto e tipo), para acertar de novo na próxima vez."""
+    with sessao() as db:
+        camp, cert, aviso = _cenario(db, 40, "9300003", "(81) 98555-0003")
+        assert renovacao.ajustar_a_etapa(db, aviso)
+        assert aviso.angulo == "renov_aviso" and aviso.mensagem.startswith("Olá! O certificado digital vence em breve.")
+        assert aviso.mensagem.rstrip().endswith("SAIR.)")
+        _, _, atrasado = _cenario(db, 1, "9300004", "(81) 98555-0004")
+        original = atrasado.mensagem
+        tentativas = []
+
+        def recusa(db, texto, u, lead=None, tarefa=None):
+            tentativas.append(texto)
+            raise sdr.EnvioRecusado("O número chegou ao limite de mensagens por hora.")
+
+        monkeypatch.setattr(sdr, "enviar_whatsapp_conectado", recusa)
+        monkeypatch.setattr(campanhas.mensagens, "dentro_do_horario", lambda db: True)
+        monkeypatch.setattr(renovacao, "fora_do_horario", lambda db, momento=None, margem_minutos=0: "")
+        erro = campanhas.enviar_toque_agora(db, atrasado, _admin(db))
+        assert tentativas and tentativas[0].startswith("Olá! Último aviso:")  # tentou com o texto da etapa
+        assert erro and atrasado.angulo == "renov_aviso" and atrasado.mensagem == original
+        db.rollback()

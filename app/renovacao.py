@@ -8,9 +8,11 @@
    nos próximos 30 dias POR CONTATO: o mesmo WhatsApp (ou e-mail) recebe UMA mensagem em cada aviso, com a lista dos
    certificados dele. Na planilha de 12/11/2026 um número aparece em 57 certificados (grupo de empresas): mandar um
    aviso por certificado seria spam e risco de bloqueio do número. Cada contato vira um lead ("Renovação (planilha)").
-3. Quatro avisos contados do vencimento: 30, 15, 5 e 1 dia antes (pedido da Maria). Quem entra tarde recebe o 1º
-   aviso na hora e só os seguintes que ainda cabem, nunca dois em dias seguidos. Fim de semana: o aviso vem para a
-   sexta antes (nunca para depois do vencimento).
+3. Quatro avisos contados do vencimento: 30, 15, 5 e 1 dia antes (pedido da Maria). Quem entra tarde começa pelo
+   aviso da etapa dos dias que faltam (pedido da Maria em 19/11/2026: vence amanhã = "Último aviso", nunca o 1º),
+   com a frase do SAIR, e recebe só os seguintes que ainda cabem, nunca dois em dias seguidos. Aviso que atrasou
+   (número desconectado, fila parada) sai com o texto da etapa do dia em que sai (ajustar_a_etapa). Fim de semana:
+   o aviso vem para a sexta antes (nunca para depois do vencimento).
 4. Depois da aprovação sai como as Empresas novas (campanhas.TIPOS_QUE_SAEM_SOZINHOS e TIPOS_WHATSAPP_PRIMEIRO):
    WhatsApp sozinho primeiro, com as mesmas travas (um a cada 3 minutos, limites por hora/dia/número, contatos frios
    por dia, horário de envio e SAIR), e o e-mail do mesmo aviso ~2 h depois. Na fila do WhatsApp, os avisos de
@@ -713,34 +715,68 @@ def _limites_para_a_sexta(vencimento: date, dias_antes: tuple[int, ...], pular_f
             if i < total - 1 else None for i in range(total)]
 
 
-def datas_dos_avisos(vencimento: date, hoje: date | None = None, pular_fds: bool = True,
-                     dias_antes: tuple[int, ...] = DIAS_AVISO, feriados: frozenset = frozenset()) -> list[date | None]:
-    """Datas dos 4 avisos (30, 15, 5 e 1 dia antes do vencimento). None = aviso que não cabe (já passou, ou ficaria a
-    menos de 2 dias do anterior). Quem entra tarde recebe o 1º aviso hoje (ou no próximo dia útil). Aviso no fim de
-    semana vem para a sexta antes, nunca para depois do vencimento; quem vence no sábado ou no domingo recebe o último
-    aviso na sexta (_limites_para_a_sexta). Feriado conta como fim de semana (`feriados`, ver dias_sem_envio). Tudo
-    None = não dá mais tempo de avisar."""
-    hoje = hoje or date.today()
-    datas: list[date | None] = []
-    anterior = None
+def _alvos(vencimento: date, pular_fds: bool, dias_antes: tuple[int, ...],
+           feriados: frozenset = frozenset()) -> list[date]:
+    """O dia de cada aviso contado do vencimento (dia útil antes; quem vence no fim de semana recebe o último aviso na
+    sexta, _limites_para_a_sexta), sem olhar o dia de hoje."""
     limites = _limites_para_a_sexta(vencimento, dias_antes, pular_fds, feriados)
+    alvos = []
     for indice, dias in enumerate(dias_antes):
         alvo = vencimento - timedelta(days=dias)
         if pular_fds:
             alvo = _dia_util_antes(alvo, feriados)
         if limites[indice] is not None:
             alvo = min(alvo, limites[indice])  # vence no fim de semana: a sexta fica para o último aviso
-        if indice == 0:
-            alvo = max(alvo, hoje)
-            if pular_fds:
-                alvo = _dia_util_depois(alvo, feriados)
-            if alvo > vencimento:
-                return [None] * len(dias_antes)
-        elif alvo < hoje or alvo > vencimento or (alvo - anterior).days < INTERVALO_MINIMO_DIAS:
-            datas.append(None)
+        alvos.append(alvo)
+    return alvos
+
+
+def _seguintes(datas: list[date | None], alvos: list[date], vencimento: date, desde: int) -> None:
+    """Os avisos depois do índice `desde` (já marcado em `datas`): cada um no dia dele, se ficar a
+    INTERVALO_MINIMO_DIAS ou mais do anterior (nunca em dias seguidos) e não passar do vencimento."""
+    anterior = datas[desde]
+    for i in range(desde + 1, len(alvos)):
+        if alvos[i] > vencimento or (alvos[i] - anterior).days < INTERVALO_MINIMO_DIAS:
             continue
-        datas.append(alvo)
-        anterior = alvo
+        datas[i] = anterior = alvos[i]
+
+
+def etapa_do_dia(vencimento: date, dia: date, pular_fds: bool = True, dias_antes: tuple[int, ...] = DIAS_AVISO,
+                 feriados: frozenset = frozenset()) -> int:
+    """Qual aviso vale no `dia` para quem vence em `vencimento` (o índice em dias_antes; pedido da Maria em
+    19/11/2026: "se o certificado vence dia 20/11, não envie a primeira mensagem, mas a de acordo com os dias que
+    faltam"). É o mais adiantado entre: o último aviso cujo dia já chegou, como para quem está na campanha desde o
+    começo, e o dos dias que faltam (avisos 12, 6, 3 e 1 dia antes: faltam 8 = 1º aviso, 4 a 6 = lembrete, 2 ou 3 =
+    "Faltam poucos dias", 1 ou vence hoje = "Último aviso"). 0 = ainda é cedo (o 1º aviso). Para quem recebe cada aviso
+    no dia certo, é sempre o próprio aviso: só o atrasado (ou quem entrou tarde) muda de etapa."""
+    alvos = _alvos(vencimento, pular_fds, dias_antes, feriados)
+    normais: list[date | None] = [None] * len(alvos)
+    if alvos:
+        normais[0] = alvos[0]
+        _seguintes(normais, alvos, vencimento, 0)
+    pelo_calendario = max((i for i, d in enumerate(normais) if d is not None and d <= dia), default=0)
+    faltam = (vencimento - dia).days
+    pelos_dias = max((i for i, n in enumerate(dias_antes) if n >= faltam), default=0)
+    return max(pelo_calendario, pelos_dias)
+
+
+def datas_dos_avisos(vencimento: date, hoje: date | None = None, pular_fds: bool = True,
+                     dias_antes: tuple[int, ...] = DIAS_AVISO, feriados: frozenset = frozenset()) -> list[date | None]:
+    """Datas dos 4 avisos (30, 15, 5 e 1 dia antes do vencimento). None = aviso que não vai (a etapa dele já passou,
+    ou ficaria a menos de 2 dias do anterior). Quem entra tarde começa pelo aviso da etapa em que está (etapa_do_dia:
+    vence amanhã = só o "Último aviso", nunca o 1º; pedido da Maria em 19/11/2026), hoje (ou no próximo dia útil), e
+    recebe os seguintes que ainda cabem. Aviso no fim de semana vem para a sexta antes, nunca para depois do
+    vencimento; quem vence no sábado ou no domingo recebe o último aviso na sexta (_limites_para_a_sexta). Feriado
+    conta como fim de semana (`feriados`, ver dias_sem_envio). Tudo None = não dá mais tempo de avisar."""
+    hoje = hoje or date.today()
+    datas: list[date | None] = [None] * len(dias_antes)
+    primeiro = _dia_util_depois(hoje, feriados) if pular_fds else hoje
+    if not dias_antes or primeiro > vencimento:
+        return datas
+    alvos = _alvos(vencimento, pular_fds, dias_antes, feriados)
+    etapa = etapa_do_dia(vencimento, primeiro, pular_fds, dias_antes, feriados)
+    datas[etapa] = max(alvos[etapa], primeiro)
+    _seguintes(datas, alvos, vencimento, etapa)
     return datas
 
 
@@ -786,18 +822,20 @@ def agenda(vencimentos: list[date], hoje: date, pular_fds: bool = True, carga: C
            feriados: frozenset = frozenset()) -> list[list[date | None]]:
     """As datas dos avisos de vários contatos com WhatsApp (do que vence primeiro ao último) sem passar de `teto`
     WhatsApps por dia: com 100 clientes vencendo no mês, os 100 primeiros avisos cairiam no mesmo dia e o número só
-    faz 20 contatos frios por dia (o resto atrasaria e ficaria esperando clique). Primeiro, o 1º aviso de todos, no
-    primeiro dia com vaga (quem vence antes escolhe antes): ninguém fica sem aviso por causa dos lembretes dos outros.
-    Depois, os lembretes nas vagas que sobraram, no dia certo ou alguns dias antes (sem vaga, aquele lembrete não vai).
-    teto 0 = sem teto (só as regras de datas_dos_avisos)."""
+    faz 20 contatos frios por dia (o resto atrasaria e ficaria esperando clique). Primeiro, o primeiro aviso de todos
+    (o da etapa em que cada um está, etapa_do_dia), no primeiro dia com vaga (quem vence antes escolhe antes): ninguém
+    fica sem aviso por causa dos lembretes dos outros. Depois, os lembretes nas vagas que sobraram, no dia certo ou
+    alguns dias antes (sem vaga, aquele lembrete não vai). teto 0 = sem teto (só as regras de datas_dos_avisos)."""
     if not teto:
         return [datas_dos_avisos(v, hoje, pular_fds, dias_antes, feriados) for v in vencimentos]
     carga = carga if carga is not None else Counter()
     resultado: list[list[date | None]] = []
     for vencimento in vencimentos:
         datas: list[date | None] = [None] * len(dias_antes)
-        primeiro = datas_dos_avisos(vencimento, hoje, pular_fds, dias_antes, feriados)[0]
-        if primeiro is not None:
+        base = datas_dos_avisos(vencimento, hoje, pular_fds, dias_antes, feriados)
+        etapa = next((i for i, d in enumerate(base) if d is not None), None)
+        if etapa is not None:
+            primeiro = base[etapa]
             dia = primeiro
             while carga[dia] >= teto and _util_seguinte(dia, pular_fds, feriados) <= vencimento:
                 dia = _util_seguinte(dia, pular_fds, feriados)
@@ -807,19 +845,19 @@ def agenda(vencimentos: list[date], hoje: date, pular_fds: bool = True, carga: C
                     dias.append(d)
                     d = _util_seguinte(d, pular_fds, feriados)
                 dia = min(dias, key=lambda x: (carga[x], x))
+            # o aviso que vale no dia em que coube (sem vaga por dias, o 1º aviso pode virar o lembrete)
+            etapa = max(etapa, etapa_do_dia(vencimento, dia, pular_fds, dias_antes, feriados))
             carga[dia] += 1
-            datas[0] = dia
+            datas[etapa] = dia
         resultado.append(datas)
     for datas, vencimento in zip(resultado, vencimentos):
-        anterior = datas[0]
-        if anterior is None:
+        etapa = next((i for i, d in enumerate(datas) if d is not None), None)
+        if etapa is None:
             continue
-        limites = _limites_para_a_sexta(vencimento, dias_antes, pular_fds, feriados)
-        for i, dias in enumerate(dias_antes[1:], start=1):
-            dia = vencimento - timedelta(days=dias)
-            dia = _dia_util_antes(dia, feriados) if pular_fds else dia
-            if limites[i] is not None:
-                dia = min(dia, limites[i])  # vence no fim de semana: a sexta fica para o último aviso
+        anterior = datas[etapa]
+        alvos = _alvos(vencimento, pular_fds, dias_antes, feriados)
+        for i in range(etapa + 1, len(dias_antes)):
+            dia = alvos[i]
             while dia >= hoje and (dia - anterior).days >= INTERVALO_MINIMO_DIAS:
                 if dia <= vencimento and carga[dia] < teto:
                     carga[dia] += 1
@@ -1096,7 +1134,9 @@ def etapa_preparar(campanha_id: int, estado: dict, prazo: float) -> bool:
                 for c in certs:
                     c.campanha_id, c.lead_id = campanha_id, lead.id
                 estado["escolhidos"].append(lead.id)
-                estado["textos"][str(lead.id)] = textos_do_contato(db, contato, usuario)
+                # entrou tarde e começa por um aviso que não é o 1º: a frase do SAIR vai nele
+                estado["textos"][str(lead.id)] = _com_sair_no_primeiro(db, textos_do_contato(db, contato, usuario),
+                                                                       datas)
                 estado["datas"][str(lead.id)] = [d.isoformat() if d else None for d in datas]
             db.commit()
         estado["feitos"] += len(lote)
@@ -1200,15 +1240,22 @@ def reajustar_na_aprovacao(db, camp: Campanha, rascunhos: list[Tarefa]) -> list[
             datas = (datas_dos_avisos(vencimento, inicio, pular_fds, dias, sem_envio) if vencimento
                      else [None] * len(dias))
         zaps = {}
+        primeira = next((i for i, d in enumerate(datas) if d is not None), None)
         for t in sorted(tarefas, key=lambda t: t.canal != "whatsapp"):  # o WhatsApp primeiro: o e-mail vem depois dele
             i = ordem.get(t.angulo)
             nova = datas[i] if i is not None and i < len(datas) else None
             if nova is None:
                 t.status, t.concluida_em = "cancelada", agora()
-                t.resultado = "Não cabe mais antes do vencimento (campanha aprovada depois)"
+                t.resultado = ("A etapa deste aviso já passou: o cliente começa pelo aviso de agora (campanha aprovada "
+                               "depois)" if primeira is not None and i is not None and i < primeira
+                               else "Não cabe mais antes do vencimento (campanha aprovada depois)")
                 continue
             if t.canal == "whatsapp":
                 zaps[t.angulo] = t
+                if primeira and i == primeira:  # começa por um aviso que não é o 1º: a frase do SAIR vai nele
+                    t.mensagem = com_sair(t.mensagem, linha_do_sair(db))
+                    if (t.mensagem_whatsapp or "").strip():
+                        t.mensagem_whatsapp = com_sair(t.mensagem_whatsapp, linha_do_sair(db))
             if t.data != nova:
                 zap = zaps.get(t.angulo) if t.canal == "email" else None
                 if zap is not None:
@@ -1218,6 +1265,117 @@ def reajustar_na_aprovacao(db, camp: Campanha, rascunhos: list[Tarefa]) -> list[
                     t.data = nova
             continuam.append(t)
     return continuam
+
+
+def linha_do_sair(db) -> str:
+    """A frase do SAIR do 1º aviso (tela Renovação): vai também no primeiro WhatsApp do contato quando ele começa por
+    outro aviso. "" = o 1º aviso não tem a frase (tirada na tela): nada a acrescentar."""
+    texto = mensagens(db)["renov_aviso"]["whatsapp"] or ""
+    return next((linha.strip() for linha in reversed(texto.splitlines()) if "SAIR" in linha), "")
+
+
+def com_sair(texto: str, linha: str) -> str:
+    """O texto com a frase do SAIR no fim (se ainda não tem)."""
+    if not linha or "SAIR" in (texto or ""):
+        return texto
+    return (texto or "").rstrip() + "\n\n" + linha
+
+
+def _com_sair_no_primeiro(db, textos: dict, datas: list) -> dict:
+    """Contato que começa por um aviso que não é o 1º (entrou tarde): a frase do SAIR, que só o 1º aviso tem, vai no
+    WhatsApp do primeiro aviso dele."""
+    primeira = next((i for i, d in enumerate(datas) if d is not None), None)
+    angulos = list(ANGULOS)
+    if primeira and primeira < len(angulos) and angulos[primeira] in textos:
+        aviso = textos[angulos[primeira]]
+        aviso["whatsapp"] = com_sair(aviso.get("whatsapp", ""), linha_do_sair(db))
+    return textos
+
+
+JUNTADO_AO_ATRASADO = "Não saiu: o aviso anterior atrasou e saiu já com o texto desta etapa"
+PERTO_DO_ATRASADO = "Não saiu: ficaria a menos de 2 dias do aviso atrasado, que saiu com o texto da etapa de agora"
+ETAPA_JA_SAIU = "Não saiu: o aviso desta etapa (ou um depois dela) já tinha sido enviado por este canal"
+
+
+def _ja_recebeu_whatsapp(db, t: Tarefa) -> bool:
+    """O contato já recebeu algum WhatsApp desta campanha?"""
+    from . import mensagens as registro
+    from .modelos import Mensagem
+
+    return db.execute(select(Mensagem.id).where(
+        Mensagem.lead_id == t.lead_id, Mensagem.campanha_id == t.campanha_id, Mensagem.canal == "whatsapp",
+        Mensagem.direcao == "saida", Mensagem.status.in_(registro.ENVIADAS)).limit(1)).first() is not None
+
+
+def ajustar_a_etapa(db, t: Tarefa, hoje: date | None = None) -> bool:
+    """Na hora de sair, o aviso de renovação vai com o texto da etapa em que o cliente está (pedido da Maria em
+    19/11/2026: "se o certificado do cliente X vence dia 20/11, não envie a primeira mensagem da campanha de renovação,
+    mas a de acordo com os dias que faltam"). Aviso atrasado (número desconectado, fila parada, e-mail esperando a
+    conta) cuja etapa já passou ganha o texto, o assunto e o tipo do aviso de agora (etapa_do_dia); os avisos do mesmo
+    canal que ele substitui são cancelados, e o seguinte também, se ficaria a menos de INTERVALO_MINIMO_DIAS dias
+    (nunca em dias seguidos). O primeiro WhatsApp que o contato recebe na campanha leva a frase do SAIR. Chamado por
+    todos os envios (filas, Minha fila, Disparar, Agenda e API oficial). Devolve False quando este aviso não deve mais
+    sair: o desta etapa (ou um depois dele) já saiu por este canal; ele fica cancelado."""
+    from .modelos import PassoCadencia
+
+    if t is None or t.angulo not in ANGULOS or not t.campanha_id or not t.lead_id:
+        return True
+    camp = db.get(Campanha, t.campanha_id)
+    if camp is None or camp.tipo != TIPO_CAMPANHA:
+        return True
+    hoje = hoje or date.today()
+    ordem = list(ANGULOS)
+    atual = ordem.index(t.angulo)
+    dono = db.get(Usuario, camp.usuario_id) if camp.usuario_id else None
+    cert = db.get(Certificado, t.certificado_id) if t.certificado_id else None
+    etapa = atual
+    if cert is not None and cert.data_vencimento >= hoje:
+        etapa = max(atual, etapa_do_dia(cert.data_vencimento, hoje, True, dias_aviso(db), dias_sem_envio(db, dono)))
+    if etapa > atual:
+        irmaos = db.execute(select(Tarefa).where(
+            Tarefa.campanha_id == t.campanha_id, Tarefa.lead_id == t.lead_id, Tarefa.certificado_id == t.certificado_id,
+            Tarefa.tipo == "prospeccao", Tarefa.canal == t.canal, Tarefa.id != t.id,
+            Tarefa.angulo.in_(ordem[atual + 1:]))).scalars().all()
+        if any(i.status == "feita" for i in irmaos):
+            t.status, t.concluida_em, t.resultado = "cancelada", agora(), ETAPA_JA_SAIU
+            return False
+        certs = certificados_do_aviso(db, t)
+        if certs:
+            novo = ordem[etapa]
+            texto = textos_do_contato(db, Contato(chave_do_contato(certs[0]), certs), dono)[novo]
+            if t.canal == "email":
+                t.assunto, t.mensagem = texto["assunto"], texto["email"]
+            else:
+                t.mensagem = texto["whatsapp"]
+            if (t.mensagem_whatsapp or "").strip():
+                t.mensagem_whatsapp = texto["whatsapp"]
+            if (t.mensagem_email or "").strip():
+                t.mensagem_email = texto["email"]
+            if (t.assunto_email or "").strip():
+                t.assunto_email = texto["assunto"]
+            passos = ({p.angulo: p for p in db.execute(select(PassoCadencia).where(
+                PassoCadencia.cadencia_id == camp.cadencia_id)).scalars()} if camp.cadencia_id else {})
+            antigo, novo_passo = passos.get(t.angulo), passos.get(novo)
+            if novo_passo is not None:
+                if antigo is not None and t.acao == antigo.acao:
+                    t.acao = novo_passo.acao
+                if t.passo_id == (antigo.id if antigo is not None else None):
+                    t.passo_id = novo_passo.id
+            t.angulo = novo  # telas e relatórios mostram o aviso que saiu de verdade
+            for irmao in irmaos:
+                if irmao.status not in ("pendente", "rascunho"):
+                    continue
+                if ordem.index(irmao.angulo) <= etapa:
+                    irmao.status, irmao.concluida_em, irmao.resultado = "cancelada", agora(), JUNTADO_AO_ATRASADO
+                elif (irmao.data - hoje).days < INTERVALO_MINIMO_DIAS:
+                    irmao.status, irmao.concluida_em, irmao.resultado = "cancelada", agora(), PERTO_DO_ATRASADO
+    if t.canal == "whatsapp" and "SAIR" not in (t.mensagem or "") and not _ja_recebeu_whatsapp(db, t):
+        linha = linha_do_sair(db)
+        if linha:
+            t.mensagem = com_sair(t.mensagem, linha)
+            if (t.mensagem_whatsapp or "").strip():
+                t.mensagem_whatsapp = com_sair(t.mensagem_whatsapp, linha)
+    return True
 
 
 def encerrar_toques(db, hoje: date | None = None) -> int:

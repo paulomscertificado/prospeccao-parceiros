@@ -632,6 +632,8 @@ def processar_fila(db, maximo: int = POR_RODADA) -> dict:
 
         if feriados.adiar_se_feriado(db, t):
             continue  # feriado da cidade de quem envia: o aviso passou para o próximo dia de envio
+        if not renovacao.ajustar_a_etapa(db, t):
+            continue  # o aviso desta etapa já saiu (o modelo já diz quantos dias faltam; os repetidos são cancelados)
         try:
             enviar_toque(db, t, None, pode_pedir_arte=artes_pedidas < ARTES_POR_RODADA)
         except EsperandoArte:

@@ -927,6 +927,8 @@ def processar_fila(db, maximo: int = 25) -> dict:
         if feriados.adiar_se_feriado(db, t):
             feito["bloqueados"] += 1
             continue  # feriado da cidade (ou nacional) de quem envia: o toque passou para o próximo dia de envio
+        if not renovacao.ajustar_a_etapa(db, t):
+            continue  # Renovação: o aviso desta etapa já saiu por e-mail (este ficou cancelado)
         try:
             conta = conta_do_toque(db, t)
         except contas_email.SemConta as erro:
@@ -1147,11 +1149,13 @@ def enviar_toque_agora(db, t: Tarefa, usuario: Usuario, canal: str = "") -> str:
         return sdr.SEM_WHATSAPP
     if canal == "email" and not (lead and lead.email):
         return "Este lead não tem e-mail."
-    original = (t.canal, t.mensagem, t.assunto, t.mensagem_whatsapp, t.mensagem_email, t.assunto_email)
+    original = (t.canal, t.mensagem, t.assunto, t.mensagem_whatsapp, t.mensagem_email, t.assunto_email, t.angulo,
+                t.acao, t.passo_id)
     trocar_canal(t, canal)
     erro = _enviar_toque(db, t, usuario)
-    if erro:  # não saiu: o toque volta ao canal que estava
-        t.canal, t.mensagem, t.assunto, t.mensagem_whatsapp, t.mensagem_email, t.assunto_email = original
+    if erro:  # não saiu: o toque volta ao canal (e ao aviso, renovacao.ajustar_a_etapa) que estava
+        (t.canal, t.mensagem, t.assunto, t.mensagem_whatsapp, t.mensagem_email, t.assunto_email, t.angulo, t.acao,
+         t.passo_id) = original
     return erro
 
 
@@ -1177,6 +1181,10 @@ def _enviar_toque(db, t: Tarefa, usuario: Usuario) -> str:
     bloqueio = mensagens.bloqueio_de_envio(db, lead, t.canal, t.campanha_id)
     if bloqueio:
         return bloqueio
+    from . import renovacao
+
+    if not renovacao.ajustar_a_etapa(db, t):  # Renovação: o texto da etapa dos dias que faltam (19/11/2026)
+        return "Este aviso não sai mais: o aviso desta etapa já foi enviado para este cliente."
     t.status = "pendente"
     if t.canal == "email":
         erro = _enviar_email_da_tarefa(db, t, usuario, f"Enviado por {usuario.nome} (Minha fila)")
@@ -1237,6 +1245,13 @@ def disparar(db, camp: Campanha, usuario: Usuario, canal: str) -> dict:
                 break
             feito["motivos"][motivo_curto(bloqueio)] += 1
             continue
+        if camp.tipo == "renovacao":
+            from . import renovacao
+
+            if not renovacao.ajustar_a_etapa(db, t):  # o texto da etapa dos dias que faltam (19/11/2026)
+                feito["bloqueados"] += 1
+                feito["motivos"]["o aviso desta etapa já tinha saído"] += 1
+                continue
         if canal == "email":
             erro = _enviar_email_da_tarefa(db, t, usuario, f"Disparado por {usuario.nome}")
             if erro == DESTINATARIO_RECUSADO:
@@ -1634,6 +1649,8 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
         if feriados.adiar_se_feriado(db, t):
             feito["bloqueados"] += 1
             continue  # feriado da cidade (ou nacional) de quem envia: o toque passou para o próximo dia de envio
+        if not renovacao.ajustar_a_etapa(db, t):
+            continue  # Renovação: o aviso desta etapa já saiu por WhatsApp (este ficou cancelado)
         try:
             sdr.enviar_whatsapp_conectado(db, t.mensagem, None, lead=lead, tarefa=t)
         except sdr.EnvioRecusado as erro:

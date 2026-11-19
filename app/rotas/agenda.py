@@ -230,16 +230,21 @@ def acao_tarefa(request: Request, tarefa_id: int, acao: str, resultado: str = Fo
             leads_servico.registrar_resposta(db, lead, t.canal, "", usuario)
             avisar(request, "Resposta registrada! As próximas tentativas da cadência foram canceladas.")
     elif acao == "enviar-whatsapp":
-        from .. import sdr
+        from .. import renovacao, sdr
 
         telefone = (t.cliente.telefone if t.cliente else "") if not lead else ""
-        try:
-            sdr.enviar_whatsapp_conectado(db, t.mensagem, usuario, lead=lead, telefone=telefone,
-                                          nome=t.cliente.contato or t.cliente.nome if t.cliente else "", tarefa=t)
-            avisar(request, "Mensagem colocada na fila do WhatsApp conectado (sai respeitando as pausas e o horário).")
-        except sdr.EnvioRecusado as erro:
-            avisar(request, str(erro), "erro")
-            return voltar(voltar_para)
+        if not renovacao.ajustar_a_etapa(db, t):  # Renovação: o texto da etapa dos dias que faltam (19/11/2026)
+            avisar(request, "Este aviso de renovação não sai mais: o aviso desta etapa já foi enviado para este "
+                            "cliente.", "erro")
+        else:
+            try:
+                sdr.enviar_whatsapp_conectado(db, t.mensagem, usuario, lead=lead, telefone=telefone,
+                                              nome=t.cliente.contato or t.cliente.nome if t.cliente else "", tarefa=t)
+                avisar(request, "Mensagem colocada na fila do WhatsApp conectado (sai respeitando as pausas e o "
+                                "horário).")
+            except sdr.EnvioRecusado as erro:
+                avisar(request, str(erro), "erro")
+                return voltar(voltar_para)
     elif acao == "pular":
         t.status, t.concluida_em, t.resultado = "pulada", agora(), resultado or "Pulada"
     elif acao == "remarcar":
