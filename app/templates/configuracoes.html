@@ -2,18 +2,41 @@
 {% block titulo %}Configurações{% endblock %}
 {% block config %}
 {% if aba == 'geral' %}
-<form class="cartao" method="post" action="/configuracoes/geral" style="max-width:860px">
+<form class="config-geral" method="post" action="/configuracoes/geral">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   {% if sou_master %}<p class="aviso aviso-info">Você muda os valores <b>padrão da plataforma</b>: valem para as ARs que
     não têm valor próprio. Quem é de uma AR muda só os da própria AR.</p>
-  {% else %}<p class="aviso aviso-info">Estas são as configurações da <b>sua AR</b>. As marcadas como "da plataforma" só o
-    admin master muda.</p>{% endif %}
-  {% for chave, nome, tipo, valor, editavel in campos %}
-  <div class="campo"><label for="c-{{ chave }}">{{ nome }}{% if not editavel %} <span class="selo">da plataforma</span>{% endif %}</label>
-    {% if tipo == 'area' %}<textarea id="c-{{ chave }}" name="{{ chave }}"{% if not editavel %} disabled{% endif %}>{{ valor }}</textarea>
-    {% else %}<input id="c-{{ chave }}" type="text" name="{{ chave }}" value="{{ valor }}"{% if not editavel %} disabled{% endif %}>{% endif %}</div>
+  {% else %}<p class="aviso aviso-info">Estas são as configurações da <b>sua AR</b>.{% if configs_da_plataforma %} As
+    outras são da plataforma: só o admin master muda.{% endif %}</p>{% endif %}
+  <nav class="config-indice" aria-label="Grupos de configurações">{% for s in secoes_gerais %}<a href="#cfg-{{ s.id }}">{{ s.titulo }}</a>{% endfor %}</nav>
+  {% for s in secoes_gerais %}
+  <section class="cartao config-secao" id="cfg-{{ s.id }}">
+    <h2>{{ s.titulo }}</h2>
+    <p class="descricao">{{ s.descricao }}</p>
+    <div class="config-campos">
+      {% for c in s.campos %}
+      {% if c.tipo == 'sim_nao' %}
+      <div class="config-chave">
+        <div class="texto"><b id="r-{{ c.chave }}">{{ c.rotulo }}</b>{% if c.ajuda %}<span>{{ c.ajuda }}</span>{% endif %}</div>
+        <input type="hidden" name="{{ c.chave }}" value="0">
+        <label class="interruptor"><input type="checkbox" name="{{ c.chave }}" value="1" aria-labelledby="r-{{ c.chave }}" {{ 'checked' if c.ligado }}><span class="trilho"></span></label>
+      </div>
+      {% else %}
+      <div class="config-campo{{ ' largo' if c.tipo == 'area' or (c.tipo == 'texto' and c.ajuda|length > 70) }}">
+        <label for="c-{{ c.chave }}">{{ c.rotulo }}</label>
+        {% if c.tipo == 'area' %}<textarea id="c-{{ c.chave }}" name="{{ c.chave }}" rows="4">{{ c.valor }}</textarea>
+        {% elif c.tipo == 'hora' %}<input id="c-{{ c.chave }}" type="time" name="{{ c.chave }}" value="{{ c.valor }}" class="campo-hora">
+        {% elif c.tipo == 'numero' %}<div class="com-unidade"><input id="c-{{ c.chave }}" type="number" min="0" step="any" name="{{ c.chave }}" value="{{ c.valor }}">{% if c.unidade %}<span>{{ c.unidade }}</span>{% endif %}</div>
+        {% else %}<input id="c-{{ c.chave }}" type="text" name="{{ c.chave }}" value="{{ c.valor }}">{% endif %}
+        {% if c.ajuda %}<p class="ajuda">{{ c.ajuda }}</p>{% endif %}
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </section>
   {% endfor %}
-  <button class="btn btn-primario">Salvar</button>
+  <div class="barra-salvar"><button class="btn btn-primario">Salvar alterações</button>
+    <span class="pequeno suave">Salva tudo desta página de uma vez.</span></div>
 </form>
 
 {% elif aba == 'marca' %}

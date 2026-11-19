@@ -62,8 +62,8 @@ no navegador, de qualquer lugar: não precisa do `iniciar.bat`. O passo a passo 
 | Pagar comissões | **Comissões**: marque e clique em "Marcar como pagas" |
 
 **Vendas, Vencimentos, Comissões e a Agenda ficam ocultos** no menu e no Dashboard (a Agenda: Configurações > Geral >
-"Mostrar a Agenda de prospecção" = 1). Para mostrar de novo: Configurações >
-Geral > "Mostrar Vendas, Vencimentos e Comissões" = 1 > Salvar.
+Menu > "Mostrar a Agenda de prospecção"). Para mostrar de novo: Configurações > Geral > Menu > ligue
+"Mostrar Vendas, Vencimentos e Comissões" > Salvar alterações.
 | Relatórios e exportação | **Relatórios** (PDF, Excel, CSV) |
 | Perguntar sobre o negócio | **IA Comercial** (perguntas prontas funcionam mesmo sem IA) |
 
@@ -96,8 +96,8 @@ Geral > "Mostrar Vendas, Vencimentos e Comissões" = 1 > Salvar.
 - Cada lead guarda **de onde veio** (fonte) e a **base legal**. Pedido de exclusão: ficha do lead → **Excluir dados (LGPD)**.
 - O sistema **não inventa dados**: se a fonte não traz telefone ou e-mail, o lead fica sem.
 - **Cópia das conversas do WhatsApp (tela Conversas):** guarda todas as conversas dos números conectados, por um
-  **prazo de guarda** (Configurações > Geral, campo "LGPD · meses que a cópia das conversas fica na nuvem"; só o admin
-  master muda). As mais antigas saem da cópia sozinhas, de hora em hora; as originais continuam nos celulares e no
+  **prazo de guarda** (Configurações > Geral > Avisos e LGPD > "Guardar a cópia das conversas do WhatsApp por"; só o
+  admin master muda). As mais antigas saem da cópia sozinhas, de hora em hora; as originais continuam nos celulares e no
   WhatsApp Leads.
 - O **registro de atividades** (Configurações > Logs) mostra o **módulo** e, nas mudanças de configurações, score,
   cadastro de pessoas, marca e módulos, o **antes e depois** (ex.: limite_diario_whatsapp: 40 → 35). E-mails e telefones
@@ -163,8 +163,8 @@ traz mais resposta) ou **Escrever a minha**. A pergunta escolhida vale em todos 
 pode ter valores, porcentagem, desconto, exclusividade nem frase de propaganda.
 
 O tom muda as mensagens de verdade, mesmo sem a IA ligada: cada tom tem os próprios textos. Para o convite por e-mail
-levar o botão do WhatsApp, cadastre o número da MS em **Configurações > Geral > "WhatsApp da MS para os convites por
-e-mail"** (sem ele, o convite pede para responder o e-mail).
+levar o botão do WhatsApp, cadastre o número da empresa em **Configurações > Geral > WhatsApp > "WhatsApp dos convites
+por e-mail"** (sem ele, o convite pede para responder o e-mail).
 
 A IA **encontra, pesquisa, qualifica, faz o primeiro contato e entrega o interessado para você**. Ela não negocia
 preço nem comissão e não fecha parceria.
@@ -186,7 +186,8 @@ preço nem comissão e não fecha parceria.
    aprovação** tem o botão **Desligar**. Desligado, o WhatsApp só sai sozinho para quem já conversou com a MS
    (respondeu pelo WhatsApp ou tem marcado na ficha "Autorizou receber mensagens da MS pelo WhatsApp"); para os
    demais, a campanha e a Minha fila mostram o botão para enviar com um clique. Para as campanhas novas voltarem ao
-   clique, mude em **Configurações > Geral** "campanha nova já vem com o WhatsApp automático ligado" para 0.
+   clique, desligue em **Configurações > Geral > WhatsApp** a chave "Campanha nova já vem com o WhatsApp automático
+   ligado".
    Toda empresa da campanha ganha a mensagem de WhatsApp. Se o campo **WhatsApp** da empresa estiver em branco, a
    mensagem fica pronta e **não sai**: cadastre o número na ficha da empresa e ela fica liberada.
    Empresa com WhatsApp **e** e-mail recebe os dois em cada toque (nas Empresas novas, só o WhatsApp).
@@ -684,7 +685,9 @@ e relatórios da própria marca, mesmo sendo administrador. A marca de cada pess
 (Minha conta). O admin master vê todas as marcas. Os modelos de mensagem, as cadências e as categorias continuam
 iguais para todas.
 
-**Configurações de cada marca:** em **Configurações > Geral**, o administrador de uma marca muda só as configurações da
+**Configurações de cada marca:** em **Configurações > Geral** (organizada em grupos: Horário de envio, WhatsApp,
+E-mail, Campanhas e IA SDR, Parceria, Acompanhamento, Menu e Avisos e LGPD; chaves de liga/desliga, relógio nos
+horários e um botão "Salvar alterações" sempre à vista), o administrador de uma marca muda só as configurações da
 própria marca (horários e limites de envio, textos da parceria, regras da IA SDR, prazos). Os campos marcados como
 **"da plataforma"** (proteção dos números de WhatsApp, avisos de problema, módulos, banco, Renovação, Empresas novas)
 só o admin master muda; o que ele muda vale para as marcas que não têm valor próprio.
@@ -882,8 +885,8 @@ banco chega a 80% do tamanho, o backup fica dias sem ser feito ou o agendador fi
 volta). Quando a nuvem passar a chamar o sistema a cada minuto (plano Pro da Vercel), também avisa se ela ficar mais
 de 10 minutos sem chamar: aí o computador da MS cobre como reserva. Quem está fazendo as filas andarem aparece em
 **Configurações > Integrações**, na linha "Relógio das filas". Vem um lembrete a cada 12 horas enquanto o problema durar e outro e-mail quando volta ao normal. O aviso
-também aparece no sino. Quem recebe: os administradores, ou a lista em **Configurações > Geral > "Avisos de
-problema · e-mails que recebem"**. Para testar: **Configurações > Integrações > Mandar e-mail de teste do aviso**.
+também aparece no sino. Quem recebe: os administradores, ou a lista em **Configurações > Geral > Avisos e
+LGPD > "Quem recebe os avisos de problema"**. Para testar: **Configurações > Integrações > Mandar e-mail de teste do aviso**.
 
 Testes automáticos: dois cliques em `testar.bat` (não mexe nos seus dados).
 

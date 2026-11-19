@@ -413,3 +413,30 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--foco); bord
 .grupo-permissao > summary::after { content: "▸"; margin-left: auto; color: var(--suave); }
 .grupo-permissao[open] > summary::after { content: "▾"; }
 .grupo-permissao[open] > summary { border-bottom: 1px solid var(--borda); }
+
+/* ---------- Configurações > Geral em grupos (19/11/2026: "está muito confuso e feio") ---------- */
+.config-geral { max-width: 920px; }
+.config-indice { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
+.config-indice a { padding: 5px 13px; border: 1px solid var(--borda); border-radius: 999px; background: var(--cartao);
+                   font-size: .82rem; font-weight: 600; color: var(--texto); }
+.config-indice a:hover { border-color: var(--azul); color: var(--azul); text-decoration: none; }
+.config-secao { scroll-margin-top: 16px; margin-bottom: 16px; padding: 18px 20px; }
+.config-secao h2 { margin: 0 0 2px; font-size: 1.05rem; }
+.config-secao > p.descricao { margin: 0 0 14px; color: var(--suave); font-size: .86rem; }
+.config-campos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 24px; align-items: start; }
+.config-campo.largo, .config-chave { grid-column: 1 / -1; }
+.config-campo label { display: block; font-weight: 600; font-size: .86rem; margin-bottom: 5px; }
+.config-campo .ajuda { margin-top: 5px; }
+.config-campo .campo-hora { width: 130px; }
+.com-unidade { display: flex; align-items: center; gap: 9px; }
+.com-unidade input { width: 110px; flex: none; }
+.com-unidade span { color: var(--suave); font-size: .84rem; }
+.config-chave { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 11px 0;
+                border-top: 1px solid var(--borda); }
+.config-campos > .config-chave:first-child { border-top: 0; padding-top: 2px; }
+.config-chave .texto b { display: block; font-size: .9rem; font-weight: 600; }
+.config-chave .texto span { display: block; color: var(--suave); font-size: .82rem; margin-top: 2px; }
+.barra-salvar { position: sticky; bottom: 12px; z-index: 30; display: flex; align-items: center; gap: 14px; margin-top: 4px;
+                padding: 10px 14px; background: var(--cartao); border: 1px solid var(--borda); border-radius: var(--raio);
+                box-shadow: 0 6px 20px rgba(16, 24, 40, .12); }
+@media (max-width: 720px) { .config-campos { grid-template-columns: 1fr; } }

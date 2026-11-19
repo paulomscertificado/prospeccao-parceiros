@@ -19,55 +19,114 @@ rotas = APIRouter()
 log = logging.getLogger(__name__)
 
 HORARIOS_DE_ENVIO = ("horario_envio_inicio", "horario_envio_fim")  # gravados sempre como HH:MM
-CAMPOS_GERAIS = [
-    ("mostrar_vendas", "Mostrar Vendas, Vencimentos e Comissões no menu e no Dashboard (1 = sim, 0 = não)", "numero"),
-    ("mostrar_agenda", "Mostrar a Agenda de prospecção (follow-ups) no menu e no Dashboard (1 = sim, 0 = não)", "numero"),
-    ("link_parceria", "Link da página de parceria ({{link_parceria}})", "texto"),
-    ("texto_comissao", "Texto da comissão nas mensagens ({{comissao}})", "texto"),
-    ("programa_parceria", "Descrição do programa de parceria (usada pela IA)", "area"),
-    ("limite_diario_whatsapp", "Limite diário de mensagens de WhatsApp (por número; 0 = sem limite)", "numero"),
-    ("limite_diario_email", "Limite diário de e-mails", "numero"),
-    ("horas_entre_contatos_whatsapp", "WhatsApp: intervalo mínimo entre mensagens para o mesmo lead (horas; vazio = 20)", "numero"),
-    ("horas_entre_contatos_email", "E-mail: intervalo mínimo entre e-mails para o mesmo lead (horas; vazio = 20)", "numero"),
-    ("pular_fim_de_semana", "Cadências pulam sábado e domingo (1 = sim, 0 = não)", "numero"),
-    ("alertas_vencimento", "Alertas de vencimento (dias antes, separados por vírgula)", "texto"),
-    ("dias_parceiro_parado", "Parceiro parado: dias sem venda", "numero"),
-    ("dias_lead_parado", "Lead parado: dias sem movimento", "numero"),
-    ("dias_retencao_perdidos", "Retenção: anonimizar leads encerrados/opt-out após (dias)", "numero"),
-    ("custo_mensal_prospeccao", "Custo mensal da prospecção em R$ (salários, ferramentas)", "numero"),
-    # IA SDR
-    ("prioridade_canais", "IA SDR · prioridade dos canais (ex.: whatsapp,email,linkedin)", "texto"),
-    ("limite_hora_email", "IA SDR · limite de e-mails por hora", "numero"),
-    ("limite_hora_whatsapp", "IA SDR · limite de WhatsApp por hora", "numero"),
-    ("intervalo_whatsapp_min", "WhatsApp · tempo mínimo entre duas mensagens automáticas (minutos; a fila sorteia um "
-     "tempo entre o mínimo e o máximo, para todos os números)", "numero"),
-    ("intervalo_whatsapp_max", "WhatsApp · tempo máximo entre duas mensagens automáticas (minutos)", "numero"),
-    ("limite_frios_whatsapp", "WhatsApp · contatos frios por número por dia (quem nunca conversou com a empresa; "
-     "protege o número contra bloqueio; 0 = sem teto)", "numero"),
-    ("pausa_frios_sair", "WhatsApp · pedidos de SAIR no mesmo dia que pausam os contatos frios do número até amanhã "
-     "(0 = não pausa)", "numero"),
-    ("limite_diario_campanha", "IA SDR · limite diário de mensagens por campanha", "numero"),
-    ("limite_diario_dominio", "IA SDR · limite diário de e-mails para o mesmo domínio", "numero"),
-    ("horario_envio_inicio", "IA SDR · envio automático a partir de (HH:MM, dias úteis)", "texto"),
-    ("horario_envio_fim", "IA SDR · envio automático até (HH:MM)", "texto"),
-    ("enviar_email_automatico", "IA SDR · fila envia e-mails sozinha depois da aprovação (1 = sim, 0 = não)", "numero"),
-    ("sdr_resposta_automatica", "IA SDR · responde \"vou passar para o time\" quando o canal permite (1 = sim, 0 = não)", "numero"),
-    ("dias_sem_resposta", "IA SDR · dias depois do último toque para marcar SEM RESPOSTA", "numero"),
-    ("enviar_whatsapp_automatico", "IA SDR · com o celular conectado, a fila manda o WhatsApp sozinha (1 = sim, 0 = não): "
-     "para quem já conversou ou autorizou e, nas campanhas com o WhatsApp automático ligado, também para contato frio",
-     "numero"),
-    ("whatsapp_sozinho_padrao", "IA SDR · campanha nova já vem com o WhatsApp automático ligado: depois da aprovação, "
-     "sai sozinho também para contato frio (1 = sim, 0 = não; o administrador desliga em cada campanha)", "numero"),
-    ("aprovacao_obrigatoria", "IA SDR · campanha só começa com aprovação (1 = sim, 0 = não)", "numero"),
-    ("whatsapp_convite", "IA SDR · WhatsApp da empresa para os convites por e-mail (com DDD, ex.: 81999998888). Quem "
-     "clicar abre a conversa com este número; vazio = o convite pede para responder o e-mail", "texto"),
-    ("notificar_por_email", "IA SDR · avisar o responsável por e-mail quando surgir oportunidade (1 = sim)", "numero"),
-    ("alertas_emails", "Avisos de problema · e-mails que recebem (separados por vírgula; vazio = os administradores)",
-     "texto"),
-    ("limite_banco_mb", "Avisos de problema · tamanho do banco contratado em MB (o aviso sai em 80%)", "numero"),
-    ("guarda_conversas_meses", "LGPD · meses que a cópia das conversas do WhatsApp fica na nuvem (0 = sem prazo; as "
-     "originais continuam nos celulares e no WhatsApp Leads)", "numero"),
+VAZIO_E_PADRAO = ("horas_entre_contatos_whatsapp", "horas_entre_contatos_email")  # em branco = o intervalo geral (20 h)
+# Configurações > Geral em grupos (pedido da Maria em 19/11/2026: "está muito confuso e feio"). Cada campo:
+# (chave, rótulo, tipo, unidade, ajuda). Tipos: sim_nao (chave liga/desliga; grava 1 ou 0), hora (HH:MM), numero,
+# texto e area. A ordem é a da tela. CAMPOS_GERAIS (a lista que o salvar usa) sai daqui.
+SECOES_GERAIS = [
+    {"id": "horario", "titulo": "Horário de envio", "descricao": "Quando as mensagens automáticas podem sair, nos dias úteis.",
+     "campos": [
+         ("horario_envio_inicio", "Começa às", "hora", "", ""),
+         ("horario_envio_fim", "Termina às", "hora", "", ""),
+         ("pular_fim_de_semana", "Cadências pulam sábado e domingo", "sim_nao", "",
+          "Os toques que cairiam no fim de semana passam para segunda-feira."),
+     ]},
+    {"id": "whatsapp", "titulo": "WhatsApp",
+     "descricao": "Ritmo e limites dos envios. Valem para cada número conectado e protegem o número contra bloqueio.",
+     "campos": [
+         ("enviar_whatsapp_automatico", "A fila manda o WhatsApp sozinha", "sim_nao", "",
+          "Com o celular conectado: para quem já conversou ou autorizou e, nas campanhas com o WhatsApp automático "
+          "ligado, também para contato frio."),
+         ("whatsapp_sozinho_padrao", "Campanha nova já vem com o WhatsApp automático ligado", "sim_nao", "",
+          "Depois da aprovação, sai sozinho também para contato frio. O administrador desliga em cada campanha."),
+         ("intervalo_whatsapp_min", "Tempo mínimo entre duas mensagens", "numero", "minutos",
+          "A fila sorteia um tempo entre o mínimo e o máximo."),
+         ("intervalo_whatsapp_max", "Tempo máximo entre duas mensagens", "numero", "minutos", ""),
+         ("limite_hora_whatsapp", "Limite por hora", "numero", "por hora", ""),
+         ("limite_diario_whatsapp", "Limite por dia", "numero", "por dia", "0 = sem limite."),
+         ("limite_frios_whatsapp", "Contatos frios por dia", "numero", "por dia",
+          "Quem nunca conversou com a empresa. 0 = sem teto."),
+         ("pausa_frios_sair", "Pausar os contatos frios depois de", "numero", "pedidos de SAIR no dia",
+          "O número volta no dia seguinte. 0 = não pausa."),
+         ("horas_entre_contatos_whatsapp", "Intervalo para a mesma empresa (envio por clique)", "numero", "horas",
+          "Em branco = 20 horas. A fila automática sempre espera pelo menos 20 horas."),
+         ("whatsapp_convite", "WhatsApp dos convites por e-mail", "texto", "",
+          "Com DDD, ex.: 81999998888. Quem clicar no convite abre a conversa com este número; em branco, o convite "
+          "pede para responder o e-mail."),
+     ]},
+    {"id": "email", "titulo": "E-mail", "descricao": "Ritmo e limites dos e-mails.",
+     "campos": [
+         ("enviar_email_automatico", "A fila manda os e-mails sozinha depois da aprovação", "sim_nao", "", ""),
+         ("limite_hora_email", "Limite por hora", "numero", "por hora", ""),
+         ("limite_diario_email", "Limite por dia", "numero", "por dia", ""),
+         ("limite_diario_dominio", "Limite para o mesmo domínio", "numero", "por dia",
+          "Vários e-mails para a mesma empresa (o mesmo @domínio) no mesmo dia."),
+         ("horas_entre_contatos_email", "Intervalo para a mesma empresa (envio por clique)", "numero", "horas",
+          "Em branco = 20 horas. A fila automática sempre espera pelo menos 20 horas."),
+     ]},
+    {"id": "campanhas", "titulo": "Campanhas e IA SDR", "descricao": "Como as campanhas andam e o que a IA faz sozinha.",
+     "campos": [
+         ("aprovacao_obrigatoria", "Campanha só começa com aprovação", "sim_nao", "", ""),
+         ("sdr_resposta_automatica", "A IA responde \"vou passar para o time\" quando o canal permite", "sim_nao", "", ""),
+         ("notificar_por_email", "Avisar o responsável por e-mail quando surgir uma oportunidade", "sim_nao", "", ""),
+         ("limite_diario_campanha", "Limite de mensagens por campanha", "numero", "por dia", ""),
+         ("dias_sem_resposta", "Marcar SEM RESPOSTA depois de", "numero", "dias", "Contados do último toque."),
+         ("prioridade_canais", "Ordem dos canais", "texto", "", "Ex.: whatsapp,email,linkedin"),
+     ]},
+    {"id": "parceria", "titulo": "Parceria", "descricao": "Textos que entram nas mensagens para os escritórios parceiros.",
+     "campos": [
+         ("link_parceria", "Link da página de parceria", "texto", "", "Entra no lugar de {{link_parceria}}."),
+         ("texto_comissao", "Texto da comissão", "texto", "", "Entra no lugar de {{comissao}}."),
+         ("programa_parceria", "Como funciona o programa de parceria", "area", "",
+          "A IA usa este texto para explicar a parceria."),
+     ]},
+    {"id": "acompanhamento", "titulo": "Acompanhamento", "descricao": "Quando o sistema avisa que algo parou.",
+     "campos": [
+         ("dias_lead_parado", "Lead parado depois de", "numero", "dias sem movimento", ""),
+         ("dias_parceiro_parado", "Parceiro parado depois de", "numero", "dias sem venda", ""),
+         ("alertas_vencimento", "Alertas de vencimento", "texto", "",
+          "Dias antes do vencimento, separados por vírgula. Ex.: 90,60,30,15,7"),
+         ("custo_mensal_prospeccao", "Custo mensal da prospecção", "numero", "R$ por mês",
+          "Salários e ferramentas: entra nos relatórios."),
+     ]},
+    {"id": "menu", "titulo": "Menu", "descricao": "O que aparece no menu e no Dashboard.",
+     "campos": [
+         ("mostrar_vendas", "Mostrar Vendas, Vencimentos e Comissões", "sim_nao", "", ""),
+         ("mostrar_agenda", "Mostrar a Agenda de prospecção (follow-ups)", "sim_nao", "", ""),
+     ]},
+    {"id": "avisos", "titulo": "Avisos e LGPD",
+     "descricao": "Avisos de problema do sistema e quanto tempo os dados ficam guardados.",
+     "campos": [
+         ("alertas_emails", "Quem recebe os avisos de problema", "texto", "",
+          "E-mails separados por vírgula. Em branco = os administradores."),
+         ("limite_banco_mb", "Tamanho do banco contratado", "numero", "MB", "O aviso sai quando chega em 80%."),
+         ("dias_retencao_perdidos", "Anonimizar leads encerrados ou com SAIR depois de", "numero", "dias", ""),
+         ("guarda_conversas_meses", "Guardar a cópia das conversas do WhatsApp por", "numero", "meses",
+          "0 = sem prazo. As originais continuam nos celulares e no WhatsApp Leads."),
+     ]},
 ]
+CAMPOS_GERAIS = [(c, rotulo, tipo) for secao in SECOES_GERAIS for c, rotulo, tipo, _, _ in secao["campos"]]
+
+
+def _secoes_gerais(db: Session, usuario: Usuario) -> tuple[list[dict], bool]:
+    """As seções da tela Geral com os valores de agora. Quem é de uma AR vê só o que pode mudar (o resto é da
+    plataforma). Devolve (seções, se ficou alguma da plataforma de fora)."""
+    master = autorizacao.e_master(usuario)
+    secoes, de_fora = [], False
+    for secao in SECOES_GERAIS:
+        campos = []
+        for chave, rotulo, tipo, unidade, ajuda in secao["campos"]:
+            if not (master or (chave in CHAVES_DA_AR and chave not in CHAVES_SO_MASTER)):
+                de_fora = True
+                continue
+            valor = ler_config(db, chave)
+            if tipo == "hora":
+                valor = util.hora_hhmm(valor)
+            campos.append({"chave": chave, "rotulo": rotulo, "tipo": tipo, "unidade": unidade, "ajuda": ajuda,
+                           "valor": valor, "ligado": str(valor or "").strip().lower() in ("1", "1.0", "sim", "true")})
+        if campos:
+            secoes.append({**secao, "campos": campos})
+    return secoes, de_fora
 
 
 def _cadastro_no_registro(u: Usuario) -> dict:
@@ -141,8 +200,7 @@ def configuracoes(request: Request, aba: str = "geral", usuario: Usuario = Depen
                                     ar=marca.ar_da_tela(request, usuario))
         if aba == "feriados" else None,
         "grupos_usuarios": _grupos_de_usuarios(db, request, usuario) if aba == "usuarios" else [],
-        "campos": [(c, n, t, ler_config(db, c), autorizacao.e_master(usuario)
-                                or (c in CHAVES_DA_AR and c not in CHAVES_SO_MASTER)) for c, n, t in CAMPOS_GERAIS],
+        **(dict(zip(("secoes_gerais", "configs_da_plataforma"), _secoes_gerais(db, usuario))) if aba == "geral" else {}),
         "criterios": score.CRITERIOS, "pesos": score.pesos(db), "faixas": score.faixas(db),
         "usuarios": db.execute(select(Usuario).order_by(Usuario.perfil, Usuario.nome)).scalars().all(),
         "papeis": _papeis(db), "equipes": db.execute(select(Equipe).order_by(Equipe.nome)).scalars().all(),
@@ -263,8 +321,10 @@ async def salvar_geral(request: Request, usuario: Usuario = Depends(exige("confi
     antes = {c: ler_config(db, c) for c in alteraveis}  # registro de atividades: o antes e o depois
     for chave, rotulo, tipo in CAMPOS_GERAIS:
         if chave in form and (master or (chave in CHAVES_DA_AR and chave not in CHAVES_SO_MASTER)):  # da plataforma: master
-            valor = str(form.get(chave)).strip()
-            if tipo == "numero":
+            valor = str(form.get(chave)).strip()  # chave liga/desliga: vem "0" (escondido) e "1" (marcado); vale o último
+            if tipo == "sim_nao":
+                valor = "1" if valor.lower() in ("1", "on", "sim", "true") else "0"
+            elif tipo == "numero" and not (valor == "" and chave in VAZIO_E_PADRAO):
                 valor = str(util.para_float(valor)).removesuffix(".0")
             if chave in HORARIOS_DE_ENVIO and valor:  # sempre HH:MM, com o zero (o "8:12" parou a fila em 19/11/2026)
                 normal = util.hora_hhmm(valor)
