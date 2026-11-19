@@ -246,15 +246,31 @@ def dias_de(db, ar, uf: str | None, cidade: str | None, anos: tuple[int, ...] | 
     return dias
 
 
+def local_da_pessoa(db, pessoa) -> tuple[str, str]:
+    """(UF, cidade) de onde a pessoa trabalha: as do cadastro dela; sem UF no cadastro, as da marca dela
+    (Configurações > Marca, pedido da Maria em 19/11/2026); sem nenhuma: ("", "")."""
+    if pessoa is None:
+        return "", ""
+    if normalizar_uf(pessoa.uf):
+        return pessoa.uf, pessoa.cidade or ""
+    if pessoa.tenant_id:
+        from . import marca
+
+        m = marca.da_ar(db, pessoa.tenant_id)
+        return m.get("uf", ""), m.get("cidade", "")
+    return "", ""
+
+
 def da_pessoa(db, pessoa, anos: tuple[int, ...] | None = None) -> dict[date, str]:
-    """Os feriados de quem envia (ou de quem atende a reunião): nacionais + do estado + da cidade dela. Sem pessoa (ou
-    sem UF no cadastro): só os nacionais."""
+    """Os feriados de quem envia (ou de quem atende a reunião): nacionais + do estado + da cidade dela (sem cidade no
+    cadastro, a da marca: local_da_pessoa). Sem pessoa (ou sem local nenhum): só os nacionais."""
     if pessoa is None:
         return dias_de(db, None, "", "", anos)
+    uf, cidade = local_da_pessoa(db, pessoa)
     cache = db.info.setdefault("feriados_da_pessoa", {})
-    chave = (pessoa.id, pessoa.tenant_id, pessoa.uf, pessoa.cidade, tuple(anos) if anos else None, date.today())
+    chave = (pessoa.id, pessoa.tenant_id, uf, cidade, tuple(anos) if anos else None, date.today())
     if chave not in cache:
-        cache[chave] = dias_de(db, pessoa.tenant_id, pessoa.uf, pessoa.cidade, anos)
+        cache[chave] = dias_de(db, pessoa.tenant_id, uf, cidade, anos)
     return cache[chave]
 
 
@@ -387,14 +403,14 @@ def _dias_que_podem_ser_feriado(db, anos: tuple[int, ...]) -> set[date]:
     for ano in anos:
         dias |= set(util.feriados_nacionais(ano))
     for pessoa in db.execute(select(Usuario).execution_options(sem_filtro_de_ar=True)).scalars():
-        if normalizar_uf(pessoa.uf):
+        if normalizar_uf(local_da_pessoa(db, pessoa)[0]):
             dias |= set(da_pessoa(db, pessoa, anos))
     return dias
 
 
 # ---------------------------------------------------------------- Tela (Configurações > Feriados)
 
-def painel(db, consulta_uf: str = "", consulta_cidade: str = "") -> dict:
+def painel(db, consulta_uf: str = "", consulta_cidade: str = "", ar=None) -> dict:
     """O que a tela mostra: os nacionais que faltam no ano (e o começo do próximo), as pessoas da marca com a cidade
     delas e um quadro para cada estado e cidade em uso (com o que já foi escrito)."""
     from .modelos import Usuario
@@ -426,6 +442,17 @@ def painel(db, consulta_uf: str = "", consulta_cidade: str = "") -> dict:
         quadro(chave_do_local(uf))["pessoas"].append(p.nome)
         if cidade:
             quadro(chave_do_local(uf, cidade), cidade)["pessoas"].append(p.nome)
+    marca_local = ""  # onde a marca fica (Configurações > Marca): vale para quem está sem cidade no cadastro
+    if ar:
+        from . import marca
+
+        m = marca.da_ar(db, ar)
+        if normalizar_uf(m.get("uf")):
+            rotulo = "padrão da marca" + (f" ({len(sem_local)} sem cidade no cadastro)" if sem_local else "")
+            quadro(chave_do_local(m["uf"]))["pessoas"].append(rotulo)
+            if normalizar_cidade(m.get("cidade")):
+                quadro(chave_do_local(m["uf"], m["cidade"]), m["cidade"])["pessoas"].append(rotulo)
+            marca_local = f"{m['cidade']} ({m['uf']})" if m.get("cidade") else m["uf"]
     for chave in listas:
         if chave_do_local(*chave.split("/", 1)) == chave:
             quadro(chave)
@@ -440,6 +467,7 @@ def painel(db, consulta_uf: str = "", consulta_cidade: str = "") -> dict:
                     "aviso": conferir_cidade(consulta_uf, cidade)[1] if cidade else "",
                     "uf": normalizar_uf(consulta_uf), "cidade": oficial or cidade}
     return {"nacionais": nacionais, "quadros": ordem, "pessoas": pessoas, "sem_local": sem_local, "ufs": UFS,
+            "marca_local": marca_local,
             "consulta": consulta, "fonte": base().get("fonte", ""),
             "municipios": len(base().get("cidades", {})),
             "com_feriado": sum(1 for v in base().get("cidades", {}).values() if v[1])}

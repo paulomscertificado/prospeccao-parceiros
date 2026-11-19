@@ -147,7 +147,10 @@ de github.com/joaopbini/feriados-brasil, licença MIT em `app/feriados_brasil_LI
 dos anos 2024-2026 = todo ano, só em 2026 = só em 2026, nacionais de fora) + os acertos da marca em Configurações >
 Feriados (chave da AR `feriados_locais`, em `banco.CHAVES_DA_AR`: JSON `{"PE": "...", "PE/RECIFE": "..."}`, uma data por
 linha, `16/07 Nome` todo ano, `20/11/2026 Nome` só naquele ano e `-16/07` tira da base; um nacional nunca sai;
-`ler_lista`). `da_pessoa(db, pessoa)` junta tudo (cache por sessão). Para atualizar a base (quando o repositório
+`ler_lista`). `da_pessoa(db, pessoa)` junta tudo (cache por sessão). Sem UF no cadastro, a pessoa segue o estado e a cidade **da marca**
+(`MarcaAR.uf`/`cidade`, Configurações > Marca; `local_da_pessoa`; pedido da Maria em 19/11/2026, "é para puxar
+os feriados"); a tela Feriados mostra o quadro dela como "padrão da marca" e salvar a marca remarca os toques de
+quem está sem cidade (`admin.salvar_marca` → `_remarcar_feriados`). Para atualizar a base (quando o repositório
 ganhar 2027): baixar os JSON de `dados/feriados/{estadual,municipal}/json/<ano>.json` e
 `dados/localizacao/municipios/municipios.json` e montar de novo com a mesma regra.
 Onde vale:

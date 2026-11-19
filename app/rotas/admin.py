@@ -80,7 +80,8 @@ def _cadastro_no_registro(u: Usuario) -> dict:
 def _marca_no_registro(db: Session, ar: int) -> dict:
     """O que o registro de atividades guarda da marca de uma AR (o logo só como "tem" ou "não tem")."""
     linha = db.get(MarcaAR, ar)
-    campos = ("nome", "curto", "artigo", "site", "descricao", "dominio_email", "cor", "cor_detalhe", "cor_fundo", "fonte")
+    campos = ("nome", "curto", "artigo", "site", "descricao", "dominio_email", "cor", "cor_detalhe", "cor_fundo", "fonte",
+              "uf", "cidade")
     dados = {c: (getattr(linha, c) or "") if linha is not None else "" for c in campos}
     dados["logo"] = "tem" if linha is not None and linha.logo_tipo else "não tem"
     return dados
@@ -136,7 +137,8 @@ def configuracoes(request: Request, aba: str = "geral", usuario: Usuario = Depen
     return tela(request, "configuracoes.html", {
         # white label: quem é de uma AR muda só as configurações da AR (o resto é da plataforma: Admin Master)
         "aba": aba, "secao": aba, "ufs": feriados.UFS,
-        "feriados": feriados.painel(db, request.query_params.get("uf", ""), request.query_params.get("cidade", ""))
+        "feriados": feriados.painel(db, request.query_params.get("uf", ""), request.query_params.get("cidade", ""),
+                                    ar=marca.ar_da_tela(request, usuario))
         if aba == "feriados" else None,
         "grupos_usuarios": _grupos_de_usuarios(db, request, usuario) if aba == "usuarios" else [],
         "campos": [(c, n, t, ler_config(db, c), autorizacao.e_master(usuario)
@@ -189,6 +191,8 @@ async def salvar_marca(request: Request, usuario: Usuario = Depends(exige("confi
                        db: Session = Depends(obter_db)):
     """Marca da AR de quem salva (white label, Fase 5; o Admin Master: a da AR em que entrou). Fora das ARs, o Admin
     Master muda o nome neutro da plataforma (tela de entrada)."""
+    from .. import feriados
+
     form = await request.form()
     destino = "/configuracoes?aba=marca"
     ar = marca.ar_da_tela(request, usuario)
@@ -206,17 +210,29 @@ async def salvar_marca(request: Request, usuario: Usuario = Depends(exige("confi
         return voltar(destino)
     arquivo = form.get("logo")
     novo_logo = await arquivo.read() if arquivo is not None and getattr(arquivo, "filename", "") else None
-    campos = ("nome", "curto", "artigo", "site", "descricao", "dominio_email", "cor", "cor_detalhe", "cor_fundo", "fonte")
+    campos = ("nome", "curto", "artigo", "site", "descricao", "dominio_email", "cor", "cor_detalhe", "cor_fundo", "fonte",
+              "uf", "cidade")
     antes = _marca_no_registro(db, ar)
     tirar_fundo = form.get("tirar_fundo") == "1"
     problemas = marca.salvar(db, ar, {c: str(form.get(c) or "") for c in campos if c in form}, novo_logo,
                              tirar_logo=form.get("tirar_logo") == "1", tirar_fundo=tirar_fundo)
     db.flush()
     feito = (["logo novo"] if novo_logo else []) + (["tirou o fundo do logo"] if tirar_fundo else [])
+    depois = _marca_no_registro(db, ar)
     registrar_log(db, usuario, "salvou_marca", "tenant", ar, "; ".join(feito + problemas)[:250], request,
-                  modulo="Marca", mudancas=diferencas(antes, _marca_no_registro(db, ar)))
-    db.commit()
+                  modulo="Marca", mudancas=diferencas(antes, depois))
     marca.esquecer(ar)
+    movidos = 0
+    if (antes.get("uf"), antes.get("cidade")) != (depois.get("uf"), depois.get("cidade")):
+        # quem está sem cidade no cadastro segue a da marca: os toques num feriado dela mudam de dia
+        sem_local = {u.id for u in db.execute(select(Usuario).where(Usuario.tenant_id == ar)
+                                              .execution_options(sem_filtro_de_ar=True)).scalars()
+                     if not feriados.normalizar_uf(u.uf)}
+        if sem_local:
+            movidos = _remarcar_feriados(db, sem_local)
+    db.commit()
+    if movidos:
+        avisar(request, f"{movidos} toque(s) que caíam num feriado da cidade da marca mudaram de dia.")
     for problema in problemas:
         avisar(request, problema, "erro")
     if not problemas:

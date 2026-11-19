@@ -59,6 +59,15 @@
       <input id="m-dominio" type="text" name="dominio_email" maxlength="120" value="{{ l.dominio_email if l }}" placeholder="suaempresa.com.br">
       <p class="ajuda">Cada pessoa cadastra o e-mail @este domínio em Contas de e-mail.</p></div>
   </div>
+  <div class="grade-2">
+    <div class="campo"><label for="m-uf">Estado (UF) da marca</label>
+      <select id="m-uf" name="uf"><option value="">—</option>
+        {% for sigla, nome_uf in ufs.items() %}<option value="{{ sigla }}" {{ 'selected' if l and l.uf == sigla }}>{{ sigla }} – {{ nome_uf }}</option>{% endfor %}</select></div>
+    <div class="campo"><label for="m-cidade">Cidade da marca</label>
+      <input id="m-cidade" type="text" name="cidade" maxlength="120" value="{{ l.cidade if l }}" placeholder="Cidade da sede">
+      <p class="ajuda">Puxa os feriados do estado e da cidade da marca para quem ainda não informou a própria cidade
+        (Minha conta ou Usuários). Quem informou segue os da cidade dele.</p></div>
+  </div>
   <h3>Cores e fonte</h3>
   <div class="grade-3">
     {% for campo, rotulo, ajuda in [('cor', 'Cor principal', 'menu, botões e títulos'), ('cor_detalhe', 'Cor dos detalhes', 'traços e botões de ação'), ('cor_fundo', 'Cor do fundo', 'fundo das telas')] %}

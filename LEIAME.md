@@ -345,8 +345,9 @@ Como deixar pronto:
    Um feriado nacional não sai. Ao salvar, os toques já marcados para um feriado **mudam sozinhos para o próximo dia de
    envio** de quem envia (e o sistema confere de novo de hora em hora e na hora de enviar).
 
-Cada marca tem os seus acertos. Quem está sem cidade no cadastro segue só os feriados nacionais (e os do estado, se
-tiver a UF). A base tem os anos 2024 a 2026: o feriado que caiu no mesmo dia nesses anos vale todo ano; o que mudou de
+Cada marca tem os seus acertos. Quem está sem cidade no cadastro segue os feriados do **estado e da cidade da marca**
+(Configurações > Marca > "Estado (UF) da marca" e "Cidade da marca"); se a marca também não tiver, só os nacionais (e os
+do estado, se a pessoa tiver a UF). A base tem os anos 2024 a 2026: o feriado que caiu no mesmo dia nesses anos vale todo ano; o que mudou de
 dia (decreto de um ano só) vale só em 2026. Feriado municipal novo ou mudado por decreto: acrescente no quadro.
 
 ### Empresas novas (venda de certificado para empresas recém-abertas)
@@ -700,7 +701,9 @@ O que o admin master faz dentro de uma marca aparece no histórico dela (Configu
 neutra (sem o nome de nenhuma marca); depois de entrar, cada pessoa vê o **nome, o logo, as cores e a fonte da própria
 marca**, e as mensagens dela saem em nome da marca. Quem muda: o administrador da marca, em **Configurações > Marca**
 (nome nas mensagens, nome curto nas telas, "a" ou "o" antes do nome, apresentação curta, site, domínio do e-mail da
-equipe, cor principal, cor dos detalhes, cor do fundo, fonte e logo). O logo vai no menu colorido: de preferência a
+equipe, estado e cidade da marca, cor principal, cor dos detalhes, cor do fundo, fonte e logo). O **estado e a cidade
+da marca** puxam os feriados de quem ainda não informou a própria cidade; ao salvar, os toques que caíam num feriado
+dela mudam de dia. O logo vai no menu colorido: de preferência a
 versão branca, em PNG com fundo transparente, até 300 KB. Se o logo veio num fundo branco ou cinza (JPG) e aparece
 como um retângulo no menu, marque **"Tirar o fundo liso do logo"** e salve (com o arquivo novo ou, sem arquivo, para o
 logo de agora): o fundo some e o logo fica direto na cor do menu. Logo escuro ou colorido pode sumir no menu sem o fundo:

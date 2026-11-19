@@ -70,6 +70,10 @@ class MarcaAR(Base):
     cor_detalhe: Mapped[str] = mapped_column(String(7), default="")  # detalhes e botões de ação
     cor_fundo: Mapped[str] = mapped_column(String(7), default="")  # fundo das telas
     fonte: Mapped[str] = mapped_column(String(40), default="")  # uma de marca.FONTES; vazio = Inter
+    # onde a marca fica (pedido da Maria em 19/11/2026: "é para puxar os feriados"): os feriados de quem não informou
+    # a própria cidade (feriados.local_da_pessoa)
+    uf: Mapped[str] = mapped_column(String(2), default="")
+    cidade: Mapped[str] = mapped_column(String(120), default="")  # o nome como o IBGE escreve
     logo: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True, deferred=True)  # para fundo colorido
     logo_tipo: Mapped[str] = mapped_column(String(20), default="")  # image/png...; vazio = sem logo
     # largura/altura do logo: largo (marca.LOGO_LARGO) fica sozinho na linha de cima do menu; vazio = ainda não medido

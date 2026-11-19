@@ -69,8 +69,8 @@
     <h2>Onde cada pessoa trabalha</h2>
     <table>{% for p in f.pessoas %}<tr><td>{{ p.nome }}</td><td>{{ (p.cidade ~ ' (' ~ p.uf ~ ')') if p.uf and p.cidade else (p.uf or '—') }}</td></tr>
       {% else %}<tr><td class="vazio">Ninguém ainda.</td></tr>{% endfor %}</table>
-    {% if f.sem_local %}<p class="pequeno suave">Sem cidade no cadastro (só os feriados nacionais): {{ f.sem_local|map(attribute='nome')|join(', ') }}.
-      Ajuste em <a href="/configuracoes?aba=usuarios">Usuários</a>.</p>{% endif %}
+    {% if f.sem_local %}<p class="pequeno suave">Sem cidade no cadastro ({{ ('seguem a cidade da marca, ' ~ f.marca_local) if f.marca_local else 'só os feriados nacionais' }}): {{ f.sem_local|map(attribute='nome')|join(', ') }}.
+      Ajuste em <a href="/configuracoes?aba=usuarios">Usuários</a>{% if not f.marca_local %} ou informe onde a marca fica em <a href="/configuracoes?aba=marca">Marca</a>{% endif %}.</p>{% endif %}
   </div>
   <div class="cartao">
     <h2>Feriados nacionais <span class="pequeno suave">(automáticos)</span></h2>

@@ -287,6 +287,7 @@ def _montar(ar: int, slug: str, nome_ar: str, linha: MarcaAR | None) -> dict:
          "site": valor("site"), "descricao": valor("descricao") or DESCRICAO_PADRAO,
          "dominio_email": valor("dominio_email").lower(), "cor": valor("cor"), "cor_detalhe": valor("cor_detalhe"),
          "cor_fundo": valor("cor_fundo"), "fonte": valor("fonte"), "titulo": f"{curto} Parceiros",
+         "uf": valor("uf").upper()[:2], "cidade": valor("cidade"),
          "logo_url": (endereco_do_logo(ar, int(linha.atualizado_em.timestamp()))
                       if linha is not None and linha.logo_tipo and linha.atualizado_em else "")}
     m["logo_largo"] = bool(m["logo_url"] and (linha.logo_proporcao or 0) >= LOGO_LARGO)
@@ -309,7 +310,7 @@ def da_plataforma(db=None) -> dict:
     m = _com_frase({"ar": None, "slug": "", "e_ms": False, "plataforma": True, "nome": nome, "curto": "sua empresa",
                     "artigo": "a", "site": "", "descricao": "", "dominio_email": "", "cor": "", "cor_detalhe": "",
                     "cor_fundo": "", "fonte": "", "titulo": nome, "logo_url": "", "logo_largo": False, "css": "",
-                    "fonte_url": ""})
+                    "fonte_url": "", "uf": "", "cidade": ""})
     if db is not None:
         _guardadas["plataforma"] = (time.monotonic() + VALIDADE, m)
     return m
@@ -504,6 +505,19 @@ def salvar(db, ar: int, dados: dict, novo_logo: bytes | None = None, tirar_logo:
                 setattr(linha, campo, cor.upper())
     if "fonte" in dados:
         linha.fonte = dados["fonte"] if dados["fonte"] in FONTES and dados["fonte"] != "Inter" else ""
+    if "uf" in dados or "cidade" in dados:  # onde a marca fica: o nome da cidade como o IBGE escreve
+        from . import feriados
+
+        uf = feriados.normalizar_uf(str(dados.get("uf", linha.uf) or ""))
+        cidade = str(dados.get("cidade", linha.cidade) or "")
+        if feriados.normalizar_cidade(cidade) and not uf:
+            problemas.append("Escolha também o estado (UF) da cidade da marca.")
+        else:
+            linha.uf = uf
+            linha.cidade, aviso = feriados.conferir_cidade(uf, cidade)
+            linha.cidade = linha.cidade[:120]
+            if aviso:
+                problemas.append(aviso)
     if novo_logo:
         problema = problema_no_logo(novo_logo)
         if problema:
