@@ -50,18 +50,21 @@ Regras fixas de segurança:
 ## Módulos de cada AR
 
 Os módulos (`autorizacao.MODULOS`: Vendas, Agenda, IA SDR, Prospecção, Assertiva, Conversas, IA Comercial, Portal e
-E-mail em HTML) ligam e desligam partes inteiras: desligado, as permissões do módulo somem (o menu e as rotas fecham;
-`mensagem_sem_permissao` explica). Cada AR tem os seus e só o Admin Master muda: em **Painel master > Módulos de cada
-AR** (`POST /master/ar/{id}/modulos`) ou em Permissões > Módulos estando dentro da AR (fora de uma AR, essa tela muda o
-padrão da plataforma). A AR sem valor próprio usa o da plataforma; sem nenhum, o de `config.CONFIG_PADRAO` (Vendas,
-Agenda e E-mail em HTML começam desligados; os outros, ligados).
+E-mail em HTML) ligam e desligam partes inteiras: desligado, as permissões do módulo somem (o menu e as rotas fecham).
+Quem abre uma tela de módulo desligado lê quem liga e onde (`mensagem_sem_permissao`: "Quem liga é o admin master, em
+Painel master > Módulos de cada AR"; fora de uma AR, "em Permissões > Módulos (padrão da plataforma)"; até 19/11/2026
+mandava todos para Permissões > Módulos, aba que só o master vê). Cada AR tem os seus e só o Admin Master muda: em
+**Painel master > Módulos de cada AR** (`POST /master/ar/{id}/modulos`) ou em Permissões > Módulos estando dentro da
+AR (fora de uma AR, essa tela muda o padrão da plataforma). A AR sem valor próprio usa o da plataforma; sem nenhum, o
+de `config.CONFIG_PADRAO` (Vendas, Agenda e E-mail em HTML começam desligados; os outros, ligados).
 
 **Módulo novo:** entrada em `autorizacao.MODULOS`, a chave em `banco.CHAVES_DA_AR` **e** em `banco.CHAVES_SO_MASTER`
 e, se começar desligado, o "0" em `config.CONFIG_PADRAO`. Fora das duas listas, o Painel master grava na plataforma e o
 que o master faz numa AR vale para todas: aconteceu com a Assertiva até 19/11/2026 (no banco de produção nenhuma AR
 nem a plataforma tinham valor gravado, então não houve nada a limpar). Teste: `testes/test_modulos_por_ar.py` (toda
 chave de módulo nas duas listas; desligar a Assertiva do Grupo Certy não muda a MS nem a plataforma, o painel mostra
-cada AR com o seu estado, e o menu "Consulta Assertiva" e a permissão `assertiva.consultar` somem só no Grupo Certy).
+cada AR com o seu estado, e o menu "Consulta Assertiva" e a permissão `assertiva.consultar` somem só no Grupo Certy,
+com o aviso apontando o Painel master).
 
 ## Hierarquia (17/11/2026)
 

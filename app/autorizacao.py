@@ -571,8 +571,14 @@ def filtrar(consulta, usuario: Usuario, permissao: str, coluna, sem_dono: bool =
 def mensagem_sem_permissao(db: Session, permissao: str) -> str:
     p = POR_CODIGO[permissao]
     if p.modulo and not modulos_ligados(db).get(p.modulo, True):
-        return (f"A parte \"{MODULOS[p.modulo][0]}\" está desligada. O administrador liga em "
-                "Permissões > Módulos.")
+        # Desde a Fase 3 os módulos são de cada AR e só o Admin Master liga, no Painel master (até 19/11/2026 o aviso
+        # mandava todos para Permissões > Módulos, aba que só ele vê). Fora de uma AR vale o padrão da plataforma,
+        # que ele muda nessa aba.
+        from .banco import _ar_da_config
+
+        onde = ("Painel master > Módulos de cada AR" if _ar_da_config(db)
+                else "Permissões > Módulos (padrão da plataforma)")
+        return f"A parte \"{MODULOS[p.modulo][0]}\" está desligada. Quem liga é o admin master, em {onde}."
     return f"Você não tem permissão para isso ({p.nome.lower()}). Se precisar, peça ao administrador."
 
 

@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import delete, select
 
 from app import autorizacao, isolamento
-from app.banco import CHAVES_DA_AR, CHAVES_SO_MASTER, ler_config, sessao, usar_config_da_ar
+from app.banco import CHAVES_DA_AR, CHAVES_SO_MASTER, gravar_config, ler_config, sessao, usar_config_da_ar
 from app.main import app
 from app.modelos import Configuracao, ConfiguracaoAR, Tenant, Usuario
 from app.seguranca import limite_pedidos, resumir_senha
@@ -123,6 +123,9 @@ def test_assertiva_liga_e_desliga_so_na_ar_escolhida(cliente):
         assert adm_ms.get("/assertiva").status_code == 200
         r = adm_certy.get("/assertiva")
         assert r.status_code == 403 and "está desligada" in r.text
+        # o aviso diz quem liga e onde (antes mandava para Permissões > Módulos, aba que só o master vê)
+        assert "Quem liga é o admin master" in r.text and "Painel master &gt; Módulos de cada AR" in r.text
+        assert "Permissões &gt; Módulos" not in r.text
 
         # o Admin Master liga de novo: volta para o Grupo Certy, e a MS segue igual
         form["csrf"] = csrf_de(cliente.get("/master").text)
@@ -133,3 +136,16 @@ def test_assertiva_liga_e_desliga_so_na_ar_escolhida(cliente):
     finally:
         _devolver(foto)
     assert _foto() == foto
+
+
+def test_aviso_de_modulo_desligado_fora_de_uma_ar_aponta_o_padrao_da_plataforma(cliente):
+    """Fora de uma AR (o Admin Master na plataforma) vale o padrão da plataforma, que ele muda em Permissões > Módulos."""
+    with sessao() as db:
+        gravar_config(db, "modulo_assertiva", "0")  # sem AR: na plataforma, só dentro deste teste (desfeito abaixo)
+        db.flush()
+        try:
+            texto = autorizacao.mensagem_sem_permissao(db, "assertiva.consultar")
+        finally:
+            db.rollback()
+    assert texto.startswith('A parte "Consultas na Assertiva') and "está desligada" in texto
+    assert texto.endswith("Quem liga é o admin master, em Permissões > Módulos (padrão da plataforma).")
