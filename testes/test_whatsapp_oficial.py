@@ -369,3 +369,29 @@ def test_webhook_completa_a_conta_de_mensagens(cliente):
     assert _assinado(cliente, evento).status_code == 200
     assert _waba() == "333444555"
     _waba("998877")
+
+
+# ---------------------------------------------------------------- teste recusado à vista e no registro (19/11/2026)
+
+def test_teste_recusado_aparece_no_alto_e_fica_no_registro(cliente, monkeypatch):
+    _zerar_limite()
+    _admin(EMAIL_MS, "MS Certificação Digital")
+    _conta_da_ms()
+    chamadas = _meta_falsa(monkeypatch)
+    c = _entrar(EMAIL_MS)
+    tela = c.get("/whatsapp").text
+    # "hello_world" escrito sem o idioma: vai em inglês (o modelo de exemplo só existe em en_US)
+    r = c.post("/whatsapp/oficial/teste", data={"csrf": csrf_de(tela), "telefone": "(81) 98888-1111",
+                                                 "modelo": "hello_world", "idioma": ""})
+    assert "Mensagem de teste enviada" in r.text
+    assert chamadas[-1][2]["json"]["template"]["language"] == {"code": "en_US"}
+    # a Meta recusa: o motivo aparece preso no alto da tela (com o × para fechar) e fica no registro de atividades
+    monkeypatch.setattr(whatsapp_cloud.httpx, "request", lambda *a, **k: _Resposta(
+        {"error": {"message": "(#131042) Business eligibility payment issue", "code": 131042}}, 400))
+    r = c.post("/whatsapp/oficial/teste", data={"csrf": csrf_de(tela), "telefone": "(81) 98888-1111"})
+    assert "O teste não saiu" in r.text and "131042" in r.text
+    assert 'class="avisos-da-acao"' in r.text and "fechar-aviso" in r.text
+    with sessao() as db:
+        log = db.execute(select(LogAuditoria).where(LogAuditoria.acao == "teste_whatsapp_oficial_recusado")
+                         .order_by(LogAuditoria.id.desc())).scalars().first()
+        assert log is not None and "131042" in log.detalhes

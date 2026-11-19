@@ -162,6 +162,14 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #9cc1e6; border-c
 .aviso-erro { background: var(--erro-claro); color: var(--erro); border-color: #f4c7c1; }
 .aviso-alerta { background: var(--alerta-claro); color: #8a5a10; border-color: #f5dfa8; }
 .aviso-info { background: var(--azul-claro); color: var(--azul); border-color: #c9dbee; }
+/* Avisos de uma ação (salvar, testar, enviar...): presos no alto da tela, para aparecerem mesmo quando a página pula
+   para um quadro mais embaixo (#âncora); o × fecha e os de sucesso somem sozinhos (app.js). Pedido da Maria em
+   19/11/2026: o erro do teste da API oficial ficava fora da vista. */
+.avisos-da-acao { position: sticky; top: 8px; z-index: 40; }
+.avisos-da-acao .aviso { position: relative; padding-right: 40px; box-shadow: 0 4px 14px rgba(15, 23, 42, .12); }
+.fechar-aviso { position: absolute; top: 6px; right: 8px; border: 0; background: none; color: inherit; font-size: 20px;
+                line-height: 1; cursor: pointer; opacity: .7; padding: 2px 6px; }
+.fechar-aviso:hover { opacity: 1; }
 
 /* ---------- Abas ---------- */
 .abas { display: flex; gap: 4px; border-bottom: 1px solid var(--borda); margin-bottom: 16px; flex-wrap: wrap; }

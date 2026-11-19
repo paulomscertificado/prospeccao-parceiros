@@ -255,8 +255,8 @@ def ativar_numero(db, conta: ContaWhatsAppOficial, senha: str, repeticao: str | 
 def enviar_teste(conta: ContaWhatsAppOficial, telefone: str, modelo: str = "", idioma: str = "") -> str:
     """Manda um modelo aprovado (o de exemplo da Meta, se nenhum for escolhido) para um número da própria equipe."""
     nome = (modelo or "").strip()
-    if nome:
-        lingua = (idioma or "").strip() or "pt_BR"
+    if nome:  # sem idioma: o do modelo de exemplo (só existe em inglês) ou português
+        lingua = (idioma or "").strip() or (MODELO_DE_TESTE[1] if nome == MODELO_DE_TESTE[0] else "pt_BR")
     else:
         nome, lingua = MODELO_DE_TESTE
     return whatsapp_cloud.enviar_modelo(conta.phone_number_id, token(conta), telefone, nome, lingua)

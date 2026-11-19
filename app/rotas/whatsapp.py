@@ -197,7 +197,10 @@ async def mensagem_de_teste_oficial(request: Request, usuario: Usuario = Depends
     telefone = str(form.get("telefone", "")).strip()
     try:
         wamid = whatsapp_oficial.enviar_teste(conta, telefone, str(form.get("modelo", "")), str(form.get("idioma", "")))
-    except whatsapp_cloud.ErroWhatsApp as erro:
+    except whatsapp_cloud.ErroWhatsApp as erro:  # o motivo fica no registro (para conferir depois)
+        registrar_log(db, usuario, "teste_whatsapp_oficial_recusado", "whatsapp_oficial", conta.id,
+                      f"mensagem de teste para {telefone}: {erro}", request, modulo="WhatsApp")
+        db.commit()
         avisar(request, f"O teste não saiu: {erro}", "erro")
         return voltar("/whatsapp#oficial")
     registrar_log(db, usuario, "teste_whatsapp_oficial", "whatsapp_oficial", conta.id,
@@ -258,6 +261,9 @@ async def teste_modelo_oficial(request: Request, usuario: Usuario = Depends(exig
     try:
         nome = whatsapp_oficial.enviar_teste_renovacao(db, conta, telefone)
     except whatsapp_cloud.ErroWhatsApp as erro:
+        registrar_log(db, usuario, "teste_aviso_whatsapp_oficial_recusado", "whatsapp_oficial", conta.id,
+                      f"aviso de exemplo para {telefone}: {erro}", request, modulo="WhatsApp")
+        db.commit()
         avisar(request, f"O aviso de exemplo não saiu: {erro}", "erro")
         return voltar("/whatsapp#modelos")
     registrar_log(db, usuario, "teste_aviso_whatsapp_oficial", "whatsapp_oficial", conta.id,

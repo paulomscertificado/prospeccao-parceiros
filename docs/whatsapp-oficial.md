@@ -48,7 +48,9 @@ começou a montar o portfólio pela conta de Carol (passo a passo abaixo); nada 
   `whatsapp.gerenciar_todos`; o Admin Master configura dentro da AR ("Entrar na AR"). Rotas:
   `POST /whatsapp/oficial` (salvar e testar), `/whatsapp/oficial/testar`, `/whatsapp/oficial/teste` (um modelo
   aprovado para um número da equipe; padrão `hello_world`/`en_US`, o de exemplo da Meta), `/whatsapp/oficial/remover`
-  e `/whatsapp/oficial/ativar` (abaixo).
+  e `/whatsapp/oficial/ativar` (abaixo). Teste recusado pela Meta: o motivo aparece no aviso (preso no alto da
+  tela, `.avisos-da-acao` do `base.html`, 19/11/2026) e fica no registro de atividades (`teste_whatsapp_oficial_recusado`,
+  `teste_aviso_whatsapp_oficial_recusado`). `hello_world` escrito sem idioma vai em `en_US`.
   Token/chave em branco ao salvar = continuam os de antes. O ID da conta do WhatsApp Business pode ficar em branco:
   ao testar, o sistema descobre pelo token (`whatsapp_cloud.contas_do_token`: permissões granulares do
   `debug_token`) e **liga o app à conta** (`whatsapp_cloud.inscrever_app`, `POST /{waba}/subscribed_apps`; sem isso o

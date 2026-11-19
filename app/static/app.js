@@ -71,6 +71,13 @@
     if (msg && !confirm(msg)) ev.preventDefault();
   });
 
+  // Avisos de uma ação (presos no alto da tela): o × fecha; os de sucesso somem sozinhos depois de 15 s.
+  document.addEventListener('click', (ev) => {
+    const fechar = ev.target.closest('.fechar-aviso');
+    if (fechar) fechar.closest('.aviso').remove();
+  });
+  setTimeout(() => document.querySelectorAll('.avisos-da-acao .aviso-ok').forEach((el) => el.remove()), 15000);
+
   // Menu no celular.
   const botaoMenu = document.getElementById('abrir-menu');
   if (botaoMenu) botaoMenu.addEventListener('click', () => document.querySelector('.menu').classList.toggle('aberto'));

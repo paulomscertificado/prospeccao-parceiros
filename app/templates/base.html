@@ -33,7 +33,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
   {% if marca.fonte_url %}<link rel="stylesheet" href="{{ marca.fonte_url }}">{% endif %}
-  <link rel="stylesheet" href="/static/estilo.css?v=14">
+  <link rel="stylesheet" href="/static/estilo.css?v=15">
   {# white label, Fase 5: cores e fonte da marca da AR (app/marca.py, tema; só #RRGGBB e fontes da lista) #}
   {% if marca.css %}<style>:root { {{ marca.css|safe }} }</style>{% endif %}
   {% if marca.logo_url and not marca.logo_largo %}<link rel="icon" href="{{ marca.logo_url }}">{% endif %}{# largo vira um risquinho na aba #}
@@ -60,14 +60,14 @@
     {% if ar_entrada_nome %}<form method="post" action="/master/sair" class="aviso aviso-alerta" style="display:flex;gap:12px;align-items:center">
       <input type="hidden" name="csrf" value="{{ csrf }}"><span>Você está dentro da <b>{{ ar_entrada_nome }}</b>: vê e mexe só no que é dela{% if ar_entrada_ate %} (até as {{ hora_de(ar_entrada_ate) }}){% endif %}.</span>
       <button class="btn">Sair da AR</button></form>{% endif %}
-    {% for tipo, texto in avisos %}<div class="aviso aviso-{{ tipo }}">{{ texto }}</div>{% endfor %}
+    {% if avisos %}<div class="avisos-da-acao" role="status">{% for tipo, texto in avisos %}<div class="aviso aviso-{{ tipo }}">{{ texto }}<button type="button" class="fechar-aviso" aria-label="Fechar aviso" title="Fechar">×</button></div>{% endfor %}</div>{% endif %}
     {% block conteudo %}{% endblock %}
   </main>
 </div>
 {% else %}
   {% block publico %}{% endblock %}
 {% endif %}
-<script src="/static/app.js?v=1"></script>
+<script src="/static/app.js?v=2"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>
