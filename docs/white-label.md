@@ -150,8 +150,9 @@ menu lê as da AR da pessoa em `web.tela`).
 
 **Testes:** `testes/test_master.py` (o portão: administradora do Grupo Certy recebe 404 no /master e não muda papel,
 modelo, cadência, categoria nem módulo da plataforma; o master entra com motivo, vê só a AR e sai; AR suspensa não
-entra; módulos por AR; papel de mesmo nome em duas ARs). O teste do porteiro (`test_permissoes`) voltou a enxergar as
-rotas (o FastAPI novo guarda os routers incluídos à parte).
+entra; módulos por AR; papel de mesmo nome em duas ARs) e `testes/test_modulos_por_ar.py` (toda chave de módulo nas
+duas listas; a Assertiva ficou de fora até 19/11/2026 e o painel ligava/desligava em todas as ARs). O teste do
+porteiro (`test_permissoes`) voltou a enxergar as rotas (o FastAPI novo guarda os routers incluídos à parte).
 
 **Feito em 14/11/2026:** administradores das ARs promovidos (Paulo Lucas e Jefferson na AR MS, Thamires no Grupo
 Certy; só o Admin Master dá o papel de administrador, e ele pede o código do celular na entrada).

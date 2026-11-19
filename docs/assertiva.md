@@ -35,7 +35,7 @@ lugar da CNPJá.
 | Regras e conversa com a API | `app/assertiva.py`: `salvar`, `testar`, `preparar` (confere CPF/CNPJ/telefone/e-mail/nome), `consultar` (reaproveita a mesma consulta dos últimos 30 dias, a não ser com `de_novo`), `resumo` (o que a tela mostra), `usar_no_lead` |
 | Telas e rotas | `app/rotas/assertiva.py`: `/assertiva` (menu "Consulta Assertiva"), `/assertiva/consultar`, `/assertiva/consulta/{id}`, `/leads/{id}/assertiva` (botão "Buscar contatos na Assertiva" na ficha), `/leads/{id}/assertiva/usar`, `/configuracoes/assertiva` (+ `/testar`, `/apagar`) |
 | Quadro em Configurações > Integrações | `templates/configuracoes.html` (`id="assertiva"`), montado por `rotas/assertiva.painel` |
-| Permissão | `assertiva.consultar` (grupo Leads, módulo `assertiva`, padrão administrador e gestor). Salvar/testar/apagar as credenciais: `configuracoes.alterar`. O módulo "Consultas na Assertiva" pode ser desligado por marca |
+| Permissão | `assertiva.consultar` (grupo Leads, módulo `assertiva`, padrão administrador e gestor). Salvar/testar/apagar as credenciais: `configuracoes.alterar`. O módulo "Consultas na Assertiva" (chave `modulo_assertiva`, ligado por padrão) liga e desliga por marca em Painel master > Módulos de cada AR (só o Admin Master; até 19/11/2026 valia para todas as marcas de uma vez, `docs/permissoes.md` > Módulos de cada AR) |
 | Testes | `testes/test_assertiva.py` (a Assertiva é simulada: `assertiva._post`/`_get`) |
 
 Regras importantes:

@@ -759,10 +759,11 @@ Cada perfil acima é um **papel**. Em **Configurações > Papéis e permissões*
    Ao lado aparece o **acesso real** da pessoa: o que ela consegue fazer agora e por quê.
 4. **Equipes:** crie equipes (ex.: "Unidade Recife") e escolha a equipe de cada pessoa em Configurações > Usuários.
    Serve para o alcance "Só a equipe" (ex.: um líder que vê os leads do time dele).
-5. **Módulos:** ligue ou desligue partes inteiras (Vendas, Agenda, IA SDR, Prospecção, Conversas, IA Comercial,
-   Portal). Desligado some do menu **e fica bloqueado para todos**. O módulo **E-mail em HTML com a marca** não tem
-   menu: ligado, o 2º e-mail em diante das campanhas sai em HTML com a marca; desligado, sai só em texto. Por marca, o
-   admin master libera em Painel master > Módulos de cada AR.
+5. **Módulos:** ligue ou desligue partes inteiras (Vendas, Agenda, IA SDR, Prospecção, Consulta Assertiva, Conversas,
+   IA Comercial, Portal). Desligado some do menu **e fica bloqueado para todos**. Para ligar ou desligar só numa marca,
+   o admin master usa **Painel master > Módulos de cada AR** (as outras marcas não mudam). O módulo **E-mail em HTML
+   com a marca** não tem menu: ligado, o 2º e-mail em diante das campanhas sai em HTML com a marca; desligado, sai só
+   em texto.
 
 Se alguém tentar abrir um lead, parceiro, cliente ou venda de outra pessoa trocando o número no endereço, o sistema
 responde "Página não encontrada". Toda mudança de permissão fica no **Registro de atividades**. Quem receber poder de

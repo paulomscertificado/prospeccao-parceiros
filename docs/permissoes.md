@@ -18,7 +18,7 @@ uma mudança localizada: uma coluna `empresa_id` nos registros e mais uma condi�
 | Permissão | `autorizacao.CATALOGO` | Ação no padrão `recurso.acao` (ex.: `leads.exportar`, `usuarios.gerenciar`) |
 | Alcance | coluna `escopo` | `tudo`, `abaixo` (a pessoa e quem tem papel de nível menor, na mesma AR), `equipe` (dono na mesma equipe; sem equipe = próprios) ou `proprios` — só nas permissões marcadas `com_escopo` |
 | Exceção | `excecoes_permissao` | PERMITIR ou NEGAR para uma pessoa, com alcance, prazo (`ate`) e motivo |
-| Módulo | `configuracoes` (`mostrar_vendas`, `mostrar_agenda`, `modulo_*`) | Liga/desliga partes inteiras para todos |
+| Módulo | `configuracoes_ar` da AR; sem valor próprio, `configuracoes` da plataforma (`mostrar_vendas`, `mostrar_agenda`, `modulo_*`) | Liga/desliga partes inteiras de cada AR (só o Admin Master muda; ver "Módulos de cada AR") |
 
 **Ordem de decisão:** módulo desligado → NEGAR do usuário → PERMITIR do usuário → papel → nega.
 
@@ -46,6 +46,22 @@ Regras fixas de segurança:
 - `oportunidades.ver` não tem alcance desde 16/11/2026 (pedido da Maria: "deixe aberto para toda equipe ver"): quem
   tem a permissão vê e atende todas as oportunidades da AR. A ficha do lead continua no alcance de `leads.ver` e o
   "Assumir lead" da ficha no de `leads.editar`.
+
+## Módulos de cada AR
+
+Os módulos (`autorizacao.MODULOS`: Vendas, Agenda, IA SDR, Prospecção, Assertiva, Conversas, IA Comercial, Portal e
+E-mail em HTML) ligam e desligam partes inteiras: desligado, as permissões do módulo somem (o menu e as rotas fecham;
+`mensagem_sem_permissao` explica). Cada AR tem os seus e só o Admin Master muda: em **Painel master > Módulos de cada
+AR** (`POST /master/ar/{id}/modulos`) ou em Permissões > Módulos estando dentro da AR (fora de uma AR, essa tela muda o
+padrão da plataforma). A AR sem valor próprio usa o da plataforma; sem nenhum, o de `config.CONFIG_PADRAO` (Vendas,
+Agenda e E-mail em HTML começam desligados; os outros, ligados).
+
+**Módulo novo:** entrada em `autorizacao.MODULOS`, a chave em `banco.CHAVES_DA_AR` **e** em `banco.CHAVES_SO_MASTER`
+e, se começar desligado, o "0" em `config.CONFIG_PADRAO`. Fora das duas listas, o Painel master grava na plataforma e o
+que o master faz numa AR vale para todas: aconteceu com a Assertiva até 19/11/2026 (no banco de produção nenhuma AR
+nem a plataforma tinham valor gravado, então não houve nada a limpar). Teste: `testes/test_modulos_por_ar.py` (toda
+chave de módulo nas duas listas; desligar a Assertiva do Grupo Certy não muda a MS nem a plataforma, o painel mostra
+cada AR com o seu estado, e o menu "Consulta Assertiva" e a permissão `assertiva.consultar` somem só no Grupo Certy).
 
 ## Hierarquia (17/11/2026)
 
