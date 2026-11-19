@@ -39,8 +39,10 @@ base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renova
    (`INTERVALO_MINIMO_DIAS`). A etapa (`etapa_do_dia`) é a mais adiantada entre o último aviso cujo dia já chegou (como
    para quem está desde o começo) e a dos dias que faltam (12, 6, 3 e 1: faltam 7 a 12 = 1º aviso, 4 a 6 = lembrete, 2
    ou 3 = "Faltam poucos dias", 1 ou vence hoje = "Último aviso"); quem recebe cada aviso no dia certo fica sempre com
-   o próprio aviso. Começando por outro aviso, o primeiro WhatsApp leva a frase do SAIR do 1º aviso (`linha_do_sair`,
-   `_com_sair_no_primeiro`). As datas vão prontas para `cadencias.aplicar`
+   o próprio aviso. Começando por outro aviso, o primeiro contato se apresenta como o 1º aviso: a frase que diz quem
+   escreve ("Aqui é {vendedor}, da {minha_empresa}.", tirada do 1º aviso por `_frase_de_apresentacao` e posta depois
+   da saudação por `_com_apresentacao`), com a marca de quem é a campanha, no WhatsApp e no e-mail, e no WhatsApp a
+   frase do SAIR (`linha_do_sair`); é o `primeiro=` de `textos_do_contato`. As datas vão prontas para `cadencias.aplicar`
    (`datas_por_lead`); o "dia" dos passos da cadência só ordena. Cada tarefa guarda em `certificado_id` o certificado
    que define as datas (`depois_de_montar`).
    **Teto por dia** (`agenda`, `datas_da_campanha`): com a planilha de 12/11/2026, 100 contatos teriam o 1º aviso no
@@ -55,9 +57,15 @@ base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renova
    sai com o texto, o assunto e o tipo (`angulo`, `acao`, `passo_id`) do aviso de agora; os avisos do mesmo canal que
    ele substitui são cancelados ("o aviso anterior atrasou e saiu já com o texto desta etapa"), e o seguinte também, se
    ficaria a menos de 2 dias. Se o aviso desta etapa (ou um depois dela) já saiu por aquele canal, o atrasado é
-   cancelado e não sai. O primeiro WhatsApp do contato na campanha sem a frase do SAIR ganha a frase. Campanha
-   aprovada depois (`reajustar_na_aprovacao`): os avisos de etapas que passaram são cancelados ("a etapa deste aviso
-   já passou") e o primeiro que fica ganha a frase do SAIR.
+   cancelado e não sai. O primeiro aviso do contato na campanha por um canal se apresenta (quem escreve; no WhatsApp,
+   o SAIR); o WhatsApp que não é o 1º aviso e chega sem o SAIR, sem nenhum WhatsApp antes (ex.: o 1º foi cancelado
+   num feriado), também. Campanha aprovada depois (`reajustar_na_aprovacao`): os avisos de etapas que passaram são
+   cancelados ("a etapa deste aviso já passou") e o primeiro que fica se apresenta.
+   **Todas as marcas:** os dias dos avisos, os textos e os "Outros feriados" da Renovação são da plataforma (iguais
+   para todas as ARs); os feriados do estado e da cidade são os do dono da campanha (`feriados.da_pessoa`, com as
+   listas da AR dele) e a marca do texto é a dele (`marca.da_pessoa`). Assim a etapa e o texto saem iguais seja quem
+   for que dispare: a fila (sem tela), a pessoa da AR ou o Admin Master de fora (a cadência é buscada pelo id, sem o
+   filtro da AR). Teste: `testes/test_renovacao_ar.py::test_etapa_e_apresentacao_valem_igual_para_todas_as_marcas`.
    Começa em `primeiro_dia` (hoje, se o horário de envio de hoje não acabou). Quem só tem e-mail não ocupa vaga.
 5. **Textos** (`textos_do_contato`, editáveis na tela, `renov_mensagens`): `{vencimentos}` vira a frase do certificado
    ("O certificado digital e-CNPJ A1 em nome de X vence no dia dd/mm/aaaa." / "O seu certificado..." no e-CPF do

@@ -328,7 +328,8 @@ def test_aprovada_depois_conta_as_datas_do_vencimento(cliente):
         primeira = next(i for i, d in enumerate(esperado) if d is not None)
         assert primeira >= 2 and all(t.status == "cancelada" and "etapa" in t.resultado for t in avisos[:primeira])
         assert avisos[primeira].status == "pendente" and avisos[primeira].data >= date.today()
-        assert "SAIR" in avisos[primeira].mensagem  # o primeiro WhatsApp do cliente leva a frase do SAIR
+        # o primeiro WhatsApp do cliente diz quem escreve e leva a frase do SAIR
+        assert "SAIR" in avisos[primeira].mensagem and "Aqui é " in avisos[primeira].mensagem
         db.rollback()
 
 
@@ -1380,6 +1381,7 @@ def test_quem_entra_tarde_comeca_pelo_aviso_da_etapa(cliente, monkeypatch):
         admin = _admin(db)
         renovacao.importar(db, renovacao.ler_planilha("r.xlsx", _planilha(linhas))[0], admin)
         cid = renovacao.criar_campanha(db, admin, quantidade=10).id
+        admin_id, admin_nome = admin.id, renovacao.util.primeiro_nome(admin.nome)
     _montar(cid)
     with sessao() as db:
         tarefas = db.execute(select(Tarefa).where(Tarefa.campanha_id == cid)).scalars().all()
@@ -1393,6 +1395,13 @@ def test_quem_entra_tarde_comeca_pelo_aviso_da_etapa(cliente, monkeypatch):
         assert not any(t.angulo in ("renov_aviso", "renov_lembrete") for t in tarefas)
         assert "SAIR" in zaps[0].mensagem and all("SAIR" not in t.mensagem for t in zaps[1:])
         assert "PERTO DO FIM LTDA" in zaps[0].mensagem
+        # o primeiro contato diz quem escreve, com a marca de quem é a campanha (no WhatsApp e no e-mail)
+        from app import marca
+
+        apresentacao = f"Aqui é {admin_nome}, da {marca.da_pessoa(db.get(Usuario, admin_id))['nome']}."
+        emails = sorted((t for t in tarefas if t.canal == "email"), key=lambda t: (t.data, t.hora))
+        assert apresentacao in zaps[0].mensagem and emails and apresentacao in emails[0].mensagem
+        assert all("Aqui é " not in t.mensagem for t in zaps[1:])
         _limpar(db)
         db.commit()
 
@@ -1422,7 +1431,8 @@ def test_aviso_atrasado_sai_com_o_texto_da_etapa(cliente, monkeypatch):
         db.flush()
         campanhas.processar_fila_whatsapp(db, maximo=1000)
         meus = [texto for empresa, texto in enviados if empresa == "CLIENTE 9300001 LTDA"]
-        assert len(meus) == 1 and meus[0].startswith("Olá! Último aviso:") and "SAIR" in meus[0]
+        assert len(meus) == 1 and meus[0].startswith("Olá! Aqui é ") and "Último aviso:" in meus[0]
+        assert "SAIR" in meus[0]
         assert f"vence no dia {cert.data_vencimento:%d/%m/%Y}" in meus[0]
         assert aviso.angulo == "renov_ultimo" and aviso.mensagem == meus[0]
         assert all(t.status == "cancelada" and t.resultado == renovacao.JUNTADO_AO_ATRASADO for t in outros.values())
@@ -1450,7 +1460,9 @@ def test_email_atrasado_e_etapa_que_ja_saiu(cliente):
         etapa = renovacao.etapa_do_dia(cert.data_vencimento, date.today(), True, renovacao.dias_aviso(db),
                                        renovacao.dias_sem_envio(db, dono))
         novo = list(renovacao.ANGULOS)[etapa]
-        texto = renovacao.textos_do_contato(db, renovacao.Contato(renovacao.chave_do_contato(cert), [cert]), dono)[novo]
+        contato = renovacao.Contato(renovacao.chave_do_contato(cert), [cert])
+        texto = renovacao.textos_do_contato(db, contato, dono, primeiro=novo)[novo]  # 1º e-mail: diz quem escreve
+        assert "Aqui é " in texto["email"]
         assert etapa >= 2 and renovacao.ajustar_a_etapa(db, primeiro)
         assert primeiro.angulo == novo and (primeiro.assunto, primeiro.mensagem) == (texto["assunto"], texto["email"])
         assert primeiro.mensagem_email == texto["email"] and primeiro.assunto_email == texto["assunto"]
@@ -1468,13 +1480,12 @@ def test_email_atrasado_e_etapa_que_ja_saiu(cliente):
 
 
 def test_aviso_no_dia_certo_nao_muda_e_enviar_agora_volta_se_falhar(cliente, monkeypatch):
-    """Aviso no dia dele: o texto e o tipo ficam (só ganha a frase do SAIR se for o primeiro WhatsApp e não tiver).
-    "Enviar agora" que não sai devolve o aviso como estava (texto e tipo), para acertar de novo na próxima vez."""
+    """Aviso no dia dele: o texto e o tipo ficam como estão. "Enviar agora" que não sai devolve o aviso como estava
+    (texto e tipo), para acertar de novo na próxima vez."""
     with sessao() as db:
         camp, cert, aviso = _cenario(db, 40, "9300003", "(81) 98555-0003")
         assert renovacao.ajustar_a_etapa(db, aviso)
-        assert aviso.angulo == "renov_aviso" and aviso.mensagem.startswith("Olá! O certificado digital vence em breve.")
-        assert aviso.mensagem.rstrip().endswith("SAIR.)")
+        assert aviso.angulo == "renov_aviso" and aviso.mensagem == "Olá! O certificado digital vence em breve."
         _, _, atrasado = _cenario(db, 1, "9300004", "(81) 98555-0004")
         original = atrasado.mensagem
         tentativas = []
@@ -1487,6 +1498,6 @@ def test_aviso_no_dia_certo_nao_muda_e_enviar_agora_volta_se_falhar(cliente, mon
         monkeypatch.setattr(campanhas.mensagens, "dentro_do_horario", lambda db: True)
         monkeypatch.setattr(renovacao, "fora_do_horario", lambda db, momento=None, margem_minutos=0: "")
         erro = campanhas.enviar_toque_agora(db, atrasado, _admin(db))
-        assert tentativas and tentativas[0].startswith("Olá! Último aviso:")  # tentou com o texto da etapa
+        assert tentativas and "Último aviso:" in tentativas[0]  # tentou com o texto da etapa
         assert erro and atrasado.angulo == "renov_aviso" and atrasado.mensagem == original
         db.rollback()

@@ -462,8 +462,9 @@ renovação novo antes, para entrarem os clientes de janeiro).
   resumo: "57 certificados digitais que você acompanha vencem entre..."). Nunca uma mensagem por certificado.
 - **Datas:** 30, 15, 5 e 1 dia antes do vencimento. Quem entra mais tarde começa pelo aviso que combina com os
   **dias que faltam** (ex.: com 12, 6, 3 e 1 dia, quem vence amanhã recebe só o **Último aviso**, nunca o 1º; faltando
-  2 ou 3 dias, o **Faltam poucos dias**), já com a frase do SAIR, e depois só os seguintes que ainda cabem (nunca em
-  dias seguidos). Aviso que atrasou (número desconectado, fila parada) também sai com o texto dos dias que faltam no
+  2 ou 3 dias, o **Faltam poucos dias**). Esse primeiro aviso se apresenta como o 1º ("Olá, Paula! Aqui é Thamires,
+  da Grupo Certy. Último aviso: ...", com a marca de quem montou a campanha) e traz a frase do SAIR; depois vêm só os
+  seguintes que ainda cabem (nunca em dias seguidos). Aviso que atrasou (número desconectado, fila parada) também sai com o texto dos dias que faltam no
   dia em que sai, e os avisos repetidos são cancelados sozinhos. Aviso que cairia no sábado ou no domingo vem para a sexta antes;
   quem vence no fim de semana tem o último aviso na sexta (se preciso, o aviso anterior vem um dia antes para caber).
 - **WhatsApp primeiro, e-mail depois:** igual às Empresas novas (o e-mail de cada aviso sai umas 2 horas depois do

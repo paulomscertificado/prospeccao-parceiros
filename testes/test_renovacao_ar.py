@@ -7,10 +7,12 @@ não guarda o número de outra pessoa. CNPJs, celulares e e-mails só destes tes
 com o CNPJ de outro teste vira "duplicado" lá).
 """
 
+from datetime import date, timedelta
+
 from sqlalchemy import select
 
-from app import campanhas, renovacao, trabalhos
-from app.banco import gravar_config, ler_config, sessao
+from app import campanhas, marca, renovacao, trabalhos, util
+from app.banco import agora, gravar_config, ler_config, sessao, usar_config_da_ar
 from app.isolamento import ligar
 from app.modelos import Campanha, Certificado, ConexaoWhatsApp, Lead, Tarefa, Tenant, Trabalho, Usuario
 from app.seguranca import resumir_senha
@@ -162,3 +164,71 @@ def test_campanha_nao_guarda_o_numero_de_outra_pessoa(cliente, monkeypatch):
         with sessao() as db:
             gravar_config(db, "renov_conexao", antes)
             _limpar(db)
+
+
+def _aviso_atrasado(db, ar: int, dono: Usuario, protocolo: str, celular: str) -> Tarefa:
+    """Campanha de renovação aprovada da AR `ar`, com um cliente que vence amanhã e o 1º aviso atrasado (de ontem)."""
+    cad = renovacao.garantir_cadencia(db)
+    passo = next(p for p in cad.passos if p.angulo == "renov_aviso")
+    camp = Campanha(tenant_id=ar, nome=f"Renovação marcas {protocolo}", tipo="renovacao", status="ativa",
+                    usuario_id=dono.id, canais="whatsapp", aprovado_em=agora(), cadencia_id=cad.id)
+    lead = Lead(tenant_id=ar, empresa=f"CLIENTE MARCAS {protocolo} LTDA", whatsapp=celular, status="Abordagem criada",
+                vendedor_id=dono.id, origem=renovacao.ORIGEM_LEAD)
+    db.add_all([camp, lead])
+    db.flush()
+    cert = Certificado(tenant_id=ar, origem="planilha", protocolo=protocolo, cliente_nome=lead.empresa,
+                       tipo="e-CNPJ A1", data_vencimento=date.today() + timedelta(days=1), status="Ativo",
+                       campanha_id=camp.id, lead_id=lead.id, whatsapp=celular)
+    db.add(cert)
+    db.flush()
+    t = Tarefa(tenant_id=ar, tipo="prospeccao", lead_id=lead.id, campanha_id=camp.id, certificado_id=cert.id,
+               canal="whatsapp", data=date.today() - timedelta(days=1), hora="10:00", status="pendente",
+               angulo="renov_aviso", acao=passo.acao, passo_id=passo.id, mensagem="Olá! 1º aviso antigo.")
+    db.add(t)
+    db.flush()
+    return t
+
+
+def test_etapa_e_apresentacao_valem_igual_para_todas_as_marcas(cliente):
+    """Pedido da Maria (19/11/2026): "valide que isso vai funcionar perfeitamente com todas as marcas". O aviso atrasado
+    de quem vence amanhã sai como "Último aviso", dizendo quem escreve com a marca DA CAMPANHA (Grupo Certy ou MS) e
+    com o SAIR, seja quem for que dispare: a fila (sem tela), a própria pessoa da AR ou o Admin Master de fora."""
+    with sessao() as db:
+        _limpar(db)
+        certy = _pessoa(db, "Thamires AR", "thamires.ar@grupocerty.com.br", "admin", "Grupo Certy")
+        ars = _ids_ar(db)
+        ms = db.execute(select(Usuario).where(Usuario.email == "lucas.marcas@mscertificados.com.br")).scalars().first()
+        if ms is None:
+            ms = Usuario(nome="Lucas Marcas MS", email="lucas.marcas@mscertificados.com.br", perfil="admin",
+                         senha_hash=resumir_senha("senhaRenovAR123"), tenant_id=ars["ms"])
+            db.add(ms)
+            db.flush()
+        master = db.execute(select(Usuario).where(Usuario.master.is_(True))).scalars().first()
+        assert certy.tenant_id == ars["grupo-certy"] and ms.tenant_id == ars["ms"] and master is not None
+        # a marca em nome de quem cada um escreve (a mesma conta de textos_do_contato)
+        nome_certy, nome_ms = marca.da_pessoa(certy, db=db)["nome"], marca.da_pessoa(ms, db=db)["nome"]
+        assert nome_certy != nome_ms
+        ids = {"certy": certy.id, "ms": ms.id, "master": master.id}
+        avisos = {}
+        for quem, (ar, dono) in {"fila": (ars["grupo-certy"], certy), "tela": (ars["grupo-certy"], certy),
+                                 "master": (ars["grupo-certy"], certy), "ms": (ars["ms"], ms)}.items():
+            avisos[quem] = _aviso_atrasado(db, ar, dono, f"77100{len(avisos)}", f"(81) 98771-100{len(avisos)}").id
+        db.commit()
+    for quem, contexto in (("fila", None), ("tela", "certy"), ("master", "master"), ("ms", "ms")):
+        with sessao() as db:
+            if contexto:  # na tela da pessoa (o Admin Master fora de qualquer AR vê tudo)
+                ligar(db, db.get(Usuario, ids[contexto]))
+            t = db.get(Tarefa, avisos[quem])
+            if contexto is None:  # a fila: as configurações da AR da tarefa, como em processar_fila_whatsapp
+                usar_config_da_ar(db, t.tenant_id)
+            assert renovacao.ajustar_a_etapa(db, t), quem
+            nome, dono = (nome_ms, "Lucas") if quem == "ms" else (nome_certy, "Thamires")
+            assert t.angulo == "renov_ultimo" and t.acao == "Último aviso", quem  # o tipo do aviso também muda
+            assert t.mensagem.startswith(f"Olá! Aqui é {dono}, da {nome}. Último aviso:"), (quem, t.mensagem)
+            assert "SAIR" in t.mensagem and "1º aviso antigo" not in t.mensagem, quem
+            outra = nome_ms if quem != "ms" else nome_certy
+            assert outra not in t.mensagem, quem  # nunca a marca da outra AR
+            db.rollback()
+    with sessao() as db:
+        _limpar(db)
+        db.commit()

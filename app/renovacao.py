@@ -57,6 +57,7 @@ ANGULOS = {
     "renov_reforco": "Faltam poucos dias (5 dias antes)",
     "renov_ultimo": "Último aviso (1 dia antes)",
 }
+PRIMEIRO_AVISO = "renov_aviso"  # o único que diz quem escreve e traz o SAIR (ver textos_do_contato, primeiro=)
 CADENCIA_NOME = "Renovação – avisos (30, 15, 5 e 1 dia antes do vencimento)"
 # O "dia" do passo só ordena e aparece na tela: a data de cada aviso é contada do vencimento de cada contato
 # (datas_dos_avisos, passada para cadencias.aplicar em datas_por_lead).
@@ -925,8 +926,29 @@ def bloco_vencimentos(certificados: list[Certificado]) -> str:
             "lista completa.")
 
 
-def textos_do_contato(db, contato: Contato, usuario: Usuario | None) -> dict:
-    """Mensagens dos 4 avisos para o contato (WhatsApp, e-mail com a assinatura e assunto)."""
+def _frase_de_apresentacao(modelo: str) -> str:
+    """A frase do 1º aviso que diz quem escreve (padrão: "Aqui é {vendedor}, da {minha_empresa}.")."""
+    achada = re.search(r"[^.!?\n]*\{minha_empresa\}[^.!?\n]*[.!?]?", modelo or "")
+    return achada.group(0).strip() if achada else ""
+
+
+def _com_apresentacao(modelo: str, frase: str) -> str:
+    """O texto de outro aviso com a frase que diz quem escreve logo depois da saudação ("Olá, {responsavel}! Aqui é
+    {vendedor}, da {minha_empresa}. Último aviso:"); sem saudação, no começo. Já fala da empresa: fica como está."""
+    if not frase or "{minha_empresa}" in (modelo or ""):
+        return modelo
+    primeira, quebra, resto = (modelo or "").partition("\n")
+    achada = re.match(r"(\s*(?:olá|oi|bom dia|boa tarde|boa noite)\b[^!?.\n]*[!?.])\s*(.*)$", primeira, re.IGNORECASE)
+    if not achada:
+        return f"{frase}\n\n{modelo}"
+    return f"{achada.group(1)} {frase}" + (f" {achada.group(2)}" if achada.group(2) else "") + quebra + resto
+
+
+def textos_do_contato(db, contato: Contato, usuario: Usuario | None, primeiro: str = "") -> dict:
+    """Mensagens dos 4 avisos para o contato (WhatsApp, e-mail com a assinatura e assunto). `primeiro`: o aviso que é
+    o primeiro contato da campanha quando não é o 1º aviso (entrou tarde ou atrasou; pedido da Maria em 19/11/2026):
+    como o 1º aviso, ele diz quem escreve ("Aqui é Thamires, da Grupo Certy.", com a marca de quem é a campanha) e,
+    no WhatsApp, traz a frase do SAIR."""
     from . import marca
 
     vendedor = util.primeiro_nome(usuario.nome) if usuario and usuario.perfil != "parceiro" else "a equipe"
@@ -941,9 +963,20 @@ def textos_do_contato(db, contato: Contato, usuario: Usuario | None) -> dict:
             texto = re.sub(r",?[ \t]*\{responsavel\}", "", texto)  # "Olá, {responsavel}!" vira "Olá!"
         return re.sub(r"\{(" + "|".join(CAMPOS_DA_MENSAGEM) + r")\}", lambda x: valores[x.group(1)], texto)
 
-    return {a: {"whatsapp": trocar(t["whatsapp"]), "email": trocar(t["email"]) + assinatura,
-                "assunto": trocar(t["assunto"])[:200], "fonte": "renovacao"}
-            for a, t in mensagens(db).items()}
+    modelos = mensagens(db)
+    e_outro = bool(primeiro) and primeiro != PRIMEIRO_AVISO and primeiro in modelos
+    if e_outro:
+        base = modelos[PRIMEIRO_AVISO]
+        modelos = {**modelos, primeiro: {
+            **modelos[primeiro],
+            "whatsapp": _com_apresentacao(modelos[primeiro]["whatsapp"], _frase_de_apresentacao(base["whatsapp"])),
+            "email": _com_apresentacao(modelos[primeiro]["email"], _frase_de_apresentacao(base["email"]))}}
+    textos = {a: {"whatsapp": trocar(t["whatsapp"]), "email": trocar(t["email"]) + assinatura,
+                  "assunto": trocar(t["assunto"])[:200], "fonte": "renovacao"}
+              for a, t in modelos.items()}
+    if e_outro:
+        textos[primeiro]["whatsapp"] = com_sair(textos[primeiro]["whatsapp"], linha_do_sair(db))
+    return textos
 
 
 # ---------------------------------------------------------------- Campanha
@@ -1134,9 +1167,9 @@ def etapa_preparar(campanha_id: int, estado: dict, prazo: float) -> bool:
                 for c in certs:
                     c.campanha_id, c.lead_id = campanha_id, lead.id
                 estado["escolhidos"].append(lead.id)
-                # entrou tarde e começa por um aviso que não é o 1º: a frase do SAIR vai nele
-                estado["textos"][str(lead.id)] = _com_sair_no_primeiro(db, textos_do_contato(db, contato, usuario),
-                                                                       datas)
+                # entrou tarde e começa por um aviso que não é o 1º: ele diz quem escreve e traz o SAIR
+                estado["textos"][str(lead.id)] = textos_do_contato(db, contato, usuario,
+                                                                   primeiro=_angulo_do_primeiro(datas))
                 estado["datas"][str(lead.id)] = [d.isoformat() if d else None for d in datas]
             db.commit()
         estado["feitos"] += len(lote)
@@ -1252,10 +1285,8 @@ def reajustar_na_aprovacao(db, camp: Campanha, rascunhos: list[Tarefa]) -> list[
                 continue
             if t.canal == "whatsapp":
                 zaps[t.angulo] = t
-                if primeira and i == primeira:  # começa por um aviso que não é o 1º: a frase do SAIR vai nele
-                    t.mensagem = com_sair(t.mensagem, linha_do_sair(db))
-                    if (t.mensagem_whatsapp or "").strip():
-                        t.mensagem_whatsapp = com_sair(t.mensagem_whatsapp, linha_do_sair(db))
+            if primeira and i == primeira:  # começa por um aviso que não é o 1º: ele diz quem escreve e traz o SAIR
+                _textos_de_primeiro(db, t, dono)
             if t.data != nova:
                 zap = zaps.get(t.angulo) if t.canal == "email" else None
                 if zap is not None:
@@ -1281,15 +1312,37 @@ def com_sair(texto: str, linha: str) -> str:
     return (texto or "").rstrip() + "\n\n" + linha
 
 
-def _com_sair_no_primeiro(db, textos: dict, datas: list) -> dict:
-    """Contato que começa por um aviso que não é o 1º (entrou tarde): a frase do SAIR, que só o 1º aviso tem, vai no
-    WhatsApp do primeiro aviso dele."""
+def _angulo_do_primeiro(datas: list) -> str:
+    """O aviso que sai primeiro para o contato, quando não é o 1º aviso ("" = é o 1º, ou nenhum)."""
     primeira = next((i for i, d in enumerate(datas) if d is not None), None)
     angulos = list(ANGULOS)
-    if primeira and primeira < len(angulos) and angulos[primeira] in textos:
-        aviso = textos[angulos[primeira]]
-        aviso["whatsapp"] = com_sair(aviso.get("whatsapp", ""), linha_do_sair(db))
-    return textos
+    return angulos[primeira] if primeira and primeira < len(angulos) else ""
+
+
+def _usar_textos(t: Tarefa, texto: dict) -> None:
+    """Grava no aviso os textos novos ({"whatsapp", "email", "assunto"}): o do canal dele e as versões guardadas do outro
+    canal que ele já tinha (cadencias.aplicar deixa cada mensagem num canal só)."""
+    if t.canal == "email":
+        t.assunto, t.mensagem = texto["assunto"], texto["email"]
+    else:
+        t.mensagem = texto["whatsapp"]
+    if (t.mensagem_whatsapp or "").strip():
+        t.mensagem_whatsapp = texto["whatsapp"]
+    if (t.mensagem_email or "").strip():
+        t.mensagem_email = texto["email"]
+    if (t.assunto_email or "").strip():
+        t.assunto_email = texto["assunto"]
+
+
+def _textos_de_primeiro(db, t: Tarefa, dono: Usuario | None) -> bool:
+    """O aviso `t` é o primeiro contato da campanha, mas não é o 1º aviso: refaz os textos dele dizendo quem escreve
+    (e, no WhatsApp, com o SAIR), com a marca de quem é a campanha. False = sem certificado ativo (fica como está)."""
+    certs = certificados_do_aviso(db, t)
+    if not certs:
+        return False
+    contato = Contato(chave_do_contato(certs[0]), certs)
+    _usar_textos(t, textos_do_contato(db, contato, dono, primeiro=t.angulo)[t.angulo])
+    return True
 
 
 JUNTADO_AO_ATRASADO = "Não saiu: o aviso anterior atrasou e saiu já com o texto desta etapa"
@@ -1297,13 +1350,13 @@ PERTO_DO_ATRASADO = "Não saiu: ficaria a menos de 2 dias do aviso atrasado, que
 ETAPA_JA_SAIU = "Não saiu: o aviso desta etapa (ou um depois dela) já tinha sido enviado por este canal"
 
 
-def _ja_recebeu_whatsapp(db, t: Tarefa) -> bool:
-    """O contato já recebeu algum WhatsApp desta campanha?"""
+def _ja_recebeu(db, t: Tarefa) -> bool:
+    """O contato já recebeu alguma mensagem desta campanha pelo canal deste aviso?"""
     from . import mensagens as registro
     from .modelos import Mensagem
 
     return db.execute(select(Mensagem.id).where(
-        Mensagem.lead_id == t.lead_id, Mensagem.campanha_id == t.campanha_id, Mensagem.canal == "whatsapp",
+        Mensagem.lead_id == t.lead_id, Mensagem.campanha_id == t.campanha_id, Mensagem.canal == t.canal,
         Mensagem.direcao == "saida", Mensagem.status.in_(registro.ENVIADAS)).limit(1)).first() is not None
 
 
@@ -1313,9 +1366,11 @@ def ajustar_a_etapa(db, t: Tarefa, hoje: date | None = None) -> bool:
     mas a de acordo com os dias que faltam"). Aviso atrasado (número desconectado, fila parada, e-mail esperando a
     conta) cuja etapa já passou ganha o texto, o assunto e o tipo do aviso de agora (etapa_do_dia); os avisos do mesmo
     canal que ele substitui são cancelados, e o seguinte também, se ficaria a menos de INTERVALO_MINIMO_DIAS dias
-    (nunca em dias seguidos). O primeiro WhatsApp que o contato recebe na campanha leva a frase do SAIR. Chamado por
-    todos os envios (filas, Minha fila, Disparar, Agenda e API oficial). Devolve False quando este aviso não deve mais
-    sair: o desta etapa (ou um depois dele) já saiu por este canal; ele fica cancelado."""
+    (nunca em dias seguidos). O primeiro aviso que o contato recebe na campanha por um canal, quando não é o 1º aviso,
+    diz quem escreve, com a marca de quem é a campanha, e no WhatsApp traz o SAIR (textos_do_contato, primeiro=).
+    Vale igual para todas as marcas: dias, textos e feriados vêm da campanha e do dono dela, não de quem clica.
+    Chamado por todos os envios (filas, Minha fila, Disparar, Agenda e API oficial). Devolve False quando este aviso
+    não deve mais sair: o desta etapa (ou um depois dele) já saiu por este canal; ele fica cancelado."""
     from .modelos import PassoCadencia
 
     if t is None or t.angulo not in ANGULOS or not t.campanha_id or not t.lead_id:
@@ -1342,19 +1397,13 @@ def ajustar_a_etapa(db, t: Tarefa, hoje: date | None = None) -> bool:
         certs = certificados_do_aviso(db, t)
         if certs:
             novo = ordem[etapa]
-            texto = textos_do_contato(db, Contato(chave_do_contato(certs[0]), certs), dono)[novo]
-            if t.canal == "email":
-                t.assunto, t.mensagem = texto["assunto"], texto["email"]
-            else:
-                t.mensagem = texto["whatsapp"]
-            if (t.mensagem_whatsapp or "").strip():
-                t.mensagem_whatsapp = texto["whatsapp"]
-            if (t.mensagem_email or "").strip():
-                t.mensagem_email = texto["email"]
-            if (t.assunto_email or "").strip():
-                t.assunto_email = texto["assunto"]
+            primeiro = novo if not _ja_recebeu(db, t) else ""  # o primeiro contato diz quem escreve (e o SAIR)
+            _usar_textos(t, textos_do_contato(db, Contato(chave_do_contato(certs[0]), certs), dono,
+                                              primeiro=primeiro)[novo])
+            # a cadência da campanha (pode ser de outra AR que a de quem clica: a busca é pelo id dela)
             passos = ({p.angulo: p for p in db.execute(select(PassoCadencia).where(
-                PassoCadencia.cadencia_id == camp.cadencia_id)).scalars()} if camp.cadencia_id else {})
+                PassoCadencia.cadencia_id == camp.cadencia_id).execution_options(sem_filtro_de_ar=True)).scalars()}
+                if camp.cadencia_id else {})
             antigo, novo_passo = passos.get(t.angulo), passos.get(novo)
             if novo_passo is not None:
                 if antigo is not None and t.acao == antigo.acao:
@@ -1369,12 +1418,9 @@ def ajustar_a_etapa(db, t: Tarefa, hoje: date | None = None) -> bool:
                     irmao.status, irmao.concluida_em, irmao.resultado = "cancelada", agora(), JUNTADO_AO_ATRASADO
                 elif (irmao.data - hoje).days < INTERVALO_MINIMO_DIAS:
                     irmao.status, irmao.concluida_em, irmao.resultado = "cancelada", agora(), PERTO_DO_ATRASADO
-    if t.canal == "whatsapp" and "SAIR" not in (t.mensagem or "") and not _ja_recebeu_whatsapp(db, t):
-        linha = linha_do_sair(db)
-        if linha:
-            t.mensagem = com_sair(t.mensagem, linha)
-            if (t.mensagem_whatsapp or "").strip():
-                t.mensagem_whatsapp = com_sair(t.mensagem_whatsapp, linha)
+    elif (t.canal == "whatsapp" and t.angulo != PRIMEIRO_AVISO and linha_do_sair(db)
+          and "SAIR" not in (t.mensagem or "") and not _ja_recebeu(db, t)):
+        _textos_de_primeiro(db, t, dono)  # o 1º aviso não saiu (ex.: cancelado no feriado): este se apresenta
     return True
 
 
