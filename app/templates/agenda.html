@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_link_do_aviso.html" import link_do_aviso with context %}
 {% block titulo %}Agenda{% endblock %}
 {% block conteudo %}
 <div class="cabecalho">
@@ -31,7 +32,7 @@
       <span class="selo">{{ {"prospeccao":"Cadência","followup":"Follow-up","reuniao":"Reunião","renovacao":"Renovação","indicacao":"Indicação"}.get(t.tipo, t.tipo) }}</span>
       {% if t.status != 'pendente' %}<span class="selo {{ 'selo-ok' if t.status == 'feita' else '' }}">{{ t.status }}</span>{% endif %}
       <div style="margin-top:4px">
-        {% if t.lead %}<a href="/leads/{{ t.lead.id }}"><b>{{ t.lead.empresa }}</b></a> <span class="suave pequeno">{{ t.lead.responsavel }} · {{ t.lead.status }}</span>
+        {% if t.lead %}{{ link_do_aviso(t.campanha_id, t.lead.id, t.lead.empresa, True) }} <span class="suave pequeno">{{ t.lead.responsavel }} · {{ t.lead.status }}</span>
         {% elif t.cliente %}<b>{{ t.cliente.nome }}</b> <span class="suave pequeno">{{ t.cliente.telefone }}</span>{% endif %}
         {% if t.parceiro %}<span class="pequeno"> · Parceiro responsável: <a href="/parceiros/{{ t.parceiro.id }}">{{ t.parceiro.escritorio }}</a></span>{% endif %}
       </div>

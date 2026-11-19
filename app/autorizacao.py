@@ -547,6 +547,16 @@ def garantir(usuario: Usuario, permissao: str, obj, *, sem_dono: bool = False):
     return obj
 
 
+def ids_que_pode(usuario: Usuario | None, permissao: str, registros) -> set[int]:
+    """Dos registros, os ids dos que a pessoa alcança com a permissão (a mesma conta de `pode`, com o alcance calculado
+    uma vez só). Ex.: as campanhas que ela pode abrir, para a tela só pôr o link onde ele abre."""
+    if not pode(usuario, permissao):
+        return set()
+    visiveis = donos_visiveis(usuario, permissao)
+    return {r.id for r in registros if r is not None
+            and (visiveis is None or any(d in visiveis for d in dono_de(r) if d is not None))}
+
+
 def filtrar(consulta, usuario: Usuario, permissao: str, coluna, sem_dono: bool = False):
     """Restringe a consulta aos registros que a pessoa alcança."""
     ids = donos_visiveis(usuario, permissao)

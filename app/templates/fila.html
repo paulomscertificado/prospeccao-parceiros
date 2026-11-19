@@ -2,6 +2,7 @@
 {% block titulo %}Minha fila{% endblock %}
 {% block conteudo %}
 {% from "_proximo_envio.html" import estilos_proximos, linha_proximo, cancelar_mostrados with context %}
+{% from "_link_do_aviso.html" import link_do_aviso, link_da_campanha with context %}
 {{ estilos_proximos() }}
 <style>
   .kpis-fila { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); margin-bottom: 16px; }
@@ -98,8 +99,8 @@
   <div class="linha-fila cab-fila"><div>Entrou</div><div>Canal</div><div>Empresa</div><div>Campanha</div><div>Mensagem</div></div>
   {% for m in na_fila %}{% set l = leads_por_id.get(m.lead_id) %}
   <div class="linha-fila"><div class="quando">{{ m.criado_em|datahora }}</div><div>WhatsApp</div>
-    <div>{% if l %}<a href="/leads/{{ l.id }}">{{ l.empresa }}</a>{% else %}—{% endif %}</div>
-    <div>{% if m.campanha_id %}<a href="/campanhas/{{ m.campanha_id }}">{{ nomes_camp.get(m.campanha_id, '') }}</a>{% else %}—{% endif %}</div>
+    <div>{% if l %}{{ link_do_aviso(m.campanha_id, l.id, l.empresa) }}{% else %}—{% endif %}</div>
+    <div>{% if m.campanha_id %}{{ link_da_campanha(m.campanha_id, m.lead_id, nomes_camp.get(m.campanha_id, '')) }}{% else %}—{% endif %}</div>
     <div class="motivo">{{ (m.corpo or '')[:110] }}{{ '…' if (m.corpo or '')|length > 110 }}</div></div>
   {% endfor %}
   <p class="ajuda">Saem pelo WhatsApp Leads, uma de cada vez, com pausas e o limite diário do número. Se o computador do WhatsApp estiver desligado, esperam.</p>
@@ -138,8 +139,8 @@
       </dialog>
       {% else %}<span class="selo">{{ '✉️ E-mail' if c == 'email' else '💬 WhatsApp' }}</span>{% endif %}{% endfor %}
       {% if pode and canais_t|length > 1 %}<div class="pequeno suave">saiu por: {{ CANAIS.get(m.canal) }}</div>{% endif %}</div>
-    <div>{% if l %}<a href="/leads/{{ l.id }}">{{ l.empresa }}</a>{% else %}—{% endif %}
-      {% if m.campanha_id %}<div class="pequeno suave">{{ nomes_camp.get(m.campanha_id, '') }}</div>{% endif %}</div>
+    <div>{% if l %}{{ link_do_aviso(m.campanha_id, l.id, l.empresa) }}{% else %}—{% endif %}
+      {% if m.campanha_id %}<div class="pequeno suave">{{ link_da_campanha(m.campanha_id, m.lead_id, nomes_camp.get(m.campanha_id, '')) }}</div>{% endif %}</div>
     <div><span class="selo {{ st[1] }}">{{ st[0] }}</span>{% if m.respondida %} <span class="selo selo-alerta">respondeu</span>{% endif %}</div>
     <div class="motivo">{% if m.status == 'falhou' and m.erro %}<b style="color:var(--erro)">{{ m.erro }}</b>{% else %}{{ m.assunto or (m.corpo or '')[:90] }}{% endif %}
       {% if pode %}

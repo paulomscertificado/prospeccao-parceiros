@@ -209,7 +209,9 @@ def tela_envios(request: Request, canal: str = "", status: str = "", campanha: s
     camp_q = select(Campanha).where(Campanha.arquivada.is_(False)).order_by(Campanha.criado_em.desc()).limit(100)
     camp_q = autorizacao.filtrar(camp_q, usuario, "envios.ver", Campanha.usuario_id)
     pessoas = {u.id: u.nome for u in db.execute(select(Usuario)).scalars()}
-    nomes_camp = {c.id: c.nome for c in db.execute(select(Campanha)).scalars()}
+    todas_camp = db.execute(select(Campanha)).scalars().all()
+    nomes_camp = {c.id: c.nome for c in todas_camp}
+    abre_campanha = autorizacao.ids_que_pode(usuario, "campanhas.ver", todas_camp)  # o nome leva à campanha
 
     atuais = {"aba": aba, "periodo": periodo, "canal": canal, "status": status, "campanha": str(camp_id or ""),
               "busca": busca.strip(), "lead": str(lead_id or ""), "quando": quando, "situacao": situacao}
@@ -224,6 +226,7 @@ def tela_envios(request: Request, canal: str = "", status: str = "", campanha: s
         "resumo": resumo, "regras": regras, "STATUS_ENVIO": STATUS_ENVIO, "aba": aba, "hoje": hoje,
         "filtros": atuais, "url_envios": url_envios, "campanhas": db.execute(camp_q).scalars().all(),
         "lead_filtro": db.get(Lead, lead_id) if lead_id else None, "pessoas": pessoas, "nomes_camp": nomes_camp,
+        "abre_campanha": abre_campanha,
         "leads_por_id": leads_por_id,
         # aba Enviados
         "grupos_enviados": grupos_enviados, "total_enviados": total_enviados, "limite_lista": LIMITE_LISTA,

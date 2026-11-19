@@ -180,7 +180,10 @@ def agenda(request: Request, ver: str = "hoje", canal: str = "", tipo: str = "",
     # Passos de WhatsApp de campanha que a IA SDR manda sozinha (contato que já conversou com a MS)
     automaticas = {t.id for t in tarefas if t.status == "pendente" and t.canal == "whatsapp" and t.lead and t.campanha_id
                    and ler_config(db, "enviar_whatsapp_automatico") == "1" and whatsapp_liberado(db, t.lead)}
+    ids_camp = {t.campanha_id for t in tarefas if t.campanha_id}
+    camps = db.execute(select(Campanha).where(Campanha.id.in_(ids_camp))).scalars().all() if ids_camp else []
     return tela(request, "agenda.html", {
+        "abre_campanha": autorizacao.ids_que_pode(usuario, "campanhas.ver", camps),  # o nome leva à campanha
         "tarefas": tarefas, "automaticas": automaticas, "ver": ver, "canal": canal, "tipo": tipo, "pendentes_hoje": pendentes_hoje,
         "usuarios": autorizacao.pessoas_visiveis(usuario, "agenda.ver", usuarios), "responsavel": responsavel, "bloqueios": bloqueios,
         "limites": {c: (mensagens.enviadas_hoje(db, c), mensagens.limite_diario(db, c)) for c in ("whatsapp", "email")},

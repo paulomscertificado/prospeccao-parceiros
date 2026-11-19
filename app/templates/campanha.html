@@ -274,12 +274,17 @@
 </div>
 {% endif %}
 
+<style>
+  /* quem chega da Minha fila (#lead-<id>) cai nas mensagens da empresa, com ela em destaque */
+  .lead-da-campanha { scroll-margin-top: 90px; }
+  .lead-da-campanha:target { background: var(--azul-claro); border-radius: 6px; padding: 4px 8px; }
+</style>
 <div class="cartao" id="mensagens"><h2>Mensagens ({{ resumo.tarefas|length }})</h2>
   <p class="suave">Cada empresa tem mensagens próprias. Você pode editar qualquer texto ou tirar uma empresa da campanha antes de aprovar.</p>
   {% set ns = namespace(lead=None) %}
   {% for t in resumo.tarefas %}
     {% if t.lead_id != ns.lead %}{% set ns.lead = t.lead_id %}
-      <hr><h3><a href="/leads/{{ t.lead.id }}">{{ t.lead.empresa }}</a> <span class="pequeno suave">{{ t.lead.categoria.nome if t.lead.categoria else '' }} · score {{ t.lead.score }} · {{ t.lead.fit }}</span>
+      <hr><h3 id="lead-{{ t.lead_id }}" class="lead-da-campanha"><a href="/leads/{{ t.lead.id }}">{{ t.lead.empresa }}</a> <span class="pequeno suave">{{ t.lead.categoria.nome if t.lead.categoria else '' }} · score {{ t.lead.score }} · {{ t.lead.fit }}</span>
         {% if t.status in ('rascunho', 'pendente') %}<form class="inline" method="post" action="/campanhas/{{ c.id }}/remover-lead"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="lead_id" value="{{ t.lead_id }}">
           <select name="motivo" required aria-label="Motivo da retirada" style="width:auto;display:inline-block;padding:2px 6px;font-size:.8rem">
             <option value="">Motivo da retirada…</option>{% for m in config.MOTIVOS_RETIRADA %}<option>{{ m }}</option>{% endfor %}</select>

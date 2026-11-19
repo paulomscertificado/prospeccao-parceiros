@@ -296,7 +296,9 @@ def minha_fila(request: Request, de: str = "", canal: str = "", aba: str = "prox
 
     # Filtros da aba Próximos envios: campanha e busca valem para tudo; o período e a situação mostram quantos há
     # em cada opção, já com os outros filtros aplicados
-    nomes_camp = {c.id: c.nome for c in db.execute(select(Campanha)).scalars()}
+    todas_camp = db.execute(select(Campanha)).scalars().all()
+    nomes_camp = {c.id: c.nome for c in todas_camp}
+    abre_campanha = autorizacao.ids_que_pode(usuario, "campanhas.ver", todas_camp)  # o nome leva à campanha
     camp_id = util.para_int(campanha) or 0
     termo = util.chave_texto(busca)
     base = [p for p in pendentes if (not camp_id or p["t"].campanha_id == camp_id)
@@ -357,7 +359,7 @@ def minha_fila(request: Request, de: str = "", canal: str = "", aba: str = "prox
         select(Usuario).where(Usuario.ativo.is_(True)).order_by(Usuario.nome)).scalars().all()) if escolhe else []
     return tela(request, "fila.html", {
         "pendentes": pendentes, "na_fila": na_fila, "historico": historico, "logs": logs, "resumo": resumo,
-        "leads_por_id": leads_por_id, "nomes_camp": nomes_camp, "STATUS_ENVIO": STATUS_ENVIO, "hoje": hoje,
+        "leads_por_id": leads_por_id, "nomes_camp": nomes_camp, "abre_campanha": abre_campanha, "STATUS_ENVIO": STATUS_ENVIO, "hoje": hoje,
         "no_horario": no_horario, "pessoas": pessoas, "filtro_de": "todos" if (escolhe and de == "todos") else str(next(iter(alvos))),
         "filtro_canal": canal, "horario": (ler_config(db, "horario_envio_inicio"), ler_config(db, "horario_envio_fim")),
         "CANAIS": config.CANAIS, "canais_do_toque": campanhas.canais_do_toque,

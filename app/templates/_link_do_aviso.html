@@ -1,0 +1,21 @@
+{# O nome da empresa num aviso (toque) de campanha abre a CAMPANHA, já nas mensagens daquela empresa (âncora
+   #lead-<id> na página da campanha), para quem pode abrir a campanha; sem campanha (ou sem acesso a ela), a ficha do
+   lead. Pedido da Maria em 19/11/2026: "clicando nos nomes das pessoas dentro do módulo Minha fila, o sistema está
+   direcionando para o lead ao invés da campanha relacionada". Usa do contexto: abre_campanha (ids das campanhas que a
+   pessoa pode abrir: autorizacao.ids_que_pode). Importar com contexto:
+   {% from "_link_do_aviso.html" import link_do_aviso, link_da_campanha with context %} #}
+
+{% macro link_do_aviso(campanha_id, lead_id, nome, negrito=False) -%}
+{%- if campanha_id and abre_campanha is defined and campanha_id in abre_campanha -%}
+<a href="/campanhas/{{ campanha_id }}#lead-{{ lead_id }}" title="Abrir a campanha, nas mensagens desta empresa">
+{%- if negrito %}<b>{{ nome }}</b>{% else %}{{ nome }}{% endif %}</a>
+{%- else -%}
+<a href="/leads/{{ lead_id }}" title="Abrir a ficha do lead">{% if negrito %}<b>{{ nome }}</b>{% else %}{{ nome }}{% endif %}</a>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro link_da_campanha(campanha_id, lead_id, nome) -%}
+{%- if campanha_id and abre_campanha is defined and campanha_id in abre_campanha -%}
+<a href="/campanhas/{{ campanha_id }}{{ '#lead-' ~ lead_id if lead_id }}" title="Abrir a campanha">{{ nome }}</a>
+{%- else -%}{{ nome }}{%- endif -%}
+{%- endmacro %}

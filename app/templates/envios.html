@@ -2,6 +2,7 @@
 {% block titulo %}Envios{% endblock %}
 {% block conteudo %}
 {% from "_proximo_envio.html" import estilos_proximos, filtros_chips, linha_proximo, cancelar_mostrados with context %}
+{% from "_link_do_aviso.html" import link_do_aviso, link_da_campanha with context %}
 {{ estilos_proximos() }}
 <style>
   .kpis-envio { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); margin-bottom: 16px; }
@@ -98,7 +99,7 @@
     <div class="hora-envio">{{ it.quando.strftime('%H:%M') }}</div>
     <div class="canal-icone teste" title="Teste da campanha">🧪</div>
     <div style="min-width:0">
-      <div class="quem">Teste da campanha{% if it.campanha_id %} <a href="/campanhas/{{ it.campanha_id }}">{{ nomes_camp.get(it.campanha_id, '') }}</a>{% endif %}</div>
+      <div class="quem">Teste da campanha{% if it.campanha_id %} {{ link_da_campanha(it.campanha_id, None, nomes_camp.get(it.campanha_id, '')) }}{% endif %}</div>
       <div class="meta"><span>{{ it.resumo }}</span>{% if it.quem %}<span>por {{ it.quem }}</span>{% endif %}<span>não foi para nenhuma empresa</span></div>
     </div>
     <div class="lado"><span class="selo selo-roxo">Teste</span><span class="pequeno suave">{{ '💬 WhatsApp' if it.canal == 'whatsapp' else '✉️ E-mail' }}</span></div>
@@ -108,10 +109,11 @@
     <div class="hora-envio">{{ m.criado_em.strftime('%H:%M') }}</div>
     <div class="canal-icone {{ m.canal }}" title="{{ CANAIS.get(m.canal, m.canal) }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="{{ ICONE_ZAP if m.canal == 'whatsapp' else ICONE_EMAIL }}"/></svg></div>
     <div style="min-width:0">
-      <div class="quem">{% if l %}<a href="/leads/{{ l.id }}">{{ l.empresa }}</a>{% else %}<span class="suave">Contato fora dos leads</span>{% endif %}
+      {# resposta do cliente: a ficha do lead (a conversa); envio de campanha: a campanha #}
+      <div class="quem">{% if l %}{{ link_do_aviso(m.campanha_id if m.status != 'recebida' else None, l.id, l.empresa) }}{% else %}<span class="suave">Contato fora dos leads</span>{% endif %}
         {% if m.status == 'recebida' %}<span class="pequeno suave">respondeu</span>{% endif %}</div>
       <div class="meta">
-        {% if m.campanha_id %}<span>📣 {{ nomes_camp.get(m.campanha_id, 'campanha') }}</span>{% endif %}
+        {% if m.campanha_id %}<span>📣 {{ link_da_campanha(m.campanha_id, m.lead_id, nomes_camp.get(m.campanha_id, 'campanha')) }}</span>{% endif %}
         {% if m.angulo %}<span>{{ config.ANGULOS.get(m.angulo, m.angulo) }}</span>{% endif %}
         <span>{{ 'por ' ~ pessoas.get(m.usuario_id) if m.usuario_id else ('IA SDR' if m.status != 'recebida' else '') }}</span>
         {% if m.canal == 'email' and l and l.email %}<span>{{ l.email }}</span>{% endif %}

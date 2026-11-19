@@ -1,6 +1,7 @@
 {# Peças usadas pela Minha fila e pela tela Envios: o mesmo jeito de mostrar um envio que ainda vai sair.
    Importar com contexto: {% from "_proximo_envio.html" import estilos_proximos, filtros_chips, linha_proximo with context %}
-   A linha usa do contexto: csrf, config, CANAIS, nomes_camp, canais_do_toque e texto_do_canal. #}
+   A linha usa do contexto: csrf, config, CANAIS, nomes_camp, abre_campanha, canais_do_toque e texto_do_canal. #}
+{% from "_link_do_aviso.html" import link_do_aviso, link_da_campanha with context %}
 
 {% macro estilos_proximos() %}
 <style>
@@ -77,8 +78,8 @@
 <div class="linha-fila linha-prox">
   <div class="quando {{ 'atrasado' if p.atrasado }}"><span class="hora-grande">{{ t.hora or '09:00' }}</span><br>{{ t.data.strftime('%d/%m/%Y') }}
     {% if p.atrasado %}<br>atrasado há {{ p.dias }} dia{{ 's' if p.dias > 1 }}{% endif %}</div>
-  <div>{% if t.lead %}<a href="/leads/{{ t.lead.id }}"><b>{{ t.lead.empresa }}</b></a>{% else %}—{% endif %}
-    <div class="pequeno suave"><a href="/campanhas/{{ t.campanha_id }}">{{ nomes_camp.get(t.campanha_id, '') }}</a> · {{ config.ANGULOS.get(t.angulo, t.acao) }}</div></div>
+  <div>{% if t.lead %}{{ link_do_aviso(t.campanha_id, t.lead.id, t.lead.empresa, True) }}{% else %}—{% endif %}
+    <div class="pequeno suave">{{ link_da_campanha(t.campanha_id, t.lead_id, nomes_camp.get(t.campanha_id, '')) }} · {{ config.ANGULOS.get(t.angulo, t.acao) }}</div></div>
   <div class="canais-toque">{% for c in canais_t %}{% set at = texto_do_canal(t, c) %}
     <button type="button" class="selo selo-botao {{ 'selo-azul' if c == t.canal else '' }}" onclick="document.getElementById('msg-{{ t.id }}-{{ c }}').showModal()"
             title="Ver e editar a mensagem de {{ CANAIS.get(c) }}">{{ '✉️ E-mail' if c == 'email' else '💬 WhatsApp' }}</button>

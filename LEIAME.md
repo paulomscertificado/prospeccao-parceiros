@@ -209,7 +209,9 @@ o contato, mas não temos interesse") continua valendo como recusa, e várias me
 e um "Em que posso ajudar?" sozinho também não contam como robô: na dúvida, a resposta aparece como oportunidade. Além disso, a SDR responde no máximo 1 vez por dia para o mesmo contato, para nunca entrar
 numa conversa sem fim. Se o mesmo lead mandar várias mensagens, tudo fica na mesma oportunidade.
 
-**Minha fila (menu):** mostra os seus disparos num lugar só, em 4 abas:
+**Minha fila (menu):** mostra os seus disparos num lugar só, em 4 abas. Clicar no **nome da empresa** (ou no nome da
+campanha logo abaixo) abre a **campanha** daquele envio, já nas mensagens daquela empresa (em destaque); o mesmo vale
+na tela **Envios** e na **Agenda**. Quem não pode abrir aquela campanha vai para a ficha do lead. As abas:
 - **Próximos envios:** o que ainda vai sair, separado por dia (Atrasados, Hoje, Amanhã, os próximos dias) e na ordem
   em que vai sair. Cada envio mostra a situação em destaque (ex.: "Aguardando seu clique", "WhatsApp em branco",
   "Programado") e o botão certo: **Enviar** ou **Cadastrar WhatsApp**/**Cadastrar e-mail**, quando falta o contato.
