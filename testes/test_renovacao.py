@@ -1369,12 +1369,16 @@ def test_etapa_do_dia_pelos_dias_que_faltam():
 
 
 def test_quem_entra_tarde_comeca_pelo_aviso_da_etapa(cliente, monkeypatch):
-    """Vence em 3 dias: a campanha não manda o 1º aviso nem o lembrete; começa por "Faltam poucos dias" (ou pelo último
-    aviso), e esse primeiro WhatsApp leva a frase do SAIR (que só o 1º aviso tem)."""
+    """Vence 2 dias depois do primeiro dia de envio: a campanha não manda o 1º aviso nem o lembrete; começa por "Faltam
+    poucos dias" (ou pelo último aviso), e esse primeiro WhatsApp leva a frase do SAIR (que só o 1º aviso tem). O
+    vencimento é contado do primeiro dia de envio, não de hoje: rodando depois do horário, na véspera de um feriado
+    (19/11/2026, às 18h), o primeiro envio só seria na segunda e um "vence em 3 dias" já teria passado."""
     from app import trabalhos
 
     monkeypatch.setattr(trabalhos.threading, "Thread", _SemLinha)
-    linhas = [_linha(3, "8100001", "e-CNPJ A1 12 meses", "PERTO DO FIM LTDA", "55666777000108", "PAULA PERTO",
+    with sessao() as db:
+        dias = (renovacao.primeiro_dia(db, _admin(db)) - date.today()).days + 2
+    linhas = [_linha(dias, "8100001", "e-CNPJ A1 12 meses", "PERTO DO FIM LTDA", "55666777000108", "PAULA PERTO",
                      "22233344455", "paula@pertodofim.com.br", "81987651001")]
     with sessao() as db:
         _limpar(db)
@@ -1386,9 +1390,10 @@ def test_quem_entra_tarde_comeca_pelo_aviso_da_etapa(cliente, monkeypatch):
     with sessao() as db:
         tarefas = db.execute(select(Tarefa).where(Tarefa.campanha_id == cid)).scalars().all()
         zaps = sorted((t for t in tarefas if t.canal == "whatsapp"), key=lambda t: (t.data, t.hora))
-        venc = date.today() + timedelta(days=3)
-        esperado = renovacao.datas_dos_avisos(venc, renovacao.primeiro_dia(db), True, renovacao.dias_aviso(db),
-                                              renovacao.dias_sem_envio(db))
+        venc = date.today() + timedelta(days=dias)
+        quem = db.get(Usuario, admin_id)
+        esperado = renovacao.datas_dos_avisos(venc, renovacao.primeiro_dia(db, quem), True, renovacao.dias_aviso(db),
+                                              renovacao.dias_sem_envio(db, quem))
         primeira = next(i for i, d in enumerate(esperado) if d is not None)
         angulos = list(renovacao.ANGULOS)
         assert primeira >= 2 and zaps and zaps[0].angulo == angulos[primeira]

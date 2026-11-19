@@ -233,7 +233,9 @@ na tela **Envios** e na **Agenda**. Quem não pode abrir aquela campanha vai par
 Os números do topo também são atalhos: clique em **Atrasados** para ver só os atrasados, em **Para sair hoje** para
 ver os de hoje e os atrasados. Admin e gestor podem ver a fila de outra pessoa ou da equipe toda.
 
-**Oportunidades (menu 🔥):** os leads que responderam. **A equipe toda vê todas as respostas**: ninguém precisa
+**Oportunidades (menu 🔥):** os leads que responderam. O número vermelho ao lado de **Oportunidades** no menu é
+quantas oportunidades **novas** esperam atendimento na sua marca (as mesmas da aba **Novas**); os avisos do sininho
+ficam em **Avisos (N)**, no rodapé do menu. **A equipe toda vê todas as respostas**: ninguém precisa
 "assumir" o lead, quem estiver livre atende o cliente na hora. Quando chega uma resposta nova, **todos da equipe
 recebem o aviso no sininho** (o aviso por e-mail continua indo só para o responsável pelo lead). Quando alguém atende
 ou descarta, o aviso some do sininho de todos. São 4 abas:

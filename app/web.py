@@ -97,7 +97,7 @@ def avisar(request: Request, texto: str, tipo: str = "ok") -> None:
 
 def tela(request: Request, nome: str, contexto: dict | None = None, status_code: int = 200):
     usuario = getattr(request.state, "usuario", None)
-    avisos_novos = 0
+    avisos_novos = oportunidades_novas = 0
     mostrar_vendas = mostrar_agenda = False
     wl = {"disponivel": False, "conectado": False}
     if usuario and usuario.perfil != "parceiro":
@@ -114,6 +114,16 @@ def tela(request: Request, nome: str, contexto: dict | None = None, status_code:
                 Notificacao.usuario_id == usuario.id, Notificacao.lida.is_(False))).scalar() or 0
             mostrar_vendas = ler_config(db, "mostrar_vendas") == "1"
             mostrar_agenda = ler_config(db, "mostrar_agenda") == "1"
+            if autorizacao.pode(usuario, "oportunidades.ver"):
+                # O número do menu Oportunidades: as novas da AR de quem vê, a mesma conta da aba "Novas" (antes eram
+                # os avisos não lidos do sininho, que já estão em "Avisos (N)" no rodapé: no Grupo Certy o menu dizia 6
+                # e a tela, 0 novas; pedido da Maria em 19/11/2026)
+                from . import isolamento
+                from .modelos import Lead, Oportunidade
+
+                isolamento.ligar(db, usuario, request.session.get("ar_entrada") if usuario.master else None)
+                oportunidades_novas = db.execute(select(func.count(Oportunidade.id)).join(
+                    Lead, Oportunidade.lead_id == Lead.id).where(Oportunidade.status == "nova")).scalar() or 0
         from . import conexoes
 
         with FabricaSessao() as db:
@@ -133,6 +143,7 @@ def tela(request: Request, nome: str, contexto: dict | None = None, status_code:
         "ar_entrada_ate": request.session.get("ar_entrada_ate") if usuario and usuario.master else None,
         "hora_de": lambda segundos: datetime.fromtimestamp(segundos).strftime("%H:%M"),
         "avisos_novos": avisos_novos,
+        "oportunidades_novas": oportunidades_novas,
         "wl": wl,
         "csrf": token_csrf(request),
         "avisos": request.session.pop("avisos", []),
