@@ -47,10 +47,13 @@ começou a montar o portfólio pela conta de Carol (passo a passo abaixo); nada 
 - **Tela**: Configurações > WhatsApp, quadro "API oficial da Meta" (`#oficial`), permissão
   `whatsapp.gerenciar_todos`; o Admin Master configura dentro da AR ("Entrar na AR"). Rotas:
   `POST /whatsapp/oficial` (salvar e testar), `/whatsapp/oficial/testar`, `/whatsapp/oficial/teste` (um modelo
-  aprovado para um número da equipe; padrão `hello_world`/`en_US`, o de exemplo da Meta), `/whatsapp/oficial/remover`
+  aprovado para um número da equipe; sem modelo, texto simples), `/whatsapp/oficial/remover`
   e `/whatsapp/oficial/ativar` (abaixo). Teste recusado pela Meta: o motivo aparece no aviso (preso no alto da
   tela, `.avisos-da-acao` do `base.html`, 19/11/2026) e fica no registro de atividades (`teste_whatsapp_oficial_recusado`,
-  `teste_aviso_whatsapp_oficial_recusado`). `hello_world` escrito sem idioma vai em `en_US`.
+  `teste_aviso_whatsapp_oficial_recusado`). Desde 19/11/2026 o teste sem modelo vai como **texto simples**
+  (`TEXTO_DE_TESTE`, de graça; a Meta só entrega para quem escreveu ao número nas últimas 24 h, erro 131047): o
+  `hello_world` só sai dos números de teste da Meta (erro 131058, visto no número da MS). Falha de entrega avisada
+  pelo webhook de uma mensagem que não é de um lead (ex.: o teste) fica no registro (`whatsapp_oficial_nao_entregue`).
   Token/chave em branco ao salvar = continuam os de antes. O ID da conta do WhatsApp Business pode ficar em branco:
   ao testar, o sistema descobre pelo token (`whatsapp_cloud.contas_do_token`: permissões granulares do
   `debug_token`) e **liga o app à conta** (`whatsapp_cloud.inscrever_app`, `POST /{waba}/subscribed_apps`; sem isso o
@@ -173,6 +176,6 @@ como "conta de mensagens" (modelos, cobrança e webhooks) e os nomes dos botões
 8. **Ativar o número** (número novo): senha de 6 números no quadro "Ativar o número na Meta".
 9. **Webhook**: Meta for Developers > app > WhatsApp > Configuração: URL de retorno e token de verificação mostrados na
    tela do sistema; assinar o campo `messages`.
-10. **Enviar teste** para o próprio celular (`hello_world`, `en_US`).
+10. **Enviar teste**: mande antes um "oi" do seu celular para o número oficial; o teste vai como texto simples.
 11. Etapa 2: **Enviar os modelos para a Meta aprovar**; aprovado, **Enviar um aviso de exemplo** e ligar o envio pela
     API na tela Renovação (quadro 4).

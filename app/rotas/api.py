@@ -17,7 +17,7 @@ from ..rotinas import responder_automaticamente, rodada
 from ..banco import agora, gravar_config, ler_config_int, ler_config_json, sessao, usar_config_da_ar
 from ..integracoes import whatsapp_cloud
 from ..modelos import ComandoWhatsApp, Lead, Mensagem, MensagemWhatsApp, PonteWhatsApp
-from ..seguranca import ip_de, limite_api
+from ..seguranca import ip_de, limite_api, registrar_log
 
 rotas = APIRouter(prefix="/api")
 log = logging.getLogger(__name__)
@@ -77,6 +77,11 @@ async def webhook_receber(request: Request):
                 msg.status = situacoes[s["status"]]
                 if s["status"] == "failed" and s.get("erro"):
                     msg.erro = s["erro"]
+            elif msg is None and s["status"] == "failed" and contas.get(s.get("numero_id", "")):
+                # mensagem que não é de um lead (ex.: o teste da tela): o motivo fica no registro de atividades
+                registrar_log(db, None, "whatsapp_oficial_nao_entregue", "whatsapp_oficial",
+                              contas[s["numero_id"]].id, f"a Meta não entregou a mensagem {s['id'][:60]}: "
+                              f"{s.get('erro') or 'sem motivo'}", modulo="WhatsApp")
         for r in recebidas:
             telefone = util.normalizar_telefone(r["de"])
             if not telefone:

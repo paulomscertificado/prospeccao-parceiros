@@ -6,7 +6,7 @@ chave secreta do app (os dois criptografados, nunca voltam para a tela) e o toke
 aqui, a pessoa copia para o painel da Meta).
 
 Etapa 1: guardar, testar a conexão, ativar o número novo na Meta (ativar_numero, com a senha de 6 números), mandar
-uma mensagem de teste (um modelo aprovado, ex.: hello_world) e receber pelo webhook as respostas, o SAIR e a situação
+uma mensagem de teste (texto simples ou um modelo aprovado) e receber pelo webhook as respostas, o SAIR e a situação
 das mensagens.
 Etapa 2 (16/11/2026, pedido da Maria): os modelos do aviso de vencimento (pedir a aprovação e acompanhar) e os avisos
 da Renovação pelo número oficial (Campanha.envio_oficial): fila própria, a arte do site no cabeçalho e os botões
@@ -25,7 +25,15 @@ from .integracoes import whatsapp_cloud
 from .modelos import ContaWhatsAppOficial, ModeloWhatsAppOficial
 from .seguranca import criptografar, descriptografar
 
-MODELO_DE_TESTE = ("hello_world", "en_US")  # o modelo de exemplo que a Meta cria em toda conta nova
+MODELO_DE_TESTE = ("hello_world", "en_US")  # o modelo de exemplo da Meta: só sai dos números de teste dela (131058)
+TEXTO_DE_TESTE = ("Mensagem de teste do sistema pela API oficial do WhatsApp. Se ela chegou, o envio pelo número "
+                  "oficial está funcionando.")
+ERROS_DO_TESTE = {  # os códigos da Meta no envio do teste, explicados para a tela
+    131047: ("A Meta só deixa mandar texto livre para quem escreveu para o número oficial nas últimas 24 horas: mande um "
+             "\"oi\" do celular para o número oficial e tente de novo (ou use um modelo aprovado)."),
+    131058: ("O modelo de exemplo hello_world só sai dos números de teste da Meta: deixe o modelo em branco (o teste vai "
+             "como texto simples) ou escreva o nome de um modelo aprovado."),
+}
 
 
 def da_ar(db) -> ContaWhatsAppOficial | None:
@@ -253,13 +261,21 @@ def ativar_numero(db, conta: ContaWhatsAppOficial, senha: str, repeticao: str | 
 
 
 def enviar_teste(conta: ContaWhatsAppOficial, telefone: str, modelo: str = "", idioma: str = "") -> str:
-    """Manda um modelo aprovado (o de exemplo da Meta, se nenhum for escolhido) para um número da própria equipe."""
+    """Mensagem de teste para um número da própria equipe. Sem modelo: texto simples (de graça; a Meta só entrega para
+    quem escreveu para o número oficial nas últimas 24 horas). Com modelo: o modelo aprovado, no idioma escolhido (sem
+    idioma, português; o hello_world, de exemplo, só existe em inglês e só sai dos números de teste da Meta: erro
+    131058, visto em 19/11/2026, quando o teste passou a ser em texto simples, pedido da Maria)."""
     nome = (modelo or "").strip()
-    if nome:  # sem idioma: o do modelo de exemplo (só existe em inglês) ou português
+    try:
+        if not nome:
+            return whatsapp_cloud.enviar_texto_por(conta.phone_number_id, token(conta), telefone, TEXTO_DE_TESTE)
         lingua = (idioma or "").strip() or (MODELO_DE_TESTE[1] if nome == MODELO_DE_TESTE[0] else "pt_BR")
-    else:
-        nome, lingua = MODELO_DE_TESTE
-    return whatsapp_cloud.enviar_modelo(conta.phone_number_id, token(conta), telefone, nome, lingua)
+        return whatsapp_cloud.enviar_modelo(conta.phone_number_id, token(conta), telefone, nome, lingua)
+    except whatsapp_cloud.ErroWhatsApp as erro:
+        amigavel = ERROS_DO_TESTE.get(erro.codigo)
+        if amigavel:
+            raise whatsapp_cloud.ErroWhatsApp(f"{amigavel} ({erro})", erro.codigo) from None
+        raise
 
 
 # ---------------------------------------------------------------- Etapa 2: modelos e Renovação pela API oficial

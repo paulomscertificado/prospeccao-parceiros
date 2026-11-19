@@ -145,12 +145,14 @@
     <form class="inline" method="post" action="/whatsapp/oficial/teste" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <div><label class="pequeno">Mandar um teste para (com DDD)</label><input type="text" inputmode="tel" name="telefone" placeholder="(81) 99999-0000" style="width:160px"></div>
-      <div><label class="pequeno">Modelo aprovado</label><input type="text" name="modelo" placeholder="hello_world" style="width:150px"></div>
-      <div><label class="pequeno">Idioma</label><input type="text" name="idioma" placeholder="en_US" style="width:80px"></div>
+      <div><label class="pequeno">Modelo aprovado (opcional)</label><input type="text" name="modelo" placeholder="em branco: texto simples" style="width:180px"></div>
+      <div><label class="pequeno">Idioma</label><input type="text" name="idioma" placeholder="pt_BR" style="width:80px"></div>
       <button class="btn btn-verde">Enviar teste</button></form>
     <form class="inline" method="post" action="/whatsapp/oficial/remover" data-confirmar="Remover a API oficial deste sistema? As chaves são apagadas daqui; nada muda na conta da Meta."><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-perigo btn-pequeno">Remover</button></form>
   </div>
-  <p class="pequeno suave">O teste usa o modelo de exemplo que a Meta cria em toda conta (hello_world, em inglês), a não ser que você escreva o nome de outro modelo aprovado. Cada envio é cobrado pela Meta.</p>
+  <p class="pequeno suave">Sem modelo, o teste vai como <b>texto simples</b>, de graça, e só chega para quem escreveu para o
+    número oficial nas últimas 24 horas: mande antes um "oi" do seu celular para ele. Com o nome de um modelo aprovado, chega
+    para qualquer número e é cobrado pela Meta. O modelo de exemplo hello_world só sai dos números de teste da Meta.</p>
 
   <h3 style="margin:22px 0 6px" id="modelos">Modelos do aviso de renovação</h3>
   <p class="pequeno" style="margin:0 0 8px">Para começar a conversa com o cliente, a Meta só aceita um <b>modelo aprovado</b> por ela.

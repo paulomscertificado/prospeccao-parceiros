@@ -632,8 +632,10 @@ Como ligar (o administrador da AR; o Admin Master, dentro da AR):
    ele.
 7. **Webhook**: no Meta for Developers > seu app > WhatsApp > Configuração, cole a **URL de retorno** e o **token de
    verificação** que aparecem na tela do sistema e assine o campo **messages**.
-8. **Enviar teste**: digite o seu celular e clique em **Enviar teste**. Chega o modelo de exemplo da Meta
-   ("hello_world", em inglês). Cada envio é cobrado pela Meta.
+8. **Enviar teste**: mande antes um "oi" do seu celular para o número oficial (a Meta só deixa mandar texto livre
+   para quem escreveu nas últimas 24 horas). Depois digite o seu celular e clique em **Enviar teste**: chega uma
+   mensagem de teste em texto simples, de graça. O modelo de exemplo "hello_world" da Meta não serve: ele só sai dos
+   números de teste dela.
 
 Quem responder ao número oficial: a resposta aparece no lead (para os próximos toques e avisa a equipe) e quem
 mandar SAIR deixa de receber mensagens. Por enquanto, responda pelo app WhatsApp Business do celular.

@@ -119,13 +119,13 @@ def test_tela_guarda_as_chaves_protegidas_testa_e_manda_o_teste(cliente, monkeyp
     with sessao() as db:
         conta = db.execute(select(ContaWhatsAppOficial).where(ContaWhatsAppOficial.phone_number_id == NUMERO_ID)).scalar_one()
         assert conta.nome == "Empresa Oficial 2" and descriptografar(conta.token_cripto) == TOKEN
-    # mensagem de teste: o modelo de exemplo da Meta, para o celular com o 9 da frente
+    # mensagem de teste: texto simples (o hello_world só sai dos números de teste da Meta), celular com o 9 da frente
     r = c.post("/whatsapp/oficial/teste", data={"csrf": csrf_de(tela), "telefone": "(81) 9888-7777"})
     assert "Mensagem de teste enviada" in r.text
     metodo, url, kw = chamadas[-1]
     assert metodo == "POST" and url.endswith(f"/{NUMERO_ID}/messages")
-    assert kw["json"]["to"] == "5581998887777" and kw["json"]["type"] == "template"
-    assert kw["json"]["template"] == {"name": "hello_world", "language": {"code": "en_US"}}
+    assert kw["json"]["to"] == "5581998887777" and kw["json"]["type"] == "text"
+    assert "Mensagem de teste" in kw["json"]["text"]["body"]
     # o token da Meta recusado aparece explicado na tela
     monkeypatch.setattr(whatsapp_cloud.httpx, "request", lambda *a, **k: _Resposta(
         {"error": {"message": "Invalid OAuth access token.", "code": 190}}, 401))
@@ -395,3 +395,33 @@ def test_teste_recusado_aparece_no_alto_e_fica_no_registro(cliente, monkeypatch)
         log = db.execute(select(LogAuditoria).where(LogAuditoria.acao == "teste_whatsapp_oficial_recusado")
                          .order_by(LogAuditoria.id.desc())).scalars().first()
         assert log is not None and "131042" in log.detalhes
+
+
+# ---------------------------------------------------------------- teste em texto simples (19/11/2026)
+
+def test_teste_em_texto_simples_explica_as_recusas_da_meta(cliente, monkeypatch):
+    _zerar_limite()
+    _admin(EMAIL_MS, "MS Certificação Digital")
+    _conta_da_ms()
+    c = _entrar(EMAIL_MS)
+    tela = c.get("/whatsapp").text
+    assert "texto simples" in tela and 'placeholder="hello_world"' not in tela
+    casos = ((131047, {}, "nas últimas 24 horas"), (131058, {"modelo": "hello_world"}, "números de teste da Meta"))
+    for codigo, extra, esperado in casos:
+        monkeypatch.setattr(whatsapp_cloud.httpx, "request", lambda *a, codigo=codigo, **k: _Resposta(
+            {"error": {"message": f"(#{codigo}) Recusado", "code": codigo}}, 400))
+        r = c.post("/whatsapp/oficial/teste", data={"csrf": csrf_de(tela), "telefone": "(81) 98888-2222", **extra})
+        assert "O teste não saiu" in r.text and esperado in r.text, r.text[:400]
+
+
+def test_webhook_guarda_a_falha_de_entrega_que_nao_e_de_um_lead(cliente):
+    _conta_da_ms()
+    evento = {"entry": [{"id": "998877", "changes": [{"value": {
+        "metadata": {"phone_number_id": NUMERO_ID},
+        "statuses": [{"id": "wamid.TESTE-SEM-LEAD", "status": "failed",
+                      "errors": [{"code": 131047, "title": "Re-engagement message"}]}]}}]}]}
+    assert _assinado(cliente, evento).status_code == 200
+    with sessao() as db:
+        log = db.execute(select(LogAuditoria).where(LogAuditoria.acao == "whatsapp_oficial_nao_entregue")
+                         .order_by(LogAuditoria.id.desc())).scalars().first()
+        assert log is not None and "Re-engagement message" in log.detalhes
