@@ -182,6 +182,20 @@ def normalizar_link(valor: str) -> str:
 
 # ---------------------------------------------------------------- Números e datas
 
+def hora_hhmm(valor, padrao: str = "") -> str:
+    """Horário no formato HH:MM, com o zero: "8:12", "08:12", "8h12", "8h" e "8" viram "08:12" ou "08:00". `padrao`
+    quando não dá para entender. Os horários das configurações são comparados como texto: "8:12" sem o zero parecia
+    vir depois de "15:48", e a fila do Grupo Certy ficou parada (19/11/2026)."""
+    texto = str(valor or "").strip().lower().replace("h", ":").replace(".", ":")
+    achou = re.fullmatch(r"(\d{1,2})(?::(\d{1,2}))?:?", texto)
+    if not achou:
+        return padrao
+    hora, minuto = int(achou.group(1)), int(achou.group(2) or 0)
+    if hora > 23 or minuto > 59:
+        return padrao
+    return f"{hora:02d}:{minuto:02d}"
+
+
 def para_int(valor) -> int | None:
     d = so_digitos(valor)
     return int(d) if d else None

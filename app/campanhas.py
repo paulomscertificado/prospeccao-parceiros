@@ -1415,10 +1415,10 @@ class JanelaDeEnvio:
 
 def janela_de_envio(db) -> JanelaDeEnvio:
     """A janela das filas automáticas com as configurações de agora (as da AR de quem vê a tela)."""
-    from . import renovacao
+    from . import renovacao, util
 
-    inicio = ler_config(db, "horario_envio_inicio") or "08:30"
-    fim = ler_config(db, "horario_envio_fim") or "18:00"
+    inicio = util.hora_hhmm(ler_config(db, "horario_envio_inicio"), "08:30")
+    fim = util.hora_hhmm(ler_config(db, "horario_envio_fim"), "18:00")
     return JanelaDeEnvio(inicio=inicio, fim=fim, renov_inicio=renovacao.hora_inicio(db) or inicio,
                          renov_fim=renovacao.hora_fim(db) or fim, feriados_renovacao=renovacao.dias_sem_envio(db),
                          horas_whatsapp=horas_minimas_automatico(db, "whatsapp"),

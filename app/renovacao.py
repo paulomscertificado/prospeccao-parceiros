@@ -265,8 +265,8 @@ def fora_do_horario(db, momento: datetime | None = None, margem_minutos: int = 0
     from .cadencias import _minutos
 
     momento = momento or agora()
-    inicio = hora_inicio(db) or ler_config(db, "horario_envio_inicio") or "08:30"
-    fim = hora_fim(db) or ler_config(db, "horario_envio_fim") or "18:00"
+    inicio = hora_inicio(db) or util.hora_hhmm(ler_config(db, "horario_envio_inicio"), "08:30")
+    fim = hora_fim(db) or util.hora_hhmm(ler_config(db, "horario_envio_fim"), "18:00")
     motivo = f"A Renovação só envia de segunda a sexta, fora os feriados, das {inicio} às {fim}"
     minuto = momento.hour * 60 + momento.minute
     if (momento.weekday() >= 5 or momento.date() in feriados_da_renovacao(db, (momento.year,))

@@ -686,7 +686,10 @@ cliente rápido". Antes cada pessoa via só as respostas dos leads dela e tinha 
   agora), soma as 20 h desde o último envio do canal (`campanhas.ultimos_envios_recentes`, que dá a hora do último
   envio; `leads_com_contato_recente` virou atalho dele), espera o WhatsApp da empresa no e-mail das Empresas novas
   (os WhatsApps são calculados primeiro, `previsto_zap`) e leva para a janela de envio (`campanhas.JanelaDeEnvio` /
-  `janela_de_envio`: dia útil, `horario_envio_inicio`-`fim`; na Renovação também `renov_hora_inicio`-`fim`, feriados e
+  `janela_de_envio`: dia útil, `horario_envio_inicio`-`fim` (sempre lidos com `util.hora_hhmm`: "8:12" vale como
+  "08:12"; Configurações > Geral grava HH:MM e recusa horário inválido ou fim antes do início. Em 19/11/2026 o
+  "8:12" do Grupo Certy, comparado como texto, deixou a AR "fora do horário" e parou a fila dela desde 18/11 12:31;
+  `testes/test_horario_envio.py`); na Renovação também `renov_hora_inicio`-`fim`, feriados e
   os 10 minutos de margem do WhatsApp). A linha mostra "sai hoje às 15:00 / amanhã às 08:41 / 18/11 às 10:00"
   (`quando_sai`) ao lado do selo; a explicação ganha o motivo quando o horário muda ("sai quando completar 20 h do
   último WhatsApp..."). Toque que pode sair agora mas está fora da janela da Renovação passa de "Sai sozinho" para

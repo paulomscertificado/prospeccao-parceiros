@@ -14,7 +14,7 @@ from datetime import date, datetime, time, timedelta
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import selectinload
 
-from . import autorizacao, metricas
+from . import autorizacao, metricas, util
 from .banco import agora, ler_config, ler_config_int
 from .modelos import Historico, Lead, Oportunidade, Tarefa, Usuario
 
@@ -26,7 +26,7 @@ MOSTRAR = 8  # itens por grupo (o resto fica no link "ver todos")
 def _horario(db) -> tuple[time, time]:
     def ler(chave: str, padrao: str) -> time:
         try:
-            return time.fromisoformat(ler_config(db, chave) or padrao)
+            return time.fromisoformat(util.hora_hhmm(ler_config(db, chave), padrao))
         except ValueError:
             return time.fromisoformat(padrao)
 

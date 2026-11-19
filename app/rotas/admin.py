@@ -18,6 +18,7 @@ from ..web import avisar, tela, voltar
 rotas = APIRouter()
 log = logging.getLogger(__name__)
 
+HORARIOS_DE_ENVIO = ("horario_envio_inicio", "horario_envio_fim")  # gravados sempre como HH:MM
 CAMPOS_GERAIS = [
     ("mostrar_vendas", "Mostrar Vendas, Vencimentos e Comissões no menu e no Dashboard (1 = sim, 0 = não)", "numero"),
     ("mostrar_agenda", "Mostrar a Agenda de prospecção (follow-ups) no menu e no Dashboard (1 = sim, 0 = não)", "numero"),
@@ -244,12 +245,24 @@ async def salvar_geral(request: Request, usuario: Usuario = Depends(exige("confi
     alteraveis = [c for c, _, _ in CAMPOS_GERAIS
                   if c in form and (master or (c in CHAVES_DA_AR and c not in CHAVES_SO_MASTER))]
     antes = {c: ler_config(db, c) for c in alteraveis}  # registro de atividades: o antes e o depois
-    for chave, _, tipo in CAMPOS_GERAIS:
+    for chave, rotulo, tipo in CAMPOS_GERAIS:
         if chave in form and (master or (chave in CHAVES_DA_AR and chave not in CHAVES_SO_MASTER)):  # da plataforma: master
             valor = str(form.get(chave)).strip()
             if tipo == "numero":
                 valor = str(util.para_float(valor)).removesuffix(".0")
+            if chave in HORARIOS_DE_ENVIO and valor:  # sempre HH:MM, com o zero (o "8:12" parou a fila em 19/11/2026)
+                normal = util.hora_hhmm(valor)
+                if not normal:
+                    db.rollback()
+                    avisar(request, f"Horário inválido em \"{rotulo}\": escreva como 08:30.", "erro")
+                    return voltar("/configuracoes")
+                valor = normal
             gravar_config(db, chave, valor)
+    inicio, fim = (util.hora_hhmm(ler_config(db, c)) for c in HORARIOS_DE_ENVIO)
+    if inicio and fim and inicio >= fim:
+        db.rollback()
+        avisar(request, "O horário de envio precisa terminar depois de começar (ex.: das 08:30 às 18:00).", "erro")
+        return voltar("/configuracoes")
     registrar_log(db, usuario, "salvou_configuracoes", "configuracao", None, request=request,
                   mudancas=diferencas(antes, {c: ler_config(db, c) for c in alteraveis}))
     db.commit()

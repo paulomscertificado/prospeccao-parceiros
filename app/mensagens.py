@@ -187,8 +187,8 @@ def dentro_do_horario(db: Session, momento: datetime | None = None) -> bool:
     momento = momento or agora()
     if momento.weekday() >= 5:
         return False
-    inicio = ler_config(db, "horario_envio_inicio") or "08:30"
-    fim = ler_config(db, "horario_envio_fim") or "18:00"
+    inicio = util.hora_hhmm(ler_config(db, "horario_envio_inicio"), "08:30")  # "8:12" vale como "08:12"
+    fim = util.hora_hhmm(ler_config(db, "horario_envio_fim"), "18:00")
     return inicio <= momento.strftime("%H:%M") < fim
 
 
