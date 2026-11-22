@@ -47,7 +47,7 @@ PERMISSAO_DO_MENU = {
     "/oportunidades": "oportunidades.ver", "/empresas-novas": "campanhas.configurar", "/renovacao": "campanhas.configurar", "/prospeccao": "prospeccao.buscar", "/assertiva": "assertiva.consultar", "/leads": "leads.ver",
     "/agenda": "agenda.ver", "/cadencias": "cadencias.ver", "/parceiros": "parceiros.ver", "/clientes": "clientes.ver",
     "/vencimentos": "vencimentos.ver", "/vendas": "vendas.ver", "/comissoes": "comissoes.ver",
-    "/relatorios": "relatorios.ver", "/inteligencia": "inteligencia.ver", "/ia": "ia.usar", "/conversas": "conversas.ver",
+    "/relatorios": "relatorios.ver", "/inteligencia": "inteligencia.ver", "/ia": "ia.usar", "/conversas": "conversas.ver", "/oficial": "oficial.ver",
     "/whatsapp": "whatsapp.ver", "/email": "email.ver", "/permissoes": "permissoes.gerenciar",
     "/configuracoes": "configuracoes.ver",
     "/portal": "portal.usar", "/portal/indicar": "portal.usar", "/portal/clientes": "portal.usar",
@@ -76,6 +76,7 @@ MENU_EQUIPE = [
     ("/inteligencia", "Inteligência", "alvo"),
     ("/ia", "IA Comercial", "brilho"),
     ("/conversas", "Conversas", "conversa"),
+    ("/oficial", "API Oficial", "selo"),
     ("/whatsapp", "WhatsApp", "celular"),
     ("/email", "E-mail", "carta"),
     ("/permissoes", "Permissões", "cadeado"),
@@ -97,7 +98,8 @@ def avisar(request: Request, texto: str, tipo: str = "ok") -> None:
 
 def tela(request: Request, nome: str, contexto: dict | None = None, status_code: int = 200):
     usuario = getattr(request.state, "usuario", None)
-    avisos_novos = oportunidades_novas = 0
+    avisos_novos = oportunidades_novas = oficial_nao_lidas = 0
+    tem_api_oficial = False
     mostrar_vendas = mostrar_agenda = False
     wl = {"disponivel": False, "conectado": False}
     if usuario and usuario.perfil != "parceiro":
@@ -114,16 +116,26 @@ def tela(request: Request, nome: str, contexto: dict | None = None, status_code:
                 Notificacao.usuario_id == usuario.id, Notificacao.lida.is_(False))).scalar() or 0
             mostrar_vendas = ler_config(db, "mostrar_vendas") == "1"
             mostrar_agenda = ler_config(db, "mostrar_agenda") == "1"
+            from . import isolamento
+
+            isolamento.ligar(db, usuario, request.session.get("ar_entrada") if usuario.master else None)  # a AR de quem vê
             if autorizacao.pode(usuario, "oportunidades.ver"):
                 # O número do menu Oportunidades: as novas da AR de quem vê, a mesma conta da aba "Novas" (antes eram
                 # os avisos não lidos do sininho, que já estão em "Avisos (N)" no rodapé: no Grupo Certy o menu dizia 6
                 # e a tela, 0 novas; pedido da Maria em 19/11/2026)
-                from . import isolamento
                 from .modelos import Lead, Oportunidade
 
-                isolamento.ligar(db, usuario, request.session.get("ar_entrada") if usuario.master else None)
                 oportunidades_novas = db.execute(select(func.count(Oportunidade.id)).join(
                     Lead, Oportunidade.lead_id == Lead.id).where(Oportunidade.status == "nova")).scalar() or 0
+            if autorizacao.pode(usuario, "oficial.ver"):
+                # Item "API Oficial" (21/11/2026): só na AR que tem a API oficial; o número vermelho = mensagens novas
+                from .modelos import ContaWhatsAppOficial, MensagemOficial
+
+                tem_api_oficial = db.execute(select(ContaWhatsAppOficial.id).where(
+                    ContaWhatsAppOficial.token_cripto != "").limit(1)).first() is not None
+                if tem_api_oficial:
+                    oficial_nao_lidas = db.execute(select(func.count(MensagemOficial.id)).where(
+                        MensagemOficial.direcao == "entrada", MensagemOficial.lida.is_(False))).scalar() or 0
         from . import conexoes
 
         with FabricaSessao() as db:
@@ -144,12 +156,14 @@ def tela(request: Request, nome: str, contexto: dict | None = None, status_code:
         "hora_de": lambda segundos: datetime.fromtimestamp(segundos).strftime("%H:%M"),
         "avisos_novos": avisos_novos,
         "oportunidades_novas": oportunidades_novas,
+        "oficial_nao_lidas": oficial_nao_lidas,
         "wl": wl,
         "csrf": token_csrf(request),
         "avisos": request.session.pop("avisos", []),
         # Permissões, WhatsApp e E-mail ficam dentro de Configurações; no menu lateral só para quem não vê as Configurações
         "menu": [m for m in menu if PERMISSAO_DO_MENU[m[0]] in permissoes
-                 and not (m[0] in DENTRO_DAS_CONFIGURACOES and "configuracoes.ver" in permissoes)] if usuario else [],
+                 and not (m[0] in DENTRO_DAS_CONFIGURACOES and "configuracoes.ver" in permissoes)
+                 and (m[0] != "/oficial" or tem_api_oficial)] if usuario else [],
         # nas telas: {% if pode('leads.atribuir') %} (só esconde o botão; a rota confere de novo)
         "pode": lambda codigo: codigo in permissoes,
         "ve_tudo_em": lambda codigo: permissoes.get(codigo) == autorizacao.TUDO,

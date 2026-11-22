@@ -83,13 +83,13 @@ CHAVES_DA_AR = frozenset({
     # novo entra aqui E em CHAVES_SO_MASTER (testes/test_modulos_por_ar.py confere): fora daqui, o Painel master
     # gravava na plataforma e ligar/desligar em uma AR valia para todas (a Assertiva, até 19/11/2026)
     "mostrar_vendas", "mostrar_agenda", "modulo_campanhas", "modulo_prospeccao", "modulo_conversas",
-    "modulo_ia_comercial", "modulo_portal", "modulo_email_html", "modulo_assertiva"})
+    "modulo_ia_comercial", "modulo_portal", "modulo_email_html", "modulo_assertiva", "modulo_api_oficial"})
 # Fase 5: o que fala da empresa. Sem valor próprio da AR, vem da marca dela (marca.config_da_marca), nunca da
 # plataforma: até a Fase 5 os valores da plataforma eram os textos da MS (que passaram para a AR MS, marca.garantir)
 CHAVES_DA_MARCA = frozenset({"empresa_nome", "link_parceria", "programa_parceria", "whatsapp_convite"})
 CHAVES_SO_MASTER = frozenset({"mostrar_vendas", "mostrar_agenda", "modulo_campanhas", "modulo_prospeccao",
                               "modulo_conversas", "modulo_ia_comercial", "modulo_portal", "modulo_email_html",
-                              "modulo_assertiva"})
+                              "modulo_assertiva", "modulo_api_oficial"})
 
 
 def _ar_da_config(db: Session) -> int | None:

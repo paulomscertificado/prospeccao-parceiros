@@ -71,6 +71,7 @@ async def webhook_receber(request: Request):
         recebidas, status = whatsapp_cloud.ler_webhook(dados)
         situacoes = {"sent": "enviada", "delivered": "entregue", "read": "lida", "failed": "falhou"}
         for s in status:
+            whatsapp_oficial.atualizar_entrega(db, s["id"], s["status"], s.get("erro", ""))  # tela API Oficial
             msg = db.execute(select(Mensagem).where(Mensagem.id_externo == s["id"])
                              .execution_options(sem_filtro_de_ar=True)).scalars().first()
             if msg and s["status"] in situacoes and msg.status != "lida":
@@ -87,6 +88,13 @@ async def webhook_receber(request: Request):
             if not telefone:
                 continue
             conta = contas.get(r.get("numero_id", ""))
+            achado = None
+            if conta is not None:  # tudo o que chega no número oficial vai para a tela API Oficial (de cliente ou não)
+                achado = sdr.lead_pelo_telefone(db, telefone, conta.tenant_id)
+                whatsapp_oficial.guardar_conversa(
+                    db, conta, telefone, "entrada", r["texto"],
+                    whatsapp_oficial.TIPO_QUE_CHEGA.get(r.get("tipo", "text") or "text", "midia"), r.get("id", ""),
+                    r.get("nome", ""), achado.id if achado is not None else None)
             if conta is None:  # forma antiga (variáveis WHATSAPP_*): número único, responde sozinho
                 lead = db.execute(select(Lead).where(or_(Lead.chave_whatsapp == telefone, Lead.chave_telefone == telefone))
                                   .limit(1)).scalars().first()
@@ -105,7 +113,7 @@ async def webhook_receber(request: Request):
                     if not lead.opt_out:
                         registrar_opt_out(db, lead, None, "respondeu SAIR no WhatsApp oficial")
                 continue
-            lead = sdr.lead_pelo_telefone(db, telefone, conta.tenant_id)
+            lead = achado
             if lead is None:
                 continue
             usar_config_da_ar(db, lead.tenant_id)

@@ -309,7 +309,8 @@ def ler_webhook(dados: dict) -> tuple[list[dict], list[dict]]:
                 botao = str((m.get("button") or {}).get("payload")
                             or ((m.get("interactive") or {}).get("button_reply") or {}).get("id") or "")
                 recebidas.append({"de": m.get("from", ""), "texto": texto, "id": m.get("id", ""), "numero_id": numero_id,
-                                  "nome": nomes.get(m.get("from", ""), ""), "botao": botao[:256]})
+                                  "nome": nomes.get(m.get("from", ""), ""), "botao": botao[:256],
+                                  "tipo": str(m.get("type") or "")})
             for s in valor.get("statuses", []):
                 erros = s.get("errors") or [{}]
                 status.append({"id": s.get("id", ""), "status": s.get("status", ""), "numero_id": numero_id,

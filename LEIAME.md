@@ -658,6 +658,14 @@ mandar SAIR deixa de receber mensagens. Por enquanto, responda pelo app WhatsApp
 3. Na tela **Renovação**, quadro 4, ligue **Enviar o WhatsApp dos avisos pela API oficial da Meta** e salve. Vale também
    para as campanhas de renovação em andamento. Para voltar ao número do QR code, é só desligar.
 
+**Onde ver as respostas: menu API Oficial.** O número oficial não abre em celular (ele fica ligado direto na Meta).
+Tudo o que ele manda e tudo o que chega nele aparece no menu **API Oficial**, separado das Conversas: a lista das
+conversas (a mais recente primeiro, com as mensagens novas em destaque) e, ao clicar, a conversa com os avisos que
+saíram (com ✓ enviada, ✓✓ entregue e ✓✓ lida, ou o motivo de não ter sido entregue) e tudo o que o cliente escreveu ou
+tocou nos botões, inclusive de quem não é cliente cadastrado. O número vermelho ao lado de **API Oficial** é quantas
+mensagens novas chegaram. Para responder, fale com o cliente pelo seu WhatsApp ou por telefone (responder pelo número
+oficial, de dentro do sistema, é o próximo passo). O item só aparece na marca que tem a API oficial configurada.
+
 Como fica: os mesmos dias e horários de sempre, a arte do aviso em cima (quem tem vários certificados recebe a lista
 no texto) e sem o limite de 20 por dia do QR code (a Meta cobra por mensagem). Quando o cliente toca em um botão:
 **Quero renovar** vira uma oportunidade quente para a equipe; **Já renovei** marca o certificado como Renovado (com

@@ -205,6 +205,10 @@ async def mensagem_de_teste_oficial(request: Request, usuario: Usuario = Depends
         return voltar("/whatsapp#oficial")
     registrar_log(db, usuario, "teste_whatsapp_oficial", "whatsapp_oficial", conta.id,
                   f"mensagem de teste para {telefone} ({wamid[:40]})", request, modulo="WhatsApp")
+    modelo_do_teste = str(form.get("modelo", "")).strip()
+    whatsapp_oficial.guardar_conversa(db, conta, telefone, "saida", f"[teste] modelo {modelo_do_teste}" if modelo_do_teste
+                                      else "[teste] " + whatsapp_oficial.TEXTO_DE_TESTE,
+                                      "modelo" if modelo_do_teste else "texto", wamid or "")
     db.commit()
     avisar(request, "Mensagem de teste enviada pela API oficial. Ela chega em alguns segundos no WhatsApp desse número.")
     return voltar("/whatsapp#oficial")

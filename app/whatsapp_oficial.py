@@ -20,6 +20,7 @@ from pathlib import Path
 
 from sqlalchemy import select
 
+from . import util
 from .banco import agora
 from .integracoes import whatsapp_cloud
 from .modelos import ContaWhatsAppOficial, ModeloWhatsAppOficial
@@ -260,6 +261,70 @@ def ativar_numero(db, conta: ContaWhatsAppOficial, senha: str, repeticao: str | 
     return resultado
 
 
+# ---------------------------------------------------------------- conversas do número oficial (tela API Oficial)
+# Pedido da Maria em 21/11/2026: "preciso ver as respostas dos clientes em algum lugar". O número oficial está ligado
+# direto na API (não abre em celular nenhum): o sistema guarda tudo o que ele manda e tudo o que chega nele.
+
+SITUACAO_DA_META = {"sent": "enviada", "delivered": "entregue", "read": "lida", "failed": "falhou"}
+ORDEM_DA_SITUACAO = {"enviada": 1, "entregue": 2, "lida": 3}  # a Meta pode avisar fora de ordem: nunca volta
+TIPO_QUE_CHEGA = {"text": "texto", "button": "botao", "interactive": "botao"}  # o resto (imagem, áudio...) = mídia
+MARCA_DA_ARTE = "[com a arte do aviso]\n"  # 1ª linha do aviso que foi com a arte (a tela mostra como etiqueta)
+
+
+def chave_da_conversa(telefone: str) -> str:
+    """Telefone com DDD e o 9 dos celulares (como a tela Conversas); estrangeiro: só os dígitos."""
+    return util.com_nono_digito(telefone) or util.so_digitos(telefone)
+
+
+def guardar_conversa(db, conta: ContaWhatsAppOficial, telefone: str, direcao: str, texto: str, tipo: str = "texto",
+                     wamid: str = "", nome: str = "", lead_id: int | None = None, status: str = ""):
+    """Guarda uma mensagem do número oficial (a que saiu ou a que chegou) para a tela API Oficial, na AR da conta. A
+    Meta às vezes manda o mesmo evento de novo: a mensagem com o mesmo id não entra duas vezes. Devolve a linha nova
+    (None = já estava ou sem telefone)."""
+    from .modelos import MensagemOficial
+
+    chave = chave_da_conversa(telefone)
+    if conta is None or not chave:
+        return None
+    if wamid and db.execute(select(MensagemOficial.id).where(MensagemOficial.wamid == wamid)
+                            .execution_options(sem_filtro_de_ar=True)).first():
+        return None
+    linha = MensagemOficial(tenant_id=conta.tenant_id, conta_id=conta.id, telefone=chave[:20], nome=(nome or "")[:200],
+                            direcao=direcao, tipo=tipo, texto=texto or "", wamid=(wamid or "")[:160],
+                            status=status or ("recebida" if direcao == "entrada" else "enviada"), lead_id=lead_id,
+                            lida=direcao != "entrada")
+    db.add(linha)
+    db.flush()
+    return linha
+
+
+def atualizar_entrega(db, wamid: str, status_da_meta: str, erro: str = "") -> bool:
+    """A Meta avisou a situação de uma mensagem que o número oficial mandou (enviada, entregue, lida ou falhou)."""
+    from .modelos import MensagemOficial
+
+    situacao_nova = SITUACAO_DA_META.get(status_da_meta)
+    if not wamid or not situacao_nova:
+        return False
+    linha = db.execute(select(MensagemOficial).where(MensagemOficial.wamid == wamid)
+                       .execution_options(sem_filtro_de_ar=True)).scalars().first()
+    if linha is None or linha.direcao != "saida":
+        return False
+    if situacao_nova == "falhou":
+        linha.status, linha.erro = "falhou", (erro or "")[:500]
+    elif ORDEM_DA_SITUACAO[situacao_nova] > ORDEM_DA_SITUACAO.get(linha.status, 0):
+        linha.status = situacao_nova
+    else:
+        return False
+    linha.atualizado_em = agora()
+    return True
+
+
+def texto_do_aviso(modelo, valores: list[str], com_arte: bool) -> str:
+    """O aviso como o cliente vê (o corpo do modelo preenchido, o rodapé e os botões), para a tela API Oficial."""
+    return ((MARCA_DA_ARTE if com_arte else "") + preencher(modelo.corpo, valores) + "\n\n"
+            + (modelo.rodape or RODAPE_RENOVACAO) + "\n" + " · ".join(f"[{b}]" for b in BOTOES_RENOVACAO))
+
+
 def enviar_teste(conta: ContaWhatsAppOficial, telefone: str, modelo: str = "", idioma: str = "") -> str:
     """Mensagem de teste para um número da própria equipe. Sem modelo: texto simples (de graça; a Meta só entrega para
     quem escreveu para o número oficial nas últimas 24 horas). Com modelo: o modelo aprovado, no idioma escolhido (sem
@@ -481,8 +546,10 @@ def enviar_teste_renovacao(db, conta: ContaWhatsAppOficial, telefone: str) -> st
         raise whatsapp_cloud.ErroWhatsApp("Ainda não há modelo do aviso aprovado pela Meta.")
     imagem_id = (whatsapp_cloud.subir_midia(conta.phone_number_id, token(conta), IMAGEM_DE_EXEMPLO.read_bytes())
                  if modelo.com_imagem else "")
-    whatsapp_cloud.enviar_modelo(conta.phone_number_id, token(conta), telefone, modelo.nome, modelo.idioma,
-                                 EXEMPLO_DOS_VALORES, imagem_id=imagem_id)
+    wamid = whatsapp_cloud.enviar_modelo(conta.phone_number_id, token(conta), telefone, modelo.nome, modelo.idioma,
+                                         EXEMPLO_DOS_VALORES, imagem_id=imagem_id)
+    guardar_conversa(db, conta, telefone, "saida", "[aviso de exemplo] " + texto_do_aviso(
+        modelo, EXEMPLO_DOS_VALORES, bool(imagem_id)), "modelo", wamid or "")
     return modelo.nome
 
 
@@ -577,6 +644,8 @@ def enviar_toque(db, t, usuario=None, pode_pedir_arte: bool = True):
                               categoria_id=lead.categoria_id,
                               assunto="[com a arte do aviso de vencimento]" if arte else "")
     msg.conexao = ("oficial:" + conta.phone_number_id)[:40]
+    guardar_conversa(db, conta, lead.whatsapp, "saida", texto_do_aviso(modelo, parametros, bool(arte)), "modelo",
+                     wamid or "", lead_id=lead.id)  # a tela API Oficial mostra o aviso como o cliente viu
     t.status, t.concluida_em = "feita", agora()
     t.resultado = "Enviada pela API oficial da Meta" + (f" por {usuario.nome}" if usuario else "")
     nome_do_aviso = config.ANGULOS.get(t.angulo) or renovacao.ANGULOS.get(t.angulo) or t.acao or "aviso"

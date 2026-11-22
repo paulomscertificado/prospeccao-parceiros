@@ -266,6 +266,12 @@ def apagar_conversas_antigas(db: Session, lote: int = 5000) -> int:
               .execution_options(sem_filtro_de_ar=True))
     apagadas = db.execute(delete(MensagemWhatsApp).where(MensagemWhatsApp.id.in_(velhas.scalar_subquery()))
                           .execution_options(sem_filtro_de_ar=True)).rowcount or 0
+    from .modelos import MensagemOficial  # as conversas do número oficial (tela API Oficial): o mesmo prazo
+
+    oficiais = (select(MensagemOficial.id).where(MensagemOficial.criado_em < limite).limit(lote)
+                .execution_options(sem_filtro_de_ar=True))
+    apagadas += db.execute(delete(MensagemOficial).where(MensagemOficial.id.in_(oficiais.scalar_subquery()))
+                           .execution_options(sem_filtro_de_ar=True)).rowcount or 0
     if apagadas:
         registrar_log(db, None, "apagou_conversas_antigas", "mensagens_whatsapp", None,
                       f"{apagadas} mensagens com mais de {meses} meses saíram da cópia na nuvem (prazo de guarda)")

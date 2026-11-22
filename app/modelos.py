@@ -189,6 +189,29 @@ class MensagemWhatsApp(DaAR, Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, index=True)
 
 
+class MensagemOficial(DaAR, Base):
+    """Conversas do número da API oficial da Meta, para a tela API Oficial (pedido da Maria em 21/11/2026: "preciso ver
+    as respostas dos clientes em algum lugar"): tudo o que o número oficial manda (os avisos da Renovação, os testes) e
+    tudo o que chega nele, de cliente ou não, com a situação da entrega que a Meta avisa. Esse número não abre em
+    celular nenhum (está ligado direto na API): é aqui que a equipe acompanha. Chave da conversa: telefone com DDD e o 9
+    (util.com_nono_digito). Guardadas pelo mesmo prazo da cópia das conversas (guarda_conversas_meses)."""
+    __tablename__ = "mensagens_oficiais"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    conta_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)  # contas_whatsapp_oficial.id
+    wamid: Mapped[str] = mapped_column(String(160), default="", index=True)  # id da mensagem na Meta
+    telefone: Mapped[str] = mapped_column(String(20), index=True)
+    nome: Mapped[str] = mapped_column(String(200), default="")  # nome do perfil do WhatsApp (só nas que chegam)
+    direcao: Mapped[str] = mapped_column(String(10))  # entrada (contato -> número oficial) ou saida
+    tipo: Mapped[str] = mapped_column(String(20), default="texto")  # texto, botao, modelo ou midia
+    texto: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(20), default="")  # recebida, enviada, entregue, lida, falhou
+    erro: Mapped[str] = mapped_column(Text, default="")
+    lead_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    lida: Mapped[bool] = mapped_column(Boolean, default=False)  # a equipe já abriu a conversa (as que chegam)
+    criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, index=True)
+    atualizado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)  # a situação da entrega mudou
+
+
 class ConexaoWhatsApp(DaAR, Base):
     """Um número de WhatsApp ligado no computador da MS: o principal ou o de um usuário. Ver app/conexoes.py."""
     __tablename__ = "conexoes_whatsapp"

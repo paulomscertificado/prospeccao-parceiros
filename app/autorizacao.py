@@ -130,6 +130,9 @@ CATALOGO = [
 
     Permissao("conversas.ver", "Comunicação", "Ver as conversas de WhatsApp", modulo="conversas", padrao="E"),
     Permissao("conversas.enviar", "Comunicação", "Responder pelas Conversas", modulo="conversas", padrao="E"),
+    # Tela API Oficial (21/11/2026): as conversas do número oficial da Meta; a equipe toda acompanha as respostas
+    Permissao("oficial.ver", "Comunicação", "Ver as conversas da API oficial do WhatsApp", modulo="api_oficial",
+              padrao="E"),
     Permissao("whatsapp.ver", "Comunicação", "Conectar e usar o próprio WhatsApp", padrao="E"),
     Permissao("whatsapp.gerenciar_todos", "Comunicação", "Gerenciar o WhatsApp de todos", padrao="A"),
     Permissao("whatsapp.compartilhar_todos", "Comunicação", "Compartilhar o WhatsApp de qualquer pessoa", padrao="G"),
@@ -160,6 +163,7 @@ MODULOS = {
     "prospeccao": ("Prospecção (buscar empresas)", "modulo_prospeccao"),
     "assertiva": ("Consultas na Assertiva (CPF, CNPJ, telefone, e-mail)", "modulo_assertiva"),
     "conversas": ("Conversas de WhatsApp", "modulo_conversas"),
+    "api_oficial": ("Conversas da API oficial do WhatsApp", "modulo_api_oficial"),
     "ia_comercial": ("IA Comercial", "modulo_ia_comercial"),
     "portal": ("Portal do parceiro", "modulo_portal"),
     # sem permissões ligadas: só decide se o 2º e-mail em diante sai em HTML com a marca (visual.html_da_marca_ligado)

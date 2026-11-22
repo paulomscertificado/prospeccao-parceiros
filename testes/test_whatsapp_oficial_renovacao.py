@@ -16,7 +16,7 @@ from app.integracoes import whatsapp_cloud
 from app.leads_servico import limpar_campos
 from app.main import app
 from app.modelos import (ArteAviso, Campanha, Certificado, ComandoWhatsApp, ContaWhatsAppOficial, Lead, Mensagem,
-                         ModeloWhatsAppOficial, Oportunidade, Tarefa, Tenant, Usuario)
+                         MensagemOficial, ModeloWhatsAppOficial, Oportunidade, Tarefa, Tenant, Usuario)
 from app.seguranca import criptografar, limite_pedidos, resumir_senha
 from conftest import SENHA, csrf_de
 
@@ -202,6 +202,10 @@ def test_aviso_sai_pela_api_com_a_arte_e_os_botoes(cliente, monkeypatch):
         msg = db.execute(select(Mensagem).where(Mensagem.tarefa_id == tid)).scalars().one()
         assert msg.modo == "oficial" and msg.id_externo.startswith("wamid.renov") and msg.conexao == f"oficial:{NUMERO_ID}"
         assert "Guilherme" in msg.corpo and "[Quero renovar]" in msg.corpo and "arte" in msg.assunto
+        # e aparece na tela API Oficial como o cliente viu (21/11/2026)
+        oficial = db.execute(select(MensagemOficial).where(MensagemOficial.wamid == msg.id_externo)).scalars().one()
+        assert oficial.direcao == "saida" and oficial.tipo == "modelo" and oficial.lead_id == t.lead_id
+        assert oficial.texto.startswith("[com a arte do aviso]") and "[Quero renovar]" in oficial.texto
         # a arte fica guardada para o e-mail do mesmo aviso (umas 2 h depois)
         assert db.execute(select(ArteAviso).where(ArteAviso.tarefa_id == tid)).scalars().first() is not None
         _limpar(db, [tid, varios_id])

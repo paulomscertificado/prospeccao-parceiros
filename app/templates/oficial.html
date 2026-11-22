@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block titulo %}API Oficial{% endblock %}
+{% block conteudo %}
+<style>
+  /* Mesmo visual da tela Conversas: lista à esquerda, conversa à direita */
+  .chat { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); height: calc(100vh - 170px); min-height: 480px;
+          background: #fff; border: 1px solid var(--borda); border-radius: 14px; overflow: hidden; box-shadow: var(--sombra); }
+  .chat-lista { display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--borda); min-height: 0; background: #fbfcfe; }
+  .chat-lista .topo { padding: 14px; border-bottom: 1px solid var(--borda); }
+  .chat-lista .topo form { display: flex; gap: 6px; }
+  .chat-lista .topo input { flex: 1; border-radius: 999px; padding: 8px 14px; }
+  .chat-itens { flex: 1; overflow-y: auto; }
+  .chat-item { display: flex; gap: 11px; align-items: center; padding: 11px 14px; color: inherit;
+               border-bottom: 1px solid #eef1f5; position: relative; }
+  .chat-item:hover { background: #f1f5fa; text-decoration: none; }
+  .chat-item.ativa { background: #eaf2fa; }
+  .chat-item.ativa::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--verde-marca); }
+  .chat-item .info { flex: 1; min-width: 0; }
+  .chat-item .linha { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .chat-item .nome { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chat-item .hora { font-size: .72rem; color: #8a96a6; flex-shrink: 0; }
+  .chat-item.nao-lida .hora { color: var(--verde); font-weight: 600; }
+  .chat-item .previa { font-size: .84rem; color: #6b7686; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chat-item.nao-lida .previa { color: var(--texto); font-weight: 500; }
+  .qtd { background: var(--verde-marca); color: #fff; border-radius: 999px; min-width: 20px; height: 20px; padding: 0 6px;
+         font-size: .72rem; font-weight: 700; display: inline-grid; place-items: center; flex-shrink: 0; }
+  .avatar { width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center;
+            font-weight: 700; font-size: .9rem; color: #fff; background: var(--azul); letter-spacing: .02em; }
+  .chat-conversa { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+  .chat-topo { display: flex; align-items: center; gap: 12px; padding: 11px 18px; border-bottom: 1px solid var(--borda); background: #fff; min-height: 64px; }
+  .chat-topo .titulo { flex: 1; min-width: 0; }
+  .chat-topo .sub { font-size: .8rem; color: #6b7686; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .chat-mensagens { flex: 1; overflow-y: auto; padding: 18px 6% 12px;
+                    background: #f4f7fb radial-gradient(rgba(13, 59, 102, .05) 1px, transparent 1px) 0 0 / 18px 18px; }
+  .dia { text-align: center; margin: 14px 0 10px; }
+  .dia span { font-family: var(--fonte-mono); font-size: .66rem; letter-spacing: .12em; text-transform: uppercase;
+              background: #fff; color: #6b7686; padding: 4px 12px; border-radius: 999px; box-shadow: 0 1px 2px rgba(16, 24, 40, .08); }
+  .bolha { max-width: min(560px, 78%); width: fit-content; margin: 4px 0; padding: 7px 11px 6px; border-radius: 12px;
+           box-shadow: 0 1px 1px rgba(16, 24, 40, .08); line-height: 1.4; }
+  .bolha .texto { white-space: pre-wrap; word-wrap: break-word; overflow-wrap: anywhere; }
+  .bolha .tipo { font-size: .7rem; color: #6b7686; margin-bottom: 2px; }
+  .bolha .meta { float: right; margin: 6px 0 -3px 12px; font-size: .68rem; color: #8a96a6; white-space: nowrap; }
+  .bolha.entrada { background: #fff; border-top-left-radius: 4px; }
+  .bolha.saida { background: #e1f5ea; margin-left: auto; border-top-right-radius: 4px; }
+  .bolha.saida .meta .lida { color: #1d8fe1; }
+  .bolha.falhou { background: #fde8e6; }
+  .bolha .erro { color: var(--erro); font-size: .78rem; margin-top: 4px; }
+  .bolha .midia { font-style: italic; color: #4b5a6b; }
+  .rodape-conversa { border-top: 1px solid var(--borda); padding: 10px 16px; background: #fff; font-size: .82rem; color: #6b7686; }
+  .vazio-chat { margin: auto; text-align: center; color: #6b7686; max-width: 360px; padding: 20px; }
+  @media (max-width: 860px) {
+    .chat { grid-template-columns: minmax(0, 1fr); height: auto; }
+    .chat-lista { max-height: 300px; border-right: 0; border-bottom: 1px solid var(--borda); }
+    .chat-mensagens { max-height: 60vh; padding: 14px; }
+  }
+</style>
+<div class="cabecalho"><div><h1>API Oficial</h1>
+  <div class="suave">Conversas do número oficial do WhatsApp{% for c in contas %}{% if c.numero %} <b>{{ c.numero }}</b>{% endif %}{% endfor %}:
+    os avisos que ele mandou, se a Meta entregou e se o cliente leu, e tudo o que os clientes responderam.
+    Esse número não abre em celular: é aqui que a equipe acompanha.</div></div></div>
+
+{% if not contas %}
+<div class="cartao"><p>Esta marca ainda não tem a <b>API oficial do WhatsApp</b>. Quem configura é o administrador, em
+  <b>Configurações &gt; WhatsApp &gt; API oficial da Meta</b>.</p></div>
+{% else %}
+<div class="chat">
+  <aside class="chat-lista">
+    <div class="topo"><form method="get" action="/oficial">
+      <input type="search" name="busca" value="{{ busca }}" placeholder="Buscar nome, empresa ou telefone" aria-label="Buscar conversa">
+      <button class="btn btn-pequeno">Buscar</button></form>
+      {% if busca %}<div class="pequeno" style="margin-top:6px"><a href="/oficial">Limpar a busca</a></div>{% endif %}</div>
+    <div class="chat-itens">
+      {% for c in conversas %}{% set u = c.ultima %}
+      <a class="chat-item {{ 'ativa' if c.telefone == chave }} {{ 'nao-lida' if c.nao_lidas }}" href="/oficial?telefone={{ c.telefone }}{{ '&busca=' ~ busca|urlencode if busca }}">
+        <div class="avatar">{{ iniciais(c.nome, c.telefone) }}</div>
+        <div class="info">
+          <div class="linha"><span class="nome">{{ c.nome or (c.telefone|telefone) }}</span>
+            <span class="hora">{% if u %}{{ quando(u.criado_em) }}{% endif %}</span></div>
+          <div class="linha"><span class="previa">{% if u %}{% set pt = partes(u.texto) %}{{ '↗ ' if u.direcao == 'saida' }}{{ MIDIAS.get(pt.texto, pt.texto)|replace('\n', ' ')|truncate(70) }}{% endif %}</span>
+            {% if c.nao_lidas %}<span class="qtd">{{ c.nao_lidas }}</span>{% endif %}</div>
+        </div></a>
+      {% else %}
+      <div class="vazio-chat">{% if busca %}Nenhuma conversa com "{{ busca }}".{% else %}Ainda não há mensagens no número
+        oficial. Os avisos que ele mandar e as respostas dos clientes aparecem aqui.{% endif %}</div>
+      {% endfor %}
+    </div>
+  </aside>
+  <section class="chat-conversa">
+    {% if aberta %}
+    <div class="chat-topo">
+      <div class="avatar">{{ iniciais(aberta.nome, aberta.telefone) }}</div>
+      <div class="titulo"><b>{{ aberta.nome or (aberta.telefone|telefone) }}</b>
+        <div class="sub"><span>{{ aberta.telefone|telefone }}</span>
+          {% if aberta.lead and aberta.lead.id in abre_lead %}<a href="/leads/{{ aberta.lead.id }}">Abrir a ficha de {{ aberta.lead.empresa }}</a>{% elif not aberta.lead %}<span>não está cadastrado como cliente</span>{% endif %}</div></div>
+    </div>
+    <div class="chat-mensagens" id="mensagens">
+      {% set ns = namespace(dia=None) %}
+      {% for m in mensagens %}
+        {% if m.criado_em.date() != ns.dia %}{% set ns.dia = m.criado_em.date() %}<div class="dia"><span>{{ m.criado_em|data }}</span></div>{% endif %}
+        {% set pt = partes(m.texto) %}
+        <div class="bolha {{ m.direcao }} {{ 'falhou' if m.status == 'falhou' }}">
+          {% if m.tipo in NOMES_DO_TIPO %}<div class="tipo">{{ NOMES_DO_TIPO[m.tipo] }}{{ ' · com a arte do aviso' if pt.arte }}</div>{% endif %}
+          <span class="texto">{% if m.tipo == 'midia' %}<span class="midia">{{ MIDIAS.get(m.texto, 'Mídia') }} (não aparece aqui)</span>{% else %}{{ pt.texto }}{% endif %}</span>
+          <span class="meta">{{ m.criado_em.strftime('%H:%M') }}{% if m.direcao == 'saida' %}
+            {% if m.status == 'lida' %} <span class="lida" title="Lida">✓✓ lida</span>{% elif m.status == 'entregue' %} <span title="Entregue">✓✓</span>{% elif m.status == 'enviada' %} <span title="Enviada">✓</span>{% elif m.status == 'falhou' %} <span title="Não entregue">não entregue</span>{% endif %}{% endif %}</span>
+          {% if m.status == 'falhou' and m.erro %}<div class="erro">A Meta não entregou: {{ m.erro }}</div>{% endif %}
+        </div>
+      {% endfor %}
+    </div>
+    <div class="rodape-conversa">Para responder, fale com o cliente pelo seu WhatsApp ou por telefone. Responder por aqui,
+      pelo número oficial, é o próximo passo. Quem toca em <b>Quero renovar</b> também aparece em
+      <a href="/oportunidades">Oportunidades</a>.</div>
+    {% else %}
+    <div class="vazio-chat">Escolha uma conversa na lista.</div>
+    {% endif %}
+  </section>
+</div>
+{% endif %}
+<script>
+  // a conversa aberta mostra o fim; com a aba à vista, confere a cada 20 s se chegou algo novo e recarrega
+  (function () {
+    var caixa = document.getElementById('mensagens');
+    if (caixa) caixa.scrollTop = caixa.scrollHeight;
+    var marca = {{ marca_da_tela|tojson }};
+    setInterval(function () {
+      if (document.visibilityState !== 'visible') return;
+      fetch('/oficial/marca', {credentials: 'same-origin'}).then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) { if (d && d.marca !== marca) window.location.reload(); }).catch(function () {});
+    }, 20000);
+  })();
+</script>
+{% endblock %}

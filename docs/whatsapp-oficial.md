@@ -34,7 +34,8 @@ começou a montar o portfólio pela conta de Carol (passo a passo abaixo); nada 
 |---|---|---|
 | 1 | Conta oficial por AR (chaves protegidas), teste de conexão, mensagem de teste, webhook (respostas, SAIR, situação) | **no ar (16/11/2026)** |
 | 2 | Modelos do WhatsApp (criar, mandar para aprovação, acompanhar) e ligação dos toques da **Renovação** aos modelos (utilidade) | **no ar (16/11/2026)**, desligado até a Meta aprovar e o admin ligar |
-| 3 | Respostas dentro da janela de 24 h pela API (IA SDR, Conversas, envio manual) e cópia das conversas oficiais | a fazer |
+| 3 | Cópia das conversas oficiais (tela **API Oficial**) | **no ar (21/11/2026)** |
+| 3b | Responder dentro da janela de 24 h pela API (IA SDR, envio manual pela tela API Oficial) | a fazer |
 | 4 | Campanhas de parceiros/Empresas novas pela API (depende da decisão sobre o opt-in) | decisão da Maria |
 | 5 | White label: a plataforma como Provedor de Tecnologia da Meta e Cadastro Incorporado (cada AR liga o próprio número) | depois da validação |
 
@@ -146,9 +147,31 @@ Pedido da Maria em 16/11/2026: "que continue fazendo essa campanha mas que seja 
   ARs (como o SAIR). Os três cancelam os próximos avisos.
 - **Testes**: `testes/test_whatsapp_oficial_renovacao.py` (Meta imitada) e, no WhatsApp Leads,
   `testes/teste_ponta_a_ponta.py` (pedido `desenhar_arte`).
-- **Falta (etapa 3)**: responder o cliente pelo sistema dentro da janela de 24 h e a cópia das conversas oficiais na
-  tela Conversas. Até lá a equipe responde pelo app WhatsApp Business do celular (se o número estiver nele) e as
-  respostas e os botões aparecem nas Oportunidades e na ficha do lead.
+- **Falta (etapa 3b)**: responder o cliente pelo sistema dentro da janela de 24 h. Até lá a equipe responde pelo
+  próprio WhatsApp ou por telefone (o número oficial foi ligado direto na API: não abre em celular nenhum, e um número
+  que já está na API não passa para a "coexistência" app + API da Meta).
+
+## Tela API Oficial (no ar desde 21/11/2026)
+
+Pedido da Maria: "preciso ver as respostas dos clientes em algum lugar ... separado das conversas ... como API
+Oficial". Item **API Oficial** no menu (`rotas/oficial.py`, `templates/oficial.html`), separado da tela Conversas (que
+é a dos números por QR code do WhatsApp Leads).
+
+- **O que guarda** (tabela `mensagens_oficiais`, modelo `MensagemOficial`, na AR da conta): tudo o que o número oficial
+  manda (os avisos da Renovação como o cliente viu, com o corpo do modelo preenchido, o rodapé e os botões, e
+  "[com a arte do aviso]" quando foi com a arte; o aviso de exemplo; o teste de conexão) e tudo o que chega nele, de
+  cliente ou não (texto, toque nos botões, mídia como "[image]"), com o nome do perfil do WhatsApp e o lead quando o
+  telefone é de um lead da AR. `whatsapp_oficial.guardar_conversa` (no webhook e nos envios; a mesma mensagem da Meta
+  não entra duas vezes, pelo `wamid`) e `atualizar_entrega` (enviada → entregue → lida, nunca volta; falhou guarda o
+  motivo). Antes disso, mensagem de quem não era lead era descartada.
+- **A tela**: lista das conversas (a mais recente primeiro, com as não lidas) e a conversa aberta, no visual da tela
+  Conversas; busca por nome, empresa ou telefone; link para a ficha do lead (quem pode vê-lo); abrir a conversa marca
+  as que chegaram como lidas. Com a aba à vista, confere a cada 20 s (`/oficial/marca`) e recarrega se algo mudou.
+- **Quem vê**: permissão `oficial.ver` (equipe toda, como as Oportunidades), módulo `api_oficial` (por AR, só o Admin
+  Master liga e desliga; ligado por padrão) e o item só aparece na AR que tem a API oficial configurada, com o número
+  vermelho das mensagens novas (`web.tela`: `tem_api_oficial`, `oficial_nao_lidas`). Cada AR só vê as do número dela.
+- **Guarda**: o mesmo prazo da cópia das conversas (`guarda_conversas_meses`, 12 meses; `leads_servico.apagar_conversas_antigas`).
+- Testes: `testes/test_tela_api_oficial.py` e a conferência no `test_whatsapp_oficial_renovacao.py`.
 
 ## Passo a passo na Meta (o que a AR faz)
 
