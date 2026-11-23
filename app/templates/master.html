@@ -50,16 +50,30 @@
 
 <div class="cartao">
   <h2>Nova AR</h2>
-  <p class="pequeno suave">Antes de colocar pessoas de outra empresa para usar, assine os planos pagos (Vercel Pro e
-    Supabase Pro): o plano grátis da Vercel não permite uso comercial.</p>
+  <p class="pequeno suave">Escreva o nome da empresa: o apelido (que vai virar o endereço dela) sai do nome, sem
+    acento nem espaço (ex.: Certifica Recife → certifica-recife). Se quiser, troque o apelido. Depois de criar, clique
+    em <b>Entrar na AR</b> e coloque a marca em Configurações &gt; Marca (nome, logo e cores).</p>
   <form method="post" action="/master/ar/nova" class="filtros">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    <input name="nome" placeholder="Nome da AR" required aria-label="Nome da AR">
-    <input name="slug" placeholder="apelido (ex.: certifica-recife)" required pattern="[a-z0-9][a-z0-9-]{1,38}" aria-label="Apelido da AR">
-    <input name="cnpj" placeholder="CNPJ (opcional)" aria-label="CNPJ da AR">
+    <input name="nome" id="nova-ar-nome" placeholder="Nome da AR" required maxlength="120" aria-label="Nome da AR">
+    <input name="slug" id="nova-ar-apelido" placeholder="apelido (sai do nome)" maxlength="60" aria-label="Apelido da AR">
+    <input name="cnpj" placeholder="CNPJ (opcional)" maxlength="20" aria-label="CNPJ da AR">
     <button class="btn btn-primario">Criar AR</button>
   </form>
 </div>
+<script>
+(function () {  // o apelido acompanha o nome (até a pessoa escrever outro); o servidor faz a mesma conta
+  var nome = document.getElementById("nova-ar-nome"), apelido = document.getElementById("nova-ar-apelido");
+  var escreveu = false;
+  function limpar(texto) {
+    return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 39).replace(/-+$/, "");
+  }
+  nome.addEventListener("input", function () { if (!escreveu) apelido.value = limpar(nome.value); });
+  apelido.addEventListener("input", function () { escreveu = apelido.value !== ""; });
+  apelido.addEventListener("change", function () { apelido.value = limpar(apelido.value); });
+})();
+</script>
 
 <div class="cartao">
   <h2>Suas entradas nas ARs</h2>

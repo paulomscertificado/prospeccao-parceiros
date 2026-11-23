@@ -787,7 +787,9 @@ só o admin master muda; o que ele muda vale para as marcas que não têm valor 
 **Painel master** (link "Painel master", só para o admin master): mostra as marcas com os números de cada uma; **Entrar
 na AR** pede o motivo (fica registrado) e, até clicar em **Sair da AR** (na faixa amarela do topo) ou por até
 **2 horas** (depois volta sozinho para a plataforma; para continuar, entre de novo), mostra só aquela marca, como o
-administrador dela vê; **Nova AR**; **Suspender** (as pessoas da marca não entram até reativar); e os
+administrador dela vê; **Nova AR** (escreva o nome da empresa: o apelido, que vira o endereço dela, é preenchido
+sozinho, sem acento nem espaço; depois de criar, entre na AR e coloque a marca em Configurações > Marca);
+**Suspender** (as pessoas da marca não entram até reativar); e os
 **módulos de cada marca**. O administrador de uma marca não muda os papéis do sistema, os modelos de mensagem, as
 cadências e as categorias que valem para todas: ele cria os da própria marca (pode copiar de um da plataforma).
 O que o admin master faz dentro de uma marca aparece no histórico dela (Configurações > Logs), marcado como dele.

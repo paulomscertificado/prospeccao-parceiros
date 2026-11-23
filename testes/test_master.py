@@ -155,3 +155,28 @@ def test_papel_com_o_mesmo_nome_em_duas_ars(cliente, csrf, cenario):
                 db.delete(p)
     finally:
         _zerar_limite()
+
+
+def test_nova_ar_apelido_sai_do_nome(cliente, csrf):
+    """O apelido da AR (vira o endereço) sai do nome ou do que a pessoa escreveu: sem acento, minúsculo e com hífen.
+    Antes a tela recusava "Certifica Recife" e o navegador não avisava antes (pedido da Maria em 23/11/2026)."""
+    _zerar_limite()
+    criadas = ["certificacao-recife-cia", "ar-de-teste-do-apelido"]
+    try:
+        r = cliente.post("/master/ar/nova", data={"csrf": csrf, "nome": "  Certificação   Recife & Cia ", "slug": ""})
+        assert "criada (apelido certificacao-recife-cia)" in r.text
+        r = cliente.post("/master/ar/nova", data={"csrf": csrf, "nome": "Outra AR", "slug": "AR de Teste do Apelido"})
+        assert "criada (apelido ar-de-teste-do-apelido)" in r.text
+        r = cliente.post("/master/ar/nova", data={"csrf": csrf, "nome": "Certificação Recife & Cia", "slug": " "})
+        assert "Já existe uma AR com o apelido" in r.text  # a mesma AR duas vezes, não
+        r = cliente.post("/master/ar/nova", data={"csrf": csrf, "nome": "?", "slug": "!"})
+        assert "pelo menos 2 letras" in r.text
+        with sessao() as db:
+            novas = {t.slug: t.nome for t in db.execute(select(Tenant).where(Tenant.slug.in_(criadas))).scalars()}
+        assert novas == {"certificacao-recife-cia": "Certificação Recife & Cia", "ar-de-teste-do-apelido": "Outra AR"}
+        tela = cliente.get("/master").text
+        assert 'pattern="[a-z0-9][a-z0-9-]' not in tela and "Vercel" not in tela  # o navegador não barra mais
+    finally:
+        _zerar_limite()
+        with sessao() as db:
+            db.execute(delete(Tenant).where(Tenant.slug.in_(criadas)))

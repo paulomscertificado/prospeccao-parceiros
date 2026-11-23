@@ -15,7 +15,9 @@ O dono da plataforma e Admin Master é o Paulo Marinho (`Usuario.master`).
 | 6 | Auditoria, LGPD e planos | exportar e apagar uma AR de teste sem tocar nas outras | **Auditoria e LGPD no ar desde 14/11/2026** (quem agiu como quem; exportar e apagar uma AR, ensaiados no banco de teste); planos e cobrança depois da validação (decidido em 14/11/2026) |
 
 Os planos pagos são obrigatórios antes da Fase 3 (a primeira AR nova): o Hobby da Vercel não permite uso comercial
-e o banco grátis tem 500 MB.
+e o banco grátis tem 500 MB. **Desde a virada de 17/11/2026 o sistema roda no servidor da Hostinger** (site e banco;
+a Vercel só redireciona e o Supabase fica de reserva até a etapa 4): o aviso dos planos pagos saiu da tela Nova AR
+em 23/11/2026.
 
 ## Fase 1: a AR entra nos dados
 
@@ -143,7 +145,9 @@ todo (código do papel, nome da equipe) são conferidos também nas outras ARs (
 **Painel /master** (`app/rotas/master.py`, link "Painel master" só para o Admin Master; para os outros as rotas dão
 404): lista das ARs com pessoas, leads, campanhas ativas, WhatsApps e administradores; **Entrar na AR** pede o motivo,
 grava em `acessos_master` e põe a AR na sessão (`request.session["ar_entrada"]` → `isolamento.ligar`), com faixa no
-topo e o botão "Sair da AR"; **Nova AR** (nome, apelido, CNPJ; avisa dos planos pagos); **Suspender/Reativar**
+topo e o botão "Sair da AR"; **Nova AR** (nome, apelido, CNPJ; o apelido sai do nome ou do que a pessoa escreveu, sem acento, minúsculo e com
+hífen: `master.apelido_da_ar`, o mesmo cálculo no script da tela; 23/11/2026, a tela recusava "Certifica Recife" e o
+`pattern` do campo, inválido para o navegador, não avisava antes); **Suspender/Reativar**
 (pessoa de AR suspensa não entra: `seguranca.usuario_logado`); **Módulos de cada AR** (as chaves de
 `autorizacao.MODULOS` estão em `banco.CHAVES_DA_AR` e em `CHAVES_SO_MASTER`: cada AR tem as suas, só o master muda; o
 menu lê as da AR da pessoa em `web.tela`).

@@ -20,11 +20,21 @@ from .. import autorizacao
 from ..banco import agora, gravar_config, ler_config, obter_db, usar_config_da_ar
 from ..modelos import AcessoMaster, Campanha, ConexaoWhatsApp, Lead, Tenant, Usuario
 from ..seguranca import PRAZO_ENTRADA_SEG, diferencas, exige, fechar_entradas, registrar_log, verificar_csrf
+from ..util import sem_acento
 from ..web import avisar, tela, voltar
 
 rotas = APIRouter()
 PORTEIRO = exige("configuracoes.alterar")
 SEM_FILTRO = {"sem_filtro_de_ar": True}
+TAMANHO_DO_APELIDO = 39  # tenants.slug tem 40
+
+
+def apelido_da_ar(texto: str) -> str:
+    """O apelido da AR (vai virar o endereço dela) a partir do que a pessoa escreveu ou do nome: sem acento, minúsculo,
+    e espaço ou símbolo vira hífen ("Certifica Recife" -> "certifica-recife"). Antes a tela recusava o apelido com
+    espaço, acento ou maiúscula, e o navegador não avisava (o `pattern` com "-" no fim é inválido para ele)."""
+    apelido = re.sub(r"[^a-z0-9]+", "-", sem_acento(texto or "").lower()).strip("-")
+    return apelido[:TAMANHO_DO_APELIDO].rstrip("-")
 
 
 def _so_master(usuario: Usuario) -> None:
@@ -108,21 +118,24 @@ def sair(request: Request, usuario: Usuario = Depends(PORTEIRO), db: Session = D
 def nova_ar(request: Request, nome: str = Form(""), slug: str = Form(""), cnpj: str = Form(""),
             usuario: Usuario = Depends(PORTEIRO), db: Session = Depends(obter_db)):
     _so_master(usuario)
-    nome, slug = nome.strip()[:120], slug.strip().lower()
-    if not nome or not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,38}", slug):
-        avisar(request, "Informe o nome e um apelido curto só com letras minúsculas, números e hífen "
-                        "(ex.: certifica-recife). Ele vai virar o endereço da AR.", "erro")
+    nome = re.sub(r"\s+", " ", nome).strip()[:120]
+    apelido = apelido_da_ar(slug) or apelido_da_ar(nome)  # sem apelido: sai do nome
+    if not nome:
+        avisar(request, "Escreva o nome da AR.", "erro")
         return voltar("/master")
-    if db.execute(select(Tenant.id).where(Tenant.slug == slug)).first():
-        avisar(request, "Já existe uma AR com esse apelido.", "erro")
+    if len(apelido) < 2:
+        avisar(request, "O apelido da AR precisa ter pelo menos 2 letras ou números (ex.: certifica-recife).", "erro")
         return voltar("/master")
-    ar = Tenant(nome=nome, slug=slug, cnpj=cnpj.strip()[:20])
+    if db.execute(select(Tenant.id).where(Tenant.slug == apelido)).first():
+        avisar(request, f"Já existe uma AR com o apelido \"{apelido}\". Escreva outro apelido.", "erro")
+        return voltar("/master")
+    ar = Tenant(nome=nome, slug=apelido, cnpj=cnpj.strip()[:20])
     db.add(ar)
     db.flush()
-    registrar_log(db, usuario, "criou_ar", "tenant", ar.id, nome, request)
+    registrar_log(db, usuario, "criou_ar", "tenant", ar.id, f"{nome} ({apelido})", request)
     db.commit()
-    avisar(request, f"AR {nome} criada. Antes de colocar pessoas de outra empresa para usar, assine os planos pagos "
-                    "(Vercel Pro e Supabase Pro): o plano grátis da Vercel não permite uso comercial.")
+    avisar(request, f"AR {nome} criada (apelido {apelido}). Para colocar a marca dela: clique em Entrar na AR e vá em "
+                    "Configurações > Marca (nome, logo e cores) e em Configurações > Usuários (o administrador dela).")
     return voltar("/master")
 
 
