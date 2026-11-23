@@ -82,6 +82,7 @@ CHAVES_DA_AR = frozenset({
     # Renovação pela API oficial (22/11/2026): cada marca liga a dela (valia para todas: ligada na MS, os avisos do
     # Grupo Certy, sem API oficial, ficariam parados esperando o número oficial)
     "renov_envio_oficial",
+    "renov_agenda", "renov_agenda_usuario_id",  # o calendário do "Quero renovar" (23/11/2026): cada marca o seu
     # módulos (autorizacao.MODULOS): cada AR tem os seus, mas só o Admin Master liga e desliga (Fase 3). Todo módulo
     # novo entra aqui E em CHAVES_SO_MASTER (testes/test_modulos_por_ar.py confere): fora daqui, o Painel master
     # gravava na plataforma e ligar/desligar em uma AR valia para todas (a Assertiva, até 19/11/2026)

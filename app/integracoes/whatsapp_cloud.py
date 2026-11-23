@@ -15,6 +15,7 @@ Duas formas de usar:
 
 import hashlib
 import hmac
+import json
 
 import httpx
 
@@ -207,6 +208,64 @@ def baixar_midia(midia_id: str, token: str, maximo: int = MAXIMO_DA_MIDIA, versa
     return r.content
 
 
+# ---------------------------------------------------------------- formulários do WhatsApp (Flows)
+# O calendário da Renovação (23/11/2026). Conferido na Meta de verdade no mesmo dia, com rascunhos apagados em seguida:
+# a versão 5.0 do JSON não é mais aceita ("INVALID_FLOW_JSON_VERSION"); a 7.3 passa sem erros com o CalendarPicker,
+# a lista de horários e as datas vindas na mensagem (data_minima, data_maxima, datas_bloqueadas, horarios).
+
+def criar_flow(waba_id: str, token: str, nome: str, categorias: tuple = ("APPOINTMENT_BOOKING",),
+               versao: str | None = None) -> str:
+    """Cria o formulário (rascunho) na conta de mensagens e devolve o id dele."""
+    dados = _pedir("POST", f"{waba_id}/flows", token, versao, json={"name": nome, "categories": list(categorias)})
+    if not dados.get("id"):
+        raise ErroWhatsApp("A Meta não devolveu o número do formulário criado.")
+    return str(dados["id"])
+
+
+def subir_flow_json(flow_id: str, token: str, conteudo: dict, versao: str | None = None) -> list[dict]:
+    """Sobe o JSON do formulário. Devolve os erros de validação da Meta (vazio = aceito)."""
+    corpo = json.dumps(conteudo, ensure_ascii=False).encode()
+    dados = _pedir("POST", f"{flow_id}/assets", token, versao, data={"name": "flow.json", "asset_type": "FLOW_JSON"},
+                   files={"file": ("flow.json", corpo, "application/json")})
+    return list(dados.get("validation_errors") or [])
+
+
+def publicar_flow(flow_id: str, token: str, versao: str | None = None) -> None:
+    """Publica o formulário (depois disso ele não muda mais: mudança = formulário novo)."""
+    _pedir("POST", f"{flow_id}/publish", token, versao)
+
+
+def apagar_flow(flow_id: str, token: str, versao: str | None = None) -> None:
+    """Apaga um rascunho (o que a Meta recusou)."""
+    _pedir("DELETE", str(flow_id), token, versao)
+
+
+def enviar_flow(phone_number_id: str, token: str, telefone: str, flow_id: str, flow_token: str, texto: str,
+                botao: str, tela: str, dados: dict, versao: str | None = None) -> str:
+    """Manda o formulário como mensagem livre (só dentro da janela de 24 h aberta pelo contato): `texto` em cima,
+    `botao` abre o formulário na `tela`, já com os `dados` dela. `flow_token` volta junto com a resposta."""
+    corpo = {"messaging_product": "whatsapp", "recipient_type": "individual", "to": _destino(telefone),
+             "type": "interactive",
+             "interactive": {"type": "flow", "body": {"text": texto},
+                             "action": {"name": "flow", "parameters": {
+                                 "flow_message_version": "3", "flow_token": flow_token, "flow_id": flow_id,
+                                 "flow_cta": botao, "flow_action": "navigate",
+                                 "flow_action_payload": {"screen": tela, "data": dados}}}}}
+    dados_ = _pedir("POST", f"{phone_number_id}/messages", token, versao, json=corpo)
+    return (dados_.get("messages") or [{}])[0].get("id", "")
+
+
+def _texto_do_formulario(formulario: dict) -> str:
+    """A resposta do calendário como gente lê: "Escolheu 25/11/2026 às 10:00"."""
+    dia, hora = str(formulario.get("dia") or ""), str(formulario.get("horario") or "")
+    partes = dia[:10].split("-")
+    if len(partes) == 3 and all(p.isdigit() for p in partes):
+        dia = f"{partes[2]}/{partes[1]}/{partes[0]}"
+    if dia and hora:
+        return f"Escolheu {dia} às {hora}"
+    return "Respondeu o formulário" + (f": {dia or hora}" if dia or hora else "")
+
+
 # ---------------------------------------------------------------- modelos (templates)
 
 def app_do_token(token: str, versao: str | None = None) -> str:
@@ -337,16 +396,27 @@ def ler_webhook(dados: dict) -> tuple[list[dict], list[dict]]:
                 tipo = str(m.get("type") or "")
                 # foto e figurinha: o id da mídia, para baixar (a Meta guarda só 7 dias) e mostrar na tela API Oficial
                 midia = (m.get(tipo) or {}) if tipo in TIPOS_DE_IMAGEM else {}
+                # resposta de um formulário (o calendário da Renovação): os campos vêm num JSON dentro de nfm_reply
+                interativo = m.get("interactive") or {}
+                formulario: dict = {}
+                if interativo.get("type") == "nfm_reply":
+                    tipo = "nfm_reply"
+                    try:
+                        formulario = json.loads((interativo.get("nfm_reply") or {}).get("response_json") or "{}")
+                    except (ValueError, TypeError):
+                        formulario = {}
+                    formulario = formulario if isinstance(formulario, dict) else {}
                 texto = ((m.get("text") or {}).get("body") or (m.get("button") or {}).get("text")
-                         or ((m.get("interactive") or {}).get("button_reply") or {}).get("title")
+                         or (interativo.get("button_reply") or {}).get("title")
                          or str(midia.get("caption") or "").strip()  # a legenda da foto
+                         or (_texto_do_formulario(formulario) if tipo == "nfm_reply" else "")
                          or f"[{m.get('type')}]")
                 # botão de resposta rápida de um modelo: o payload que o sistema mandou junto (ex.: renov:renovar:123)
                 botao = str((m.get("button") or {}).get("payload")
                             or ((m.get("interactive") or {}).get("button_reply") or {}).get("id") or "")
                 recebidas.append({"de": m.get("from", ""), "texto": texto, "id": m.get("id", ""), "numero_id": numero_id,
                                   "nome": nomes.get(m.get("from", ""), ""), "botao": botao[:256], "tipo": tipo,
-                                  "midia_id": str(midia.get("id") or "")[:120]})
+                                  "midia_id": str(midia.get("id") or "")[:120], "formulario": formulario})
             for s in valor.get("statuses", []):
                 erros = s.get("errors") or [{}]
                 status.append({"id": s.get("id", ""), "status": s.get("status", ""), "numero_id": numero_id,

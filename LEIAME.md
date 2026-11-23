@@ -728,6 +728,20 @@ no texto) e sem o limite de 20 por dia do QR code (a Meta cobra por mensagem). Q
 vários certificados, a equipe confere qual); **Parar avisos** funciona como o SAIR. A arte é desenhada no computador do
 WhatsApp Leads; se ele estiver desligado, o aviso sai só com o texto.
 
+**Calendário para quem quer renovar.** Na tela **Renovação**, quadro 4, ligue **Calendário para quem tocar em "Quero
+renovar"** e escolha a **Agenda de quem atende**. Quem tocar em "Quero renovar" recebe na hora, pelo número oficial, o
+botão **Escolher o horário**: abre um calendário com os próximos 15 dias (só os dias com horário livre) e a lista de
+horários. Ao confirmar:
+- o horário vira uma **reunião na Agenda** de quem atende (nunca duas no mesmo horário; se alguém pegou o horário
+  antes, o sistema marca o livre mais perto e avisa o cliente);
+- o cliente recebe: "Combinado! Nossa equipe vai falar com você na quarta, 25/11, às 10:00 para fazer a sua
+  renovação.";
+- a equipe recebe o aviso no sininho, e a conversa aparece na tela **API Oficial**.
+Os horários livres saem do expediente da pessoa (Configurações > Usuários) e das reuniões que já estão na Agenda dela.
+Para testar no seu celular: mande um "oi" do seu WhatsApp para o número oficial e, em **Configurações > WhatsApp**,
+use **Testar o calendário** (a confirmação do teste vem com "[TESTE]" e não marca reunião). A Meta só deixa mandar o
+calendário até 24 horas depois do toque do cliente.
+
 ## 5. Perfis de acesso
 
 | Perfil | Vê |

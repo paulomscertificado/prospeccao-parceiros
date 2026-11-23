@@ -19,7 +19,7 @@ import re
 import secrets
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 
 from . import util
 from .banco import agora
@@ -275,7 +275,8 @@ def ativar_numero(db, conta: ContaWhatsAppOficial, senha: str, repeticao: str | 
 
 SITUACAO_DA_META = {"sent": "enviada", "delivered": "entregue", "read": "lida", "failed": "falhou"}
 ORDEM_DA_SITUACAO = {"enviada": 1, "entregue": 2, "lida": 3}  # a Meta pode avisar fora de ordem: nunca volta
-TIPO_QUE_CHEGA = {"text": "texto", "button": "botao", "interactive": "botao"}  # o resto (imagem, áudio...) = mídia
+TIPO_QUE_CHEGA = {"text": "texto", "button": "botao", "interactive": "botao",  # o resto (imagem, áudio...) = mídia
+                  "nfm_reply": "formulario"}  # a resposta do calendário da Renovação
 MARCA_DA_ARTE = "[com a arte do aviso]\n"  # 1ª linha do aviso que foi com a arte (a tela mostra como etiqueta)
 PREFIXO_DO_EXEMPLO = "[aviso de exemplo] "  # o aviso de exemplo do teste da tela (Configurações > WhatsApp)
 # a mídia que chega sem legenda fica guardada como "[tipo]" (whatsapp_cloud.ler_webhook): o nome para a tela
@@ -929,4 +930,355 @@ def tratar_botao(db, conta: ContaWhatsAppOficial, telefone: str, recebida: dict)
     elif lead.etapa < 2 and not lead.perdido:
         mudar_status(db, lead, "Respondeu", None)
     sdr.criar_oportunidade(db, lead, analise, texto, "whatsapp", enviada, temperatura)
+    if acao == "renovar":  # o calendário para o cliente escolher o dia e o horário (se a marca ligou)
+        pedir_agendamento(db, conta, lead, tarefa, telefone)
     return True
+
+
+# ---------------------------------------------------------------- o calendário da Renovação (Flow)
+# Pedido da Maria em 23/11/2026: "em caso deles responderem que querem renovar, dar a opção de um calendário e ele
+# informar a data e horário que ele quer". Quem toca em "Quero renovar" recebe pelo número oficial (na janela de 24 h
+# que o toque abre, sem mudar o modelo aprovado) um formulário do WhatsApp com o calendário dos próximos 15 dias e os
+# horários livres de quem atende (renov_agenda_usuario_id; a Maria escolheu o Paulo Lucas). A escolha vira reunião na
+# Agenda dessa pessoa (agenda_horarios.agendar: nunca duas no mesmo horário) e o cliente recebe a confirmação ("nossa
+# equipe vai falar com você ..."). O relógio manda o calendário e a confirmação (o webhook só grava).
+
+FLOW_AGENDA_NOME = "agendar_renovacao"
+FLOW_AGENDA_TELA = "AGENDAR"
+FLOW_AGENDA_VERSAO = "7.3"   # a 5.0 a Meta já não aceita (conferido em 23/11/2026)
+DIAS_DA_AGENDA = 15          # o calendário mostra os próximos 15 dias (escolha da Maria)
+HORAS_DA_JANELA = 23         # a Meta só deixa mandar mensagem livre até 24 h depois da última do cliente
+TENTATIVAS_DO_CALENDARIO = 3
+PREFIXO_DO_TOKEN = "agenda:"
+TEXTO_DO_CALENDARIO = ("Que bom! Escolha o melhor dia e horário para a nossa equipe falar com você e fazer a sua "
+                       "renovação.")
+BOTAO_DO_CALENDARIO = "Escolher o horário"
+DIAS_DA_SEMANA = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"]
+
+
+def flow_agenda() -> dict:
+    """O formulário do calendário (JSON do Flow, versão FLOW_AGENDA_VERSAO): o calendário (CalendarPicker) com os dias
+    que dá para marcar, a lista de horários e Confirmar. As datas e os horários vêm na mensagem (dados_do_calendario)."""
+    return {
+        "version": FLOW_AGENDA_VERSAO,
+        "screens": [{
+            "id": FLOW_AGENDA_TELA, "title": "Agendar a renovação", "terminal": True, "success": True,
+            "data": {
+                "data_minima": {"type": "string", "__example__": "2026-11-24"},
+                "data_maxima": {"type": "string", "__example__": "2026-12-08"},
+                "datas_bloqueadas": {"type": "array", "items": {"type": "string"}, "__example__": ["2026-11-28"]},
+                "horarios": {"type": "array", "items": {"type": "object", "properties": {
+                    "id": {"type": "string"}, "title": {"type": "string"}}},
+                    "__example__": [{"id": "09:00", "title": "09:00"}, {"id": "09:30", "title": "09:30"}]},
+            },
+            "layout": {"type": "SingleColumnLayout", "children": [
+                {"type": "TextBody", "text": "Escolha o dia e o horário. Nossa equipe fala com você nesse horário para "
+                                             "fazer a sua renovação."},
+                {"type": "CalendarPicker", "name": "dia", "label": "Dia", "mode": "single", "required": True,
+                 "min-date": "${data.data_minima}", "max-date": "${data.data_maxima}",
+                 "unavailable-dates": "${data.datas_bloqueadas}"},
+                {"type": "Dropdown", "name": "horario", "label": "Horário", "required": True,
+                 "data-source": "${data.horarios}"},
+                {"type": "Footer", "label": "Confirmar", "on-click-action": {
+                    "name": "complete", "payload": {"dia": "${form.dia}", "horario": "${form.horario}"}}},
+            ]},
+        }],
+    }
+
+
+def garantir_flow_agenda(db, conta: ContaWhatsAppOficial) -> str:
+    """O calendário publicado na Meta para esta conta (cria, sobe o JSON e publica na primeira vez). Devolve o problema
+    ("" = pronto). O que a Meta recusar sai do rascunho (apagado) e volta como problema."""
+    if conta is None or not conta.token_cripto:
+        return "configure a API oficial da Meta em Configurações > WhatsApp"
+    if conta.flow_agenda_id:
+        return ""
+    if not conta.waba_id:
+        return "falta a conta de mensagens do número: clique em Testar conexão em Configurações > WhatsApp"
+    tok = token(conta)
+    try:
+        flow_id = whatsapp_cloud.criar_flow(conta.waba_id, tok, f"{FLOW_AGENDA_NOME}_{agora():%Y%m%d_%H%M%S}")
+        erros = whatsapp_cloud.subir_flow_json(flow_id, tok, flow_agenda())
+        if erros:
+            try:
+                whatsapp_cloud.apagar_flow(flow_id, tok)
+            except whatsapp_cloud.ErroWhatsApp:
+                pass
+            return "a Meta recusou o calendário: " + "; ".join(str(e.get("message") or e) for e in erros)[:300]
+        whatsapp_cloud.publicar_flow(flow_id, tok)
+    except whatsapp_cloud.ErroWhatsApp as erro:
+        return f"não deu para criar o calendário na Meta ({erro})"
+    conta.flow_agenda_id = flow_id
+    return ""
+
+
+def responsavel_da_agenda(db, lead=None):
+    """Quem atende: a pessoa escolhida na tela Renovação (renov_agenda_usuario_id); sem ela (ou inativa), quem cuida
+    do cliente. None = ninguém com agenda."""
+    from . import renovacao
+    from .modelos import Usuario
+
+    uid = util.para_int(renovacao.cfg(db, "renov_agenda_usuario_id"))
+    pessoa = db.get(Usuario, uid) if uid else None
+    if (pessoa is None or not pessoa.ativo) and lead is not None and lead.vendedor_id:
+        pessoa = db.get(Usuario, lead.vendedor_id)
+    return pessoa if pessoa is not None and pessoa.ativo else None
+
+
+def dados_do_calendario(db, pessoa) -> dict | None:
+    """Os dados da tela do calendário: o primeiro e o último dia com horário livre nos próximos DIAS_DA_AGENDA dias, os
+    dias sem horário no meio (fim de semana, feriado, agenda cheia) e os horários do expediente de quem atende.
+    None = nenhum horário livre (a equipe combina o horário)."""
+    from datetime import timedelta
+
+    from . import agenda_horarios
+
+    livres = agenda_horarios.horarios_livres(db, pessoa, dias=DIAS_DA_AGENDA, quantidade=2000, antecedencia_horas=2)
+    if not livres:
+        return None
+    dias = sorted({h.date() for h in livres})
+    inicio, fim = dias[0], dias[-1]
+    com_vaga = set(dias)
+    bloqueados = [d.isoformat() for d in (inicio + timedelta(days=n) for n in range((fim - inicio).days + 1))
+                  if d not in com_vaga]
+    horas = sorted({h.strftime("%H:%M") for h in livres})
+    return {"data_minima": inicio.isoformat(), "data_maxima": fim.isoformat(), "datas_bloqueadas": bloqueados,
+            "horarios": [{"id": h, "title": h} for h in horas]}
+
+
+def pedir_agendamento(db, conta: ContaWhatsAppOficial, lead, tarefa, telefone: str):
+    """Quem tocou em "Quero renovar" vai receber o calendário (o relógio manda): só com o calendário ligado na marca
+    (renov_agenda) e publicado na Meta, e um por cliente enquanto a janela de 24 h estiver aberta."""
+    from datetime import timedelta
+
+    from . import renovacao
+    from .modelos import AgendamentoOficial
+
+    if renovacao.cfg(db, "renov_agenda") != "1" or not conta.flow_agenda_id or lead is None:
+        return None
+    if db.execute(select(AgendamentoOficial.id).where(
+            AgendamentoOficial.lead_id == lead.id, AgendamentoOficial.situacao.in_(("a_enviar", "enviado")),
+            AgendamentoOficial.criado_em >= agora() - timedelta(hours=HORAS_DA_JANELA))
+            .execution_options(sem_filtro_de_ar=True)).first():
+        return None
+    pessoa = responsavel_da_agenda(db, lead)
+    ag = AgendamentoOficial(tenant_id=conta.tenant_id, conta_id=conta.id, lead_id=lead.id,
+                            tarefa_id=tarefa.id if tarefa is not None else None,
+                            usuario_id=pessoa.id if pessoa is not None else None,
+                            telefone=chave_da_conversa(telefone)[:20], token=PREFIXO_DO_TOKEN + secrets.token_urlsafe(18))
+    db.add(ag)
+    db.flush()
+    return ag
+
+
+def _enviar_calendario(db, ag, conta: ContaWhatsAppOficial) -> None:
+    """Manda o calendário (o formulário) deste pedido. Sem horário livre: sem_vaga (a equipe combina)."""
+    from .modelos import Usuario
+
+    pessoa = db.get(Usuario, ag.usuario_id) if ag.usuario_id else None
+    dados = dados_do_calendario(db, pessoa) if pessoa is not None else None
+    if dados is None:
+        ag.situacao = "sem_vaga"
+        return
+    wamid = whatsapp_cloud.enviar_flow(conta.phone_number_id, token(conta), ag.telefone, conta.flow_agenda_id, ag.token,
+                                       TEXTO_DO_CALENDARIO, BOTAO_DO_CALENDARIO, FLOW_AGENDA_TELA, dados)
+    ag.situacao, ag.enviado_em = "enviado", agora()
+    guardar_conversa(db, conta, ag.telefone, "saida", ("[teste] " if ag.teste else "") + TEXTO_DO_CALENDARIO,
+                     "calendario", wamid or "", lead_id=ag.lead_id)
+
+
+def texto_da_confirmacao(ag) -> str:
+    """A confirmação para o cliente (escolha da Maria: a equipe fala com ele no horário marcado)."""
+    if ag.situacao == "sem_vaga" or ag.dia is None:
+        return ("Recebemos o seu pedido! Nossa equipe vai falar com você em breve para combinar o melhor horário da "
+                "sua renovação.")
+    texto = (f"Combinado! Nossa equipe vai falar com você na {DIAS_DA_SEMANA[ag.dia.weekday()]}, {ag.dia:%d/%m}, "
+             f"às {ag.hora} para fazer a sua renovação.")
+    marcado = f"{ag.dia.isoformat()} {ag.hora}"
+    if ag.pedido and ag.pedido != marcado:
+        pedido = ag.pedido.split(" ")
+        quando = pedido[1] if len(pedido) == 2 and pedido[0] == ag.dia.isoformat() else "que você escolheu"
+        texto = (f"O horário {('das ' + quando) if quando[:1].isdigit() else quando} já estava ocupado, então marquei "
+                 f"o mais próximo. " + texto)
+    return ("[TESTE] " if ag.teste else "") + texto
+
+
+def _ler_dia(valor):
+    """O dia que veio do calendário: "AAAA-MM-DD" (ou um número de milissegundos, nas versões antigas)."""
+    from datetime import date, datetime as _dt
+
+    texto = str(valor or "").strip()
+    try:
+        return date.fromisoformat(texto[:10])
+    except ValueError:
+        pass
+    if texto.isdigit():
+        try:
+            return _dt.fromtimestamp(int(texto) / 1000).date()
+        except (ValueError, OSError, OverflowError):
+            return None
+    return None
+
+
+def _mais_perto(livres: list, pedido):
+    """O horário livre mais perto do escolhido: o próprio; senão o mais perto no mesmo dia; senão o primeiro depois."""
+    if not livres:
+        return None
+    if pedido is None:
+        return livres[0]
+    if pedido in livres:
+        return pedido
+    no_dia = [h for h in livres if h.date() == pedido.date()]
+    if no_dia:
+        return min(no_dia, key=lambda h: (abs((h - pedido).total_seconds()), h))
+    depois = [h for h in livres if h > pedido]
+    return depois[0] if depois else livres[-1]
+
+
+def tratar_formulario(db, conta: ContaWhatsAppOficial, telefone: str, recebida: dict) -> bool:
+    """O cliente respondeu o calendário: marca a reunião na Agenda de quem atende (o horário escolhido ou o livre mais
+    perto) e avisa a equipe; a confirmação o relógio manda. Devolve False quando o formulário não é deste sistema."""
+    from datetime import datetime as _dt, time as _time
+
+    from . import agenda_horarios, sdr
+    from .leads_servico import historico
+    from .modelos import AgendamentoOficial, Lead, Tarefa, Usuario
+
+    formulario = recebida.get("formulario") or {}
+    token_ = str(formulario.get("flow_token") or "")
+    if not token_.startswith(PREFIXO_DO_TOKEN):
+        return False
+    ag = db.execute(select(AgendamentoOficial).where(AgendamentoOficial.token == token_,
+                                                     AgendamentoOficial.conta_id == conta.id)
+                    .execution_options(sem_filtro_de_ar=True)).scalars().first()
+    if ag is None or ag.telefone != chave_da_conversa(telefone)[:20]:
+        log.warning("Resposta de calendário que não bate com nenhum pedido (conta %s)", conta.id)
+        return True  # é um formulário do sistema: não vira resposta comum
+    dia, hora = _ler_dia(formulario.get("dia")), str(formulario.get("horario") or "")[:5]
+    try:
+        pedido = _dt.combine(dia, _time.fromisoformat(hora)) if dia else None
+    except ValueError:
+        pedido = None
+    ag.pedido = f"{dia.isoformat()} {hora}" if dia else hora
+    ag.marcado_em, ag.confirmado_em = agora(), None  # nova escolha: nova confirmação
+    if ag.teste:  # o teste da tela: confirma o que foi escolhido, sem marcar reunião
+        ag.dia, ag.hora, ag.situacao = (pedido.date(), pedido.strftime("%H:%M"), "marcado") if pedido else (None, "", "sem_vaga")
+        return True
+    lead = db.get(Lead, ag.lead_id) if ag.lead_id else None
+    pessoa = db.get(Usuario, ag.usuario_id) if ag.usuario_id else None
+    livres = (agenda_horarios.horarios_livres(db, pessoa, dias=DIAS_DA_AGENDA + 1, quantidade=2000, antecedencia_horas=1)
+              if pessoa is not None and pessoa.ativo else [])
+    if ag.reuniao_id:  # escolheu de novo: a reunião anterior sai da agenda e o horário dela fica livre
+        anterior = db.get(Tarefa, ag.reuniao_id)
+        if anterior is not None and anterior.status == "pendente":
+            anterior.status = "cancelada"
+            db.flush()
+            livres = sorted(set(livres) | {_dt.combine(anterior.data, _time.fromisoformat(anterior.hora or "09:00"))})
+    escolhido = _mais_perto(livres, pedido)
+    if lead is None or escolhido is None:
+        ag.situacao, ag.dia, ag.hora = "sem_vaga", None, ""
+        if lead is not None:
+            sdr.notificar(db, lead, f"{lead.empresa} quer renovar e pediu {ag.pedido}, mas a agenda não tem horário "
+                                    "livre: combine o horário com o cliente.", f"/leads/{lead.id}", equipe_toda=True)
+        return True
+    try:
+        reuniao = agenda_horarios.agendar(db, lead, pessoa, escolhido, "whatsapp", None,
+                                          pauta="Renovação do certificado · o cliente marcou no calendário do WhatsApp "
+                                                "oficial · a equipe fala com ele nesse horário")
+    except agenda_horarios.HorarioIndisponivel:
+        ag.situacao = "sem_vaga"
+        return True
+    db.flush()
+    ag.reuniao_id, ag.dia, ag.hora, ag.situacao = reuniao.id, escolhido.date(), escolhido.strftime("%H:%M"), "marcado"
+    quando = f"{DIAS_DA_SEMANA[ag.dia.weekday()]}, {ag.dia:%d/%m}, às {ag.hora}"
+    historico(db, lead.id, "sistema", f"O cliente marcou a renovação no calendário do WhatsApp oficial: {quando}"
+                                      + (f" (pediu {ag.pedido})" if ag.pedido != f"{ag.dia.isoformat()} {ag.hora}" else "")
+                                      + f". Agenda de {pessoa.nome}.", None)
+    sdr.notificar(db, lead, f"{lead.empresa} marcou a renovação para {quando} (agenda de {pessoa.nome}).",
+                  f"/leads/{lead.id}", equipe_toda=True)
+    return True
+
+
+def processar_agendamentos(db, maximo: int = 20) -> dict:
+    """O relógio, a cada minuto: manda o calendário de quem tocou em "Quero renovar" e a confirmação de quem escolheu o
+    horário. Passou a janela de 24 h: vencido (não dá mais para mandar mensagem livre). Erro: tenta de novo (até
+    TENTATIVAS_DO_CALENDARIO). Um pedido que falha não trava os outros."""
+    from datetime import timedelta
+
+    from .banco import usar_config_da_ar
+    from .modelos import AgendamentoOficial
+
+    feito = {"calendarios": 0, "confirmacoes": 0, "vencidos": 0, "erros": 0}
+    limite = agora() - timedelta(hours=HORAS_DA_JANELA)
+    pendentes = db.execute(select(AgendamentoOficial).where(or_(
+        AgendamentoOficial.situacao == "a_enviar",
+        and_(AgendamentoOficial.situacao.in_(("marcado", "sem_vaga")), AgendamentoOficial.confirmado_em.is_(None))))
+        .order_by(AgendamentoOficial.id).limit(maximo).execution_options(sem_filtro_de_ar=True)).scalars().all()
+    anterior = db.info.get("ar_config")
+    try:
+        for ag in pendentes:
+            momento = ag.marcado_em if ag.situacao != "a_enviar" and ag.marcado_em else ag.criado_em
+            if momento < limite:  # a janela de 24 h fechou: a Meta não deixa mais mandar mensagem livre
+                if ag.situacao == "a_enviar":
+                    ag.situacao = "vencido"
+                else:
+                    ag.confirmado_em = agora()  # a confirmação não sai mais (a equipe vê na Agenda e na ficha)
+                feito["vencidos"] += 1
+                continue
+            conta = db.get(ContaWhatsAppOficial, ag.conta_id)
+            if conta is None or not conta.token_cripto or not conta.flow_agenda_id:
+                ag.situacao, ag.erro = "erro", "a conta oficial ou o calendário não existem mais"
+                feito["erros"] += 1
+                continue
+            usar_config_da_ar(db, ag.tenant_id)
+            try:
+                if ag.situacao == "a_enviar":
+                    _enviar_calendario(db, ag, conta)
+                    feito["calendarios"] += ag.situacao == "enviado"
+                if ag.situacao in ("marcado", "sem_vaga") and ag.confirmado_em is None:
+                    texto = texto_da_confirmacao(ag)
+                    wamid = whatsapp_cloud.enviar_texto_por(conta.phone_number_id, token(conta), ag.telefone, texto)
+                    ag.confirmado_em = agora()
+                    guardar_conversa(db, conta, ag.telefone, "saida", texto, "texto", wamid or "", lead_id=ag.lead_id)
+                    feito["confirmacoes"] += 1
+            except whatsapp_cloud.ErroWhatsApp as erro:
+                ag.tentativas = (ag.tentativas or 0) + 1
+                ag.erro = str(erro)[:500]
+                if ag.tentativas >= TENTATIVAS_DO_CALENDARIO:
+                    if ag.situacao == "a_enviar":
+                        ag.situacao = "erro"
+                    else:
+                        ag.confirmado_em = agora()  # a reunião está marcada; só a confirmação não saiu
+                log.warning("Calendário da renovação (pedido %s) não saiu: %s", ag.id, erro)
+                feito["erros"] += 1
+    finally:
+        usar_config_da_ar(db, anterior)
+    return feito
+
+
+def enviar_calendario_de_teste(db, conta: ContaWhatsAppOficial, telefone: str, usuario) -> None:
+    """O teste da tela (Configurações > WhatsApp): o calendário para o WhatsApp de quem testa (que precisa ter escrito
+    para o número oficial nas últimas 24 h). A resposta volta com a confirmação "[TESTE]" e não marca reunião. Lança
+    whatsapp_cloud.ErroWhatsApp."""
+    from .modelos import AgendamentoOficial
+
+    problema = garantir_flow_agenda(db, conta)
+    if problema:
+        raise whatsapp_cloud.ErroWhatsApp(problema[:1].upper() + problema[1:] + ".")
+    chave = chave_da_conversa(telefone)
+    if not chave:
+        raise whatsapp_cloud.ErroWhatsApp("Telefone inválido para WhatsApp (digite com DDD, ex.: 81 99999-0000).")
+    pessoa = responsavel_da_agenda(db) or usuario
+    ag = AgendamentoOficial(tenant_id=conta.tenant_id, conta_id=conta.id, usuario_id=pessoa.id if pessoa else None,
+                            telefone=chave[:20], token=PREFIXO_DO_TOKEN + secrets.token_urlsafe(18), teste=True)
+    db.add(ag)
+    db.flush()
+    try:
+        _enviar_calendario(db, ag, conta)
+    except whatsapp_cloud.ErroWhatsApp as erro:  # o teste não tenta de novo sozinho
+        ag.situacao, ag.erro = "erro", str(erro)[:500]
+        raise
+    if ag.situacao != "enviado":
+        ag.situacao = "erro"
+        raise whatsapp_cloud.ErroWhatsApp(f"{pessoa.nome if pessoa else 'Quem atende'} não tem horário livre nos "
+                                          "próximos 15 dias (confira o expediente em Configurações > Usuários).")

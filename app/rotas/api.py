@@ -107,6 +107,10 @@ async def webhook_receber(request: Request):
                 usar_config_da_ar(db, conta.tenant_id)
                 if whatsapp_oficial.tratar_botao(db, conta, telefone, r):
                     continue
+            if r.get("formulario"):  # o cliente escolheu o dia e o horário no calendário da Renovação (23/11/2026)
+                usar_config_da_ar(db, conta.tenant_id)
+                if whatsapp_oficial.tratar_formulario(db, conta, telefone, r):
+                    continue
             if mensagens.pede_opt_out(r["texto"]):
                 from ..leads_servico import registrar_opt_out
 

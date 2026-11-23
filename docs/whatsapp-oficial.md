@@ -145,6 +145,30 @@ Pedido da Maria em 16/11/2026: "que continue fazendo essa campanha mas que seja 
   aviso para a equipe toda. **Já renovei**: com um certificado ativo, ele vira Renovado e os avisos param, sem trabalho
   para a equipe; com vários, oportunidade morna "JÁ RENOVOU" para conferir qual. **Parar avisos**: opt-out em todas as
   ARs (como o SAIR). Os três cancelam os próximos avisos.
+- **Calendário do "Quero renovar"** (23/11/2026, pedido da Maria: "dar a opção de um calendário e ele informar a data e
+  horário que ele quer"). O modelo aprovado não muda: o toque abre a janela de 24 h e o sistema responde com um
+  formulário do WhatsApp (Flow). Escolhas da Maria: próximos 15 dias, a agenda de uma pessoa fixa (Paulo Lucas) e a
+  confirmação "Combinado! Nossa equipe vai falar com você na quarta, 25/11, às 10:00 para fazer a sua renovação." Liga na
+  tela Renovação, quadro 4 (`renov_agenda` e `renov_agenda_usuario_id`, por marca em `banco.CHAVES_DA_AR`; sem pessoa,
+  quem cuida do cliente). Ao ligar, ou no 1º teste, `whatsapp_oficial.garantir_flow_agenda` cria o formulário, sobe o
+  JSON (`flow_agenda()`, versão 7.3: a 5.0 a Meta já recusa) e publica (`contas_whatsapp_oficial.flow_agenda_id`;
+  publicado não muda: mudança = formulário novo). O que a Meta recusar é apagado e o problema aparece. Conferido na Meta
+  de verdade em 23/11/2026 com rascunhos apagados depois: `CalendarPicker` (mês inteiro na tela) + `Dropdown` dos
+  horários + `Footer` complete, sem erros. Fluxo: `tratar_botao` ("renovar") → `pedir_agendamento` (tabela
+  `agendamentos_oficiais`, um por cliente na janela, `token` = flow_token `agenda:...`) → o relógio
+  (`rotinas._agenda_whatsapp_oficial` → `processar_agendamentos`, a cada minuto) manda o formulário
+  (`whatsapp_cloud.enviar_flow`, mensagem livre na janela) com os dados do dia: `dados_do_calendario` (dias de
+  `agenda_horarios.horarios_livres`: expediente da pessoa, feriados dela, reuniões já marcadas, 2 h de antecedência;
+  dias sem horário em `datas_bloqueadas`; os horários do expediente na lista). A resposta volta no webhook (interactive
+  `nfm_reply`, `ler_webhook` → `formulario` e texto "Escolheu 25/11/2026 às 10:00", tipo `formulario`) →
+  `tratar_formulario`: o horário escolhido ou o livre mais perto no mesmo dia (`_mais_perto`; a confirmação avisa "O
+  horário das 10:00 já estava ocupado ...") → `agenda_horarios.agendar` (reunião na Agenda da pessoa, lead em
+  "Reunião", histórico) + aviso para a equipe; escolher de novo troca a reunião. A confirmação sai pelo relógio
+  (`enviar_texto_por`). Sem horário livre: "Recebemos o seu pedido! Nossa equipe vai falar com você ..." e aviso para a
+  equipe (situação `sem_vaga`). Janela de 24 h fechada antes de sair: `vencido`. Erro da Meta: até 3 tentativas. A tela
+  API Oficial mostra o calendário, a escolha e a confirmação. Teste: Configurações > WhatsApp > "Testar o calendário"
+  (`/whatsapp/oficial/calendario/teste`; a Meta só entrega para quem escreveu ao número nas últimas 24 h, erro 131047),
+  que confirma com "[TESTE]" e não marca reunião. Testes: `testes/test_agenda_renovacao.py`.
 - **Testes**: `testes/test_whatsapp_oficial_renovacao.py` (Meta imitada) e, no WhatsApp Leads,
   `testes/teste_ponta_a_ponta.py` (pedido `desenhar_arte`).
 - **Mensagem de teste da tela** (22/11/2026): escrito o nome de um modelo do aviso de vencimento (sem ligar para

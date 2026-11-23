@@ -259,6 +259,37 @@ class ContaWhatsAppOficial(DaAR, Base):
     situacao: Mapped[str] = mapped_column(Text, default="")  # JSON do último teste de conexão
     testado_em: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
+    # o calendário da renovação (formulário do WhatsApp, "Flow", publicado na Meta pelo sistema; 23/11/2026)
+    flow_agenda_id: Mapped[str] = mapped_column(String(40), default="")
+
+
+class AgendamentoOficial(DaAR, Base):
+    """O calendário da Renovação (pedido da Maria em 23/11/2026: "dar a opção de um calendário e ele informar a data e
+    horário que ele quer"): quem toca em "Quero renovar" no aviso recebe, pelo número oficial, o formulário do WhatsApp
+    com o calendário e os horários livres de quem atende (renov_agenda_usuario_id); a escolha vira reunião na Agenda
+    dessa pessoa e o cliente recebe a confirmação. Ver whatsapp_oficial.processar_agendamentos e tratar_formulario.
+    Situação: a_enviar, enviado, marcado, sem_vaga (a equipe combina o horário), erro ou vencido (a janela de 24 h da
+    Meta fechou antes de o calendário sair)."""
+    __tablename__ = "agendamentos_oficiais"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    conta_id: Mapped[int] = mapped_column(Integer, index=True)  # contas_whatsapp_oficial.id
+    lead_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    tarefa_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # o aviso que tinha o botão
+    usuario_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # de quem é a agenda
+    telefone: Mapped[str] = mapped_column(String(20), default="")  # como em mensagens_oficiais (DDD e o 9)
+    token: Mapped[str] = mapped_column(String(64), default="", index=True)  # flow_token: volta com a resposta
+    situacao: Mapped[str] = mapped_column(String(20), default="a_enviar")
+    teste: Mapped[bool] = mapped_column(Boolean, default=False)  # o teste da tela: confirma sem marcar reunião
+    tentativas: Mapped[int] = mapped_column(Integer, default=0)
+    erro: Mapped[str] = mapped_column(Text, default="")
+    pedido: Mapped[str] = mapped_column(String(20), default="")  # o que o cliente escolheu ("AAAA-MM-DD HH:MM")
+    dia: Mapped[date | None] = mapped_column(Date, nullable=True)  # o que ficou marcado
+    hora: Mapped[str] = mapped_column(String(5), default="")
+    reuniao_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # tarefas.id da reunião na Agenda
+    criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, index=True)
+    enviado_em: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    marcado_em: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    confirmado_em: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # a confirmação saiu
 
 
 class ModeloWhatsAppOficial(DaAR, Base):

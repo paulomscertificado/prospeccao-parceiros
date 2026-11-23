@@ -296,6 +296,15 @@ def _fila_whatsapp_oficial() -> None:
             log.info("API oficial do WhatsApp: %s avisos enviados", r["enviados"])
 
 
+def _agenda_whatsapp_oficial() -> None:
+    from . import whatsapp_oficial
+
+    with sessao() as db:  # o calendário de quem tocou em "Quero renovar" e a confirmação do horário escolhido
+        r = whatsapp_oficial.processar_agendamentos(db)
+        if r["calendarios"] or r["confirmacoes"]:
+            log.info("Calendário da renovação: %s enviados, %s confirmações", r["calendarios"], r["confirmacoes"])
+
+
 def _fotos_whatsapp_oficial() -> None:
     from . import whatsapp_oficial
 
@@ -387,6 +396,7 @@ def rodada(numero: int | None) -> None:
     _passo("fila_whatsapp", _fila_whatsapp)
     _passo("fila_whatsapp_oficial", _fila_whatsapp_oficial)
     _passo("fotos_whatsapp_oficial", _fotos_whatsapp_oficial)
+    _passo("agenda_whatsapp_oficial", _agenda_whatsapp_oficial)
     _passo("sincronizar_whatsapp", _sincronizar_whatsapp)
     if _na_vez(numero, "ultima_leitura_email", 5):
         _passo("ler_emails", _ler_emails)

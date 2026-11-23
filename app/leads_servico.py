@@ -272,7 +272,11 @@ def apagar_conversas_antigas(db: Session, lote: int = 5000) -> int:
                 .execution_options(sem_filtro_de_ar=True))
     apagadas += db.execute(delete(MensagemOficial).where(MensagemOficial.id.in_(oficiais.scalar_subquery()))
                            .execution_options(sem_filtro_de_ar=True)).rowcount or 0
-    from .modelos import ImagemOficial  # a imagem que foi na mensagem do número oficial: sai junto com ela
+    from .modelos import AgendamentoOficial, ImagemOficial  # a imagem e o calendário: saem junto com a conversa
+
+    db.execute(delete(AgendamentoOficial).where(AgendamentoOficial.id.in_(
+        select(AgendamentoOficial.id).where(AgendamentoOficial.criado_em < limite).limit(lote)
+        .execution_options(sem_filtro_de_ar=True).scalar_subquery())).execution_options(sem_filtro_de_ar=True))
 
     imagens = (select(ImagemOficial.id).where(ImagemOficial.criado_em < limite).limit(lote)
                .execution_options(sem_filtro_de_ar=True))

@@ -152,6 +152,20 @@
         renovar, Já renovei e Parar avisos. Sem o limite de 20 por dia do QR code (a Meta cobra por mensagem). Vale também
         para as campanhas de renovação em andamento.</span></span></label>
     {% if falta_oficial %}<p class="ajuda">{{ 'Ainda não dá para ligar' if cfg.renov_envio_oficial != '1' else 'Atenção: está ligado, mas os avisos esperam' }}: {{ falta_oficial }}.</p>{% endif %}
+    <label class="interruptor" style="margin-top:12px"><input type="checkbox" name="agenda" {{ 'checked' if cfg.renov_agenda == '1' }} {{ 'disabled' if falta_oficial and cfg.renov_agenda != '1' }}>
+      <span class="trilho" aria-hidden="true"></span>
+      <span><b>Calendário para quem tocar em "Quero renovar"</b><br><span class="pequeno suave">pelo número oficial, o
+        cliente escolhe o dia e o horário (próximos 15 dias, só nos horários livres de quem atende) e recebe a
+        confirmação: "Nossa equipe vai falar com você ... para fazer a sua renovação". O horário vira uma reunião na
+        Agenda.{{ ' Calendário já publicado na Meta.' if calendario_pronto else ' Ao ligar, o sistema publica o calendário na Meta.' }}</span></span></label>
+    <div style="margin:8px 0 0 52px;max-width:360px"><label for="agenda_usuario_id">Agenda de quem atende</label>
+      <select name="agenda_usuario_id" id="agenda_usuario_id">
+        <option value="">Quem cuida de cada cliente</option>
+        {% for u in usuarios %}<option value="{{ u.id }}" {{ 'selected' if cfg.renov_agenda_usuario_id == u.id|string }}>{{ u.nome }}</option>{% endfor %}
+      </select>
+      <p class="ajuda">Os horários livres saem do expediente da pessoa (Configurações > Usuários) e das reuniões que já
+        estão na Agenda dela: nunca duas no mesmo horário. Para testar no seu celular: Configurações > WhatsApp >
+        "Testar o calendário".</p></div>
   </div>
   {% elif cfg.renov_envio_oficial == '1' %}<p class="ajuda">Os avisos de WhatsApp saem pela <b>API oficial da Meta</b>
     (quem troca é o administrador).</p>{% endif %}

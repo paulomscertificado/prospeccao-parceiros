@@ -186,7 +186,15 @@
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <div><label class="pequeno">Aviso de exemplo para (com DDD)</label><input type="text" inputmode="tel" name="telefone" placeholder="(81) 99999-0000" style="width:170px"></div>
       <button class="btn">Enviar um aviso de exemplo</button></form>{% endif %}
+    {% if modelo_aprovado %}<form class="inline" method="post" action="/whatsapp/oficial/calendario/teste" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div><label class="pequeno">Calendário da renovação para (com DDD)</label><input type="text" inputmode="tel" name="telefone" placeholder="(81) 99999-0000" style="width:170px"></div>
+      <button class="btn">Testar o calendário</button></form>{% endif %}
   </div>
+  {% if modelo_aprovado %}<p class="pequeno suave">O calendário é o que recebe quem toca em "Quero renovar" (liga na tela
+    <a href="/renovacao#configurar">Renovação</a>, quadro 4). Para testar, mande antes um "oi" do seu WhatsApp para o
+    número oficial: a Meta só deixa mandar o calendário para quem escreveu nas últimas 24 horas. O teste confirma o
+    horário escolhido com "[TESTE]" e não marca reunião.</p>{% endif %}
   <p class="pequeno suave">A Meta costuma responder em minutos (às vezes em até 24 horas); o sistema confere sozinho de hora em hora.
     Com o modelo aprovado, ligue o envio pela API oficial na tela <a href="/renovacao#configurar">Renovação</a> (quadro 4).</p>
   {% endif %}

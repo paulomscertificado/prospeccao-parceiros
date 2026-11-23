@@ -200,7 +200,8 @@ def _api_oficial(db, request: Request, usuario: Usuario) -> dict:
     ar = _ar_da_renovacao(db, request, usuario)
     conta = whatsapp_oficial.conta_da_ar(db, ar)
     return {"falta_oficial": whatsapp_oficial.falta_para_renovacao(db, ar),
-            "numero_oficial": (conta.numero or conta.nome) if conta is not None else ""}
+            "numero_oficial": (conta.numero or conta.nome) if conta is not None else "",
+            "calendario_pronto": bool(conta is not None and conta.flow_agenda_id)}
 
 
 @rotas.post("/renovacao/configurar", dependencies=[Depends(verificar_csrf)])
@@ -282,6 +283,26 @@ async def configurar(request: Request, usuario: Usuario = Depends(exige("campanh
             avisar(request, ("Os avisos de WhatsApp passam a sair pela API oficial da Meta" if oficial else
                              "Os avisos de WhatsApp voltam a sair pelo número do QR code")
                    + (f", também nas {mudaram} campanha(s) em andamento." if mudaram else "."))
+        # o calendário para quem toca em "Quero renovar" (pedido da Maria em 23/11/2026)
+        ar = _ar_da_renovacao(db, request, usuario)
+        agenda, agenda_antes = bool(form.get("agenda")), renovacao.cfg(db, "renov_agenda") == "1"
+        pessoa = db.get(Usuario, util.para_int(form.get("agenda_usuario_id")) or 0)
+        if pessoa is not None and (not pessoa.ativo or pessoa.perfil == "parceiro"
+                                   or (pessoa.tenant_id != ar and not pessoa.master)):
+            pessoa = None
+        if str(pessoa.id if pessoa else "") != renovacao.cfg(db, "renov_agenda_usuario_id"):
+            gravar_config(db, "renov_agenda_usuario_id", str(pessoa.id) if pessoa else "")
+        if agenda and not agenda_antes:
+            problema = whatsapp_oficial.garantir_flow_agenda(db, whatsapp_oficial.conta_da_ar(db, ar))
+            if problema:
+                avisar(request, f"O calendário não foi ligado: {problema}.", "erro")
+                return voltar("/renovacao#configurar")
+        if agenda != agenda_antes:
+            gravar_config(db, "renov_agenda", "1" if agenda else "0")
+            registrar_log(db, usuario, "renovacao_calendario", "configuracao", None,
+                          ("ligou" if agenda else "desligou") + " o calendário do \"Quero renovar\"", request)
+            avisar(request, "Quem tocar em \"Quero renovar\" passa a receber o calendário para escolher o dia e o horário."
+                   if agenda else "O calendário do \"Quero renovar\" foi desligado: a equipe combina o horário.")
     if _visual.html_da_marca_ligado(db):  # o botão "E-mail em HTML com a marca" só aparece com o módulo liberado
         email_html = bool(form.get("email_html"))
         if email_html != (renovacao.cfg(db, "renov_email_html") != "0"):

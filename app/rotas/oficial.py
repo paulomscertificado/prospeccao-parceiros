@@ -25,7 +25,8 @@ rotas = APIRouter()
 
 LIMITE_CONVERSAS = 200  # conversas na lista (as mais recentes primeiro)
 LIMITE_MENSAGENS = 300  # mensagens mostradas da conversa aberta (as últimas)
-NOMES_DO_TIPO = {"botao": "tocou no botão", "modelo": "aviso (modelo aprovado pela Meta)"}
+NOMES_DO_TIPO = {"botao": "tocou no botão", "modelo": "aviso (modelo aprovado pela Meta)",
+                 "calendario": "calendário para marcar a renovação", "formulario": "escolheu no calendário"}
 MIDIAS = whatsapp_oficial.NOMES_DAS_MIDIAS
 EXTENSOES = {"image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp"}
 

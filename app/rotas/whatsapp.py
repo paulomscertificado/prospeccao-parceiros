@@ -314,6 +314,35 @@ async def teste_modelo_oficial(request: Request, usuario: Usuario = Depends(exig
     return voltar("/whatsapp#modelos")
 
 
+@rotas.post("/whatsapp/oficial/calendario/teste", dependencies=[Depends(verificar_csrf)])
+async def teste_calendario_oficial(request: Request, usuario: Usuario = Depends(exige("whatsapp.gerenciar_todos")),
+                                   db: Session = Depends(obter_db)):
+    """O calendário da Renovação para o WhatsApp de quem testa (23/11/2026; na primeira vez o sistema publica o
+    calendário na Meta). A resposta volta com a confirmação "[TESTE]" e não marca reunião."""
+    conta, motivo = _conta_oficial_da_tela(request, usuario, db)
+    if motivo:
+        avisar(request, motivo, "erro")
+        return voltar("/whatsapp#modelos")
+    form = await request.form()
+    telefone = str(form.get("telefone", "")).strip()
+    try:
+        whatsapp_oficial.enviar_calendario_de_teste(db, conta, telefone, usuario)
+    except whatsapp_cloud.ErroWhatsApp as erro:
+        registrar_log(db, usuario, "teste_calendario_whatsapp_oficial_recusado", "whatsapp_oficial", conta.id,
+                      f"calendário para {telefone}: {erro}", request, modulo="WhatsApp")
+        db.commit()
+        dica = (" A Meta só deixa mandar o calendário para quem escreveu para o número oficial nas últimas 24 horas: "
+                "mande um \"oi\" do seu WhatsApp para ele e tente de novo.") if erro.codigo == 131047 else ""
+        avisar(request, f"O calendário não saiu: {erro}{dica}", "erro")
+        return voltar("/whatsapp#modelos")
+    registrar_log(db, usuario, "teste_calendario_whatsapp_oficial", "whatsapp_oficial", conta.id,
+                  f"calendário para {telefone}", request, modulo="WhatsApp")
+    db.commit()
+    avisar(request, "Calendário enviado pelo número oficial: toque em \"Escolher o horário\", escolha o dia e a hora e "
+                    "confirme. A confirmação de teste chega em até 1 minuto (sem marcar reunião).")
+    return voltar("/whatsapp#modelos")
+
+
 @rotas.post("/whatsapp/oficial/remover", dependencies=[Depends(verificar_csrf)])
 async def remover_oficial(request: Request, usuario: Usuario = Depends(exige("whatsapp.gerenciar_todos")),
                           db: Session = Depends(obter_db)):

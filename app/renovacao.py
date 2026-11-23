@@ -76,6 +76,8 @@ PADRAO = {
     "renov_arte": "1",                # a arte do aviso (a do site) vai junto no WhatsApp e no e-mail
     "renov_conexao": "",              # número de WhatsApp dos disparos ("" = automático, sempre um número de verdade)
     "renov_envio_oficial": "0",       # WhatsApp dos avisos pela API oficial da Meta (etapa 2, whatsapp_oficial.py)
+    "renov_agenda": "0",              # o calendário para quem toca em "Quero renovar" (API oficial; 23/11/2026)
+    "renov_agenda_usuario_id": "",    # de quem é a agenda que recebe os horários ("" = quem cuida do cliente)
     "renov_email_html": "1",          # botão "E-mail em HTML com a marca" (só aparece com o módulo liberado)
     "renov_dias": "30,15,5,1",        # dias antes do vencimento dos 4 avisos (piloto de 13/11/2026: 12, 6, 3 e 1)
     "renov_hora_inicio": "",          # os avisos saem a partir deste horário ("" = o horário de envio geral)
