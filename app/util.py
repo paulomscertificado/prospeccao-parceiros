@@ -98,6 +98,36 @@ def celular(*telefones) -> str:
     return ""
 
 
+def quando_extenso(momento: datetime | None, hoje: date | None = None) -> str:
+    """Como nos "Dados da mensagem" do WhatsApp: "Hoje às 13:50", "Ontem às 13:50", "23/11 às 13:50" (outro ano:
+    "23/11/2025 às 13:50"). Vazio sem data."""
+    if momento is None:
+        return ""
+    hoje = hoje or datetime.now().date()
+    dia = momento.date()
+    if dia == hoje:
+        prefixo = "Hoje"
+    elif dia == hoje - timedelta(days=1):
+        prefixo = "Ontem"
+    else:
+        prefixo = momento.strftime("%d/%m" if dia.year == hoje.year else "%d/%m/%Y")
+    return f"{prefixo} às {momento:%H:%M}"
+
+
+def de_timestamp(valor) -> datetime | None:
+    """Hora local de um timestamp (segundos; milissegundos também servem), como a Meta manda. None se não der."""
+    try:
+        numero = int(str(valor or "").strip() or 0)
+    except ValueError:
+        return None
+    if numero > 10 ** 11:
+        numero //= 1000
+    try:
+        return datetime.fromtimestamp(numero).replace(microsecond=0) if numero > 0 else None
+    except (OverflowError, OSError, ValueError):
+        return None
+
+
 def formatar_telefone(telefone: str) -> str:
     d = normalizar_telefone(telefone)
     if len(d) == 11:

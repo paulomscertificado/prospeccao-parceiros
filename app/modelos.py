@@ -187,6 +187,10 @@ class MensagemWhatsApp(DaAR, Base):
     origem: Mapped[str] = mapped_column(String(30), default="")  # manual, automacao, sdr, ia, celular
     lida: Mapped[bool] = mapped_column(Boolean, default=False)
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, index=True)
+    # "Dados da mensagem" como no WhatsApp (23/11/2026): quando o contato recebeu e quando leu a que saiu (as
+    # confirmações do WhatsApp, guardadas no WhatsApp Leads). `lida` é outra coisa: a equipe abriu a que chegou.
+    entregue_em: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    visualizada_em: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class MensagemOficial(DaAR, Base):
@@ -210,6 +214,9 @@ class MensagemOficial(DaAR, Base):
     lida: Mapped[bool] = mapped_column(Boolean, default=False)  # a equipe já abriu a conversa (as que chegam)
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, index=True)
     atualizado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)  # a situação da entrega mudou
+    # quando o contato recebeu e quando leu (a hora que a Meta manda junto com a situação; 23/11/2026)
+    entregue_em: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    visualizada_em: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # foto ou figurinha que o contato mandou (23/11/2026): o id da mídia na Meta, que vale 7 dias; o relógio baixa
     # (whatsapp_oficial.baixar_imagens_recebidas) e guarda em imagens_oficiais. Tentativas que não deram certo:
     midia_id: Mapped[str] = mapped_column(String(120), default="")

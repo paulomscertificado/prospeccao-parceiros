@@ -420,5 +420,6 @@ def ler_webhook(dados: dict) -> tuple[list[dict], list[dict]]:
             for s in valor.get("statuses", []):
                 erros = s.get("errors") or [{}]
                 status.append({"id": s.get("id", ""), "status": s.get("status", ""), "numero_id": numero_id,
-                               "erro": (erros[0].get("title") or erros[0].get("message") or "")[:300]})
+                               "erro": (erros[0].get("title") or erros[0].get("message") or "")[:300],
+                               "quando": str(s.get("timestamp") or "")})  # a hora da entrega / leitura
     return recebidas, status

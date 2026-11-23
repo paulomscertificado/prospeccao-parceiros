@@ -71,7 +71,8 @@ async def webhook_receber(request: Request):
         recebidas, status = whatsapp_cloud.ler_webhook(dados)
         situacoes = {"sent": "enviada", "delivered": "entregue", "read": "lida", "failed": "falhou"}
         for s in status:
-            whatsapp_oficial.atualizar_entrega(db, s["id"], s["status"], s.get("erro", ""))  # tela API Oficial
+            whatsapp_oficial.atualizar_entrega(db, s["id"], s["status"], s.get("erro", ""),  # tela API Oficial
+                                               s.get("quando"))
             msg = db.execute(select(Mensagem).where(Mensagem.id_externo == s["id"])
                              .execution_options(sem_filtro_de_ar=True)).scalars().first()
             if msg and s["status"] in situacoes and msg.status != "lida":
@@ -328,6 +329,16 @@ def _gravar_status(db, recebido: dict) -> None:
     gravar_config(db, "wl_status", status)
 
 
+def _data_wl(valor):
+    """Data e hora do WhatsApp Leads ("AAAA-MM-DD HH:MM:SS", hora local). None se vazia ou inválida."""
+    from datetime import datetime
+
+    try:
+        return datetime.fromisoformat(str(valor)[:19]) if valor else None
+    except ValueError:
+        return None
+
+
 def _guardar_conversas(db, conversas: dict) -> None:
     """Cópia das conversas do WhatsApp Leads (todas as mensagens) para a tela Conversas."""
     from datetime import datetime
@@ -350,7 +361,9 @@ def _guardar_conversas(db, conversas: dict) -> None:
                                 direcao=str(m.get("direcao", ""))[:10], texto=str(m.get("texto") or ""),
                                 status=str(m.get("status") or "")[:20], erro=str(m.get("erro") or "")[:500],
                                 origem=str(m.get("origem") or "")[:30], criado_em=criado,
-                                lida=m.get("direcao") != "entrada" or m.get("origem") == "historico")
+                                lida=m.get("direcao") != "entrada" or m.get("origem") == "historico",
+                                entregue_em=_data_wl(m.get("entregue_em")),
+                                visualizada_em=_data_wl(m.get("visualizada_em")))
         db.add(nova)
         if (nova.direcao == "saida" and nova.origem in conexoes.ORIGENS_DE_GENTE) or (
                 nova.direcao == "entrada" and not nova.lida):
@@ -360,15 +373,23 @@ def _guardar_conversas(db, conversas: dict) -> None:
         conexoes.marcar_respondidas(db, tocadas)
     # Status das mensagens: UMA consulta, só com as colunas que mudam. Antes era uma consulta por mensagem, com a linha
     # inteira, a cada 30 s (3 s com a tela aberta): era o que mais gastava o tráfego do Supabase (14/11/2026).
-    novos = {int(s["id"]): (str(s.get("status") or "")[:20], str(s.get("erro") or "")[:500])
+    # Também a hora em que o contato recebeu e leu ("Dados da mensagem", 23/11/2026): só entra, nunca some.
+    novos = {int(s["id"]): (str(s.get("status") or "")[:20], str(s.get("erro") or "")[:500],
+                            _data_wl(s.get("entregue_em")), _data_wl(s.get("visualizada_em")))
              for s in conversas.get("status") or []}
     if novos:
-        for id_, id_wl, atual, erro in db.execute(
-                select(MensagemWhatsApp.id, MensagemWhatsApp.id_wl, MensagemWhatsApp.status, MensagemWhatsApp.erro)
+        for id_, id_wl, atual, erro, entregue, visualizada in db.execute(
+                select(MensagemWhatsApp.id, MensagemWhatsApp.id_wl, MensagemWhatsApp.status, MensagemWhatsApp.erro,
+                       MensagemWhatsApp.entregue_em, MensagemWhatsApp.visualizada_em)
                 .where(MensagemWhatsApp.id_wl.in_(list(novos)))).all():
-            if (atual, erro or "") != novos[id_wl]:
-                db.execute(update(MensagemWhatsApp).where(MensagemWhatsApp.id == id_)
-                           .values(status=novos[id_wl][0], erro=novos[id_wl][1]))
+            status, erro_novo, entregue_nova, visualizada_nova = novos[id_wl]
+            valores = {"status": status, "erro": erro_novo} if (atual, erro or "") != (status, erro_novo) else {}
+            if entregue_nova and entregue_nova != entregue:
+                valores["entregue_em"] = entregue_nova
+            if visualizada_nova and visualizada_nova != visualizada:
+                valores["visualizada_em"] = visualizada_nova
+            if valores:
+                db.execute(update(MensagemWhatsApp).where(MensagemWhatsApp.id == id_).values(**valores))
     if "ultimo_id" in conversas:
         gravar_config(db, "wl_conv_ultimo_id", str(int(conversas["ultimo_id"])))
     gravar_config(db, "wl_conv_pendente", "1" if len(mensagens) >= 300 else "0")

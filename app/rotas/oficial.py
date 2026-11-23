@@ -127,6 +127,16 @@ def _previa(m: MensagemOficial | None) -> str:
     return ("↗ " if m.direcao == "saida" else "") + texto.replace("\n", " ")
 
 
+def _dados_da_mensagem(m: MensagemOficial) -> dict:
+    """Os "Dados da mensagem" (clique na que saiu, como no WhatsApp; 23/11/2026): quando o contato recebeu e quando
+    leu. As de antes desse dia só têm a situação, sem a hora."""
+    sem_hora = "sim (a hora não foi registrada)"
+    return {"texto": _partes(m.texto)["texto"], "hora": m.criado_em.strftime("%H:%M") if m.criado_em else "",
+            "lida": util.quando_extenso(m.visualizada_em) or (sem_hora if m.status == "lida" else ""),
+            "entregue": util.quando_extenso(m.entregue_em) or (sem_hora if m.status in ("entregue", "lida") else ""),
+            "erro": (m.erro or "a Meta não entregou") if m.status == "falhou" else ""}
+
+
 def _iniciais(nome: str, telefone: str) -> str:
     partes = [p for p in (nome or "").split() if p[:1].isalnum()]
     if partes:
@@ -169,7 +179,7 @@ def tela_oficial(request: Request, telefone: str = "", busca: str = "",
         "contas": contas, "conversas": conversas, "aberta": aberta, "mensagens": mensagens, "busca": busca,
         "chave": chave, "abre_lead": abre_lead, "marca_da_tela": _marca(db), "NOMES_DO_TIPO": NOMES_DO_TIPO,
         "iniciais": _iniciais, "quando": _quando, "partes": _partes, "imagens": imagens, "midia": _midia,
-        "previa": _previa})
+        "previa": _previa, "dados_da_mensagem": _dados_da_mensagem})
 
 
 @rotas.get("/oficial/imagem/{mensagem_id:int}")

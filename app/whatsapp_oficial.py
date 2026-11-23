@@ -429,8 +429,9 @@ def guardar_imagens_que_faltam(db) -> int:
     return feitas
 
 
-def atualizar_entrega(db, wamid: str, status_da_meta: str, erro: str = "") -> bool:
-    """A Meta avisou a situação de uma mensagem que o número oficial mandou (enviada, entregue, lida ou falhou)."""
+def atualizar_entrega(db, wamid: str, status_da_meta: str, erro: str = "", quando=None) -> bool:
+    """A Meta avisou a situação de uma mensagem que o número oficial mandou (enviada, entregue, lida ou falhou), com a
+    hora (`quando`, timestamp): a de entrega e a de leitura ficam guardadas para os "Dados da mensagem" da tela."""
     from .modelos import MensagemOficial
 
     situacao_nova = SITUACAO_DA_META.get(status_da_meta)
@@ -440,14 +441,19 @@ def atualizar_entrega(db, wamid: str, status_da_meta: str, erro: str = "") -> bo
                        .execution_options(sem_filtro_de_ar=True)).scalars().first()
     if linha is None or linha.direcao != "saida":
         return False
+    mudou = False
+    hora = util.de_timestamp(quando) or agora()
+    if situacao_nova in ("entregue", "lida") and linha.entregue_em is None:  # a Meta pode avisar fora de ordem
+        linha.entregue_em, mudou = hora, True
+    if situacao_nova == "lida" and linha.visualizada_em is None:
+        linha.visualizada_em, mudou = hora, True
     if situacao_nova == "falhou":
-        linha.status, linha.erro = "falhou", (erro or "")[:500]
+        linha.status, linha.erro, mudou = "falhou", (erro or "")[:500], True
     elif ORDEM_DA_SITUACAO[situacao_nova] > ORDEM_DA_SITUACAO.get(linha.status, 0):
-        linha.status = situacao_nova
-    else:
-        return False
-    linha.atualizado_em = agora()
-    return True
+        linha.status, mudou = situacao_nova, True
+    if mudou:
+        linha.atualizado_em = agora()
+    return mudou
 
 
 def texto_do_aviso(modelo, valores: list[str], com_arte: bool) -> str:

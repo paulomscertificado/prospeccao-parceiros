@@ -57,6 +57,9 @@
   .bolha.entrada { background: #fff; border-top-left-radius: 4px; }
   .bolha.saida { background: #e1f5ea; margin-left: auto; border-top-right-radius: 4px; }
   .bolha.saida .meta .ok { color: var(--verde); }
+  .bolha.saida .meta .entregue { color: #8a96a6; letter-spacing: -2px; }
+  .bolha.saida .meta .lido { color: #1d8fe1; letter-spacing: -2px; }
+  .bolha.saida[data-i] { cursor: pointer; }  /* clique: os "Dados da mensagem" (Entregue e Lida, como no WhatsApp) */
   .bolha.erro { background: #fde8e6; }
   .bolha.enviando { opacity: .7; }
   .bolha .midia { font-style: italic; color: #4b5a6b; }
@@ -146,6 +149,7 @@
     </div>
   </section>
 </div>
+{% include "_dados_mensagem.html" %}
 {% endblock %}
 
 {% block scripts %}
@@ -166,6 +170,10 @@ let marcaConversa = '', marcaLista = '', chaveLista = '';
 const el = id => document.getElementById(id);
 const escapar = t => (t || '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 const STATUS = { na_fila: '🕓', enviada: '<span class="ok">✓</span>', erro: '⚠️ não saiu', cancelada: 'cancelada', recebida: '' };
+// ✓ saiu; ✓✓ o contato recebeu; ✓✓ azul o contato leu (as confirmações do WhatsApp, 23/11/2026)
+const tique = m => m.status === 'enviada' && m.lida ? '<span class="lido" title="Lida">✓✓</span>'
+  : (m.status === 'enviada' && m.entregue ? '<span class="entregue" title="Entregue">✓✓</span>' : (STATUS[m.status] || ''));
+let mensagensNaTela = [];
 const CORES = ['#0d3b66', '#1e5f96', '#1f9d5c', '#12456f', '#2d6394', '#167a6b', '#3b5b86'];
 
 function iniciais(nome, tel) {
@@ -251,17 +259,19 @@ async function carregarConversa(rolar, forcar) {
   el('c-optout').style.display = d.lead && d.lead.opt_out ? '' : 'none';
   marcaConversa = d.marca || '';
   const todas = d.mensagens.concat(d.enviando.map(m => ({ ...m, direcao: 'saida', enviando: true })));
-  const nova = JSON.stringify(todas.map(m => [m.texto, m.status, m.hora]));
+  const nova = JSON.stringify(todas.map(m => [m.texto, m.status, m.hora, m.entregue || '', m.lida || '']));
   if (nova === assinatura && !rolar) { mostrarSituacao(d.situacao); return; }  // nada mudou: não redesenha
   assinatura = nova;
   const caixa = el('mensagens');
   const noFim = caixa.scrollHeight - caixa.scrollTop - caixa.clientHeight < 60;
   let html = '', diaAnterior = '', direcaoAnterior = '';
-  for (const m of todas) {
+  mensagensNaTela = todas;
+  for (const [i, m] of todas.entries()) {
     if (m.dia !== diaAnterior) { html += `<div class="dia"><span>${rotuloDia(m.dia)}</span></div>`; diaAnterior = m.dia; direcaoAnterior = ''; }
     const classes = ['bolha', m.direcao, m.status === 'erro' ? 'erro' : '', m.enviando ? 'enviando' : '', m.direcao === direcaoAnterior ? 'seguida' : ''];
-    const situacao = m.enviando ? '🕓' : (m.direcao === 'saida' ? (STATUS[m.status] || '') : '');
-    html += `<div class="${classes.join(' ')}" title="${escapar(m.erro || '')}"><span class="texto">${textoMensagem(m.texto)}</span>`
+    const situacao = m.enviando ? '🕓' : (m.direcao === 'saida' ? tique(m) : '');
+    const dados = m.direcao === 'saida' && !m.enviando ? ` data-i="${i}"` : '';
+    html += `<div class="${classes.join(' ')}"${dados} title="${escapar(m.erro || (dados ? 'Clique para ver os dados da mensagem' : ''))}"><span class="texto">${textoMensagem(m.texto)}</span>`
           + `<span class="meta">${m.hora}${situacao ? ' ' + situacao : ''}</span></div>`;
     direcaoAnterior = m.direcao;
   }
@@ -284,6 +294,15 @@ function abrir(telefone, numero) {
   carregarConversa(true).then(() => carregarLista());
   el('texto').focus();
 }
+
+// clique numa mensagem que saiu: os "Dados da mensagem" (quando o contato recebeu e quando leu), como no WhatsApp
+el('mensagens').addEventListener('click', e => {
+  const bolha = e.target.closest('.bolha[data-i]');
+  const m = bolha && mensagensNaTela[Number(bolha.dataset.i)];
+  if (!m || (window.getSelection && String(window.getSelection()))) return;  // selecionando o texto: não abre
+  abrirDadosMensagem({ texto: m.texto, hora: m.hora, entregue: m.entregue, lida: m.lida,
+                       erro: m.status === 'erro' ? (m.erro || 'a mensagem não saiu') : '' });
+});
 
 el('nova').addEventListener('click', () => {
   modoNovo = true;

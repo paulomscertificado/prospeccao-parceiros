@@ -204,6 +204,18 @@ Oficial". Item **API Oficial** no menu (`rotas/oficial.py`, `templates/oficial.h
 - **A tela**: lista das conversas (a mais recente primeiro, com as não lidas) e a conversa aberta, no visual da tela
   Conversas; busca por nome, empresa ou telefone; link para a ficha do lead (quem pode vê-lo); abrir a conversa marca
   as que chegaram como lidas. Com a aba à vista, confere a cada 20 s (`/oficial/marca`) e recarrega se algo mudou.
+- **Dados da mensagem** (23/11/2026, pedido da Maria com o print do WhatsApp): a Meta manda a hora (`timestamp`) junto
+  com cada situação; `ler_webhook` passa como `quando` e `atualizar_entrega(..., quando)` guarda `entregue_em` e
+  `visualizada_em` em `mensagens_oficiais` (só a primeira; a Meta avisa fora de ordem: a leitura que chega antes da
+  entrega vale para as duas). Clicando numa mensagem que saiu, o painel `templates/_dados_mensagem.html` (o mesmo da
+  tela Conversas) mostra "Lida" e "Entregue" como no WhatsApp ("Hoje às 13:50", `util.quando_extenso`); a mensagem
+  leva os dados em `data-dados` (`rotas/oficial._dados_da_mensagem`; as de antes, só com a situação, dizem "a hora não
+  foi registrada"). Nas Conversas (QR code), as horas vêm das confirmações do WhatsApp guardadas no WhatsApp Leads
+  (`whatsapp.registrar_recibo`, evento `ReceiptEv` do neonize: entregue = 1, lida = 4, ouvida = 6; colunas
+  `entregue_em`/`visualizada_em`/`recibo_em` lá) e mandadas no `status` de `integracao.conversas_desde` (as das
+  últimas 6 h e as com confirmação nos últimos 30 min); `rotas/api._guardar_conversas` guarda em `mensagens_whatsapp`
+  (nunca apaga uma hora que já chegou) e a marca da conversa aberta inclui as confirmações. Testes:
+  `testes/test_dados_da_mensagem.py` e, no WhatsApp Leads, o passo 17 do `teste_ponta_a_ponta.py`.
 - **Quem vê**: permissão `oficial.ver` (equipe toda, como as Oportunidades), módulo `api_oficial` (por AR, só o Admin
   Master liga e desliga; ligado por padrão) e o item só aparece na AR que tem a API oficial configurada, com o número
   vermelho das mensagens novas (`web.tela`: `tem_api_oficial`, `oficial_nao_lidas`; some quando alguém abre a

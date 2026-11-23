@@ -233,13 +233,15 @@ def conversa(telefone: str, numero: str = "", marca: str = "", usuario: Usuario 
     # Primeiro só o que muda: as 30 mensagens mais novas (id e status, sem o texto) e o que está saindo agora. A conversa
     # inteira (até 300 mensagens, com o texto) só vai quando algo mudou: numa conversa longa eram ~60 KB a cada 5 s.
     recentes = db.execute(select(MensagemWhatsApp.id, MensagemWhatsApp.status, MensagemWhatsApp.direcao,
-                                 MensagemWhatsApp.lida).where(*da_conversa)
-                          .order_by(MensagemWhatsApp.id.desc()).limit(30)).all()
+                                 MensagemWhatsApp.lida, MensagemWhatsApp.entregue_em, MensagemWhatsApp.visualizada_em)
+                          .where(*da_conversa).order_by(MensagemWhatsApp.id.desc()).limit(30)).all()
     pendentes = [p for p in db.execute(select(PonteWhatsApp).where(
         PonteWhatsApp.manual.is_(True), PonteWhatsApp.conexao == numero,
         PonteWhatsApp.status.in_(["aguardando", "retirada"])).order_by(PonteWhatsApp.id)).scalars().all()
         if _chave(p.telefone) == chave]
-    atual = _marca(chave, numero, [(r.id, r.status) for r in recentes], [p.id for p in pendentes])
+    # o contato recebeu ou leu (✓✓): também muda a marca, e a conversa aberta se redesenha
+    atual = _marca(chave, numero, [(r.id, r.status, bool(r.entregue_em), bool(r.visualizada_em)) for r in recentes],
+                   [p.id for p in pendentes])
     igual = bool(marca) and marca == atual
     if not igual or any(r.direcao == "entrada" and not r.lida for r in recentes):
         _marcar_lidas(db, da_conversa)
@@ -247,7 +249,8 @@ def conversa(telefone: str, numero: str = "", marca: str = "", usuario: Usuario 
         return JSONResponse({"igual": True, "marca": atual, "situacao": _situacao(db, numero)})
     mensagens = list(db.execute(select(MensagemWhatsApp.direcao, MensagemWhatsApp.texto, MensagemWhatsApp.status,
                                        MensagemWhatsApp.erro, MensagemWhatsApp.origem, MensagemWhatsApp.nome,
-                                       MensagemWhatsApp.criado_em).where(*da_conversa)
+                                       MensagemWhatsApp.criado_em, MensagemWhatsApp.entregue_em,
+                                       MensagemWhatsApp.visualizada_em).where(*da_conversa)
                                 .order_by(MensagemWhatsApp.criado_em.desc(), MensagemWhatsApp.id.desc())
                                 .limit(300)).all())[::-1]
     lead = sdr.lead_pelo_telefone(db, chave)
@@ -258,7 +261,10 @@ def conversa(telefone: str, numero: str = "", marca: str = "", usuario: Usuario 
         "telefone": chave, "telefone_formatado": util.formatar_telefone(chave), "nome": nome, "numero": numero,
         "mensagens": [{"direcao": m.direcao, "texto": m.texto, "status": m.status, "erro": m.erro, "origem": m.origem,
                        "quando": m.criado_em.strftime("%d/%m %H:%M"), "dia": m.criado_em.strftime("%Y-%m-%d"),
-                       "hora": m.criado_em.strftime("%H:%M")} for m in mensagens],
+                       "hora": m.criado_em.strftime("%H:%M"),
+                       # "Dados da mensagem" (23/11/2026): quando o contato recebeu e quando leu
+                       "entregue": util.quando_extenso(m.entregue_em), "lida": util.quando_extenso(m.visualizada_em)}
+                      for m in mensagens],
         "enviando": [{"texto": p.texto, "quando": p.criado_em.strftime("%d/%m %H:%M"),
                       "dia": p.criado_em.strftime("%Y-%m-%d"), "hora": p.criado_em.strftime("%H:%M")} for p in pendentes],
         "lead": {"id": lead.id, "empresa": lead.empresa, "status": lead.status, "opt_out": lead.opt_out}

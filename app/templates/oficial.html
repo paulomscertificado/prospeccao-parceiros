@@ -43,6 +43,7 @@
   .bolha.entrada { background: #fff; border-top-left-radius: 4px; }
   .bolha.saida { background: #e1f5ea; margin-left: auto; border-top-right-radius: 4px; }
   .bolha.saida .meta .lida { color: #1d8fe1; }
+  .bolha[data-dados] { cursor: pointer; }  /* clique: os "Dados da mensagem" (Entregue e Lida, como no WhatsApp) */
   .bolha.falhou { background: #fde8e6; }
   .bolha .erro { color: var(--erro); font-size: .78rem; margin-top: 4px; }
   .bolha .midia { font-style: italic; color: #4b5a6b; }
@@ -105,7 +106,7 @@
       {% for m in mensagens %}
         {% if m.criado_em.date() != ns.dia %}{% set ns.dia = m.criado_em.date() %}<div class="dia"><span>{{ m.criado_em|data }}</span></div>{% endif %}
         {% set pt = partes(m.texto) %}
-        <div class="bolha {{ m.direcao }} {{ 'falhou' if m.status == 'falhou' }}">
+        <div class="bolha {{ m.direcao }} {{ 'falhou' if m.status == 'falhou' }}"{% if m.direcao == 'saida' %} data-dados='{{ dados_da_mensagem(m)|tojson }}' title="Clique para ver os dados da mensagem"{% endif %}>
           {% if m.tipo in NOMES_DO_TIPO %}<div class="tipo">{{ NOMES_DO_TIPO[m.tipo] }}{{ ' · com a arte do aviso' if pt.arte }}</div>{% endif %}
           {% if m.id in imagens %}<a class="imagem" href="/oficial/imagem/{{ m.id }}" target="_blank" rel="noopener" title="Abrir a imagem inteira numa aba nova">
             {% if m.direcao == 'entrada' %}<img class="foto" src="/oficial/imagem/{{ m.id }}" alt="Imagem que o contato mandou">
@@ -128,12 +129,19 @@
   </section>
 </div>
 {% endif %}
+{% include "_dados_mensagem.html" %}
 <script>
   // a conversa aberta mostra o fim; com a aba à vista, confere a cada 20 s se chegou algo novo e recarrega
   (function () {
     var caixa = document.getElementById('mensagens');
     if (caixa) {
       caixa.scrollTop = caixa.scrollHeight;
+      // clique numa mensagem que saiu: quando o contato recebeu e quando leu (como no WhatsApp; 23/11/2026)
+      caixa.addEventListener('click', function (e) {
+        var bolha = e.target.closest('.bolha[data-dados]');
+        if (!bolha || e.target.closest('a') || (window.getSelection && String(window.getSelection()))) return;
+        try { abrirDadosMensagem(JSON.parse(bolha.dataset.dados)); } catch (erro) { /* sem os dados: nada a mostrar */ }
+      });
       // a imagem de um aviso terminou de carregar: quem estava no fim da conversa continua no fim
       var noFim = true;
       caixa.addEventListener('scroll', function () { noFim = caixa.scrollHeight - caixa.scrollTop - caixa.clientHeight < 60; });

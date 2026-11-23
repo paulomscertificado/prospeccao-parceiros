@@ -42,6 +42,10 @@ no navegador, de qualquer lugar: não precisa do `iniciar.bat`. O passo a passo 
   números que você vê. Elas ficam lidas quando alguém abre a conversa nessa tela ou responde pelo celular do número
   (ou pela tela Conversas). Resposta automática (da IA ou da campanha) não conta como lida.
   Acima da lista, **Não lidas** mostra só as conversas com mensagem nova (**Tudo** volta a mostrar todas).
+  Nas mensagens que saíram, como no WhatsApp: **✓** saiu, **✓✓** o contato recebeu, **✓✓ azul** o contato leu.
+  Clique numa mensagem que saiu para ver os **Dados da mensagem**: a hora em que foi **Entregue** e em que foi
+  **Lida** ("-" enquanto não aconteceu; quem desligou a confirmação de leitura no WhatsApp nunca aparece como lida). O
+  mesmo vale na tela **API Oficial**. As mensagens de antes de 23/11/2026 não têm essas horas.
 - **Avisos como no WhatsApp:** com o sistema aberto no navegador (pode estar em outra aba), quando chega mensagem nas
   Conversas, no número oficial (API Oficial) ou uma resposta de campanha:
   - toca um **som**;
