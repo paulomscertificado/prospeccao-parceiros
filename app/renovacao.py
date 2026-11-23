@@ -1032,7 +1032,7 @@ def criar_campanha(db, usuario: Usuario, quantidade: int | None = None, ate: dat
                     objetivo="Renovar o certificado digital dos clientes", quantidade=len(escolhidos),
                     canais=cfg(db, "renov_canais"), status="gerando", usuario_id=usuario.id, inicio=hoje,
                     cadencia_id=garantir_cadencia(db).id, conexao_id=numero or "",
-                    envio_oficial=cfg(db, "renov_envio_oficial") == "1",
+                    envio_oficial=envio_oficial_da_ar(db, ar),  # a chave da marca da campanha (e a API pronta)
                     email_html=cfg(db, "renov_email_html") != "0",
                     pedido=f"Clientes com certificado vencendo até {ultimo:%d/%m/%Y} (planilha de renovação)")
     db.add(camp)
@@ -1784,12 +1784,38 @@ def aplicar_email_html(db, ligado: bool) -> int:
     return mudaram
 
 
+def envio_oficial_da_ar(db, ar: int | None) -> bool:
+    """A marca `ar` manda os avisos pela API oficial? A chave dela (Renovação, quadro 4; por marca desde 22/11/2026) e a
+    API oficial dela pronta: marca sem a conta pronta fica no QR code (senão os avisos ficariam parados)."""
+    from . import whatsapp_oficial
+    from .banco import usar_config_da_ar
+
+    tinha, antes = "ar_config" in db.info, db.info.get("ar_config")
+    usar_config_da_ar(db, ar)
+    try:
+        ligado = cfg(db, "renov_envio_oficial") == "1"
+    finally:
+        if tinha:
+            db.info["ar_config"] = antes
+        else:
+            db.info.pop("ar_config", None)
+    return ligado and not whatsapp_oficial.falta_para_renovacao(db, ar)
+
+
 def aplicar_envio_oficial(db, ligado: bool) -> int:
     """Liga/desliga a API oficial também nas campanhas de renovação em andamento (os avisos que ainda não saíram passam
-    a sair pelo número oficial, ou voltam para o QR code). Devolve quantas campanhas mudaram."""
-    mudaram = 0
+    a sair pelo número oficial, ou voltam para o QR code). Ao ligar, só as campanhas das marcas com a API oficial
+    pronta (as outras continuam no QR code). Devolve quantas campanhas mudaram."""
+    from . import whatsapp_oficial
+
+    mudaram, prontas = 0, {}
     for camp in db.execute(select(Campanha).where(Campanha.tipo == TIPO_CAMPANHA, Campanha.status.in_(
             ("ativa", "aguardando_aprovacao", "gerando")))).scalars():
+        if ligado:
+            if camp.tenant_id not in prontas:
+                prontas[camp.tenant_id] = not whatsapp_oficial.falta_para_renovacao(db, camp.tenant_id)
+            if not prontas[camp.tenant_id]:
+                continue  # a marca desta campanha não tem a API oficial pronta: continua no QR code
         if bool(camp.envio_oficial) != ligado:
             camp.envio_oficial = ligado
             mudaram += 1

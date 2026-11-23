@@ -153,7 +153,14 @@ Pedido da Maria em 16/11/2026: "que continue fazendo essa campanha mas que seja 
   nome não existe"). Recusas 132000/132001 explicadas na tela (`ERROS_DO_TESTE`). Texto simples: a Meta aceita e só
   depois avisa que não entregou fora das 24 h (131047, "Re-engagement message"): o aviso da tela lembra disso e o motivo
   aparece na tela API Oficial.
-- **Falta (etapa 3b)**: responder o cliente pelo sistema dentro da janela de 24 h. Até lá a equipe responde pelo
+- **A chave é de cada marca** (22/11/2026): `renov_envio_oficial` está em `banco.CHAVES_DA_AR` (cada marca liga a dela
+  na tela Renovação) e só vale para a marca com a API oficial pronta (`renovacao.envio_oficial_da_ar`, na criação da
+  campanha; `aplicar_envio_oficial` ao ligar pula as campanhas das marcas sem a API pronta). Antes valia para todas: ligada
+  na MS, as campanhas do Grupo Certy (sem API oficial) iriam para o número oficial e os avisos ficariam parados.
+- **Uso decidido pela Maria (22/11/2026):** o número oficial fica só para os avisos de renovação (nada de prospecção
+  fria por ele, que é o que mais derruba uma conta oficial; as campanhas de parceiros e Empresas novas continuam no QR code).
+- **Falta (etapa 3b)**: responder o cliente pelo sistema dentro da janela de 24 h (oferecido; a Maria preferiu deixar o
+  número só para os avisos). Até lá a equipe responde pelo
   próprio WhatsApp ou por telefone (o número oficial foi ligado direto na API: não abre em celular nenhum, e um número
   que já está na API não passa para a "coexistência" app + API da Meta).
 

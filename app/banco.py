@@ -79,6 +79,9 @@ CHAVES_DA_AR = frozenset({
     "horario_envio_inicio", "horario_envio_fim", "enviar_email_automatico", "sdr_resposta_automatica",
     "dias_sem_resposta", "enviar_whatsapp_automatico", "whatsapp_sozinho_padrao", "whatsapp_convite",
     "notificar_por_email", "score_pesos", "score_faixas", "receita_oculta", "feriados_locais",
+    # Renovação pela API oficial (22/11/2026): cada marca liga a dela (valia para todas: ligada na MS, os avisos do
+    # Grupo Certy, sem API oficial, ficariam parados esperando o número oficial)
+    "renov_envio_oficial",
     # módulos (autorizacao.MODULOS): cada AR tem os seus, mas só o Admin Master liga e desliga (Fase 3). Todo módulo
     # novo entra aqui E em CHAVES_SO_MASTER (testes/test_modulos_por_ar.py confere): fora daqui, o Painel master
     # gravava na plataforma e ligar/desligar em uma AR valia para todas (a Assertiva, até 19/11/2026)

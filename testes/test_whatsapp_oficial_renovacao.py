@@ -344,13 +344,14 @@ def test_renovacao_liga_a_api_oficial_so_quando_esta_pronta(cliente, monkeypatch
         r = c.post("/renovacao/configurar", data=form)
         assert "Ainda não dá para enviar pela API oficial da Meta" in r.text
         with sessao() as db:
-            assert renovacao.cfg(db, "renov_envio_oficial") == "0"
+            assert not renovacao.envio_oficial_da_ar(db, _ar_ms(db))
             _conta(db)  # a Meta aprovou os modelos
             db.commit()
         r = c.post("/renovacao/configurar", data=form)
         assert "passam a sair pela API oficial da Meta" in r.text, r.text[:400]
         with sessao() as db:
-            assert renovacao.cfg(db, "renov_envio_oficial") == "1"
+            assert renovacao.envio_oficial_da_ar(db, _ar_ms(db))  # gravada na marca de quem liga (22/11/2026)
+            assert renovacao.cfg(db, "renov_envio_oficial") != "1"  # a plataforma (e as outras marcas) não muda
             assert db.get(Campanha, camp_id).envio_oficial  # a campanha em andamento também
         assert "API oficial" in c.get("/renovacao").text
         r = c.post("/renovacao/configurar", data={k: v for k, v in form.items() if k != "oficial"})
@@ -388,3 +389,31 @@ def test_teste_da_tela_com_o_nome_do_modelo_do_aviso_vai_preenchido(cliente, mon
         saiu = db.execute(select(MensagemOficial).where(MensagemOficial.telefone == "81988883333")
                           .order_by(MensagemOficial.id.desc())).scalars().first()
         assert saiu is not None and saiu.texto.startswith("[aviso de exemplo]") and "Guilherme" in saiu.texto
+
+
+def test_api_oficial_da_renovacao_vale_por_marca(cliente):
+    """22/11/2026: a chave da API oficial da Renovação valia para todas as marcas. Ligada na MS, as campanhas do Grupo
+    Certy (sem API oficial) iriam para o número oficial e os avisos ficariam parados. Agora é por marca, e campanha de
+    marca sem a API oficial pronta nunca vai para ela (nem com a chave ligada para a plataforma toda)."""
+    from app.banco import usar_config_da_ar
+
+    with sessao() as db:
+        ms = _ar_ms(db)
+        certy = db.execute(select(Tenant.id).where(Tenant.slug == "grupo-certy")).scalar_one()
+        _conta(db)  # a MS tem a API oficial pronta; o Grupo Certy não tem conta
+        usar_config_da_ar(db, ms)
+        gravar_config(db, "renov_envio_oficial", "1")  # a MS liga na tela dela
+        usar_config_da_ar(db, None)
+        assert renovacao.envio_oficial_da_ar(db, ms) and not renovacao.envio_oficial_da_ar(db, certy)
+        assert renovacao.cfg(db, "renov_envio_oficial") != "1"  # a plataforma (e o Grupo Certy) continua desligada
+        gravar_config(db, "renov_envio_oficial", "1")  # ligada para a plataforma toda (Admin Master fora de uma AR)
+        assert not renovacao.envio_oficial_da_ar(db, certy)  # sem a API oficial pronta, o Grupo Certy fica no QR code
+        da_ms = Campanha(tenant_id=ms, nome="Renovação MS por marca", tipo="renovacao", status="ativa",
+                         envio_oficial=False)
+        da_certy = Campanha(tenant_id=certy, nome="Renovação Certy por marca", tipo="renovacao", status="ativa",
+                            envio_oficial=False)
+        db.add_all([da_ms, da_certy])
+        db.flush()
+        renovacao.aplicar_envio_oficial(db, True)
+        assert da_ms.envio_oficial and not da_certy.envio_oficial
+        db.rollback()
