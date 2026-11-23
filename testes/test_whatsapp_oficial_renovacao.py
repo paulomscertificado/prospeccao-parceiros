@@ -6,6 +6,7 @@ Parar avisos fazem o trabalho sozinhos. A Meta é imitada: nada sai de verdade."
 import hashlib
 import hmac
 import json
+import uuid
 from datetime import date, timedelta
 
 from sqlalchemy import select
@@ -57,7 +58,8 @@ def _meta(monkeypatch, situacao: str = "") -> list:
         if url.endswith("/media"):
             return _Resposta({"id": "midia123"})
         if url.endswith("/messages"):
-            return _Resposta({"messages": [{"id": f"wamid.renov{len(chamadas)}"}]})
+            # id único (como na Meta): a tela API Oficial não guarda duas vezes a mesma mensagem
+            return _Resposta({"messages": [{"id": f"wamid.renov{len(chamadas)}-{uuid.uuid4().hex[:10]}"}]})
         return _Resposta({})
 
     monkeypatch.setattr(whatsapp_cloud.httpx, "request", pedir)
@@ -360,3 +362,29 @@ def test_renovacao_liga_a_api_oficial_so_quando_esta_pronta(cliente, monkeypatch
             for chave, valor in guardadas.items():
                 gravar_config(db, chave, valor)
             _limpar(db, [t.id])
+
+
+def test_teste_da_tela_com_o_nome_do_modelo_do_aviso_vai_preenchido(cliente, monkeypatch):
+    """22/11/2026: no teste da tela (Mensagem de teste), o nome do modelo do aviso ia sem os 3 campos e a Meta recusava
+    (erro 132000); escrito com maiúscula, a Meta nem achava o modelo (132001). Agora vai preenchido com os dados de
+    exemplo, como o botão "Enviar um aviso de exemplo", e aparece na tela API Oficial."""
+    from test_whatsapp_oficial import EMAIL_MS, _admin, _entrar, _zerar_limite
+
+    chamadas = _meta(monkeypatch)
+    _zerar_limite()
+    _admin(EMAIL_MS, "MS Certificação Digital")
+    with sessao() as db:
+        _conta(db)
+        db.commit()
+    c = _entrar(EMAIL_MS)
+    tela = c.get("/whatsapp").text
+    r = c.post("/whatsapp/oficial/teste", data={"csrf": csrf_de(tela), "telefone": "(81) 98888-3333",
+                                                "modelo": " Aviso_Vencimento_Certificado "})
+    assert "Aviso de exemplo enviado (aviso_vencimento_certificado)" in r.text, r.text[:300]
+    envio = next(kw["json"] for metodo, url, kw in chamadas if url.endswith("/messages"))
+    assert envio["template"]["name"] == "aviso_vencimento_certificado"
+    assert [p["text"] for p in envio["template"]["components"][0]["parameters"]] == whatsapp_oficial.EXEMPLO_DOS_VALORES
+    with sessao() as db:
+        saiu = db.execute(select(MensagemOficial).where(MensagemOficial.telefone == "81988883333")
+                          .order_by(MensagemOficial.id.desc())).scalars().first()
+        assert saiu is not None and saiu.texto.startswith("[aviso de exemplo]") and "Guilherme" in saiu.texto

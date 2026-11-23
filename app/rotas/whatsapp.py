@@ -195,8 +195,16 @@ async def mensagem_de_teste_oficial(request: Request, usuario: Usuario = Depends
         return voltar("/whatsapp#oficial")
     form = await request.form()
     telefone = str(form.get("telefone", "")).strip()
+    modelo_do_teste = str(form.get("modelo", "")).strip()
+    # o aviso de vencimento tem 3 campos: escrito aqui, vai preenchido com os dados de exemplo (como o botão "Enviar um
+    # aviso de exemplo"); antes ia vazio e a Meta recusava (erro 132000, 22/11/2026)
+    do_aviso = whatsapp_oficial.modelo_do_aviso_pelo_nome(modelo_do_teste)
     try:
-        wamid = whatsapp_oficial.enviar_teste(conta, telefone, str(form.get("modelo", "")), str(form.get("idioma", "")))
+        if do_aviso:
+            whatsapp_oficial.enviar_teste_renovacao(db, conta, telefone, do_aviso)  # já vai para a tela API Oficial
+            wamid = ""
+        else:
+            wamid = whatsapp_oficial.enviar_teste(conta, telefone, modelo_do_teste, str(form.get("idioma", "")))
     except whatsapp_cloud.ErroWhatsApp as erro:  # o motivo fica no registro (para conferir depois)
         registrar_log(db, usuario, "teste_whatsapp_oficial_recusado", "whatsapp_oficial", conta.id,
                       f"mensagem de teste para {telefone}: {erro}", request, modulo="WhatsApp")
@@ -204,13 +212,21 @@ async def mensagem_de_teste_oficial(request: Request, usuario: Usuario = Depends
         avisar(request, f"O teste não saiu: {erro}", "erro")
         return voltar("/whatsapp#oficial")
     registrar_log(db, usuario, "teste_whatsapp_oficial", "whatsapp_oficial", conta.id,
-                  f"mensagem de teste para {telefone} ({wamid[:40]})", request, modulo="WhatsApp")
-    modelo_do_teste = str(form.get("modelo", "")).strip()
-    whatsapp_oficial.guardar_conversa(db, conta, telefone, "saida", f"[teste] modelo {modelo_do_teste}" if modelo_do_teste
-                                      else "[teste] " + whatsapp_oficial.TEXTO_DE_TESTE,
-                                      "modelo" if modelo_do_teste else "texto", wamid or "")
+                  f"mensagem de teste para {telefone} ({do_aviso or wamid[:40]})", request, modulo="WhatsApp")
+    if not do_aviso:
+        whatsapp_oficial.guardar_conversa(db, conta, telefone, "saida", f"[teste] modelo {modelo_do_teste}"
+                                          if modelo_do_teste else "[teste] " + whatsapp_oficial.TEXTO_DE_TESTE,
+                                          "modelo" if modelo_do_teste else "texto", wamid or "")
     db.commit()
-    avisar(request, "Mensagem de teste enviada pela API oficial. Ela chega em alguns segundos no WhatsApp desse número.")
+    if do_aviso:
+        avisar(request, f"Aviso de exemplo enviado ({do_aviso}), com os campos preenchidos com dados de exemplo. Ele "
+                        "chega em alguns segundos; a entrega aparece no menu API Oficial.")
+    elif modelo_do_teste:
+        avisar(request, "Mensagem de teste enviada pela API oficial. Ela chega em alguns segundos no WhatsApp desse "
+                        "número; a entrega aparece no menu API Oficial.")
+    else:
+        avisar(request, "Mensagem de teste enviada. Atenção: texto simples só chega para quem escreveu para o número "
+                        "oficial nas últimas 24 horas. Se não chegar, o motivo aparece no menu API Oficial.")
     return voltar("/whatsapp#oficial")
 
 

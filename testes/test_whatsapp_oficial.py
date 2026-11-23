@@ -406,7 +406,9 @@ def test_teste_em_texto_simples_explica_as_recusas_da_meta(cliente, monkeypatch)
     c = _entrar(EMAIL_MS)
     tela = c.get("/whatsapp").text
     assert "texto simples" in tela and 'placeholder="hello_world"' not in tela
-    casos = ((131047, {}, "nas últimas 24 horas"), (131058, {"modelo": "hello_world"}, "números de teste da Meta"))
+    casos = ((131047, {}, "nas últimas 24 horas"), (131058, {"modelo": "hello_world"}, "números de teste da Meta"),
+             (132000, {"modelo": "outro_modelo"}, "campos para preencher"),  # 22/11/2026
+             (132001, {"modelo": "Outro Modelo"}, "exatamente como aparece"))
     for codigo, extra, esperado in casos:
         monkeypatch.setattr(whatsapp_cloud.httpx, "request", lambda *a, codigo=codigo, **k: _Resposta(
             {"error": {"message": f"(#{codigo}) Recusado", "code": codigo}}, 400))

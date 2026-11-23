@@ -147,6 +147,12 @@ Pedido da Maria em 16/11/2026: "que continue fazendo essa campanha mas que seja 
   ARs (como o SAIR). Os três cancelam os próximos avisos.
 - **Testes**: `testes/test_whatsapp_oficial_renovacao.py` (Meta imitada) e, no WhatsApp Leads,
   `testes/teste_ponta_a_ponta.py` (pedido `desenhar_arte`).
+- **Mensagem de teste da tela** (22/11/2026): escrito o nome de um modelo do aviso de vencimento (sem ligar para
+  maiúsculas), vai preenchido com os dados de exemplo (`whatsapp_oficial.modelo_do_aviso_pelo_nome` →
+  `enviar_teste_renovacao(nome=)`): antes ia sem os 3 campos e a Meta recusava (erro 132000; com maiúscula, 132001, "o
+  nome não existe"). Recusas 132000/132001 explicadas na tela (`ERROS_DO_TESTE`). Texto simples: a Meta aceita e só
+  depois avisa que não entregou fora das 24 h (131047, "Re-engagement message"): o aviso da tela lembra disso e o motivo
+  aparece na tela API Oficial.
 - **Falta (etapa 3b)**: responder o cliente pelo sistema dentro da janela de 24 h. Até lá a equipe responde pelo
   próprio WhatsApp ou por telefone (o número oficial foi ligado direto na API: não abre em celular nenhum, e um número
   que já está na API não passa para a "coexistência" app + API da Meta).

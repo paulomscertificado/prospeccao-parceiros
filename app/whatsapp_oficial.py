@@ -34,6 +34,11 @@ ERROS_DO_TESTE = {  # os códigos da Meta no envio do teste, explicados para a t
              "\"oi\" do celular para o número oficial e tente de novo (ou use um modelo aprovado)."),
     131058: ("O modelo de exemplo hello_world só sai dos números de teste da Meta: deixe o modelo em branco (o teste vai "
              "como texto simples) ou escreva o nome de um modelo aprovado."),
+    # 22/11/2026: o teste mandava o modelo sem os campos ({{1}}, {{2}}...) e a Meta recusava
+    132000: ("Esse modelo tem campos para preencher (nome, certificado, vencimento...) e o teste manda o modelo sem eles. "
+             "Para o aviso de vencimento, use o botão \"Enviar um aviso de exemplo\" (ele preenche com dados de exemplo)."),
+    132001: ("A Meta não achou um modelo com esse nome nesse idioma. Escreva o nome exatamente como aparece no Gerenciador "
+             "do WhatsApp (tudo minúsculo, com _), por exemplo aviso_vencimento_certificado, e o idioma pt_BR."),
 }
 
 
@@ -536,12 +541,26 @@ def pedir_modelos_renovacao(db, conta: ContaWhatsAppOficial) -> list[str]:
     return problemas
 
 
-def enviar_teste_renovacao(db, conta: ContaWhatsAppOficial, telefone: str) -> str:
+def modelo_do_aviso_pelo_nome(nome: str) -> str:
+    """O nome certo do modelo do aviso de vencimento quando a pessoa escreve um deles no teste (sem ligar para
+    maiúsculas e espaços); "" = não é um modelo do aviso."""
+    procurado = re.sub(r"\s+", "_", (nome or "").strip().lower())
+    return procurado if procurado in NOMES_DOS_MODELOS.values() else ""
+
+
+def enviar_teste_renovacao(db, conta: ContaWhatsAppOficial, telefone: str, nome: str = "") -> str:
     """Um aviso de exemplo (EMPRESA EXEMPLO LTDA) para o WhatsApp de quem testa: com a arte de exemplo se o modelo com
-    a arte estiver aprovado, senão o só de texto. Os botões do teste não fazem nada. Devolve o modelo usado."""
+    a arte estiver aprovado, senão o só de texto (`nome`: aquele modelo do aviso, escrito no teste da tela). Os campos
+    vão preenchidos com dados de exemplo (sem eles a Meta recusa: erro 132000). Os botões do teste não fazem nada.
+    Devolve o modelo usado."""
     modelos = modelos_da_conta(db, conta)
     arte, texto = modelos.get(USO_ARTE), modelos.get(USO_TEXTO)
-    modelo = arte if arte is not None and arte.status == "APPROVED" else texto
+    if nome:
+        modelo = next((m for m in modelos.values() if m.nome == nome), None)
+        if modelo is None or modelo.status != "APPROVED":
+            raise whatsapp_cloud.ErroWhatsApp(f"O modelo {nome} ainda não está aprovado pela Meta.")
+    else:
+        modelo = arte if arte is not None and arte.status == "APPROVED" else texto
     if modelo is None or modelo.status != "APPROVED":
         raise whatsapp_cloud.ErroWhatsApp("Ainda não há modelo do aviso aprovado pela Meta.")
     imagem_id = (whatsapp_cloud.subir_midia(conta.phone_number_id, token(conta), IMAGEM_DE_EXEMPLO.read_bytes())
