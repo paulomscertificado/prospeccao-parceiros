@@ -410,7 +410,8 @@ def test_arte_do_toque_so_para_quem_tem_um_certificado(cliente):
         cert.tipo, cert.cnpj = "e-CNPJ A1 12 meses - videoconferencia", "11.222.333/0001-81"
         arte = renovacao.arte_do_toque(db, t)
         assert arte == {"tarefa": t.id, "modelo": "cnpj", "tipo": "A1", "nome": "CLIENTE 9400001 LTDA",
-                        "doc": "11.222.333/0001-81", "data": cert.data_vencimento.isoformat()}
+                        "doc": "11.222.333/0001-81", "data": cert.data_vencimento.isoformat(),
+                        "url": renovacao.URL_DA_ARTE}  # a página da arte da marca (a MS: a do site da MS)
         cert.tipo, cert.cnpj = "e-CPF A3 36 meses", "123.456.789-01"
         assert renovacao.arte_do_toque(db, t)["modelo"] == "cpf" and renovacao.arte_do_toque(db, t)["tipo"] == "A3"
         # dois certificados no mesmo contato: a lista vai no texto, sem a arte (ela é de um certificado só)

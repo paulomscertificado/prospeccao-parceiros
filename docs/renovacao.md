@@ -104,6 +104,18 @@ base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renova
    `DIAS_GUARDANDO_ARTE` dias, `limpar_artes` na rotina de hora em hora; fora do backup) e vai no e-mail do mesmo
    aviso, dentro do HTML (`email_com_arte`, `cid:arte-aviso`, multipart/related em `email_smtp.enviar(imagens=)`).
    Sem Chrome ou com erro, sai só o texto; a tela avisa quando nenhuma arte voltou em 7 dias (`situacao_das_artes`).
+   **Arte de cada marca** (pedido da Maria em 23/11/2026: "coloque um campo editável"): campo **Endereço da arte do
+   aviso** no quadro 4 (`#arte-url`), um por AR (`renov_arte_url` em `banco.CHAVES_DA_AR`, gravado por
+   `banco.gravar_config_da_ar` na AR da tela, `_ar_da_renovacao`). Só o Admin Master troca (quem abre a página, com os
+   dados do cliente, é o servidor); os outros veem o endereço. `url_da_arte(db, ar)` lê só o valor próprio da AR
+   (`banco.config_propria_da_ar`, nunca o da plataforma); sem ele, a AR MS usa `URL_DA_ARTE` e as outras mandam só o
+   texto. Ao salvar, `problema_no_endereco_da_arte` confere: https de um site da internet (`endereco_publico`: pelo
+   nome, nunca IP, localhost ou rede interna), a página abre (`_pagina_da_arte`, segue até 3 desvios, todos públicos)
+   e tem o desenho (`MARCAS_DA_ARTE`: `id="cv"` e `function update`, uma cópia da ferramenta do site da MS); o
+   endereço da MS numa outra AR é recusado. `arte_do_toque` e o teste (`enviar_teste(ar=)`, o cliente fictício usa a AR
+   da tela) mandam `"url"` junto; o WhatsApp Leads confere de novo (`arte_aviso.endereco_da_arte`) e guarda uma cópia
+   por página. Sem a arte na tela, o "Arte do aviso junto" vai escondido no formulário (salvar o quadro 4 numa AR sem
+   arte não desliga a arte da MS: `renov_arte` é da plataforma). Testes: `testes/test_arte_por_marca.py`.
 10. **Área de teste** (`POST /renovacao/testar`, `enviar_teste`; pedido da Maria em 12/11/2026, "igual à da IA SDR",
     com a opção de mandar a arte): manda os avisos (o 1º, um deles ou os 4) para o WhatsApp ou o e-mail de quem testa,
     com "[TESTE · cliente · aviso]" no começo, pelo número/conta de quem assina as campanhas (`dono`, senão quem

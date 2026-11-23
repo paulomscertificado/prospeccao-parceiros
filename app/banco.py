@@ -83,6 +83,9 @@ CHAVES_DA_AR = frozenset({
     # Grupo Certy, sem API oficial, ficariam parados esperando o número oficial)
     "renov_envio_oficial",
     "renov_agenda", "renov_agenda_usuario_id",  # o calendário do "Quero renovar" (23/11/2026): cada marca o seu
+    # a página do site que desenha a arte do aviso (23/11/2026): cada marca a sua; só vale o valor próprio da AR
+    # (renovacao.url_da_arte), nunca o da plataforma, para a arte de uma marca não ir com o aviso de outra
+    "renov_arte_url",
     # módulos (autorizacao.MODULOS): cada AR tem os seus, mas só o Admin Master liga e desliga (Fase 3). Todo módulo
     # novo entra aqui E em CHAVES_SO_MASTER (testes/test_modulos_por_ar.py confere): fora daqui, o Painel master
     # gravava na plataforma e ligar/desligar em uma AR valia para todas (a Assertiva, até 19/11/2026)
@@ -140,6 +143,24 @@ def _valores_da_ar(db: Session, ar: int) -> dict:
         cache[ar] = dict(db.execute(select(ConfiguracaoAR.chave, ConfiguracaoAR.valor)
                                     .where(ConfiguracaoAR.tenant_id == ar)).all())
     return cache[ar]
+
+
+def config_propria_da_ar(db: Session, ar: int | None, chave: str) -> str | None:
+    """O valor que a AR `ar` gravou para `chave` (None: ela não tem um próprio; não cai no da plataforma)."""
+    return _valores_da_ar(db, ar).get(chave) if ar else None
+
+
+def gravar_config_da_ar(db: Session, ar: int, chave: str, valor: str) -> None:
+    """Grava `chave` na AR `ar`, seja quem for que está na tela (o Admin Master fora das ARs gravaria na plataforma)."""
+    tinha, antes = "ar_config" in db.info, db.info.get("ar_config")
+    usar_config_da_ar(db, ar)
+    try:
+        gravar_config(db, chave, valor)
+    finally:
+        if tinha:
+            db.info["ar_config"] = antes
+        else:
+            db.info.pop("ar_config", None)
 
 
 def ler_config(db: Session, chave: str) -> str:

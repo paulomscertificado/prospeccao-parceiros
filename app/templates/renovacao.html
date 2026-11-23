@@ -61,7 +61,10 @@
       <span class="escolha-corpo"><span class="escolha-marca" aria-hidden="true">✓</span>
         <b>🖼️ Mandar a arte junto</b><span class="pequeno suave">a <a href="{{ url_da_arte }}" target="_blank" rel="noopener">arte do site</a> com os dados
           desse cliente e quantos dias faltam (no WhatsApp, o texto vai de legenda). No e-mail, a arte vai quando o teste de
-          WhatsApp do mesmo cliente já saiu na última hora (quem desenha é o computador do WhatsApp Leads)</span></span></label>{% endif %}
+          WhatsApp do mesmo cliente já saiu na última hora (quem desenha é o computador do WhatsApp Leads){% if usuario.master %}.
+          <a href="#arte-url">Trocar o endereço da arte</a>{% endif %}</span></span></label>
+    {% elif usuario.master %}<p class="pequeno suave" style="margin-top:10px">🖼️ {{ nome_da_marca_renov }} ainda não tem a arte do
+      aviso: o teste sai só com o texto. <a href="#arte-url">Colocar o endereço da arte</a></p>{% endif %}
     <p class="pequeno suave">Chega com "[TESTE]" e o nome do cliente no começo, assinado por {{ remetente.nome }}
       (quem assina as campanhas de renovação). O WhatsApp sai pelo número escolhido; número em <b>modo teste</b> só simula
       o envio e a mensagem não chega. Não muda nada nas campanhas.</p>
@@ -177,6 +180,21 @@
       <span class="escolha-corpo"><span class="escolha-marca" aria-hidden="true">✓</span>
         <b>✉️ E-mail</b><span class="pequeno suave">em cada aviso, umas 2 h depois do WhatsApp (se o cliente responder antes, não sai). Quem não tem celular recebe só por e-mail</span></span></label>
   </div>
+  <div id="arte-url" style="margin-top:14px;max-width:760px">
+    {% if usuario.master %}<label for="arte_url">🖼️ Endereço da arte do aviso ({{ nome_da_marca_renov }})</label>
+    <input type="url" name="arte_url" id="arte_url" value="{{ url_da_arte }}" maxlength="300"
+           placeholder="https://site-da-marca.com.br/interno/aviso-vencimento">
+    <p class="ajuda">A página do site que desenha a arte, com o logo e as cores da marca (uma cópia da ferramenta de
+      aviso do site da MS, com os mesmos campos). O servidor abre essa página em cada aviso e preenche com os dados do
+      cliente. {{ 'Em branco, volta para a do site da MS.' if arte_padrao else 'Em branco, os avisos saem só com o texto.' }}
+      {% if url_da_arte %}<a href="{{ url_da_arte }}" target="_blank" rel="noopener">Abrir a página</a>.{% endif %}
+      Só o administrador master troca este endereço.</p>
+    {% elif url_da_arte %}<p class="ajuda">🖼️ Arte do aviso: <a href="{{ url_da_arte }}" target="_blank" rel="noopener">{{ url_da_arte }}</a>
+      (quem troca o endereço é o administrador master).</p>
+    {% else %}<p class="ajuda">🖼️ {{ nome_da_marca_renov }} ainda não tem a página da arte do aviso: os avisos saem só
+      com o texto (quem coloca o endereço é o administrador master).</p>{% endif %}
+  </div>
+  {% if not url_da_arte and cfg.renov_arte == '1' %}<input type="hidden" name="arte" value="1">{% endif %}
   <div class="cartoes-escolha" style="margin-top:10px">
     {% if url_da_arte %}<label class="escolha"><input type="checkbox" name="arte" {{ 'checked' if cfg.renov_arte == '1' }}>
       <span class="escolha-corpo"><span class="escolha-marca" aria-hidden="true">✓</span>

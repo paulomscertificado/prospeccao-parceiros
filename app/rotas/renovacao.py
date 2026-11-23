@@ -12,9 +12,9 @@ from sqlalchemy.orm import Session
 
 from .. import autorizacao, marca, renovacao, util
 from .. import visual as _visual
-from ..banco import gravar_config, ler_config_int, obter_db
+from ..banco import gravar_config, gravar_config_da_ar, ler_config_int, obter_db
 from ..modelos import Certificado, Tarefa, Usuario
-from ..seguranca import exige, registrar_log, verificar_csrf
+from ..seguranca import diferencas, exige, registrar_log, verificar_csrf
 from ..web import avisar, tela, voltar
 
 rotas = APIRouter()
@@ -119,7 +119,7 @@ def tela_renovacao(request: Request, ver: str = "avisar", q: str = "", usuario: 
         "situacao": lambda c, h: renovacao.situacao_na_tela(c, h, janela),
         "chave_do_contato": renovacao.chave_do_contato,
         "tipo_curto": renovacao.tipo_curto,
-        "url_da_arte": renovacao.url_da_arte(db, marca.ar_da_tela(request, usuario)),  # vazio: AR sem arte
+        **_arte_da_marca(db, request, usuario),
         "artes": renovacao.situacao_das_artes(db),
         "exemplos": renovacao.exemplos_para_teste(db), "avisos_teste": renovacao.avisos_teste(db),
         "remetente": renovacao.dono(db) or usuario, "numeros": numeros,
@@ -193,6 +193,14 @@ def _ar_da_renovacao(db, request: Request, usuario: Usuario):
     return marca.ar_da_tela(request, usuario) or marca.ar_padrao(db)
 
 
+def _arte_da_marca(db, request: Request, usuario: Usuario) -> dict:
+    """Para os quadros 1 e 4: a página da arte do aviso da marca da tela (vazio: a marca não tem e sai só o texto)."""
+    ar = _ar_da_renovacao(db, request, usuario)
+    m = marca.da_ar(db, ar)
+    return {"url_da_arte": renovacao.url_da_arte(db, ar), "nome_da_marca_renov": m["nome"],
+            "arte_padrao": renovacao.URL_DA_ARTE if m["e_ms"] else ""}
+
+
 def _api_oficial(db, request: Request, usuario: Usuario) -> dict:
     """Para o quadro 4: o que falta para os avisos saírem pela API oficial da Meta e o número oficial."""
     from .. import whatsapp_oficial
@@ -213,6 +221,25 @@ async def configurar(request: Request, usuario: Usuario = Depends(exige("campanh
         avisar(request, "Escolha pelo menos um canal (WhatsApp ou e-mail).", "erro")
         return voltar("/renovacao#configurar")
     maximo = max(1, min(300, util.para_int(form.get("maximo_dia")) or 40))
+    # a página do site que desenha a arte do aviso desta marca (pedido da Maria em 23/11/2026: "coloque um campo
+    # editável"). Só o Admin Master troca: quem abre a página, com os dados do cliente, é o servidor
+    aviso_da_arte = ""
+    if autorizacao.e_master(usuario) and form.get("arte_url") is not None:
+        ar_arte = _ar_da_renovacao(db, request, usuario)
+        novo, antes = str(form.get("arte_url") or "").strip(), renovacao.url_da_arte(db, ar_arte)
+        if novo != antes:
+            problema = renovacao.problema_no_endereco_da_arte(db, ar_arte, novo) if novo else ""
+            if problema:
+                avisar(request, f"O endereço da arte não foi salvo: {problema}.", "erro")
+                return voltar("/renovacao#arte-url")
+            gravar_config_da_ar(db, ar_arte, renovacao.CHAVE_URL_DA_ARTE, novo)
+            depois, m = renovacao.url_da_arte(db, ar_arte), marca.da_ar(db, ar_arte)
+            registrar_log(db, usuario, "renovacao_endereco_da_arte", "tenant", ar_arte,
+                          f"{m['nome']}: {depois or 'sem arte'}", request, modulo="Renovação",
+                          mudancas=diferencas({"endereço da arte": antes}, {"endereço da arte": depois}))
+            de_quem = marca.frase(m, "de", nome=True)
+            aviso_da_arte = (f" Os avisos {de_quem} passam a sair com a arte de {depois}." if depois else
+                             f" Sem endereço da arte: os avisos {de_quem} saem só com o texto.")
     # dias dos 4 avisos (ex.: "12, 6, 3, 1"), horário mínimo e o dia em que a campanha automática começa
     import re
 
@@ -323,11 +350,12 @@ async def configurar(request: Request, usuario: Usuario = Depends(exige("campanh
                           + (f" e {r['cancelados']} não couberam em outro dia antes do vencimento" if r["cancelados"] else "")
                           + ".")
     if form.get("ativo") and not dono_id:
-        avisar(request, "Configuração salva, mas escolha quem é o dono das campanhas de renovação." + remarcados, "erro")
+        avisar(request, "Configuração salva, mas escolha quem é o dono das campanhas de renovação." + remarcados
+               + aviso_da_arte, "erro")
     else:
         avisar(request, "Configuração salva." + (
             f" A campanha automática roda todo dia às {hora}" + (f", a partir de {desde:%d/%m/%Y}" if desde else "") + "."
-            if form.get("ativo") else "") + remarcados)
+            if form.get("ativo") else "") + remarcados + aviso_da_arte)
     return voltar("/renovacao#configurar")
 
 
@@ -388,7 +416,8 @@ async def testar(request: Request, usuario: Usuario = Depends(exige("campanhas.c
     try:
         conexao = str(form.get("conexao_teste") or "") if autorizacao.pode(usuario, "campanhas.escolher_numero") else ""
         r = renovacao.enviar_teste(db, usuario, cert_id, canal, destino, str(form.get("avisos", "renov_aviso")),
-                                   com_arte=bool(form.get("com_arte")), conexao=conexao)
+                                   com_arte=bool(form.get("com_arte")), conexao=conexao,
+                                   ar=_ar_da_renovacao(db, request, usuario))
     except ValueError as erro:
         avisar(request, str(erro), "erro")
         return voltar("/renovacao#testar")

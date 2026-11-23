@@ -543,7 +543,13 @@ renovação novo antes, para entrarem os clientes de janeiro).
   do número). O e-mail do mesmo aviso leva a mesma arte. Quem tem vários certificados recebe a lista no texto, sem a
   arte. Quem desenha a arte é o **computador do WhatsApp Leads**, que precisa do **Google Chrome instalado** e de
   internet. Se a arte falhar, o aviso sai só com o texto e a tela Renovação avisa. Mudou a arte no site? Em até 6
-  horas os avisos já saem com a arte nova. Para desligar: quadro 3, opção **Arte do aviso junto**.
+  horas os avisos já saem com a arte nova. Para desligar: quadro 4, opção **Arte do aviso junto**.
+- **Arte de cada marca (campo "Endereço da arte do aviso", quadro 4):** cada marca tem a sua página da arte, com o
+  logo e as cores dela (uma cópia da ferramenta de aviso do site da MS, com os mesmos campos). Quem coloca ou troca o
+  endereço é o **administrador master**: entre na marca (Painel master > **Entrar na AR**), abra a Renovação e escreva
+  o endereço (começando com https://) no quadro 4; ao salvar, o sistema abre a página e confere se ela tem o desenho da
+  arte. Em branco: a MS volta para a arte do site da MS, e as outras marcas mandam os avisos só com o texto. O teste
+  do quadro 1 já usa a arte da marca em que você está.
 - **Testar antes (quadro 1, "Testar os avisos"):** como o teste da IA SDR. Escolha também **por qual número** o teste
   sai (número em modo teste: a tela avisa que não chega de verdade). Escolha um cliente da planilha (ou o
   cliente fictício), o canal (WhatsApp ou e-mail), digite o **seu** WhatsApp ou e-mail, escolha os avisos (só o 1º, um

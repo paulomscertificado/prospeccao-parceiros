@@ -86,13 +86,95 @@ PADRAO = {
     "renov_ativo_desde": "",          # a campanha automática só começa nesta data (AAAA-MM-DD; "" = já)
 }
 URL_DA_ARTE = "https://mscertificados.com.br/interno/aviso-vencimento"  # quem desenha: whatsapp-leads/app/arte_aviso.py
+CHAVE_URL_DA_ARTE = "renov_arte_url"  # o endereço da arte de cada marca (quadro 4; só o Admin Master troca)
+MARCAS_DA_ARTE = ('id="cv"', "function update")  # o desenho que a página precisa ter (o WhatsApp Leads confere igual)
 
 
 def url_da_arte(db, ar: int | None) -> str:
-    """A arte do aviso é a do site da MS: só a AR MS a usa (white label, Fase 5). Outra AR: só o texto (vazio)."""
+    """O endereço da página do site que desenha a arte do aviso da marca `ar` (pedido da Maria em 23/11/2026: um campo
+    editável na Renovação, quadro 4, que só o Admin Master troca). Sem endereço próprio, a AR MS usa a do site da MS
+    (URL_DA_ARTE) e as outras marcas mandam só o texto (vazio): a arte de uma marca nunca vai no aviso de outra."""
+    from . import marca
+    from .banco import config_propria_da_ar
+
+    ar = ar or marca.ar_padrao(db)
+    proprio = (config_propria_da_ar(db, ar, CHAVE_URL_DA_ARTE) or "").strip()
+    if proprio:
+        return proprio
+    return URL_DA_ARTE if marca.da_ar(db, ar)["e_ms"] else ""
+
+
+def endereco_publico(url: str) -> bool:
+    """https de um site da internet (pelo nome, nunca pelo número), que não leva a este servidor nem à rede interna:
+    quem abre a página da arte é o servidor."""
+    import ipaddress
+    import socket
+    from urllib.parse import urlsplit
+
+    try:
+        partes = urlsplit(url)
+        porta = partes.port or 443
+    except ValueError:
+        return False
+    host = (partes.hostname or "").lower().rstrip(".")
+    if (partes.scheme != "https" or "." not in host or partes.username or partes.password or len(url) > 300
+            or host.endswith((".localhost", ".local", ".internal", ".lan", ".home", ".arpa"))):
+        return False
+    try:
+        ipaddress.ip_address(host)
+        return False
+    except ValueError:
+        pass
+    try:
+        enderecos = {i[4][0] for i in socket.getaddrinfo(host, porta, proto=socket.IPPROTO_TCP)}
+    except (OSError, UnicodeError):
+        return False
+    return bool(enderecos) and all(ipaddress.ip_address(e.split("%")[0]).is_global for e in enderecos)
+
+
+def _pagina_da_arte(url: str) -> str:
+    """O HTML da página da arte (segue até 3 mudanças de endereço, sempre para um site da internet)."""
+    import httpx
+
+    for _ in range(4):
+        r = httpx.get(url, timeout=15, follow_redirects=False)
+        if r.is_redirect and r.next_request is not None:
+            url = str(r.next_request.url)
+            if not endereco_publico(url):
+                raise ValueError("a página leva para um endereço que não é de um site da internet")
+            continue
+        r.raise_for_status()
+        return r.text
+    raise ValueError("a página muda de endereço vezes demais")
+
+
+def problema_no_endereco_da_arte(db, ar: int | None, url: str) -> str:
+    """Confere o endereço antes de gravar ("" = pode gravar): https de um site da internet, a página abre e tem o
+    desenho da arte (a ferramenta de aviso do site da MS, copiada com o logo e as cores da marca)."""
+    import httpx
+
     from . import marca
 
-    return URL_DA_ARTE if marca.da_ar(db, ar or marca.ar_padrao(db))["e_ms"] else ""
+    if not url.lower().startswith("https://"):
+        return "o endereço precisa começar com https://"
+    if url.rstrip("/").lower() == URL_DA_ARTE.lower() and not marca.da_ar(db, ar or marca.ar_padrao(db))["e_ms"]:
+        return "esse é o endereço da arte da MS, com a marca da MS: use a página com a marca desta AR"
+    if not endereco_publico(url):
+        return "o endereço não é de um site da internet (confira se está certo e se o site está no ar)"
+    try:
+        html = _pagina_da_arte(url)
+    except httpx.HTTPStatusError as erro:
+        return f"o site respondeu com o erro {erro.response.status_code} (confira o endereço)"
+    except httpx.HTTPError:
+        return "o site não respondeu (confira o endereço e se o site está no ar)"
+    except ValueError as erro:
+        return str(erro)
+    if not all(m in html for m in MARCAS_DA_ARTE):
+        return ("a página abriu, mas não tem o desenho da arte do aviso (precisa ser uma cópia da ferramenta de aviso "
+                "do site da MS, com os mesmos campos)")
+    return ""
+
+
 DIAS_GUARDANDO_ARTE = 10  # a cópia da arte que voltou do computador (para o e-mail) fica só uns dias
 # E-mail com a arte: a imagem primeiro (como no WhatsApp, onde o texto é a legenda) e o texto do aviso embaixo
 HTML_EMAIL_COM_ARTE = (
@@ -1757,12 +1839,14 @@ def rodada_diaria() -> str:
 # ---------------------------------------------------------------- Arte do aviso (a do site)
 
 def arte_do_toque(db, tarefa: Tarefa | None) -> dict | None:
-    """Os dados para o computador do WhatsApp Leads desenhar a arte do aviso (a do site, URL_DA_ARTE) neste toque, ou
-    None (sai só o texto). Só para contato com UM certificado na campanha: a arte é de um certificado; com vários, a
-    lista vai no texto. Pedido da Maria em 12/11/2026, com a arte também para quem nunca conversou (risco aceito)."""
+    """Os dados para o computador do WhatsApp Leads desenhar a arte do aviso neste toque (com "url", a página da arte
+    da marca da campanha: url_da_arte), ou None (sai só o texto). Só para contato com UM certificado na campanha: a
+    arte é de um certificado; com vários, a lista vai no texto. Pedido da Maria em 12/11/2026, com a arte também para
+    quem nunca conversou (risco aceito)."""
     if tarefa is None or not tarefa.certificado_id or not tarefa.campanha_id or cfg(db, "renov_arte") != "1":
         return None
-    if not url_da_arte(db, tarefa.tenant_id):  # a arte é a do site da MS: outra AR manda só o texto
+    url = url_da_arte(db, tarefa.tenant_id)
+    if not url:  # marca sem a página da arte: só o texto
         return None
     camp = db.get(Campanha, tarefa.campanha_id)
     if camp is None or camp.tipo != TIPO_CAMPANHA:
@@ -1771,7 +1855,7 @@ def arte_do_toque(db, tarefa: Tarefa | None) -> dict | None:
     if len(certs) != 1:
         return None
     dados = _arte_do_certificado(certs[0])
-    return {"tarefa": tarefa.id, **dados} if dados else None
+    return {"tarefa": tarefa.id, **dados, "url": url} if dados else None
 
 
 def aplicar_email_html(db, ligado: bool) -> int:
@@ -2058,7 +2142,7 @@ def arte_do_teste_no_email(db, cert_id: int, dados_arte: dict) -> bytes | None:
 
 
 def enviar_teste(db, usuario: Usuario, cert_id: int, canal: str, destino: str, avisos: str = "renov_aviso",
-                 com_arte: bool = True, conexao: str = "") -> dict:
+                 com_arte: bool = True, conexao: str = "", ar: int | None = None) -> dict:
     """Ambiente de teste (como o da IA SDR): manda os avisos para o WhatsApp ou o e-mail DE QUEM ESTÁ TESTANDO, com
     "[TESTE]" no começo, do jeito que o cliente receberia (o texto e, se marcado, a arte do site). Sai pelo número e
     pelo e-mail de quem assina as campanhas de renovação; o WhatsApp, pelo número escolhido no teste (`conexao`), senão
@@ -2074,8 +2158,12 @@ def enviar_teste(db, usuario: Usuario, cert_id: int, canal: str, destino: str, a
     angulos = list(ANGULOS) if avisos == "todos" else [avisos if avisos in ANGULOS else "renov_aviso"]
     cert = contato.certificados[0]
     # a arte é de UM certificado: com vários no mesmo contato, o cliente recebe a lista no texto (o teste mostra igual)
-    com_arte = com_arte and bool(url_da_arte(db, getattr(cert, "tenant_id", None)))  # a do site da MS: só a AR MS
+    # a arte da marca do cliente (o fictício: a da tela, `ar`); marca sem a página da arte: só o texto
+    url = url_da_arte(db, getattr(cert, "tenant_id", None) or ar)
+    com_arte = com_arte and bool(url)
     dados_arte = _arte_do_certificado(cert) if com_arte and len(contato.certificados) == 1 else None
+    if dados_arte:
+        dados_arte["url"] = url
     feito = {"enviadas": 0, "erros": [], "arte": False, "remetente": remetente.nome,
              "certificados": len(contato.certificados), "arte_pedida": com_arte, "numero": "", "modo_teste": False}
     numero, conta, imagem_email = "", None, None
