@@ -198,9 +198,41 @@ def itens_da_fila(tarefas, hoje: date, no_horario: bool, conversaram, email_auto
         chave, motivo, previsto = calculado[t.id]
         rotulo, classe = SITUACOES[chave]
         itens.append({"t": t, "situacao": chave, "rotulo": rotulo, "classe": classe, "motivo": motivo,
-                      "previsto": quando_sai(previsto, hoje) if previsto else "",
+                      "previsto": quando_sai(previsto, hoje) if previsto else "", "previsto_em": previsto,
                       "atrasado": t.data < hoje, "dias": (hoje - t.data).days})
     return itens
+
+
+SAEM_NA_RODADA = {"rodada", "sozinho"}  # saem sozinhos na próxima rodada da fila, sem horário calculado
+
+
+def por_hora(itens: list[dict], hoje: date) -> dict:
+    """Quantos WhatsApps e quantos e-mails saem em cada hora, dia a dia, pela previsão de saída de cada envio (a mesma
+    do "sai amanhã às 08:41"), e quantos não têm hora para sair (esperam um clique ou um ajuste, como o WhatsApp em
+    branco). Pedido da Maria em 23/11/2026: "coloque dados de quantas mensagens vão sair por hora, quantos e-mails
+    também". A fila manda um por vez, com pausas: numa hora cheia, parte sai na hora seguinte."""
+    dias: dict[date, dict[int, dict[str, int]]] = {}
+    sem_hora = {"whatsapp": 0, "email": 0}
+    agora_ = agora()
+    for p in itens:
+        t = p["t"]
+        if t.canal not in sem_hora:
+            continue
+        momento = p.get("previsto_em")
+        if momento is None and p["situacao"] in SAEM_NA_RODADA:
+            momento = max(_marcado(t), agora_)
+        if momento is None:
+            sem_hora[t.canal] += 1
+            continue
+        dias.setdefault(momento.date(), {}).setdefault(momento.hour, {"whatsapp": 0, "email": 0})[t.canal] += 1
+    blocos = []
+    for d in sorted(dias):
+        horas = dias[d]
+        linhas = [(h, horas.get(h, {"whatsapp": 0, "email": 0})) for h in range(min(horas), max(horas) + 1)]
+        titulo, detalhe = _titulo_do_dia(d, hoje)
+        blocos.append({"dia": d, "titulo": titulo, "detalhe": detalhe, "horas": linhas,
+                       "total": {c: sum(v[c] for _, v in linhas) for c in ("whatsapp", "email")}})
+    return {"dias": blocos, "sem_hora": sem_hora}
 
 
 def _no_periodo(p: dict, periodo: str, hoje: date) -> bool:
@@ -229,15 +261,19 @@ def _agrupar_por_dia(itens: list[dict], hoje: date) -> list[dict]:
         if not p["atrasado"]:
             por_dia.setdefault(p["t"].data, []).append(p)
     for d in sorted(por_dia):
-        semana = DIAS_SEMANA[d.weekday()]
-        if d == hoje:
-            titulo, detalhe = "Hoje", f"{semana}, {d:%d/%m}"
-        elif d == hoje + timedelta(days=1):
-            titulo, detalhe = "Amanhã", f"{semana}, {d:%d/%m}"
-        else:
-            titulo, detalhe = semana.capitalize(), f"{d:%d/%m}"
+        titulo, detalhe = _titulo_do_dia(d, hoje)
         grupos.append({"titulo": titulo, "detalhe": detalhe, "atrasado": False, "itens": por_dia[d]})
     return grupos
+
+
+def _titulo_do_dia(d: date, hoje: date) -> tuple[str, str]:
+    """("Hoje", "segunda-feira, 23/11"), ("Amanhã", ...) ou ("Quarta-feira", "25/11")."""
+    semana = DIAS_SEMANA[d.weekday()]
+    if d == hoje:
+        return "Hoje", f"{semana}, {d:%d/%m}"
+    if d == hoje + timedelta(days=1):
+        return "Amanhã", f"{semana}, {d:%d/%m}"
+    return semana.capitalize(), f"{d:%d/%m}"
 
 
 @rotas.get("/fila")
@@ -368,6 +404,7 @@ def minha_fila(request: Request, de: str = "", canal: str = "", aba: str = "prox
         "aba": aba, "periodo": periodo, "situacao": situacao, "campanha": camp_id, "busca": busca.strip(),
         "PERIODOS": PERIODOS, "SITUACOES": SITUACOES, "contagem_periodo": contagem_periodo,
         "contagem_situacao": contagem_situacao, "grupos": _agrupar_por_dia(filtrados[:LIMITE_MOSTRAR], hoje),
+        "por_hora": por_hora(filtrados, hoje),  # quantos saem em cada hora (todos os filtrados, não só os mostrados)
         "limite_mostrar": LIMITE_MOSTRAR, "ids_mostrados": [p["t"].id for p in filtrados[:LIMITE_MOSTRAR]],
         "total_filtrados": len(filtrados), "opcoes_campanha": opcoes_campanha, "url_fila": url_fila,
         "filtrando": bool(situacao or camp_id or termo or periodo != "todos"),

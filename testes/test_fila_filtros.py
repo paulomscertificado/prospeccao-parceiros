@@ -1,6 +1,6 @@
 """Minha fila (nov/2026): próximos envios por dia, filtros por período, situação, campanha e busca, e abas."""
 
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 
 from sqlalchemy import select
 
@@ -53,6 +53,7 @@ def test_fila_agrupa_por_dia_e_filtra(cliente):
     # um grupo por dia, na ordem em que vão sair
     assert proximos.index("Atrasados") < proximos.index("Hoje Email Filtro") < proximos.index("Amanha Email Filtro")
     assert "atrasado há 2 dias" in proximos
+    assert "Quantos saem por hora" in proximos  # o quadro por hora (23/11/2026)
     # WhatsApp em branco: em vez de um botão que não funciona, o atalho para cadastrar o número
     assert "Cadastrar WhatsApp" in proximos and "WhatsApp em branco" in proximos
 
@@ -85,3 +86,33 @@ def test_fila_abas_e_atalhos_dos_numeros(cliente):
     historico = cliente.get("/fila?aba=historico").text
     assert "Histórico dos envios" in historico and 'aria-label="Campanha"' not in historico  # só a aba aberta
     assert cliente.get("/fila?aba=nao-existe&periodo=errado&situacao=x").status_code == 200
+
+
+def test_quantos_saem_por_hora_pela_previsao():
+    """Pedido da Maria (23/11/2026): "coloque dados de quantas mensagens vão sair por hora, quantos e-mails também". A
+    conta usa a hora prevista de cada envio; o que sai na próxima rodada conta agora; o que espera um clique ou um
+    ajuste fica em "sem hora para sair"."""
+    from app.rotas import fila
+
+    hoje = date.today()
+    amanha = hoje + timedelta(days=1)
+
+    def item(canal, quando, situacao="programado", dia=amanha):
+        return {"t": Tarefa(canal=canal, data=dia, hora="00:01"), "situacao": situacao, "previsto_em": quando}
+
+    itens = [item("whatsapp", datetime.combine(amanha, time(10, 12))),
+             item("whatsapp", datetime.combine(amanha, time(10, 40))),
+             item("email", datetime.combine(amanha, time(12, 5))),
+             item("whatsapp", datetime.combine(amanha + timedelta(days=1), time(9, 0))),
+             item("email", None, "rodada", hoje),  # sai na próxima rodada: conta na hora de agora
+             item("whatsapp", None, "sem_whatsapp"), item("email", None, "clique")]
+    r = fila.por_hora(itens, hoje)
+    assert [d["titulo"] for d in r["dias"]][:2] == ["Hoje", "Amanhã"]
+    assert r["dias"][0]["total"] == {"whatsapp": 0, "email": 1}
+    amanha_bloco = r["dias"][1]
+    assert amanha_bloco["total"] == {"whatsapp": 2, "email": 1}
+    horas = dict(amanha_bloco["horas"])
+    assert list(horas) == [10, 11, 12]  # da primeira à última hora com envio (a 11h vazia aparece)
+    assert horas[10] == {"whatsapp": 2, "email": 0} and horas[11] == {"whatsapp": 0, "email": 0}
+    assert r["dias"][2]["total"] == {"whatsapp": 1, "email": 0}
+    assert r["sem_hora"] == {"whatsapp": 1, "email": 1}

@@ -220,6 +220,11 @@ na tela **Envios** e na **Agenda**. Quem não pode abrir aquela campanha vai par
   do horário de envio, em dia útil (a Renovação também respeita o horário e os feriados dela). A fila manda um por vez,
   com alguns minutos entre um e outro: quando muitos ficam livres na mesma hora, alguns saem depois. Envio que espera o
   seu clique não mostra horário.
+  **Quantos saem por hora:** logo acima da lista, um quadro por dia (Hoje, Amanhã e os próximos) mostra, hora a hora,
+  quantos WhatsApps e quantos e-mails vão sair, pelo horário previsto de cada envio, e o total do dia. Ele segue os
+  filtros da tela (pessoa, canal, campanha, período). O que não tem hora para sair (espera o seu clique ou um ajuste,
+  como o WhatsApp em branco) aparece embaixo, separado. A fila manda um por vez, com pausas: numa hora cheia, parte sai
+  na hora seguinte.
   Para achar um envio, use os filtros: **Quando** (todos, hoje e atrasados, atrasados, hoje, amanhã, próximos dias),
   **Situação**, a **campanha** e a **busca pelo nome da empresa**. Cada filtro mostra quantos envios há nele;
   **Limpar filtros** volta a mostrar tudo.

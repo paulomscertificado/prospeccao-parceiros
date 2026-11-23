@@ -8,6 +8,21 @@
   .kpis-fila { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); margin-bottom: 16px; }
   .filtros-fila { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
   .filtros-fila select { width: auto; }
+  /* Quantos saem por hora (23/11/2026) */
+  .por-hora { border: 1px solid var(--borda); border-radius: 12px; padding: 12px 14px; margin: 12px 0 6px; background: #fbfcfe; }
+  .por-hora h3 { margin: 0 0 2px; font-size: 1rem; }
+  .por-hora details { border-top: 1px solid var(--borda); padding: 8px 0 4px; }
+  .por-hora details:first-of-type { border-top: 0; }
+  .por-hora summary { cursor: pointer; display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline; }
+  .por-hora summary .detalhe-dia { color: #6b7686; font-size: .85rem; }
+  .por-hora summary .totais { margin-left: auto; font-size: .85rem; color: #4b5a6b; }
+  .tabela-horas { overflow-x: auto; margin-top: 8px; }
+  .tabela-horas table { border-collapse: collapse; font-size: .82rem; min-width: 100%; }
+  .tabela-horas th, .tabela-horas td { padding: 5px 7px; text-align: center; border-bottom: 1px solid #eef1f5; white-space: nowrap; }
+  .tabela-horas thead th { font-family: var(--fonte-mono); font-size: .72rem; color: #6b7686; font-weight: 600; }
+  .tabela-horas tbody th { text-align: left; font-weight: 600; }
+  .tabela-horas td.zero { color: #b4bdc8; }
+  .tabela-horas .total { background: #f1f5fa; font-weight: 700; }
 </style>
 <div class="cabecalho">
   <div><h1>Minha fila de disparos</h1>
@@ -82,6 +97,31 @@
     {% if filtrando %}Mostrando <b>{{ [total_filtrados, limite_mostrar]|min }}</b> de {{ pendentes|length }}.{% endif %}
     {% if total_filtrados > limite_mostrar %}<b>Aparecem os {{ limite_mostrar }} primeiros de {{ total_filtrados }}:</b> use os filtros para achar os outros.{% endif %}</p>
   {% if filtrando %}<div style="margin:8px 0 0">{{ cancelar_mostrados(ids_mostrados, '/fila' ~ ('?' ~ request.url.query if request.url.query else '')) }}</div>{% endif %}
+
+  {% set sem_hora = por_hora.sem_hora.whatsapp + por_hora.sem_hora.email %}
+  {% if por_hora.dias or sem_hora %}
+  <div class="por-hora">
+    <h3>Quantos saem por hora</h3>
+    <p class="pequeno suave" style="margin:0 0 6px">Pelo horário previsto de cada envio, com os filtros de cima. A fila manda um
+      por vez, com pausas: numa hora cheia, parte sai na hora seguinte.</p>
+    {% for d in por_hora.dias %}
+    <details {{ 'open' if loop.index <= 2 }}>
+      <summary><b>{{ d.titulo }}</b> <span class="detalhe-dia">{{ d.detalhe }}</span>
+        <span class="totais">💬 <b>{{ d.total.whatsapp }}</b> WhatsApp · ✉️ <b>{{ d.total.email }}</b> e-mail{{ 's' if d.total.email != 1 }}</span></summary>
+      <div class="tabela-horas"><table>
+        <thead><tr><th></th>{% for h, v in d.horas %}<th>{{ '%02d'|format(h) }}h</th>{% endfor %}<th class="total">Total</th></tr></thead>
+        <tbody>
+          <tr><th>💬 WhatsApp</th>{% for h, v in d.horas %}<td class="{{ 'zero' if not v.whatsapp }}">{{ v.whatsapp or '–' }}</td>{% endfor %}<td class="total">{{ d.total.whatsapp }}</td></tr>
+          <tr><th>✉️ E-mail</th>{% for h, v in d.horas %}<td class="{{ 'zero' if not v.email }}">{{ v.email or '–' }}</td>{% endfor %}<td class="total">{{ d.total.email }}</td></tr>
+        </tbody>
+      </table></div>
+    </details>
+    {% endfor %}
+    {% if sem_hora %}<p class="pequeno" style="margin:8px 0 0">Sem hora para sair: <b>{{ por_hora.sem_hora.whatsapp }}</b> WhatsApp
+      e <b>{{ por_hora.sem_hora.email }}</b> e-mail{{ 's' if por_hora.sem_hora.email != 1 }} (esperam o seu clique ou um ajuste, como
+      o WhatsApp em branco; veja a situação de cada um na lista abaixo).</p>{% endif %}
+  </div>
+  {% endif %}
 
   {% for g in grupos %}
   <h3 class="dia-fila {{ 'dia-atrasado' if g.atrasado }}">{{ g.titulo }} <span class="detalhe-dia">{{ g.detalhe }}</span>
