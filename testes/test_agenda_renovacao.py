@@ -166,7 +166,7 @@ def test_quero_renovar_manda_o_calendario_e_marca_na_agenda(cliente, monkeypatch
         dd = f"{dia[8:10]}/{dia[5:7]}"
         assert any(t.startswith("Combinado! Nossa equipe vai falar com você na") and f", {dd}, às 10:00 para fazer a sua "
                    "renovação." in t for t in textos), textos
-        assert any(t.startswith("O horário das 10:00 já estava ocupado, então marquei o mais próximo.") for t in textos)
+        assert any(t.startswith("O horário das 10:00 não estava livre, então marquei o mais próximo.") for t in textos)
         tela = cliente.get("/oficial?telefone=81994480001").text  # a tela API Oficial mostra tudo
         assert "calendário para marcar a renovação" in tela and "escolheu no calendário" in tela and "Combinado!" in tela
     finally:

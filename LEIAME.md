@@ -742,6 +742,8 @@ horários. Ao confirmar:
   renovação.";
 - a equipe recebe o aviso no sininho, e a conversa aparece na tela **API Oficial**.
 Os horários livres saem do expediente da pessoa (Configurações > Usuários) e das reuniões que já estão na Agenda dela.
+No expediente, um dia com horário diferente vai separado por ponto e vírgula, por exemplo
+`seg-qui 08:00-18:00; sex 08:00-17:30` (segunda a quinta das 8h às 18h, sexta das 8h às 17h30).
 Para testar no seu celular: mande um "oi" do seu WhatsApp para o número oficial e, em **Configurações > WhatsApp**,
 use **Testar o calendário** (a confirmação do teste vem com "[TESTE]" e não marca reunião). A Meta só deixa mandar o
 calendário até 24 horas depois do toque do cliente.

@@ -162,7 +162,7 @@ Pedido da Maria em 16/11/2026: "que continue fazendo essa campanha mas que seja 
   dias sem horário em `datas_bloqueadas`; os horários do expediente na lista). A resposta volta no webhook (interactive
   `nfm_reply`, `ler_webhook` → `formulario` e texto "Escolheu 25/11/2026 às 10:00", tipo `formulario`) →
   `tratar_formulario`: o horário escolhido ou o livre mais perto no mesmo dia (`_mais_perto`; a confirmação avisa "O
-  horário das 10:00 já estava ocupado ...") → `agenda_horarios.agendar` (reunião na Agenda da pessoa, lead em
+  horário das 10:00 não estava livre ...") → `agenda_horarios.agendar` (reunião na Agenda da pessoa, lead em
   "Reunião", histórico) + aviso para a equipe; escolher de novo troca a reunião. A confirmação sai pelo relógio
   (`enviar_texto_por`). Sem horário livre: "Recebemos o seu pedido! Nossa equipe vai falar com você ..." e aviso para a
   equipe (situação `sem_vaga`). Janela de 24 h fechada antes de sair: `vencido`. Erro da Meta: até 3 tentativas. A tela

@@ -546,10 +546,11 @@ def salvar_usuario(request: Request, uid: int, nome: str = Form(...), email: str
         u.equipe_id = util.para_int(equipe_id) if equipe_id and db.get(Equipe, util.para_int(equipe_id) or 0) else None
     u.parceiro_id = util.para_int(parceiro_id) if perfil == "parceiro" else None
     if expediente.strip():
-        from ..agenda_horarios import ler_expediente
+        from ..agenda_horarios import faixas_por_dia
 
-        if not ler_expediente(expediente)[0]:
-            avisar(request, "Expediente inválido. Use o formato: seg-sex 09:00-12:00,14:00-18:00", "erro")
+        if not faixas_por_dia(expediente):
+            avisar(request, "Expediente inválido. Use o formato: seg-sex 09:00-12:00,14:00-18:00 (com um dia diferente, "
+                            "separe por ponto e vírgula: seg-qui 08:00-18:00; sex 08:00-17:30)", "erro")
             return voltar(destino)
         u.expediente = expediente.strip()
     u.duracao_reuniao = util.para_int(duracao_reuniao) or u.duracao_reuniao or 30

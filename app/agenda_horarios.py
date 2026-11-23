@@ -37,6 +37,22 @@ def ler_expediente(texto: str) -> tuple[set[int], list[tuple[time, time]]]:
         return set(), []
 
 
+def faixas_por_dia(texto: str) -> dict[int, list[tuple[time, time]]]:
+    """O expediente de cada dia da semana (0 = segunda). Dias com horários diferentes vão separados por ";" (pedido da
+    Maria em 23/11/2026, com o horário da MS: "seg-qui 08:00-18:00; sex 08:00-17:30"); o formato de antes,
+    "seg-sex 09:00-12:00,14:00-18:00", continua valendo. Um pedaço inválido deixa tudo vazio."""
+    resultado: dict[int, list[tuple[time, time]]] = {}
+    for parte in (texto or "").split(";"):
+        if not parte.strip():
+            continue
+        dias, faixas = ler_expediente(parte)
+        if not dias or not faixas:
+            return {}
+        for dia in dias:
+            resultado.setdefault(dia, []).extend(faixas)
+    return resultado
+
+
 def ocupados(db, usuario_id: int, inicio: date, fim: date) -> list[datetime]:
     linhas = db.execute(select(Tarefa.data, Tarefa.hora).where(
         Tarefa.usuario_id == usuario_id, Tarefa.tipo == "reuniao", Tarefa.status == "pendente",
@@ -52,8 +68,8 @@ def ocupados(db, usuario_id: int, inicio: date, fim: date) -> list[datetime]:
 
 def horarios_livres(db, usuario: Usuario, dias: int = 7, quantidade: int = 6,
                     antecedencia_horas: int = 2) -> list[datetime]:
-    dias_semana, faixas = ler_expediente(usuario.expediente)
-    if not dias_semana or not faixas:
+    por_dia = faixas_por_dia(usuario.expediente)
+    if not por_dia:
         return []
     duracao = timedelta(minutes=max(15, usuario.duracao_reuniao or 30))
     minimo = agora() + timedelta(hours=antecedencia_horas)
@@ -65,9 +81,9 @@ def horarios_livres(db, usuario: Usuario, dias: int = 7, quantidade: int = 6,
     livres = []
     for n in range(dias + 1):
         dia = hoje + timedelta(days=n)
-        if dia.weekday() not in dias_semana or dia in sem_reuniao:
+        if dia.weekday() not in por_dia or dia in sem_reuniao:
             continue
-        for ini, fim in faixas:
+        for ini, fim in sorted(por_dia[dia.weekday()]):
             inicio = datetime.combine(dia, ini)
             while inicio + duracao <= datetime.combine(dia, fim):
                 conflito = any(abs((m - inicio).total_seconds()) < duracao.total_seconds() for m in marcados)

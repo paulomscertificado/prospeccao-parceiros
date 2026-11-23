@@ -134,8 +134,10 @@ endereço, login e senha de app criptografada (Google Workspace: smtp.gmail.com:
 
 ### Agenda de reuniões
 Cada usuário tem um **expediente** (Configurações > Usuários, ex.: `seg-sex 09:00-12:00,14:00-18:00`) e a duração
-da reunião. Os horários oferecidos = expediente − reuniões já marcadas − feriados da pessoa. Integração com Google
-Calendar: prevista.
+da reunião. Dias com horário diferente vão separados por ponto e vírgula (23/11/2026, o horário da MS no calendário da
+Renovação: `seg-qui 08:00-18:00; sex 08:00-17:30`; `agenda_horarios.faixas_por_dia`; um pedaço errado deixa o
+expediente inválido). Os horários oferecidos = expediente − reuniões já marcadas − feriados da pessoa. Integração com
+Google Calendar: prevista. Testes: `testes/test_expediente.py`.
 
 ### Feriados de cada pessoa (Configurações > Feriados; pedido da Maria em 18/11/2026)
 `app/feriados.py`. Cada pessoa tem **cidade e UF** (`Usuario.cidade`/`uf`; Configurações > Usuários ou Minha conta >

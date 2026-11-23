@@ -1104,7 +1104,7 @@ def texto_da_confirmacao(ag) -> str:
     if ag.pedido and ag.pedido != marcado:
         pedido = ag.pedido.split(" ")
         quando = pedido[1] if len(pedido) == 2 and pedido[0] == ag.dia.isoformat() else "que você escolheu"
-        texto = (f"O horário {('das ' + quando) if quando[:1].isdigit() else quando} já estava ocupado, então marquei "
+        texto = (f"O horário {('das ' + quando) if quando[:1].isdigit() else quando} não estava livre, então marquei "
                  f"o mais próximo. " + texto)
     return ("[TESTE] " if ag.teste else "") + texto
 
