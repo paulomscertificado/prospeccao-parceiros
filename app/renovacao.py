@@ -148,31 +148,69 @@ def _pagina_da_arte(url: str) -> str:
     raise ValueError("a página muda de endereço vezes demais")
 
 
-def problema_no_endereco_da_arte(db, ar: int | None, url: str) -> str:
-    """Confere o endereço antes de gravar ("" = pode gravar): https de um site da internet, a página abre e tem o
-    desenho da arte (a ferramenta de aviso do site da MS, copiada com o logo e as cores da marca)."""
+WIX_DADOS_DA_PAGINA = re.compile(r"https://siteassets\.parastorage\.com/pages/pages/thunderbolt\?[^\"'<>\s]+")
+WIX_HTML_INCORPORADO = re.compile(r"https://[a-z0-9-]+\.filesusr\.com/html/[A-Za-z0-9_]+\.html")
+MOLDURA = re.compile(r"<iframe[^>]+src=[\"']([^\"']+)", re.IGNORECASE)
+
+
+def _ferramenta_na_moldura(url: str, html: str) -> str:
+    """A página do site sem o desenho pode trazer a ferramenta numa moldura (iframe). No Wix (o site do Grupo Certy,
+    23/11/2026), o "HTML incorporado" fica noutro endereço (www-<site>.filesusr.com/html/...), que só aparece nos
+    dados da página (o módulo "thunderbolt-features" do Wix). Devolve o endereço da moldura com o desenho, ou ""."""
+    from urllib.parse import urljoin
+
+    import httpx
+
+    candidatos = [urljoin(url, src) for src in MOLDURA.findall(html)]
+    for modulo in WIX_DADOS_DA_PAGINA.findall(html):
+        modulo = modulo.replace("&amp;", "&")
+        if "module=thunderbolt-features" not in modulo:
+            continue
+        try:
+            candidatos += WIX_HTML_INCORPORADO.findall(_pagina_da_arte(modulo))
+        except (httpx.HTTPError, ValueError):
+            continue
+    for candidato in list(dict.fromkeys(candidatos))[:6]:
+        if not endereco_publico(candidato):
+            continue
+        try:
+            pagina = _pagina_da_arte(candidato)
+        except (httpx.HTTPError, ValueError):
+            continue
+        if all(m in pagina for m in MARCAS_DA_ARTE):
+            return candidato
+    return ""
+
+
+def conferir_endereco_da_arte(db, ar: int | None, url: str) -> tuple[str, str]:
+    """Confere o endereço antes de gravar: (endereço a gravar, problema). Precisa ser https de um site da internet, a
+    página abrir e ter o desenho da arte (a ferramenta de aviso do site da MS, copiada com o logo e as cores da marca).
+    Se a página do site traz a ferramenta numa moldura (Wix, iframe), grava o endereço da ferramenta."""
     import httpx
 
     from . import marca
 
     if not url.lower().startswith("https://"):
-        return "o endereço precisa começar com https://"
+        return "", "o endereço precisa começar com https://"
     if url.rstrip("/").lower() == URL_DA_ARTE.lower() and not marca.da_ar(db, ar or marca.ar_padrao(db))["e_ms"]:
-        return "esse é o endereço da arte da MS, com a marca da MS: use a página com a marca desta AR"
+        return "", "esse é o endereço da arte da MS, com a marca da MS: use a página com a marca desta AR"
     if not endereco_publico(url):
-        return "o endereço não é de um site da internet (confira se está certo e se o site está no ar)"
+        return "", "o endereço não é de um site da internet (confira se está certo e se o site está no ar)"
     try:
         html = _pagina_da_arte(url)
     except httpx.HTTPStatusError as erro:
-        return f"o site respondeu com o erro {erro.response.status_code} (confira o endereço)"
+        return "", f"o site respondeu com o erro {erro.response.status_code} (confira o endereço)"
     except httpx.HTTPError:
-        return "o site não respondeu (confira o endereço e se o site está no ar)"
+        return "", "o site não respondeu (confira o endereço e se o site está no ar)"
     except ValueError as erro:
-        return str(erro)
-    if not all(m in html for m in MARCAS_DA_ARTE):
-        return ("a página abriu, mas não tem o desenho da arte do aviso (precisa ser uma cópia da ferramenta de aviso "
+        return "", str(erro)
+    if all(m in html for m in MARCAS_DA_ARTE):
+        return url, ""
+    dentro = _ferramenta_na_moldura(url, html)
+    if dentro:
+        return dentro, ""
+    return "", ("a página abriu, mas não tem o desenho da arte do aviso (precisa ser uma cópia da ferramenta de aviso "
                 "do site da MS, com os mesmos campos)")
-    return ""
 
 
 DIAS_GUARDANDO_ARTE = 10  # a cópia da arte que voltou do computador (para o e-mail) fica só uns dias

@@ -18,6 +18,13 @@ from test_renovacao import _NUMEROS, _admin, _cenario
 URL_CERTY = "https://arte.grupo-exemplo.com.br/interno/aviso-vencimento"
 SEM_DESENHO = "https://arte.grupo-exemplo.com.br/outra"
 PAGINA_BOA = '<html><body><canvas id="cv"></canvas><script>function update(){}</script></body></html>'
+# site feito no Wix (o do Grupo Certy, 23/11/2026): a ferramenta fica no "HTML incorporado", noutro endereço, que só
+# aparece nos dados da página (módulo thunderbolt-features)
+PAGINA_WIX = "https://www.grupo-exemplo.com.br/aviso-de"
+MODULO_WIX = ("https://siteassets.parastorage.com/pages/pages/thunderbolt?module=thunderbolt-features"
+              "&pageId=abc_714.json")
+FERRAMENTA_WIX = "https://www-grupo-exemplo-com-br.filesusr.com/html/7d8bdb_abc123.html"
+PAGINA_COM_MOLDURA = "https://arte.grupo-exemplo.com.br/com-moldura"
 
 
 @pytest.fixture
@@ -37,16 +44,32 @@ def ars(cliente):  # o cliente prepara o banco de teste
 @pytest.fixture
 def site_falso(monkeypatch):
     """Sem internet nos testes: o DNS e as páginas de cada endereço são de mentira."""
-    paginas = {URL_CERTY: PAGINA_BOA, SEM_DESENHO: "<html><body>outra coisa</body></html>"}
+    paginas = {URL_CERTY: PAGINA_BOA, SEM_DESENHO: "<html><body>outra coisa</body></html>",
+               PAGINA_WIX: f'<html><head><script src="{MODULO_WIX.replace("&", "&amp;")}"></script></head></html>',
+               MODULO_WIX: '{"props": {"url": "' + FERRAMENTA_WIX + '"}}', FERRAMENTA_WIX: PAGINA_BOA,
+               PAGINA_COM_MOLDURA: '<html><body><iframe width="900" src="/interno/aviso-vencimento"></iframe></body></html>'}
 
     def _pagina(url):
         if url not in paginas:
             raise httpx.ConnectError("sem resposta")
         return paginas[url]
 
-    monkeypatch.setattr(renovacao, "endereco_publico", lambda url: ".grupo-exemplo.com.br/" in url)
+    monkeypatch.setattr(renovacao, "endereco_publico",
+                        lambda url: ".grupo-exemplo.com.br/" in url or ".filesusr.com/" in url)
     monkeypatch.setattr(renovacao, "_pagina_da_arte", _pagina)
     return paginas
+
+
+def test_acha_a_ferramenta_dentro_da_pagina_do_site(ars, site_falso):
+    """A Maria colou o endereço da página do site do Grupo Certy (feito no Wix): a ferramenta da arte fica numa
+    moldura com outro endereço. O sistema acha a ferramenta e grava o endereço dela."""
+    with sessao() as db:
+        certy = ars["grupo-certy"]
+        assert renovacao.conferir_endereco_da_arte(db, certy, PAGINA_WIX) == (FERRAMENTA_WIX, "")
+        assert renovacao.conferir_endereco_da_arte(db, certy, PAGINA_COM_MOLDURA) == (URL_CERTY, "")
+        assert renovacao.conferir_endereco_da_arte(db, certy, URL_CERTY) == (URL_CERTY, "")
+        final, problema = renovacao.conferir_endereco_da_arte(db, certy, SEM_DESENHO)
+        assert final == "" and "não tem o desenho da arte" in problema
 
 
 def _tela(c) -> str:
@@ -130,6 +153,11 @@ def test_so_o_admin_master_troca_o_endereco_da_arte(cliente, csrf, ars, site_fal
             renovacao.enviar_teste(db, _admin(db), 0, "whatsapp", "5581999990000", "renov_aviso", ar=ars["ms"])
             assert filas[-1]["arte"]["url"] == renovacao.URL_DA_ARTE
             db.rollback()
+        # a página do site feito no Wix: o sistema grava o endereço da ferramenta que está dentro dela
+        r = cliente.post("/renovacao/configurar", data={"csrf": csrf, **base, "arte_url": PAGINA_WIX})
+        assert f"passam a sair com a arte de {FERRAMENTA_WIX}" in r.text and "achou e guardou o endereço" in r.text
+        with sessao() as db:
+            assert renovacao.url_da_arte(db, certy) == FERRAMENTA_WIX
         # em branco: o Grupo Certy volta a mandar só o texto
         r = cliente.post("/renovacao/configurar", data={"csrf": csrf, **base, "arte_url": ""})
         assert "Sem endereço da arte: os avisos do Grupo Certy saem só com o texto." in r.text

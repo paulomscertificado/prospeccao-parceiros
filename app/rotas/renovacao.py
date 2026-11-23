@@ -228,11 +228,11 @@ async def configurar(request: Request, usuario: Usuario = Depends(exige("campanh
         ar_arte = _ar_da_renovacao(db, request, usuario)
         novo, antes = str(form.get("arte_url") or "").strip(), renovacao.url_da_arte(db, ar_arte)
         if novo != antes:
-            problema = renovacao.problema_no_endereco_da_arte(db, ar_arte, novo) if novo else ""
+            final, problema = renovacao.conferir_endereco_da_arte(db, ar_arte, novo) if novo else ("", "")
             if problema:
                 avisar(request, f"O endereço da arte não foi salvo: {problema}.", "erro")
                 return voltar("/renovacao#arte-url")
-            gravar_config_da_ar(db, ar_arte, renovacao.CHAVE_URL_DA_ARTE, novo)
+            gravar_config_da_ar(db, ar_arte, renovacao.CHAVE_URL_DA_ARTE, final)
             depois, m = renovacao.url_da_arte(db, ar_arte), marca.da_ar(db, ar_arte)
             registrar_log(db, usuario, "renovacao_endereco_da_arte", "tenant", ar_arte,
                           f"{m['nome']}: {depois or 'sem arte'}", request, modulo="Renovação",
@@ -240,6 +240,9 @@ async def configurar(request: Request, usuario: Usuario = Depends(exige("campanh
             de_quem = marca.frase(m, "de", nome=True)
             aviso_da_arte = (f" Os avisos {de_quem} passam a sair com a arte de {depois}." if depois else
                              f" Sem endereço da arte: os avisos {de_quem} saem só com o texto.")
+            if final and final != novo:  # a página do site traz a ferramenta numa moldura (Wix)
+                aviso_da_arte += (" A ferramenta da arte fica numa moldura dentro da página do site: o sistema achou "
+                                  "e guardou o endereço dela.")
     # dias dos 4 avisos (ex.: "12, 6, 3, 1"), horário mínimo e o dia em que a campanha automática começa
     import re
 

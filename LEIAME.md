@@ -548,7 +548,9 @@ renovação novo antes, para entrarem os clientes de janeiro).
   logo e as cores dela (uma cópia da ferramenta de aviso do site da MS, com os mesmos campos). Quem coloca ou troca o
   endereço é o **administrador master**: entre na marca (Painel master > **Entrar na AR**), abra a Renovação e escreva
   o endereço (começando com https://) no quadro 4; ao salvar, o sistema abre a página e confere se ela tem o desenho da
-  arte. Em branco: a MS volta para a arte do site da MS, e as outras marcas mandam os avisos só com o texto. O teste
+  arte. Pode ser o endereço da página do site onde a ferramenta aparece, também em site feito no **Wix**: o sistema
+  acha a ferramenta dentro da página e guarda o endereço dela. Nas artes das outras marcas, o "FALTAM N DIAS" vai
+  numa etiqueta branca no alto, ao lado de "AVISO DE VENCIMENTO". Em branco: a MS volta para a arte do site da MS, e as outras marcas mandam os avisos só com o texto. O teste
   do quadro 1 já usa a arte da marca em que você está.
 - **Testar antes (quadro 1, "Testar os avisos"):** como o teste da IA SDR. Escolha também **por qual número** o teste
   sai (número em modo teste: a tela avisa que não chega de verdade). Escolha um cliente da planilha (ou o

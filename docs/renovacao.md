@@ -109,10 +109,14 @@ base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renova
    `banco.gravar_config_da_ar` na AR da tela, `_ar_da_renovacao`). Só o Admin Master troca (quem abre a página, com os
    dados do cliente, é o servidor); os outros veem o endereço. `url_da_arte(db, ar)` lê só o valor próprio da AR
    (`banco.config_propria_da_ar`, nunca o da plataforma); sem ele, a AR MS usa `URL_DA_ARTE` e as outras mandam só o
-   texto. Ao salvar, `problema_no_endereco_da_arte` confere: https de um site da internet (`endereco_publico`: pelo
-   nome, nunca IP, localhost ou rede interna), a página abre (`_pagina_da_arte`, segue até 3 desvios, todos públicos)
-   e tem o desenho (`MARCAS_DA_ARTE`: `id="cv"` e `function update`, uma cópia da ferramenta do site da MS); o
-   endereço da MS numa outra AR é recusado. `arte_do_toque` e o teste (`enviar_teste(ar=)`, o cliente fictício usa a AR
+   texto. Ao salvar, `conferir_endereco_da_arte` (devolve o endereço a gravar e o problema) confere: https de um site
+   da internet (`endereco_publico`: pelo nome, nunca IP, localhost ou rede interna), a página abre (`_pagina_da_arte`,
+   segue até 3 desvios, todos públicos) e tem o desenho (`MARCAS_DA_ARTE`: `id="cv"` e `function update`, uma cópia
+   da ferramenta do site da MS); o endereço da MS numa outra AR é recusado. Página sem o desenho que traz a ferramenta
+   numa moldura (`_ferramenta_na_moldura`): `<iframe src>` ou, no Wix, o "HTML incorporado"
+   (`www-<site>.filesusr.com/html/...`, achado nos dados da página, módulo `thunderbolt-features` em
+   `siteassets.parastorage.com`): grava o endereço da ferramenta (o site do Grupo Certy é Wix, 23/11/2026; se eles
+   mudarem o HTML incorporado, o endereço pode mudar: colar a página de novo). `arte_do_toque` e o teste (`enviar_teste(ar=)`, o cliente fictício usa a AR
    da tela) mandam `"url"` junto; o WhatsApp Leads confere de novo (`arte_aviso.endereco_da_arte`) e guarda uma cópia
    por página. Sem a arte na tela, o "Arte do aviso junto" vai escondido no formulário (salvar o quadro 4 numa AR sem
    arte não desliga a arte da MS: `renov_arte` é da plataforma). Testes: `testes/test_arte_por_marca.py`.
