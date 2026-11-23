@@ -245,6 +245,25 @@ permissão `campanhas.ver`; configurar/buscar com `campanhas.gerenciar`).
   `/empresas-novas/busca/{id}`; teste `/empresas-novas/testar` (`limit=10`, 1 página = 1 crédito, sem campanha).
 - Testes: `testes/test_empresas_novas.py` (API simulada).
 
+## Empresas novas: maior capital social primeiro (nov/2026)
+
+Pedido da Maria em 23/11/2026: "sempre dar preferência às empresas que tenham o maior capital social".
+- A CNPJá não ordena a pesquisa `GET /office`, mas filtra pelo capital (`company.equity.gte`/`company.equity.lte`;
+  o registro traz `company.equity`, em reais). `buscar_abertas(..., por_capital=True, custo=...)` (usado por
+  `buscar_e_criar`: Buscar agora e busca automática) pede faixa por faixa, da mais alta para a mais baixa
+  (`FAIXAS_DE_CAPITAL`: R$ 1 milhão ou mais, 500 mil, 200 mil, 100 mil, 50 mil, 20 mil, 10 mil, 5 mil, mil e a última
+  até R$ 999,99), cada pedido com `limit` = o que falta, e para quando completa a quantidade. A CNPJá cobra 1 crédito a
+  cada 10 empresas de cada pedido: as faixas podem custar alguns créditos a mais (`BuscaCnpja.creditos` soma pedido
+  por pedido).
+- Erro 400 na pesquisa por faixas antes de vir qualquer empresa (filtro recusado): busca do jeito antigo, sem as
+  faixas. Falhou no meio: fica com as já pagas, como antes.
+- `buscas_cnpja_empresas.capital` guarda o capital; `registrar_busca` grava a lista do maior capital para o menor; a
+  tela da busca mostra a coluna "Capital social" nessa ordem; o lead ganha "Capital social: R$ ..." nas observações.
+- `criar_campanha` ordena: quem tem celular ou e-mail primeiro, depois o maior capital, depois quem tem os dois
+  canais. A busca automática (pede o dobro do máximo por dia) leva as de maior capital.
+- O teste da API (`testar`: 10 empresas, 1 crédito) continua sem as faixas; a lista dele também sai ordenada.
+- Testes: `testes/test_empresas_novas_capital.py`.
+
 ## Empresas novas: foco no WhatsApp (nov/2026)
 
 `cadencias.aplicar(..., foco_whatsapp=True)` (usado por `_montar` quando `Campanha.tipo == "empresas_novas"`): o

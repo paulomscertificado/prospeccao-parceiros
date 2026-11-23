@@ -28,6 +28,14 @@ class _Resposta:
         return self.dados
 
 
+def _na_faixa(registro, params):
+    """A CNPJá simulada respeita o filtro de capital social (company.equity.gte/lte) da busca por faixas (23/11/2026).
+    Registro sem capital = capital zero: só a última faixa devolve."""
+    capital = float(((registro or {}).get("company") or {}).get("equity") or 0)
+    gte, lte = params.get("company.equity.gte"), params.get("company.equity.lte")
+    return (gte is None or capital >= float(gte)) and (lte is None or capital <= float(lte))
+
+
 def test_celular_ganha_o_nono_digito():
     assert empresas_novas.celular("81", "91363335") == "81991363335"
     assert empresas_novas.celular("81", "991363335") == "81991363335"
@@ -43,12 +51,13 @@ def test_busca_monta_campanha_de_venda(cliente, monkeypatch):
             return _Resposta({"perpetual": 100, "transient": 2400})
         if (params or {}).get("token"):
             return _Resposta({"records": [_registro("44444444000144", "QUARTA EMPRESA LTDA")], "next": None})
-        return _Resposta({"records": [
+        registros = [r for r in [
             _registro("11111111000111", "NOVA CONSTRUTORA LTDA"),
             _registro("22222222000122", "JOAO DA SILVA", natureza=2135, email=""),
             _registro("33333333000133", "SEM CONTATO LTDA", numero="", email=""),
             _registro("11111111000111", "NOVA CONSTRUTORA LTDA"),  # repetida
-        ], "next": "abc"})
+        ] if _na_faixa(r, params or {})]  # sem capital: só a última faixa de capital da busca devolve
+        return _Resposta({"records": registros, "next": "abc" if registros else None})
 
     monkeypatch.setattr(empresas_novas.httpx, "get", falso)
     monkeypatch.setattr(config, "CNPJA_API_KEY", "chave-de-teste")
@@ -285,8 +294,9 @@ def test_teste_olha_um_dia_diferente_e_busca_nao_repete_empresa(cliente, monkeyp
 
     def falso(url, params=None, headers=None, timeout=None):
         pedidos.append(dict(params or {}))
-        return _Resposta({"records": [_registro("77777777000177", "REPETIDA LTDA"),
-                                      _registro("88888888000188", "NOVA DE VERDADE LTDA")], "next": None})
+        return _Resposta({"records": [r for r in [_registro("77777777000177", "REPETIDA LTDA"),
+                                                  _registro("88888888000188", "NOVA DE VERDADE LTDA")]
+                                      if _na_faixa(r, params or {})], "next": None})
 
     monkeypatch.setattr(empresas_novas.httpx, "get", falso)
     monkeypatch.setattr(config, "CNPJA_API_KEY", "chave-de-teste")
@@ -339,11 +349,16 @@ def test_buscar_de_novo_nao_paga_quem_ja_veio(cliente, monkeypatch):
     pesquisas, listas = [], []
     ja_veio = {"90000001000101", "90000002000102"}
 
+    novas = iter(("90000001000199", "90000002000199", "90000003000199"))
+
     def get(url, params=None, headers=None, timeout=None):
         pesquisas.append(dict(params or {}))
+        if not _na_faixa({}, params or {}):  # sem capital (zero): só a última faixa de capital da busca devolve
+            return _Resposta({"records": [], "next": None})
         excluir = bool((params or {}).get("taxId.nin"))
         registros = [_registro(c, f"EMPRESA {c[-4:]} LTDA") for c in sorted(ja_veio) if not excluir]
-        registros.append(_registro(f"9000000{len(pesquisas)}000199", f"NOVA {len(pesquisas)} LTDA"))
+        nova = next(novas)
+        registros.append(_registro(nova, f"NOVA {nova[7]} LTDA"))
         for r in registros:
             r["founded"] = params["founded.gte"]  # abertas no dia pesquisado (como a CNPJá devolve)
         return _Resposta({"records": registros, "next": None})

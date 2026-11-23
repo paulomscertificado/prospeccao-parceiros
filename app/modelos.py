@@ -735,6 +735,8 @@ class EmpresaCnpja(DaAR, Base):
     porte: Mapped[str] = mapped_column(String(60), default="")
     natureza: Mapped[str] = mapped_column(String(120), default="")
     natureza_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # capital social que a CNPJá informa (company.equity, em reais): a busca e a campanha preferem o maior (23/11/2026)
+    capital: Mapped[float | None] = mapped_column(Float, nullable=True)
     telefones_fixos: Mapped[str] = mapped_column(String(120), default="")  # separados por vírgula (DDD + número)
     celulares: Mapped[str] = mapped_column(String(120), default="")
     emails: Mapped[str] = mapped_column(Text, default="")                  # separados por vírgula

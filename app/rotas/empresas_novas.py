@@ -45,7 +45,8 @@ def tela_empresas_novas(request: Request, usuario: Usuario = Depends(exige("camp
 @rotas.get("/empresas-novas/busca/{busca_id:int}")
 def ver_busca(request: Request, busca_id: int, usuario: Usuario = Depends(exige("campanhas.configurar")),
               db: Session = Depends(obter_db)):
-    """Lista das empresas que a CNPJá devolveu nessa busca (com quem ficou de fora e por quê) e a campanha."""
+    """Lista das empresas que a CNPJá devolveu nessa busca (com quem ficou de fora e por quê) e a campanha, do maior
+    capital social para o menor."""
     from fastapi import HTTPException
 
     from ..modelos import BuscaCnpja, Campanha, EmpresaCnpja
@@ -54,7 +55,8 @@ def ver_busca(request: Request, busca_id: int, usuario: Usuario = Depends(exige(
     if busca is None:
         raise HTTPException(404)
     empresas = db.execute(select(EmpresaCnpja).where(EmpresaCnpja.busca_id == busca_id)
-                          .order_by(EmpresaCnpja.motivo_fora != "", EmpresaCnpja.razao_social)).scalars().all()
+                          .order_by(EmpresaCnpja.motivo_fora != "", func.coalesce(EmpresaCnpja.capital, -1).desc(),
+                                    EmpresaCnpja.razao_social)).scalars().all()
     return tela(request, "empresas_novas_busca.html", {
         "busca": busca, "empresas": empresas,
         "campanha": db.get(Campanha, busca.campanha_id) if busca.campanha_id else None,
@@ -204,9 +206,9 @@ async def buscar_agora(request: Request, usuario: Usuario = Depends(exige("campa
                   f"{r['encontradas']} encontradas (pediu {quantidade})", request)
     db.commit()
     if r["campanha_id"]:
-        avisar(request, f"Você pediu {quantidade} empresas: {r['encontradas']} encontradas ({r['fora']} ficaram de "
-                        "fora). A campanha está sendo montada com todas as que podem entrar e vai pedir aprovação "
-                        "(leva alguns minutos).")
+        avisar(request, f"Você pediu {quantidade} empresas: {r['encontradas']} encontradas, as de maior capital social "
+                        f"primeiro ({r['fora']} ficaram de fora). A campanha está sendo montada com todas as que podem "
+                        "entrar e vai pedir aprovação (leva alguns minutos).")
     else:
         avisar(request, f"{r['encontradas']} empresas encontradas, nenhuma nova para contatar nesse período.")
     return voltar(f"/empresas-novas/busca/{r['busca_id']}")

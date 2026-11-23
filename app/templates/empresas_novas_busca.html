@@ -12,6 +12,8 @@
 <div class="cartao">
   <p><b>{{ busca.encontradas }}</b> empresas encontradas · <b>{{ busca.encontradas - busca.fora }}</b> podem entrar na campanha ·
     <b>{{ busca.fora }}</b> ficaram de fora · ≈ {{ busca.creditos }} crédito(s) da CNPJá.</p>
+  <p class="pequeno suave">Lista do maior capital social para o menor: a campanha começa pelas de maior capital (entre
+    as que têm celular ou e-mail).</p>
   {% if campanha %}<p>Campanha: <a href="/campanhas/{{ campanha.id }}"><b>{{ campanha.nome }}</b></a> — {{ campanha.etapa or campanha.status }}</p>
   {% elif busca.encontradas - busca.fora > 0 and pode('campanhas.configurar') %}
   <form method="post" action="/empresas-novas/busca/{{ busca.id }}/campanha" data-confirmar="Montar a campanha de venda do e-CNPJ com as {{ busca.encontradas - busca.fora }} empresas que podem entrar? Ela só começa depois da aprovação. Não gasta crédito.">
@@ -21,13 +23,14 @@
 
 <div class="cartao">
   <div class="tabela-rolagem"><table>
-    <tr><th>Razão social</th><th>CNPJ</th><th>Cidade</th><th>Aberta em</th><th>Telefone fixo</th><th>Celular</th><th>E-mails</th><th>Atividade</th><th>Situação</th></tr>
+    <tr><th>Razão social</th><th>CNPJ</th><th>Capital social</th><th>Cidade</th><th>Aberta em</th><th>Telefone fixo</th><th>Celular</th><th>E-mails</th><th>Atividade</th><th>Situação</th></tr>
     {% for e in empresas %}
     <tr {% if e.motivo_fora %}class="suave"{% endif %}>
       <td><b>{{ e.razao_social or e.nome_fantasia }}</b>{% if e.nome_fantasia and e.razao_social %}<div class="pequeno suave">{{ e.nome_fantasia }}</div>{% endif %}
         {% if e.motivo_fora %}<div class="pequeno"><span class="selo selo-alerta">fora da campanha</span> {{ e.motivo_fora }}</div>{% endif %}
         {% if e.lead_id %}<div class="pequeno"><a href="/leads/{{ e.lead_id }}">ver lead</a></div>{% endif %}</td>
       <td style="white-space:nowrap">{{ e.cnpj|cnpj if e.cnpj|length == 14 else e.cnpj }}</td>
+      <td class="num" style="white-space:nowrap">{{ e.capital|moeda if e.capital is not none else '—' }}</td>
       <td>{{ e.cidade }}/{{ e.uf }}</td>
       <td>{{ e.aberta_em.strftime('%d/%m/%Y') if e.aberta_em }}</td>
       <td style="white-space:nowrap">{% for t in e.telefones_fixos.split(',') if t %}{{ t|telefone }}<br>{% else %}—{% endfor %}</td>
@@ -35,7 +38,7 @@
       <td class="pequeno">{% for m in e.emails.split(',') if m %}{{ m }}<br>{% else %}—{% endfor %}</td>
       <td class="pequeno">{{ e.cnae[:4] }}-{{ e.cnae[4:5] }}/{{ e.cnae[5:] }} {{ e.cnae_texto }}</td>
       <td>{{ e.situacao }}</td></tr>
-    {% else %}<tr><td colspan="9" class="vazio">A CNPJá não devolveu nenhuma empresa com esses filtros.</td></tr>{% endfor %}
+    {% else %}<tr><td colspan="10" class="vazio">A CNPJá não devolveu nenhuma empresa com esses filtros.</td></tr>{% endfor %}
   </table></div>
 </div>
 {% endblock %}

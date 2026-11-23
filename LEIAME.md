@@ -432,7 +432,8 @@ leads: as respostas vão para **Oportunidades** e o time conversa.
   dia está desligado desde 17/11/2026). Com 50 ou 100 empresas, leva algumas horas ou dias. O quadro **Vagas de
   WhatsApp no número de quem envia**, embaixo do Buscar agora, mostra quantas vagas livres há hoje e nos próximos dias;
   ao aprovar, o que não cabe vai para o próximo dia com vaga, sem ficar atrasado.
-- **Custo:** cada 10 empresas encontradas gastam 1 crédito. Em PE abrem cerca de 380 empresas por dia
+- **Custo:** cada 10 empresas encontradas gastam 1 crédito (a busca por faixas de capital pode gastar alguns a
+  mais). Em PE abrem cerca de 380 empresas por dia
   (≈ 1.100 créditos por mês).
 - Os celulares que a Receita guarda sem o 9 ganham o 9 na frente (é um palpite: confira antes de enviar).
 - Empresas com o mesmo telefone/e-mail (do contador) **não** são juntadas: só o CNPJ conta como repetido.
@@ -449,10 +450,15 @@ leads: as respostas vão para **Oportunidades** e o time conversa.
 - **Buscar de novo não gasta à toa:** toda empresa que já veio entra numa lista de exclusão guardada na própria
   CNPJá. Buscando o mesmo dia de novo, a CNPJá só traz (e só cobra) as empresas que ainda não vieram.
 - **Atividade:** a busca pega empresas novas de **qualquer atividade** (toda empresa nova pode precisar do e-CNPJ).
+- **Maior capital social primeiro:** a busca (no **Buscar agora** e na automática) traz primeiro as empresas de
+  **maior capital social**: pede à CNPJá as de R$ 1 milhão ou mais, depois as de R$ 500 mil a R$ 1 milhão, e assim
+  por diante, até completar a quantidade. A campanha também começa por elas (entre as que têm celular ou e-mail), e o
+  capital aparece na lista das empresas encontradas e nas observações do lead. O botão **Testar** continua pegando
+  10 empresas quaisquer daquele dia (1 crédito).
 - **Lista de exclusão:** com a opção marcada, quem já está em alguma **lista importada** (Configurações >
   Integrações > Listas) fica de fora. Também ficam de fora: repetidas, leads já em atendimento e quem pediu para sair.
 - **Ver as empresas encontradas:** no quadro **"Empresas encontradas na CNPJá"**, clique na busca. A lista mostra
-  razão social, CNPJ, cidade, data de abertura, **telefone fixo**, **celular**, **e-mails**, atividade e quem ficou
+  razão social, CNPJ, **capital social** (do maior para o menor), cidade, data de abertura, **telefone fixo**, **celular**, **e-mails**, atividade e quem ficou
   de fora (e por quê), com o link da campanha.
 - **Testar a API:** o botão **Testar (10 empresas · 1 crédito)** busca até 10 empresas abertas **num dia** e só
   mostra a lista. Cada teste olha um dia diferente (ontem, anteontem...), para não vir sempre a mesma lista. Se estiver certa, clique em **Montar a campanha com estas empresas** (não gasta crédito).

@@ -2,7 +2,8 @@
 
 Todo dia (a partir do horário configurado), o sistema:
 1. pergunta à API da CNPJá (paga, chave CNPJA_API_KEY) quais empresas ATIVAS foram abertas desde a última busca
-   nos estados escolhidos (filtro por data de abertura: founded.gte / founded.lte);
+   nos estados escolhidos (filtro por data de abertura: founded.gte / founded.lte), as de maior capital social
+   primeiro (faixas_de_capital; pedido da Maria em 23/11/2026);
 2. cadastra essas empresas como leads (origem "Empresas novas (CNPJá)"), sem duplicar quem já existe;
 3. monta a campanha do dia ("Empresas novas 05/11 – PE"), com 3 toques de venda (D1, D3, D7), e deixa
    esperando APROVAÇÃO, como as outras campanhas.
@@ -69,6 +70,11 @@ LIMITE_TESTE = 10  # consulta de teste: 10 empresas = 1 crédito
 # todas as que vierem e puderem entrar (nada pago fica sem uso). Cada 10 empresas = 1 crédito.
 QUANTIDADES_BUSCA = (10, 20, 30, 40, 50, 100)
 ATRASO_DIAS = 2    # a busca diária pega as empresas abertas até 2 dias atrás (a Receita publica com atraso)
+# Capital social (pedido da Maria em 23/11/2026: "sempre dar preferência às empresas que tenham o maior capital
+# social"). A CNPJá não ordena a pesquisa, mas filtra pelo capital (company.equity.gte/lte): a busca pede primeiro as
+# empresas da faixa mais alta e desce de faixa até completar a quantidade; a lista e a campanha ficam do maior capital
+# para o menor. Cada pedido paga só o que devolve (1 crédito a cada 10 empresas).
+FAIXAS_DE_CAPITAL = (1_000_000, 500_000, 200_000, 100_000, 50_000, 20_000, 10_000, 5_000, 1_000, 0)
 
 MENSAGENS_PADRAO = {
     "venda_boas_vindas": {
@@ -166,38 +172,69 @@ def saldo() -> dict:
     return _pedir("/credit")
 
 
-def buscar_abertas(desde: date, ate: date, ufs: list[str], limite: int | None = None,
-                   lista_exclusao: str = "") -> list[dict]:
+def faixas_de_capital() -> list[dict]:
+    """Os filtros de capital social da busca (FAIXAS_DE_CAPITAL), da faixa mais alta para a mais baixa, sem
+    sobreposição: R$ 1 milhão ou mais, de R$ 500 mil a R$ 999.999,99 e assim por diante; a última vai até R$ 999,99
+    (com as de capital zero)."""
+    faixas, teto = [], None
+    for piso in FAIXAS_DE_CAPITAL:
+        faixa = {"company.equity.gte": piso} if piso else {}
+        if teto is not None:
+            faixa["company.equity.lte"] = round(teto - 0.01, 2)
+        faixas.append(faixa)
+        teto = piso
+    return faixas
+
+
+def buscar_abertas(desde: date, ate: date, ufs: list[str], limite: int | None = None, lista_exclusao: str = "",
+                   por_capital: bool = False, custo: dict | None = None) -> list[dict]:
     """Estabelecimentos ATIVOS abertos entre as datas nos estados, de QUALQUER atividade (a venda do e-CNPJ serve
     para toda empresa nova). Custa 1 crédito a cada 10 empresas. limite: no máximo essa quantidade (teste: 10).
     lista_exclusao: código da lista de CNPJs na CNPJá (taxId.nin) com quem já veio antes: a CNPJá nem devolve (nem
-    cobra) essas empresas de novo."""
-    params = {"founded.gte": desde.isoformat(), "founded.lte": ate.isoformat(),
-              "address.state.in": ",".join(ufs), "status.id.in": "2",
-              "limit": min(POR_PAGINA, limite) if limite else POR_PAGINA}
+    cobra) essas empresas de novo. por_capital (com limite): as de maior capital social primeiro, faixa por faixa
+    (faixas_de_capital), até completar o limite. custo: recebe "pedidos" e "creditos" (1 a cada 10 empresas de cada
+    pedido)."""
+    filtros = {"founded.gte": desde.isoformat(), "founded.lte": ate.isoformat(),
+               "address.state.in": ",".join(ufs), "status.id.in": "2"}
     if lista_exclusao:
-        params["taxId.nin"] = lista_exclusao
-    registros = []
-    for _ in range(MAXIMO_PAGINAS):
-        try:
-            pagina = _pedir("/office", params)
-        except ErroCnpja as erro:
-            if "taxId.nin" in params and ("erro 400" in str(erro) or "erro 404" in str(erro)):
-                log.warning("Lista de exclusão da CNPJá recusada (%s): busca sem ela", erro)
-                params.pop("taxId.nin")  # lista apagada na CNPJá: busca sem ela (a exclusão daqui continua valendo)
-                _esquecer_lista_exclusao()
-                continue
-            if registros:
-                # as páginas anteriores já foram pagas: fica com elas (e elas são guardadas) em vez de perder tudo
-                # e pagar de novo na próxima tentativa
-                log.warning("CNPJá falhou no meio da busca (%s): seguindo com %s empresas", erro, len(registros))
-                break
-            raise
-        registros += pagina.get("records") or []
-        proximo = pagina.get("next")
-        if not proximo or (limite and len(registros) >= limite):
+        filtros["taxId.nin"] = lista_exclusao
+    faixas = faixas_de_capital() if por_capital and limite else [{}]
+    registros: list[dict] = []
+    for faixa in faixas:
+        if limite and len(registros) >= limite:
             break
-        params = {"token": proximo}
+        faltam = limite - len(registros) if limite else 0
+        params = {**filtros, **faixa, "limit": min(POR_PAGINA, faltam) if faltam else POR_PAGINA}
+        for _ in range(MAXIMO_PAGINAS):
+            try:
+                pagina = _pedir("/office", params)
+            except ErroCnpja as erro:
+                if faixa and not registros and "erro 400" in str(erro):
+                    # a CNPJá recusou a pesquisa com o filtro de capital: busca do jeito de antes, sem as faixas (a
+                    # lista e a campanha continuam do maior capital para o menor, com o que vier)
+                    log.warning("CNPJá recusou a busca por faixas de capital social (%s): busca sem as faixas", erro)
+                    return buscar_abertas(desde, ate, ufs, limite, filtros.get("taxId.nin", ""), custo=custo)
+                if "taxId.nin" in params and ("erro 400" in str(erro) or "erro 404" in str(erro)):
+                    log.warning("Lista de exclusão da CNPJá recusada (%s): busca sem ela", erro)
+                    params.pop("taxId.nin")  # lista apagada na CNPJá: busca sem ela (a exclusão daqui continua valendo)
+                    filtros.pop("taxId.nin", None)  # nem nas faixas seguintes
+                    _esquecer_lista_exclusao()
+                    continue
+                if registros:
+                    # o que veio antes já foi pago: fica com isso (e é guardado) em vez de perder tudo e pagar de novo
+                    # na próxima tentativa
+                    log.warning("CNPJá falhou no meio da busca (%s): seguindo com %s empresas", erro, len(registros))
+                    return registros[:limite] if limite else registros
+                raise
+            recebidos = pagina.get("records") or []
+            if custo is not None:
+                custo["pedidos"] = custo.get("pedidos", 0) + 1
+                custo["creditos"] = custo.get("creditos", 0) + -(-len(recebidos) // 10)
+            registros += recebidos
+            proximo = pagina.get("next")
+            if not proximo or (limite and len(registros) >= limite):
+                break
+            params = {"token": proximo}
     return registros[:limite] if limite else registros
 
 
@@ -262,7 +299,7 @@ def reaproveitaveis(db, desde: date, ate: date, ufs: list[str]) -> list[dict]:
         vistas.add(e.cnpj)
         linhas.append({c: getattr(e, c) for c in (
             "cnpj", "razao_social", "nome_fantasia", "cnae", "cnae_texto", "uf", "cidade", "endereco", "aberta_em",
-            "situacao", "porte", "natureza", "natureza_id", "telefones_fixos", "celulares", "emails")})
+            "situacao", "porte", "natureza", "natureza_id", "capital", "telefones_fixos", "celulares", "emails")})
     return linhas
 
 
@@ -281,6 +318,14 @@ def telefones(registro: dict) -> tuple[list[str], list[str]]:
         if valor not in alvo:
             alvo.append(valor)
     return fixos, celulares
+
+
+def _capital(valor) -> float | None:
+    """O capital social que a CNPJá informa (company.equity, em reais). None: não veio."""
+    try:
+        return round(float(valor), 2) if valor not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
 
 
 def dados_da_empresa(registro: dict) -> dict:
@@ -309,7 +354,8 @@ def dados_da_empresa(registro: dict) -> dict:
         "endereco": f"{rua} – {endereco.get('district', '')} – CEP {endereco.get('zip', '')}".strip(" –")[:250],
         "aberta_em": aberta, "situacao": ((registro.get("status") or {}).get("text") or "Ativa")[:40],
         "porte": ((empresa.get("size") or {}).get("text") or "")[:60], "natureza": (natureza.get("text") or "")[:120],
-        "natureza_id": natureza.get("id"), "telefones_fixos": ",".join(fixos)[:120],
+        "natureza_id": natureza.get("id"), "capital": _capital(empresa.get("equity")),
+        "telefones_fixos": ",".join(fixos)[:120],
         "celulares": ",".join(celulares)[:120], "emails": ",".join(emails),
     }
 
@@ -332,6 +378,7 @@ def para_lead(e) -> dict:
     celulares = [t for t in (e.celulares or "").split(",") if t]
     emails = [m for m in (e.emails or "").split(",") if m]
     obs = [f"Aberta em {e.aberta_em:%d/%m/%Y}." if e.aberta_em else "",
+           f"Capital social: {util.moeda(e.capital)}." if e.capital else "",
            f"Atividade: {e.cnae_texto}." if e.cnae_texto else "", f"Natureza: {e.natureza}." if e.natureza else "",
            f"Outros telefones: {', '.join(util.formatar_telefone(t) for t in (fixos + celulares)[1:])}."
            if len(fixos + celulares) > 1 else "",
@@ -341,6 +388,7 @@ def para_lead(e) -> dict:
         "telefone": (fixos or celulares or [""])[0], "whatsapp": celulares[0] if celulares else "",
         "email": emails[0] if emails else "", "cidade": e.cidade, "estado": e.uf, "endereco": e.endereco,
         "porte": e.porte, "tipo_empresa": (e.natureza or "")[:80], "observacoes": " ".join(o for o in obs if o),
+        "capital": e.capital or 0,  # só para a ordem da campanha (criar_campanha); o lead não tem esse campo
     }
 
 
@@ -386,7 +434,8 @@ def textos_do_lead(db, lead: Lead, usuario: Usuario | None) -> dict:
 
 
 def registrar_busca(db, registros: list[dict], desde: date, ate: date, ufs: list[str], usuario: Usuario | None,
-                    teste: bool = False, automatica: bool = False, reaproveitadas: list[dict] | None = None):
+                    teste: bool = False, automatica: bool = False, reaproveitadas: list[dict] | None = None,
+                    creditos: int | None = None):
     """Guarda a lista das empresas que a API devolveu (para o usuário conferir) e marca quem fica de fora da campanha:
     repetida, empresário individual/MEI (se configurado), já está numa lista importada (lista de exclusão) ou já é
     lead em atendimento/que pediu para sair."""
@@ -395,11 +444,14 @@ def registrar_busca(db, registros: list[dict], desde: date, ate: date, ufs: list
 
     busca = BuscaCnpja(usuario_id=usuario.id if usuario else None, desde=desde, ate=ate, ufs=",".join(ufs)[:120],
                        teste=teste, automatica=automatica,
-                       encontradas=len(registros), creditos=-(-len(registros) // 10))
+                       encontradas=len(registros),
+                       creditos=creditos if creditos is not None else -(-len(registros) // 10))
     db.add(busca)
     db.flush()
     # reaproveitadas: já pagas numa busca que não virou campanha (ver reaproveitaveis): entram sem gastar crédito
     linhas = [dados_da_empresa(r) for r in registros] + list(reaproveitadas or [])
+    # do maior capital social para o menor (pedido da Maria em 23/11/2026): a ordem da lista e da campanha
+    linhas.sort(key=lambda linha: -(linha.get("capital") or 0))
     busca.encontradas = len(linhas)
     cnpjs = [l["cnpj"] for l in linhas if l["cnpj"]]
     em_listas: dict[str, str] = {}
@@ -511,8 +563,11 @@ def criar_campanha(db, dados: list[dict], usuario: Usuario, rotulo: str,
     dados = [d for d in dados if d["empresa"] and d["cnpj"]]
     if not dados:
         return None
-    # quem tem e-mail e celular primeiro: são os que a campanha consegue alcançar
-    dados.sort(key=lambda d: (not d["whatsapp"], not d["email"]))
+    # quem a campanha consegue alcançar (celular ou e-mail) primeiro e, entre essas, o maior capital social (pedido da
+    # Maria em 23/11/2026: "sempre dar preferência às empresas que tenham o maior capital social"); no mesmo capital,
+    # quem tem celular e e-mail
+    dados.sort(key=lambda d: (not (d["whatsapp"] or d["email"]), -(d.get("capital") or 0), not d["whatsapp"],
+                              not d["email"]))
     canais = cfg(db, "novas_canais")
     camp = Campanha(nome=f"Empresas novas {rotulo}"[:160], tipo=TIPO_CAMPANHA, objetivo="Vender certificado digital",
                     estado=",".join(_ufs(db))[:2], cidade="",
@@ -610,9 +665,13 @@ def buscar_e_criar(db, usuario: Usuario, desde: date, ate: date, automatica: boo
     # pagas que ainda não entraram em campanha (ex.: de um teste) entram pelo que está guardado aqui (até o limite; as
     # que passarem ficam para a próxima busca).
     reaproveitadas = reaproveitaveis(db, desde, ate, ufs)[:limite]
+    # as de maior capital social primeiro: a CNPJá devolve faixa por faixa, da mais alta para a mais baixa
+    custo = {"pedidos": 0, "creditos": 0}
     registros = buscar_abertas(desde, ate, ufs, limite=max(1, limite - len(reaproveitadas)),
-                               lista_exclusao=lista_exclusao(db)) if len(reaproveitadas) < limite else []
-    busca = registrar_busca(db, registros, desde, ate, ufs, usuario, automatica=automatica, reaproveitadas=reaproveitadas)
+                               lista_exclusao=lista_exclusao(db), por_capital=True, custo=custo) \
+        if len(reaproveitadas) < limite else []
+    busca = registrar_busca(db, registros, desde, ate, ufs, usuario, automatica=automatica, reaproveitadas=reaproveitadas,
+                            creditos=custo["creditos"])
     db.commit()
     atualizar_lista_exclusao(db)
     db.commit()
