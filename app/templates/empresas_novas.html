@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_vagas_whatsapp.html" import quadro_vagas %}
 {% block titulo %}Empresas novas{% endblock %}
 {% block conteudo %}
 {% set SELOS = {'aguardando_aprovacao': ('selo-alerta', 'Aguardando aprovação'), 'ativa': ('selo-ok', 'Em andamento'),
@@ -45,7 +46,8 @@
     <form class="inline" method="post" action="/empresas-novas/saldo"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">Ver saldo</button></form>{% endif %}
   </div>
   <p class="pequeno suave" style="margin-bottom:0">Escolha quantas empresas buscar: cada 10 gastam 1 crédito da CNPJá (100 empresas = 10 créditos) e a campanha leva todas as que podem entrar. Em Pernambuco abrem cerca de 380 empresas por dia (≈ 1.100 créditos por mês).{% if limite_frios %}
-    O WhatsApp sai no ritmo seguro do número (no máximo {{ limite_frios }} contatos frios por dia, contando os lembretes): com 50 ou 100 empresas leva vários dias, e o toque atrasado mais de 2 dias espera um clique em Minha fila.{% endif %}</p>
+    O WhatsApp sai no ritmo seguro do número (no máximo {{ limite_frios }} contatos frios por dia, contando os lembretes): com 50 ou 100 empresas leva vários dias.{% endif %}</p>
+  {% if vagas %}{{ quadro_vagas(vagas, "Vagas de WhatsApp no número de quem envia") }}{% endif %}
 </div>
 
 <form method="post" action="/empresas-novas/configurar" id="configurar">

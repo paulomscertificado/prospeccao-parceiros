@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from .. import agenda_horarios, autorizacao, campanhas, config, hoje as fila_hoje, ia, metricas, sdr, util, visual
+from .. import agenda_horarios, autorizacao, campanhas, config, hoje as fila_hoje, ia, metricas, sdr, util, vagas, visual
 from ..banco import agora, ler_config, obter_db
 from ..leads_servico import historico, limpar_campos
 from ..modelos import (Cadencia, Campanha, Categoria, Conhecimento, Lead, Mensagem, Notificacao, Oportunidade, Tarefa,
@@ -591,6 +591,7 @@ def nova_campanha(request: Request, pedido: str = "", base: str = "", usuario: U
         "visuais": visual.disponiveis(db, "sdr"),
         "email_html_liberado": visual.html_da_marca_ligado(db), "email_html_atual": True,
         "whatsapp_sozinho_padrao": ler_config(db, "whatsapp_sozinho_padrao") != "0",
+        "vagas": vagas.para_tela(db, usuario),  # as vagas de WhatsApp do número de quem cria (23/11/2026)
     })
 
 
@@ -745,7 +746,23 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(exige("c
         "caminho": area[0] if area else request.url.path,
         "voltar_para": area[0] if area else "/campanhas",
         "nome_da_area": area[1] if area else "IA SDR",
+        # aprovação: as vagas de WhatsApp do número e quanto a campanha pede (23/11/2026)
+        "vagas": vagas.da_campanha(db, camp) if camp.status == "aguardando_aprovacao" else None,
     })
+
+
+def _texto_das_vagas(nas_vagas: dict) -> str:
+    """O que a aprovação fez com as vagas do número (campanhas.aprovar -> vagas.planejar), para o aviso da tela."""
+    if not nas_vagas.get("de"):
+        return ""
+    de, ate = nas_vagas["de"], nas_vagas["ate"]
+    periodo = f"no dia {de:%d/%m}" if de == ate else f"de {de:%d/%m} a {ate:%d/%m}"
+    texto = f" Primeiro WhatsApp de cada empresa {periodo}, dentro das vagas do número"
+    movidos = nas_vagas.get("movidos") or 0
+    if movidos:
+        texto += (f" ({movidos} {'WhatsApp foi' if movidos == 1 else 'WhatsApps foram'} para o próximo dia com vaga, "
+                  "para não acumular com as outras campanhas)")
+    return texto + "."
 
 
 @rotas.post("/campanhas/{cid:int}/{acao}", dependencies=[Depends(verificar_csrf)])
@@ -798,16 +815,18 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
                             "falham na entrega (caixa que não existe) saem sozinhos quando a devolução chega.")
         return voltar(f"/campanhas/{cid}")
     if acao == "aprovar" and camp.status == "aguardando_aprovacao":
-        n = campanhas.aprovar(db, camp, usuario)
+        nas_vagas: dict = {}
+        n = campanhas.aprovar(db, camp, usuario, nas_vagas)
         registrar_log(db, usuario, "aprovou_campanha", "campanha", cid, f"{n} tarefas", request)
         if camp.whatsapp_sozinho:
             avisar(request, f"Campanha aprovada: {n} contatos programados. Os e-mails e os WhatsApps entram na fila e "
-                            "saem sozinhos, cada um no seu horário (WhatsApp: um de cada vez, com "
-                            f"{campanhas.texto_do_intervalo(db)} entre um e outro e os limites do número).")
+                            "saem sozinhos, cada um no seu horário (WhatsApp: um de cada vez em cada número, com "
+                            f"{campanhas.texto_do_intervalo(db)} entre um e outro e os limites do número)."
+                            + _texto_das_vagas(nas_vagas))
         else:
             avisar(request, f"Campanha aprovada: {n} contatos programados. Os WhatsApps de cada dia aparecem aqui na "
                             "campanha para enviar com um clique (para quem já conversou com a empresa, saem sozinhos); "
-                            "e-mails saem pela fila.")
+                            "e-mails saem pela fila." + _texto_das_vagas(nas_vagas))
     elif acao == "cancelar" and camp.status in ("aguardando_aprovacao", "ativa", "gerando", "erro"):
         n = campanhas.cancelar(db, camp, usuario)
         registrar_log(db, usuario, "cancelou_campanha", "campanha", cid, f"{n} tarefas", request)
@@ -961,8 +980,8 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
                 avisar(request, "WhatsApp automático desligado: quem nunca conversou com a empresa volta a esperar o seu clique.")
             elif camp.status == "ativa" and camp.aprovado_em:
                 avisar(request, "WhatsApp automático ligado: as mensagens desta campanha saem sozinhas, uma de cada "
-                                f"vez, com {campanhas.texto_do_intervalo(db)} entre uma e outra, no horário de envio e "
-                                "com os limites do número.")
+                                f"vez em cada número, com {campanhas.texto_do_intervalo(db)} entre uma e outra, no "
+                                "horário de envio e com os limites do número.")
             else:
                 avisar(request, "WhatsApp automático ligado: começa quando a campanha for aprovada.")
         db.commit()

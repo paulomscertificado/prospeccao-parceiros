@@ -60,8 +60,8 @@ def _previsao(t: Tarefa, recentes, recentes_email, espera_whatsapp, automaticas,
               previsto_zap) -> tuple[datetime | None, str]:
     """(horário previsto de saída, por que mudou) do toque automático: o marcado (nunca antes de agora), ou quando
     completam as 20 h do último envio do canal para a empresa, ou depois do WhatsApp da empresa (e-mail das Empresas
-    novas), levado para o próximo horário de envio (campanhas.JanelaDeEnvio). A fila manda um por vez, a cada 3 ou 4
-    minutos: com muitos na mesma hora, alguns saem uns minutos depois."""
+    novas), levado para o próximo horário de envio (campanhas.JanelaDeEnvio). A fila manda um por vez em cada número, a
+    cada 8 a 12 minutos: com muitos na mesma hora, alguns saem uns minutos depois."""
     if janela is None:
         return None, ""
     base, mudou = max(_marcado(t), agora()), ""

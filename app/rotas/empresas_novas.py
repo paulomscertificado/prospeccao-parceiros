@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .. import autorizacao, empresas_novas, util
+from .. import autorizacao, empresas_novas, util, vagas
 from ..banco import gravar_config, ler_config_int, obter_db
 from ..modelos import Tarefa, Usuario
 from ..seguranca import exige, registrar_log, verificar_csrf
@@ -38,6 +38,7 @@ def tela_empresas_novas(request: Request, usuario: Usuario = Depends(exige("camp
         "limite_frios": ler_config_int(db, "limite_frios_whatsapp", 0),
         "visuais": visual.disponiveis(db, "empresas_novas"),
         "email_html_liberado": visual.html_da_marca_ligado(db),
+        "vagas": vagas.para_tela(db, empresas_novas.dono(db)),  # vagas de WhatsApp do número de quem envia (23/11)
     })
 
 

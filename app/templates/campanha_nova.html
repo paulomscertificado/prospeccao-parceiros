@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_vagas_whatsapp.html" import quadro_vagas %}
 {% block titulo %}Nova campanha{% endblock %}
 {% block conteudo %}
 {% set e = entendido or {} %}
@@ -123,6 +124,7 @@
                onfocus="document.getElementById('q-outro').checked = true" aria-label="Quantidade personalizada"></label>
     </div>
     <p class="ajuda">A IA pesquisa o dobro e fica com as melhores.</p>
+    {% if vagas %}{{ quadro_vagas(vagas, "Vagas de WhatsApp no seu número") }}{% endif %}
   </div>
 
   {# ------------------------------------------------ 4. Como abordar #}

@@ -1,0 +1,32 @@
+{# Vagas de WhatsApp do número (app/vagas.py; pedido da Maria em 23/11/2026: campanhas não podem acumular no número).
+   v = vagas.para_tela(...) ou vagas.da_campanha(...). Usado na Nova campanha, no Buscar agora das Empresas novas e
+   na aprovação da campanha. #}
+{% macro quadro_vagas(v, titulo="Vagas de WhatsApp no número", explicar=True) %}
+<style>
+  .vagas-zap { border: 1px solid var(--borda); border-radius: 12px; padding: 12px 14px; margin: 12px 0 4px; background: #fbfcfe; }
+  .vagas-zap .vagas-topo { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+  .vagas-zap .vagas-dias { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .vagas-zap .vaga-dia { flex: 1 1 92px; max-width: 140px; border: 1px solid var(--borda); border-radius: 10px; padding: 6px 10px; background: #fff; }
+  .vagas-zap .vaga-dia .vaga-titulo { display: block; font-size: .78rem; color: #6b7686; text-transform: capitalize; }
+  .vagas-zap .vaga-dia b { font-size: 1.25rem; }
+  .vagas-zap .vaga-dia.apertado { border-color: #e7c27a; background: #fffaf0; }
+  .vagas-zap .vaga-dia.cheio { border-color: #e9a3a3; background: #fff5f5; }
+  .vagas-zap .vaga-dia.cheio b { color: #b42318; }
+  .vagas-zap .vagas-nota { margin: 8px 0 0; }
+</style>
+<div class="vagas-zap" id="vagas-whatsapp">
+  <div class="vagas-topo"><b>{{ titulo }}{% if v.nome %}: {{ v.nome }}{% endif %}</b>
+    <span class="pequeno suave">cabem {{ v.por_hora }} por hora, {{ v.por_dia }} num dia inteiro (um a cada {{ v.intervalo }})</span></div>
+  {% if not v.nome %}<p class="pequeno vagas-nota"><b>Ainda sem número de WhatsApp conectado.</b> Conecte em WhatsApp &gt; Meu WhatsApp (ou peça um número compartilhado): sem número, o WhatsApp espera.</p>{% endif %}
+  <div class="vagas-dias">{% for d in v.dias %}
+    <div class="vaga-dia {{ 'cheio' if d.livres == 0 else ('apertado' if d.livres * 4 < d.cabem else '') }}" title="{{ d.marcados }} já marcados de {{ d.cabem }} que cabem">
+      <span class="vaga-titulo">{{ d.titulo }}</span><b>{{ d.livres }}</b> <span class="pequeno suave">livres de {{ d.cabem }}</span></div>{% endfor %}
+  </div>
+  {% if v.empresas is defined %}
+  <p class="pequeno vagas-nota">Esta campanha: <b>{{ v.empresas }}</b> {{ 'empresa' if v.empresas == 1 else 'empresas' }} com WhatsApp ({{ v.whatsapps }} WhatsApps somando os toques).
+    {% if v.empresas and v.primeiros %}Com as vagas livres, os primeiros toques saem {% if v.primeiros.de.dia == v.primeiros.ate.dia %}<b>{{ v.primeiros.de.titulo }}</b>{% else %}entre <b>{{ v.primeiros.de.titulo }}</b> e <b>{{ v.primeiros.ate.titulo }}</b>{% endif %}.
+    {% elif v.empresas %}Os primeiros toques passam das vagas das próximas semanas: o que não couber vai para os dias seguintes com vaga.{% endif %}</p>
+  {% endif %}
+  {% if explicar %}<p class="pequeno suave vagas-nota">Ao aprovar, cada WhatsApp entra numa vaga do número: o que não cabe no dia marcado vai para o próximo dia com vaga, sem acumular com as outras campanhas e sem ficar atrasado. Cada número tem a sua vez na fila: números diferentes mandam ao mesmo tempo.</p>{% endif %}
+</div>
+{% endmacro %}

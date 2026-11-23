@@ -175,9 +175,11 @@ preço nem comissão e não fecha parceria.
    escreve uma mensagem **diferente para cada empresa**, nos toques da cadência escolhida (padrão: dia 1, 3, 7 e 12).
 3. Você confere e clica em **APROVAR CAMPANHA** (ou edita/cancela). Nada sai antes disso.
 4. **Aprovou, entrou na fila.** Os e-mails e os WhatsApps saem sozinhos, cada um no seu horário, também para quem
-   nunca conversou com a MS (desde 12/11/2026). O WhatsApp sai pelo celular conectado, uma mensagem a cada 8 a 12 minutos (Configurações > Geral; desde 17/11/2026),
+   nunca conversou com a MS (desde 12/11/2026). O WhatsApp sai pelo celular conectado, uma mensagem a cada 8 a 12 minutos
+   em cada número (Configurações > Geral; desde 17/11/2026; números diferentes mandam ao mesmo tempo desde 23/11/2026),
    só no horário de envio, com o limite por hora (sem limite por dia e sem teto de contatos frios desde 17/11/2026) e
-   pausa com 3 pedidos de SAIR. Toque atrasado mais de 2 dias espera o clique, para não sair tudo de uma vez, e o toque seguinte
+   pausa com 3 pedidos de SAIR. Ao aprovar, cada WhatsApp entra numa **vaga do número** (veja abaixo) e o que fica de
+   um dia para o outro vai sozinho para a próxima vaga, sem acumular atrasados. O toque seguinte
    da mesma empresa espera o anterior sair (o "último contato" nunca chega antes da apresentação). A fila nunca manda
    dois WhatsApps, nem dois e-mails, para a mesma empresa em menos de 20 horas, mesmo com o intervalo mínimo em 0 nas
    Configurações (o e-mail desde 17/11/2026): o segundo fica para o dia seguinte. O envio manual segue as Configurações.
@@ -190,6 +192,23 @@ preço nem comissão e não fecha parceria.
    ligado".
    Toda empresa da campanha ganha a mensagem de WhatsApp. Se o campo **WhatsApp** da empresa estiver em branco, a
    mensagem fica pronta e **não sai**: cadastre o número na ficha da empresa e ela fica liberada.
+   **Vagas de WhatsApp de cada número (desde 23/11/2026):** cada número manda uns **6 WhatsApps por hora** (um a cada
+   8 a 12 minutos), no horário de envio da marca e fora do almoço: uns 64 num dia inteiro das 07:30 às 20:00. Várias
+   campanhas no mesmo número dividem essas vagas. Por isso:
+   - na **Nova campanha** (passo 3), no **Buscar agora** das Empresas novas e na **aprovação** aparece o quadro
+     **Vagas de WhatsApp no número**, com quantas vagas livres há hoje e nos próximos dias (vermelho = dia cheio) e,
+     na aprovação, até quando cabem os primeiros toques da campanha;
+   - ao **aprovar**, o WhatsApp fica no horário marcado se aquela hora ainda tem vaga no número; se não tem, vai para
+     a hora mais vazia do dia ou para o próximo dia com vaga, e os toques seguintes da empresa (e o e-mail do mesmo
+     toque) andam junto, mantendo o espaço da cadência. O aviso da aprovação diz de que dia a que dia saem os
+     primeiros WhatsApps;
+   - **de hora em hora**, o WhatsApp que ficou de um dia anterior (o número caiu, o computador ficou desligado) e o
+     que está numa hora já lotada do número vão para a próxima vaga. Quem já começou a conversa fica com a vaga; anda
+     o primeiro toque de quem ainda não recebeu nada. Ficam como estão a Renovação (tem prazo), os avisos pela API
+     oficial e as campanhas com o WhatsApp automático desligado (essas esperam o seu clique);
+   - na fila, **cada número tem a sua vez**: o intervalo de 8 a 12 minutos vale para o mesmo número, e números
+     diferentes mandam ao mesmo tempo. Quando a fila aperta, a conversa que já começou (o toque seguinte) sai antes do
+     primeiro toque de uma empresa nova.
    Empresa com WhatsApp **e** e-mail recebe os dois em cada toque (nas Empresas novas, só o WhatsApp).
 5. Quando alguém responde com interesse, a automação para e a resposta aparece em **Oportunidades** (🔥), com o
    resumo, para a equipe toda. Quem estiver livre responde o cliente, clica em **Marcar como atendido** e segue com a
@@ -217,14 +236,14 @@ na tela **Envios** e na **Agenda**. Quem não pode abrir aquela campanha vai par
   "Programado") e o botão certo: **Enviar** ou **Cadastrar WhatsApp**/**Cadastrar e-mail**, quando falta o contato.
   Ao lado de **Programado** e de **Fora do horário** aparece **quando o envio sai sozinho** (ex.: "sai amanhã às
   08:41"): o horário marcado, ou quando completam 20 horas do último WhatsApp (ou e-mail) para a empresa, sempre dentro
-  do horário de envio, em dia útil (a Renovação também respeita o horário e os feriados dela). A fila manda um por vez,
-  com alguns minutos entre um e outro: quando muitos ficam livres na mesma hora, alguns saem depois. Envio que espera o
+  do horário de envio, em dia útil (a Renovação também respeita o horário e os feriados dela). A fila manda um por vez
+  em cada número, com alguns minutos entre um e outro: quando muitos ficam livres na mesma hora, alguns saem depois. Envio que espera o
   seu clique não mostra horário.
   **Quantos saem por hora:** logo acima da lista, um quadro por dia (Hoje, Amanhã e os próximos) mostra, hora a hora,
   quantos WhatsApps e quantos e-mails vão sair, pelo horário previsto de cada envio, e o total do dia. Ele segue os
   filtros da tela (pessoa, canal, campanha, período). O que não tem hora para sair (espera o seu clique ou um ajuste,
-  como o WhatsApp em branco) aparece embaixo, separado. A fila manda um por vez, com pausas: numa hora cheia, parte sai
-  na hora seguinte.
+  como o WhatsApp em branco) aparece embaixo, separado. A fila manda um por vez em cada número, com pausas: numa hora
+  cheia, parte sai na hora seguinte (as campanhas aprovadas desde 23/11/2026 já entram nas vagas do número).
   Para achar um envio, use os filtros: **Quando** (todos, hoje e atrasados, atrasados, hoje, amanhã, próximos dias),
   **Situação**, a **campanha** e a **busca pelo nome da empresa**. Cada filtro mostra quantos envios há nele;
   **Limpar filtros** volta a mostrar tudo.
@@ -379,8 +398,9 @@ atraso; nenhum dia é buscado duas vezes e empresa que já entrou em campanha nu
 como leads (origem "Empresas novas (CNPJá)") e monta a campanha **"Empresas novas dd/mm – PE"**, que fica
 **aguardando aprovação**. Depois de aprovada, **tudo sai sozinho, sem clique**: o e-mail e o WhatsApp entram na fila
 e saem cada um no seu horário, um por vez, com as pausas e os limites do número (WhatsApp: 1 a cada 8 a 12 minutos,
-6 por hora por número, sem limite por dia desde 17/11/2026, só no horário de envio; quem pede SAIR não recebe mais). Toque atrasado mais
-de 2 dias não sai sozinho (espera um clique em **Minha fila**), para não sair tudo de uma vez. São 3 toques: dia 1 (boas-vindas + oferta do e-CNPJ), dia 3 (lembrete)
+6 por hora por número, sem limite por dia desde 17/11/2026, só no horário de envio; quem pede SAIR não recebe mais). Ao aprovar,
+cada WhatsApp entra numa vaga do número de quem envia, e o que fica de um dia para o outro vai sozinho para a próxima
+vaga (veja "Vagas de WhatsApp de cada número"). São 3 toques: dia 1 (boas-vindas + oferta do e-CNPJ), dia 3 (lembrete)
 e dia 7 (último contato). As mensagens podem ser editadas na própria tela. A IA não responde sozinha esses
 leads: as respostas vão para **Oportunidades** e o time conversa.
 
@@ -388,9 +408,10 @@ leads: as respostas vão para **Oportunidades** e o time conversa.
   50 ou 100; cada 10 gastam 1 crédito) e clique em **Buscar e montar campanha**. A campanha leva **todas** as
   empresas que vierem e puderem entrar: nada pago fica sem uso. O **Máximo de empresas por campanha diária**
   (passo 2) vale só para a busca automática, que pede à CNPJá o dobro desse número e usa esse número.
-- **Muitas empresas de uma vez:** o WhatsApp sai no ritmo do número (até 15 por hora; o teto de contatos frios por
-  dia está desligado desde 17/11/2026). Com 50 ou 100 empresas, leva algumas horas ou dias, e o toque atrasado mais de
-  2 dias espera um clique em **Minha fila**.
+- **Muitas empresas de uma vez:** o WhatsApp sai no ritmo do número (uns 6 por hora; o teto de contatos frios por
+  dia está desligado desde 17/11/2026). Com 50 ou 100 empresas, leva algumas horas ou dias. O quadro **Vagas de
+  WhatsApp no número de quem envia**, embaixo do Buscar agora, mostra quantas vagas livres há hoje e nos próximos dias;
+  ao aprovar, o que não cabe vai para o próximo dia com vaga, sem ficar atrasado.
 - **Custo:** cada 10 empresas encontradas gastam 1 crédito. Em PE abrem cerca de 380 empresas por dia
   (≈ 1.100 créditos por mês).
 - Os celulares que a Receita guarda sem o 9 ganham o 9 na frente (é um palpite: confira antes de enviar).
@@ -528,9 +549,10 @@ renovação novo antes, para entrarem os clientes de janeiro).
 
 Nas campanhas automáticas (depois da aprovação), os **e-mails** e as **mensagens de WhatsApp** que saem sozinhos
 saem **um de cada vez**, sorteando o tempo a cada envio (nunca todos no mesmo horário): **e-mail, 3 a 4 minutos**
-entre um e outro; **WhatsApp, 8 a 12 minutos** (desde 17/11/2026, quando o WhatsApp restringiu um número por "envio de
-spam" depois de 66 mensagens no dia; muda em **Configurações > Geral**). E-mail e WhatsApp têm cada um o seu
-intervalo. Os envios feitos por clique de uma pessoa não esperam a fila da Prospecção, mas o WhatsApp Leads também
+entre um e outro; **WhatsApp, 8 a 12 minutos em cada número** (desde 17/11/2026, quando o WhatsApp restringiu um número
+por "envio de spam" depois de 66 mensagens no dia; muda em **Configurações > Geral**). Desde 23/11/2026 o intervalo do
+WhatsApp é de cada número: dois números diferentes mandam ao mesmo tempo, e o mesmo número nunca manda dois em menos
+de 8 minutos. E-mail e WhatsApp têm cada um o seu intervalo. Os envios feitos por clique de uma pessoa não esperam a fila da Prospecção, mas o WhatsApp Leads também
 espera de 3 a 6 minutos entre uma mensagem e outra de cada número (Configurações do WhatsApp Leads).
 Com mais de uma marca, a vez **reveza**: o próximo envio é da marca que mandou há mais tempo, e uma marca que chegou ao
 limite dela espera sozinha, sem segurar as outras.

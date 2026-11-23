@@ -328,6 +328,48 @@ automático usa `campanhas.intervalo_automatico(db, "whatsapp")` = Configuraçõ
 15); no WhatsApp Leads `intervalo_min_seg`/`max_seg` = 180/360 (era 30/90), que espaça também os envios por clique.
 Sem teto diário de frios (a Maria escolheu só o intervalo). As telas mostram o intervalo da fila
 (`texto_do_intervalo`) ou "alguns minutos", nunca mais "um a cada 3 minutos".
+
+## Vagas de WhatsApp por número (23/11/2026)
+
+Pedido da Maria ("se eu fizer muitas campanhas, essas campanhas vão acumular a quantidade de disparos dentro de um
+único número ... que não fique gargalando, não fique acumulando e que eu não fique com as mensagens atrasadas aqui na
+minha fila"). Em 23/11 havia 128 WhatsApps marcados para o dia (Empresas novas 79 + parceiros 49) e a fila mandava uns
+75 por dia somando todos os números: as campanhas eram marcadas pelos dias da cadência sem olhar o que já estava
+marcado e, com mais de 2 dias de atraso, o toque parava esperando o clique.
+
+- **Vez de cada número** (`campanhas.processar_fila_whatsapp`): saiu a trava global `_vez_do_canal(db, "whatsapp")`.
+  Cada toque descobre o número por onde sai (`_numero_do_envio`: `conexoes.da_campanha` ou `para_enviar` do
+  responsável, como `sdr.enviar_whatsapp_conectado`; sem número = sem trava, o envio recusa e avisa) e só sai se o
+  número já cumpriu o intervalo (`_vez_do_numero`, config `proximo_envio_automatico:whatsapp:<número>`, sorteado por
+  `_anotar_envio_do_numero` com `intervalo_automatico`). Um envio por número por rodada; `maximo` limita a rodada. O
+  e-mail continua com `_vez_do_canal(db, "email")`.
+- **Prioridade:** no mesmo dia, depois da Renovação, o toque de quem já recebeu algum toque da campanha
+  (`campanhas._ja_comecou`, `EXISTS` de tarefa `feita`) sai antes do primeiro toque de outra empresa.
+- **`app/vagas.py`:** `por_hora` = min(3600 / média do intervalo, `limite_hora_whatsapp`) (6); `vagas_por_hora` = vagas
+  de cada hora no horário de envio da marca (fora do almoço 12:00-13:30, 20 min de folga no fim; janela da campanha
+  opcional); `ocupacao` = WhatsApps pendentes das campanhas ativas por (número, dia, hora), só de quem recebe
+  (`_recebe`: campo preenchido, sem SAIR/pausa/resposta/perdido) e sem a API oficial; o número de cada toque é o
+  fixado na campanha ou o do responsável (`Numeros`: o mesmo de `conexoes.para_enviar`, o conectado agora: quem
+  dispara pelo número compartilhado de outra pessoa divide as vagas dele; sem número conectado, o próprio ou o
+  primeiro compartilhado).
+- **`vagas.planejar(db, tarefas, desde, ordem, minimo, maximo)`:** por (campanha, lead), toque a toque (passo da
+  cadência ou, sem passo, o dia): o WhatsApp fica no horário marcado se a hora tem vaga (`_primeira_vaga(atual=)`);
+  senão vai para o primeiro dia com vaga, na hora mais vazia, com minutos espalhados (nunca redondos). Hoje: só o que
+  falta do dia, e o que já venceu hoje e não saiu também ocupa. Entre os toques da mesma empresa fica pelo menos o
+  espaço original (WhatsApp seguido de WhatsApp: no mínimo 1 dia). E-mail do mesmo toque: junto (mesmo horário) ou
+  `cadencias.depois_de` (umas 2 h depois); e-mail de outro dia anda os mesmos dias; toque só de e-mail anda o
+  necessário; e-mail de dia que já passou fica (a fila de e-mail solta os atrasados). Devolve `movidos`, `de`, `ate`.
+- **Aprovação** (`campanhas.aprovar(..., vagas_usadas=)`): depois de `_sem_horario_no_passado`, com as configurações
+  da AR da campanha (`usar_config_da_ar(camp.tenant_id)`, devolvidas no fim), menos Renovação (datas pelo vencimento)
+  e `envio_oficial`. A rota mostra "Primeiro WhatsApp de cada empresa de dd/mm a dd/mm..." (`rotas/sdr._texto_das_vagas`).
+- **De hora em hora** (`rotinas._rotina_hora` -> `vagas.replanejar`): toques de WhatsApp pendentes de dias anteriores
+  e os que estão numa hora já lotada do número (amanhã em diante), só de campanhas ativas que saem sozinhas
+  (`TIPOS_QUE_SAEM_SOZINHOS` ou `whatsapp_sozinho`), fora a Renovação e a API oficial, e só de quem recebe. Hoje não
+  mexe (a fila está mandando). Ordem: quem já começou a conversa fica com as vagas. `so_campanhas` limita (testes).
+- **Telas:** `templates/_vagas_whatsapp.html` (`quadro_vagas`) na Nova campanha (`vagas.para_tela(db, usuario)`), no
+  Buscar agora das Empresas novas (`para_tela(db, empresas_novas.dono(db))`) e na aprovação
+  (`vagas.da_campanha(db, camp)`: vagas do número da campanha + empresas/WhatsApps dos rascunhos e `quando_cabem`).
+- Testes: `testes/test_vagas.py`.
 Chave da CNPJá: Configurações > Integrações (`/configuracoes/cnpja`, `/configuracoes/cnpja/saldo`); saiu da tela
 Empresas novas, que virou um painel em 4 passos (estados por caixinha, `name="ufs"` repetido).
 
@@ -655,7 +697,8 @@ cliente rápido". Antes cada pessoa via só as respostas dos leads dela e tinha 
 - `campanhas.campanhas_que_saem_sozinhas` (tipos em `TIPOS_QUE_SAEM_SOZINHOS` = Empresas novas, ativas e aprovadas) e
   `toque_sai_sozinho` (até `DIAS_ATRASO_AUTOMATICO` = 2 dias de atraso; mais velho espera o clique, para não sair
   uma rajada). `processar_fila_whatsapp` inclui esses toques no filtro do banco e grava o resultado "Enviada sozinha
-  (campanha de Empresas novas aprovada)". Valem as mesmas travas da fila automática: `_vez_do_canal` (1 a cada 3 min),
+  (campanha de Empresas novas aprovada)". Valem as mesmas travas da fila automática: a vez de cada número (desde
+  23/11/2026; antes `_vez_do_canal`, 1 a cada 3 min para a plataforma toda),
   limite por hora (15), por dia e por número (40), horário de envio, controle de frequência e SAIR.
 - Minha fila e Envios (`fila._situacao`, parâmetro `automaticas`): "Sai sozinho: campanha de Empresas novas aprovada";
   toque futuro mostra "(sai sozinho)" ou "(vai esperar o seu clique)".

@@ -356,6 +356,10 @@ def _rotina_hora() -> None:
 
     with sessao() as db:  # toque marcado num feriado de quem envia (nacional, do estado ou da cidade) muda de dia
         feriados.remarcar(db)
+    from . import vagas
+
+    with sessao() as db:  # WhatsApp que ficou de um dia anterior ou numa hora lotada vai para a próxima vaga do número
+        vagas.replanejar(db)  # (pedido da Maria em 23/11/2026: nada acumulando nem atrasado na fila)
     from . import assertiva
 
     with sessao() as db:  # LGPD: o resultado das consultas da Assertiva fica só 30 dias

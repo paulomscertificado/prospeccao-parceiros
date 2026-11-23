@@ -538,8 +538,10 @@ def resumo_aprovacao(db, camp: Campanha) -> dict:
             "contatos_estimados": len(tarefas)}
 
 
-def aprovar(db, camp: Campanha, usuario: Usuario) -> int:
-    """Rascunhos viram tarefas de verdade (datas a partir de hoje)."""
+def aprovar(db, camp: Campanha, usuario: Usuario, vagas_usadas: dict | None = None) -> int:
+    """Rascunhos viram tarefas de verdade (datas a partir de hoje). Os WhatsApps entram nas vagas do número (app/vagas.py,
+    pedido da Maria em 23/11/2026): o que não cabe no dia marcado vai para o próximo dia com vaga, sem acumular com as
+    outras campanhas; `vagas_usadas` recebe o resumo (vagas.planejar) para a mensagem da tela."""
     rascunhos = db.execute(select(Tarefa).where(Tarefa.campanha_id == camp.id, Tarefa.status == "rascunho")).scalars().all()
     for t in [t for t in rascunhos if t.canal not in ("email", "whatsapp")]:
         t.status = "cancelada"  # campanhas antigas com ligação: a campanha só manda e-mail e WhatsApp
@@ -563,6 +565,17 @@ def aprovar(db, camp: Campanha, usuario: Usuario) -> int:
             while atraso and t.data in sem_envio:  # empurrada para frente: nunca para um feriado de quem envia
                 t.data = util.proximo_dia_util(t.data + timedelta(days=1))
         _sem_horario_no_passado(db, rascunhos, minimo, maximo, sem_envio)
+        if camp.tipo != "renovacao" and not camp.envio_oficial:  # Renovação: datas pelo vencimento (tem prazo)
+            from . import vagas
+
+            anterior = db.info.get("ar_config")
+            usar_config_da_ar(db, camp.tenant_id)  # o horário e o ritmo da marca da campanha
+            try:
+                feito = vagas.planejar(db, rascunhos, minimo=minimo, maximo=maximo)
+            finally:
+                usar_config_da_ar(db, anterior)
+            if vagas_usadas is not None:
+                vagas_usadas.update(feito)
         if camp.tipo == "renovacao":
             from . import renovacao
 
@@ -815,7 +828,8 @@ def intervalo_automatico(db, canal: str) -> tuple[float, float]:
     """Segundos entre dois envios automáticos do canal (a fila sorteia entre os dois). WhatsApp: o de Configurações >
     Geral (intervalo_whatsapp_min/max, em minutos), 8 a 12 desde 17/11/2026: o número do Paulo Lucas foi restringido
     pelo WhatsApp ("pode caracterizar envio de spam") depois de 66 mensagens no dia, 65 para quem nunca tinha
-    respondido, uma a cada 3 a 4 minutos. Vale para a plataforma toda (um WhatsApp automático por vez)."""
+    respondido, uma a cada 3 a 4 minutos. Vale para CADA número (desde 23/11/2026; antes era um WhatsApp automático
+    por vez para a plataforma toda e os números dividiam uns 75 envios por dia): vagas.por_hora conta as vagas com ele."""
     if canal != "whatsapp":
         return INTERVALO_AUTOMATICO_SEG
     minimo = max(1, ler_config_int(db, "intervalo_whatsapp_min", 8))
@@ -1586,8 +1600,8 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
         return feito
     if not mensagens.dentro_do_horario_de_alguma_ar(db):
         return feito
-    if not _vez_do_canal(db, "whatsapp"):
-        return feito  # a última mensagem automática saiu há menos de 3 minutos
+    # a vez é de cada número (8 a 12 min entre um WhatsApp e outro do MESMO número; 23/11/2026): números diferentes
+    # mandam ao mesmo tempo. Antes era um WhatsApp por vez para a plataforma toda (uns 75 por dia somando tudo)
     if not whatsapp_leads.status().get("disponivel"):
         return feito  # computador com o WhatsApp Leads desligado: tudo espera, nada se perde
     from . import renovacao
@@ -1618,8 +1632,10 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
                        ~_toque_anterior_pendente(),  # o toque anterior da empresa sai primeiro
                        ~recebeu_ha_pouco)  # nunca dois WhatsApps automáticos para a mesma empresa em menos de 20 h
                 # no mesmo dia, o aviso de renovação sai antes (tem prazo: o certificado vence) e divide melhor o
-                # limite de contatos frios do número com as Empresas novas
-                .order_by(Tarefa.data, case((Campanha.tipo == "renovacao", 0), else_=1), Tarefa.hora, Tarefa.id)
+                # limite de contatos frios do número com as Empresas novas; depois, a conversa que já começou (o
+                # toque seguinte) antes do primeiro toque de uma campanha nova (23/11/2026)
+                .order_by(Tarefa.data, case((Campanha.tipo == "renovacao", 0), else_=1),
+                          case((_ja_comecou(), 0), else_=1), Tarefa.hora, Tarefa.id)
                 .limit(200))
     # Renovação: só de segunda a sexta, das 10:00 às 18:00 (pedido da Maria em 13/11/2026). O WhatsApp para uns minutos
     # antes do fim: ainda passa pela fila do computador do WhatsApp Leads e precisa chegar dentro do horário.
@@ -1628,6 +1644,8 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
     automaticas = campanhas_que_saem_sozinhas(db)
     campanhas_no_limite: set[int] = set()
     ars_paradas: set = set()  # AR que chegou a um limite dela nesta rodada: só ela espera (fila justa)
+    numeros: dict = {}  # (responsável, quem criou, campanha) -> número por onde sai
+    usados: set = set()  # números que já mandaram nesta rodada (um por número por rodada)
     for t in _em_lotes(db, _revezar(db, "whatsapp", db.execute(consulta).all())):
         if feito["enviados"] >= maximo:
             break
@@ -1646,6 +1664,9 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
             continue  # lead respondeu, saiu ou está com um humano
         if not automatica and not whatsapp_liberado(db, lead):
             continue  # contato frio de campanha de parceiros: fica na Agenda para o clique
+        numero = _numero_do_envio(db, t, numeros)
+        if config.ESPACAR_ENVIOS and numero and (numero in usados or not _vez_do_numero(db, numero)):
+            continue  # este número ainda está no intervalo (8 a 12 min): os envios dos outros números seguem
         if feriados.adiar_se_feriado(db, t):
             feito["bloqueados"] += 1
             continue  # feriado da cidade (ou nacional) de quem envia: o toque passou para o próximo dia de envio
@@ -1679,11 +1700,49 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
                        else "Enviada sozinha pela IA SDR (contato já conversou com a empresa)")
         feito["enviados"] += 1
         _anotar_vez(db, "whatsapp", t.tenant_id)
-        if config.ESPACAR_ENVIOS:
-            _anotar_envio(db, "whatsapp")
-            break  # uma por vez: a próxima sai daqui a 3 ou 4 minutos
+        if config.ESPACAR_ENVIOS and numero:
+            _anotar_envio_do_numero(db, numero)  # o próximo DESTE número só daqui a 8 a 12 minutos
+            usados.add(numero)
     usar_config_da_ar(db, None)
     return feito
+
+
+def _numero_do_envio(db, t: Tarefa, guardados: dict) -> str | None:
+    """O número por onde o WhatsApp deste toque vai sair (o mesmo que sdr.enviar_whatsapp_conectado escolhe: o fixado na
+    campanha ou o do responsável pelo lead). None = o responsável ainda não conectou nenhum número."""
+    from . import conexoes
+
+    lead = t.lead
+    chave = (lead.vendedor_id if lead else None, t.usuario_id, t.campanha_id)
+    if chave not in guardados:
+        try:
+            quem = conexoes.responsavel(db, lead, None, t)
+            camp = db.get(Campanha, t.campanha_id) if t.campanha_id else None
+            guardados[chave] = conexoes.da_campanha(db, camp, quem) or conexoes.para_enviar(db, quem)
+        except conexoes.SemNumero:
+            guardados[chave] = None
+    return guardados[chave]
+
+
+def _vez_do_numero(db, numero: str) -> bool:
+    """Já passou o intervalo (8 a 12 min) desde o último WhatsApp automático deste número?"""
+    return ler_config(db, f"proximo_envio_automatico:whatsapp:{numero}") <= agora().isoformat(timespec="seconds")
+
+
+def _anotar_envio_do_numero(db, numero: str) -> None:
+    """Depois de um WhatsApp automático: sorteia quando o próximo deste número pode sair (8 a 12 min)."""
+    import random
+
+    proximo = agora() + timedelta(seconds=random.uniform(*intervalo_automatico(db, "whatsapp")))
+    gravar_config(db, f"proximo_envio_automatico:whatsapp:{numero}", proximo.isoformat(timespec="seconds"))
+
+
+def _ja_comecou():
+    """Condição do banco: a empresa já recebeu algum toque desta campanha (a conversa começou): o toque seguinte sai
+    antes do primeiro toque de outra empresa quando a fila aperta (pedido da Maria em 23/11/2026)."""
+    feito = aliased(Tarefa)
+    return select(feito.id).where(feito.campanha_id == Tarefa.campanha_id, feito.lead_id == Tarefa.lead_id,
+                                  feito.status == "feita").exists()
 
 
 def _avisar_para_conectar(db, lead: Lead, tarefa: Tarefa) -> None:
