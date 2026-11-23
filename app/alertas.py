@@ -37,7 +37,8 @@ BURACO_DO_AGENDADOR = timedelta(minutes=30)
 BACKUP_ATRASADO = timedelta(hours=84)  # 3 dias e meio (o fim de semana sem backup não avisa)
 NOMES_ROTINAS = {"fila_email": "fila de e-mails", "fila_whatsapp": "fila do WhatsApp",
                  "sincronizar_whatsapp": "leitura das respostas do WhatsApp", "ler_emails": "leitura das respostas por e-mail",
-                 "empresas_novas": "busca diária de Empresas novas", "renovacao": "campanha diária de Renovação", "rotina_hora": "rotina de hora em hora"}
+                 "empresas_novas": "busca diária de Empresas novas", "renovacao": "campanha diária de Renovação", "rotina_hora": "rotina de hora em hora",
+                 "fotos_whatsapp_oficial": "download das fotos que chegam no número oficial"}
 
 
 def ligado() -> bool:

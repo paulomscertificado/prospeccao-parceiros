@@ -94,7 +94,8 @@ async def webhook_receber(request: Request):
                 whatsapp_oficial.guardar_conversa(
                     db, conta, telefone, "entrada", r["texto"],
                     whatsapp_oficial.TIPO_QUE_CHEGA.get(r.get("tipo", "text") or "text", "midia"), r.get("id", ""),
-                    r.get("nome", ""), achado.id if achado is not None else None)
+                    r.get("nome", ""), achado.id if achado is not None else None,
+                    midia_id=r.get("midia_id", ""))  # foto: o relógio baixa da Meta (baixar_imagens_recebidas)
             if conta is None:  # forma antiga (variáveis WHATSAPP_*): número único, responde sozinho
                 lead = db.execute(select(Lead).where(or_(Lead.chave_whatsapp == telefone, Lead.chave_telefone == telefone))
                                   .limit(1)).scalars().first()

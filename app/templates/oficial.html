@@ -50,6 +50,7 @@
   .bolha .imagem { display: block; margin: 3px -5px 7px; width: fit-content; }
   .bolha .imagem img { display: block; width: 300px; max-width: 100%; height: auto; border-radius: 8px;
                        background: #d9e4ee; object-fit: contain; }
+  .bolha .imagem img.foto { width: auto; max-width: min(300px, 100%); max-height: 360px; }  /* foto de contato: formato livre */
   .bolha .imagem:hover img { filter: brightness(.96); }
   .bolha .sem-imagem { font-size: .78rem; font-style: italic; color: #6b7686; margin: 2px 0 4px; }
   .rodape-conversa { border-top: 1px solid var(--borda); padding: 10px 16px; background: #fff; font-size: .82rem; color: #6b7686; }
@@ -82,7 +83,7 @@
         <div class="info">
           <div class="linha"><span class="nome">{{ c.nome or (c.telefone|telefone) }}</span>
             <span class="hora">{% if u %}{{ quando(u.criado_em) }}{% endif %}</span></div>
-          <div class="linha"><span class="previa">{% if u %}{% set pt = partes(u.texto) %}{{ '↗ ' if u.direcao == 'saida' }}{{ MIDIAS.get(pt.texto, pt.texto)|replace('\n', ' ')|truncate(70) }}{% endif %}</span>
+          <div class="linha"><span class="previa">{{ previa(u)|truncate(70) }}</span>
             {% if c.nao_lidas %}<span class="qtd">{{ c.nao_lidas }}</span>{% endif %}</div>
         </div></a>
       {% else %}
@@ -107,9 +108,11 @@
         <div class="bolha {{ m.direcao }} {{ 'falhou' if m.status == 'falhou' }}">
           {% if m.tipo in NOMES_DO_TIPO %}<div class="tipo">{{ NOMES_DO_TIPO[m.tipo] }}{{ ' · com a arte do aviso' if pt.arte }}</div>{% endif %}
           {% if m.id in imagens %}<a class="imagem" href="/oficial/imagem/{{ m.id }}" target="_blank" rel="noopener" title="Abrir a imagem inteira numa aba nova">
-            <img src="/oficial/imagem/{{ m.id }}" alt="Imagem que foi junto com esta mensagem" width="1080" height="1350"></a>
+            {% if m.direcao == 'entrada' %}<img class="foto" src="/oficial/imagem/{{ m.id }}" alt="Imagem que o contato mandou">
+            {% else %}<img src="/oficial/imagem/{{ m.id }}" alt="Imagem que foi junto com esta mensagem" width="1080" height="1350">{% endif %}</a>
           {% elif pt.arte %}<div class="sem-imagem">A imagem deste aviso não está guardada aqui.</div>{% endif %}
-          <span class="texto">{% if m.tipo == 'midia' %}<span class="midia">{{ MIDIAS.get(m.texto, 'Mídia') }} (não aparece aqui)</span>{% else %}{{ pt.texto }}{% endif %}</span>
+          <span class="texto">{% if m.tipo == 'midia' %}{% set md = midia(m, imagens) %}{% if md.rotulo %}<span class="midia">{{ md.rotulo }}</span>{% if md.legenda %}
+{% endif %}{% endif %}{{ md.legenda }}{% else %}{{ pt.texto }}{% endif %}</span>
           <span class="meta">{{ m.criado_em.strftime('%H:%M') }}{% if m.direcao == 'saida' %}
             {% if m.status == 'lida' %} <span class="lida" title="Lida">✓✓ lida</span>{% elif m.status == 'entregue' %} <span title="Entregue">✓✓</span>{% elif m.status == 'enviada' %} <span title="Enviada">✓</span>{% elif m.status == 'falhou' %} <span title="Não entregue">não entregue</span>{% endif %}{% endif %}</span>
           {% if m.status == 'falhou' and m.erro %}<div class="erro">A Meta não entregou: {{ m.erro }}</div>{% endif %}

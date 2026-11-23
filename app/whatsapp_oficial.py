@@ -14,6 +14,7 @@ Quero renovar / Já renovei / Parar avisos. As outras campanhas continuam pelo W
 """
 
 import json
+import logging
 import re
 import secrets
 from pathlib import Path
@@ -25,6 +26,8 @@ from .banco import agora
 from .integracoes import whatsapp_cloud
 from .modelos import ContaWhatsAppOficial, ModeloWhatsAppOficial
 from .seguranca import criptografar, descriptografar
+
+log = logging.getLogger(__name__)
 
 MODELO_DE_TESTE = ("hello_world", "en_US")  # o modelo de exemplo da Meta: só sai dos números de teste dela (131058)
 TEXTO_DE_TESTE = ("Mensagem de teste do sistema pela API oficial do WhatsApp. Se ela chegou, o envio pelo número "
@@ -275,6 +278,12 @@ ORDEM_DA_SITUACAO = {"enviada": 1, "entregue": 2, "lida": 3}  # a Meta pode avis
 TIPO_QUE_CHEGA = {"text": "texto", "button": "botao", "interactive": "botao"}  # o resto (imagem, áudio...) = mídia
 MARCA_DA_ARTE = "[com a arte do aviso]\n"  # 1ª linha do aviso que foi com a arte (a tela mostra como etiqueta)
 PREFIXO_DO_EXEMPLO = "[aviso de exemplo] "  # o aviso de exemplo do teste da tela (Configurações > WhatsApp)
+# a mídia que chega sem legenda fica guardada como "[tipo]" (whatsapp_cloud.ler_webhook): o nome para a tela
+NOMES_DAS_MIDIAS = {"[image]": "Imagem", "[audio]": "Áudio", "[video]": "Vídeo", "[document]": "Documento",
+                    "[sticker]": "Figurinha", "[location]": "Localização", "[contacts]": "Contato", "[reaction]": "Reação"}
+TENTATIVAS_DA_FOTO = 5     # foto de contato que a Meta não entregou nessas tentativas: a tela avisa e o relógio desiste
+DIAS_DA_MIDIA_NA_META = 7  # o id da mídia que vem no webhook vale 7 dias (documentação da Meta)
+FOTOS_POR_RODADA = 5       # fotos baixadas por rodada do relógio (a cada minuto)
 
 
 def chave_da_conversa(telefone: str) -> str:
@@ -284,10 +293,11 @@ def chave_da_conversa(telefone: str) -> str:
 
 def guardar_conversa(db, conta: ContaWhatsAppOficial, telefone: str, direcao: str, texto: str, tipo: str = "texto",
                      wamid: str = "", nome: str = "", lead_id: int | None = None, status: str = "",
-                     imagem: bytes | None = None):
+                     imagem: bytes | None = None, midia_id: str = ""):
     """Guarda uma mensagem do número oficial (a que saiu ou a que chegou) para a tela API Oficial, na AR da conta. A
     Meta às vezes manda o mesmo evento de novo: a mensagem com o mesmo id não entra duas vezes. `imagem`: a que foi
-    junto (a arte do aviso), guardada para a tela mostrar dentro da mensagem. Devolve a linha nova (None = já estava ou
+    junto (a arte do aviso), guardada para a tela mostrar dentro da mensagem; `midia_id`: a foto ou figurinha que o
+    contato mandou, que o relógio baixa da Meta (baixar_imagens_recebidas). Devolve a linha nova (None = já estava ou
     sem telefone)."""
     from .modelos import MensagemOficial
 
@@ -300,12 +310,65 @@ def guardar_conversa(db, conta: ContaWhatsAppOficial, telefone: str, direcao: st
     linha = MensagemOficial(tenant_id=conta.tenant_id, conta_id=conta.id, telefone=chave[:20], nome=(nome or "")[:200],
                             direcao=direcao, tipo=tipo, texto=texto or "", wamid=(wamid or "")[:160],
                             status=status or ("recebida" if direcao == "entrada" else "enviada"), lead_id=lead_id,
-                            lida=direcao != "entrada")
+                            lida=direcao != "entrada", midia_id=(midia_id or "")[:120])
     db.add(linha)
     db.flush()
     if imagem:
         guardar_imagem(db, linha, imagem)
     return linha
+
+
+def foto_perdida(mensagem) -> bool:
+    """A foto que o contato mandou não vai mais aparecer: a Meta não entregou nas tentativas ou o id dela já venceu."""
+    from datetime import timedelta
+
+    return (mensagem.midia_tentativas or 0) >= TENTATIVAS_DA_FOTO or (
+        mensagem.criado_em is not None and agora() - mensagem.criado_em > timedelta(days=DIAS_DA_MIDIA_NA_META))
+
+
+def baixar_imagens_recebidas(db, maximo: int = FOTOS_POR_RODADA) -> int:
+    """As fotos e figurinhas que os contatos mandam para o número oficial (pedido da Maria em 23/11/2026): o relógio
+    baixa da Meta, a cada minuto (o id vale 7 dias), e guarda em imagens_oficiais; a tela API Oficial mostra dentro da
+    mensagem e recarrega sozinha (atualizado_em). Erro conta uma tentativa (até TENTATIVAS_DA_FOTO); grande demais ou
+    o que não é imagem para na hora. Uma foto que falha não trava as outras. Devolve quantas baixou."""
+    from datetime import timedelta
+
+    from .modelos import ImagemOficial, MensagemOficial
+
+    sem = {"sem_filtro_de_ar": True}
+    tem_imagem = select(ImagemOficial.id).where(ImagemOficial.mensagem_id == MensagemOficial.id,
+                                                ImagemOficial.wamid == MensagemOficial.wamid).exists()
+    pendentes = db.execute(select(MensagemOficial).where(
+        MensagemOficial.direcao == "entrada", MensagemOficial.midia_id != "",
+        MensagemOficial.midia_tentativas < TENTATIVAS_DA_FOTO,
+        MensagemOficial.criado_em >= agora() - timedelta(days=DIAS_DA_MIDIA_NA_META), ~tem_imagem)
+        .order_by(MensagemOficial.id).limit(maximo).execution_options(**sem)).scalars().all()
+    baixadas, contas = 0, {}
+    for m in pendentes:
+        if m.conta_id not in contas:
+            contas[m.conta_id] = db.execute(select(ContaWhatsAppOficial).where(
+                ContaWhatsAppOficial.id == m.conta_id).execution_options(**sem)).scalars().first()
+        conta = contas[m.conta_id]
+        if conta is None or not conta.token_cripto:  # a conta saiu: não tem como baixar
+            m.midia_tentativas = TENTATIVAS_DA_FOTO
+            continue
+        try:
+            conteudo = whatsapp_cloud.baixar_midia(m.midia_id, token(conta))
+        except whatsapp_cloud.ErroWhatsApp as erro:
+            grande = erro.codigo == whatsapp_cloud.CODIGO_GRANDE_DEMAIS
+            m.midia_tentativas = TENTATIVAS_DA_FOTO if grande else (m.midia_tentativas or 0) + 1
+            log.warning("Foto do número oficial (mensagem %s) não baixou: %s", m.id, erro)
+            continue
+        except Exception:  # noqa: BLE001  (uma foto com problema não pode travar as outras)
+            m.midia_tentativas = (m.midia_tentativas or 0) + 1
+            log.exception("Erro ao baixar a foto da mensagem %s do número oficial", m.id)
+            continue
+        if guardar_imagem(db, m, conteudo) is None:  # não é imagem que o navegador mostra
+            m.midia_tentativas = TENTATIVAS_DA_FOTO
+            continue
+        m.atualizado_em = agora()  # a tela aberta percebe (/oficial/marca) e mostra a foto
+        baixadas += 1
+    return baixadas
 
 
 def guardar_imagem(db, mensagem, imagem: bytes):

@@ -210,12 +210,17 @@ class MensagemOficial(DaAR, Base):
     lida: Mapped[bool] = mapped_column(Boolean, default=False)  # a equipe já abriu a conversa (as que chegam)
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, index=True)
     atualizado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)  # a situação da entrega mudou
+    # foto ou figurinha que o contato mandou (23/11/2026): o id da mídia na Meta, que vale 7 dias; o relógio baixa
+    # (whatsapp_oficial.baixar_imagens_recebidas) e guarda em imagens_oficiais. Tentativas que não deram certo:
+    midia_id: Mapped[str] = mapped_column(String(120), default="")
+    midia_tentativas: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class ImagemOficial(DaAR, Base):
-    """A imagem que foi numa mensagem do número oficial (a arte do aviso de vencimento, a de exemplo do teste), para a
-    tela API Oficial mostrar dentro da mensagem (pedido da Maria em 23/11/2026: "não consigo ver a imagem das mensagens
-    para saber se saíram corretas"). É uma cópia: a de artes_aviso sai em 10 dias. Fica o mesmo prazo da conversa
+    """A imagem que foi numa mensagem do número oficial (a arte do aviso de vencimento, a de exemplo do teste) ou que
+    chegou nele (a foto ou a figurinha de um contato, baixada da Meta), para a tela API Oficial mostrar dentro da
+    mensagem (pedidos da Maria em 23/11/2026: "não consigo ver a imagem das mensagens para saber se saíram corretas" e
+    as fotos dos clientes). A da arte é uma cópia: a de artes_aviso sai em 10 dias. Fica o mesmo prazo da conversa
     (guarda_conversas_meses) e não vai no backup (como as artes)."""
     __tablename__ = "imagens_oficiais"
     id: Mapped[int] = mapped_column(primary_key=True)

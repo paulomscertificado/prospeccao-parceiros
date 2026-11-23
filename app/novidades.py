@@ -14,7 +14,7 @@ from urllib.parse import urlencode
 
 from sqlalchemy import func, select
 
-from . import autorizacao, conexoes, util
+from . import autorizacao, conexoes, util, whatsapp_oficial
 from .modelos import (ContaWhatsAppOficial, ContatoWhatsApp, Lead, MensagemOficial, MensagemWhatsApp, Notificacao,
                       Oportunidade)
 
@@ -92,9 +92,12 @@ def resumo(db, usuario, desde: dict[str, int] | None = None) -> dict:
         for m in db.execute(select(MensagemOficial).where(
                 MensagemOficial.id > desde["o"], MensagemOficial.direcao == "entrada", MensagemOficial.lida.is_(False))
                 .order_by(MensagemOficial.id).limit(MAXIMO)).scalars():
+            texto = m.texto
+            if m.tipo == "midia":  # foto: "📷 Imagem" ou a legenda dela, como no WhatsApp (não "[image]")
+                texto = ("📷 " if m.midia_id else "") + whatsapp_oficial.NOMES_DAS_MIDIAS.get(m.texto, m.texto or "")
             novas.append({"tipo": "oficial", "id": m.id, "chave": f"oficial-{m.telefone}",
                           "titulo": (m.nome or util.formatar_telefone(m.telefone)) + " · número oficial",
-                          "texto": _curto(m.texto) or "Mensagem nova", "telefone": m.telefone, "numero": "",
+                          "texto": _curto(texto) or "Mensagem nova", "telefone": m.telefone, "numero": "",
                           "link": "/oficial?" + urlencode({"telefone": m.telefone})})
     if "n" in desde:  # resposta a uma campanha: o aviso do sininho que leva às Oportunidades
         for n in db.execute(select(Notificacao).where(

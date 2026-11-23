@@ -707,7 +707,11 @@ conversas (a mais recente primeiro, com as mensagens novas em destaque) e, ao cl
 saíram (com ✓ enviada, ✓✓ entregue e ✓✓ lida, ou o motivo de não ter sido entregue) e tudo o que o cliente escreveu ou
 tocou nos botões, inclusive de quem não é cliente cadastrado. O aviso que foi com a arte mostra a **imagem** em cima do
 texto, como no WhatsApp: dá para conferir se saiu certa (nome, certificado, vencimento). Clique na imagem para vê-la
-inteira numa aba nova. A imagem fica guardada o mesmo tempo da conversa (12 meses). O número vermelho ao lado de **API Oficial** é quantas
+inteira numa aba nova. A imagem fica guardada o mesmo tempo da conversa (12 meses).
+As **fotos e figurinhas que os clientes mandam** para o número oficial também aparecem na conversa, com a legenda: o
+sistema baixa cada uma da Meta em até 1 minuto ("Imagem: aparece aqui em instantes" enquanto isso). A Meta guarda a
+foto só 7 dias; se ela não entregar, a mensagem avisa "a Meta não entregou". Áudio, vídeo e documento ainda não
+aparecem aqui (fale com o cliente pelo seu WhatsApp). O número vermelho ao lado de **API Oficial** é quantas
 mensagens novas chegaram (some quando alguém abre a conversa). Para responder, fale com o cliente pelo seu WhatsApp ou
 por telefone (responder pelo número oficial, de dentro do sistema, é o próximo passo). O item só aparece na marca que
 tem a API oficial configurada.

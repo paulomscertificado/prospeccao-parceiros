@@ -203,8 +203,21 @@ Oficial". Item **API Oficial** no menu (`rotas/oficial.py`, `templates/oficial.h
   por aviso), e depois de restaurar um backup um número de mensagem reaproveitado nunca mostra a imagem de outra.
   Aviso com a arte sem a imagem guardada: "A imagem deste aviso não está guardada aqui." Os avisos que saíram antes
   ganharam a imagem na publicação (`guardar_imagens_que_faltam`, no `criar_tabelas`; acha a arte pela mensagem do
-  sistema com o mesmo `wamid` → tarefa → `artes_aviso`). Foto que o CLIENTE manda para o número oficial continua só
-  "Imagem (não aparece aqui)": baixar a mídia da Meta ainda não foi feito. Teste: `testes/test_imagem_api_oficial.py`.
+  sistema com o mesmo `wamid` → tarefa → `artes_aviso`). Teste: `testes/test_imagem_api_oficial.py`.
+- **As fotos dos contatos** (23/11/2026, pedido da Maria, "Sim, fazer"): `whatsapp_cloud.ler_webhook` passa o id da
+  mídia das mensagens `image` e `sticker` (e a legenda da foto vira o texto; sem legenda, "[image]"/"[sticker]");
+  `guardar_conversa(..., midia_id=)` guarda em `mensagens_oficiais.midia_id`. O relógio, a cada minuto
+  (`rotinas._fotos_whatsapp_oficial` → `whatsapp_oficial.baixar_imagens_recebidas`, até 5 por rodada), baixa da Meta
+  (`whatsapp_cloud.baixar_midia`: GET `/<id da mídia>` dá o endereço, que vale 5 minutos, e o arquivo vem desse
+  endereço com o token; o id do webhook vale só 7 dias) e guarda em `imagens_oficiais` com o `wamid` da mensagem;
+  `atualizado_em` muda e a tela aberta recarrega. O token só vai para servidores da Meta (`SERVIDORES_DA_MIDIA`:
+  fbsbx.com, fbcdn.net, facebook.com, whatsapp.net; sem seguir redirecionamento); até 6 MB. Erro = uma tentativa
+  (`midia_tentativas`, até `TENTATIVAS_DA_FOTO` = 5); grande demais ou que não é imagem para na hora. Conferido na
+  Meta de verdade em 23/11/2026 (mídia de teste subida, baixada igual pelo id e apagada): servidor lookaside.fbsbx.com,
+  200 com o arquivo, sem redirecionar, 401 sem o token. Na tela: a foto em cima da legenda (formato livre, até 300 x
+  360 px), "Imagem: aparece aqui em instantes" enquanto não baixou e "a Meta não entregou" depois das tentativas ou
+  dos 7 dias (`whatsapp_oficial.foto_perdida`); a lista mostra "📷", e o aviso na tela do computador também
+  (`novidades`). Áudio, vídeo e documento continuam "(não aparece aqui)". Teste: `testes/test_fotos_api_oficial.py`.
 - **Guarda**: o mesmo prazo da cópia das conversas (`guarda_conversas_meses`, 12 meses; `leads_servico.apagar_conversas_antigas`).
 - Testes: `testes/test_tela_api_oficial.py`, `testes/test_imagem_api_oficial.py` e a conferência no
   `test_whatsapp_oficial_renovacao.py`.

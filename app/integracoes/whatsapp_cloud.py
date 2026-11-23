@@ -176,6 +176,37 @@ def subir_midia(phone_number_id: str, token: str, conteudo: bytes, tipo: str = "
     return str(dados["id"])
 
 
+# Mídia que um contato mandou (23/11/2026, pedido da Maria: as fotos dos clientes na tela API Oficial). Conferido na
+# Meta de verdade no mesmo dia: o id dá o endereço (lookaside.fbsbx.com, vale 5 minutos), que devolve o arquivo com o
+# token (sem ele, 401), sem redirecionar. O id que vem no webhook vale 7 dias.
+TIPOS_DE_IMAGEM = ("image", "sticker")
+SERVIDORES_DA_MIDIA = ("fbsbx.com", "fbcdn.net", "facebook.com", "whatsapp.net")  # o token só vai para a Meta
+MAXIMO_DA_MIDIA = 6_000_000  # foto até 5 MB na Meta; figurinha até 500 KB
+CODIGO_GRANDE_DEMAIS = -1    # erro que não adianta tentar de novo
+
+
+def baixar_midia(midia_id: str, token: str, maximo: int = MAXIMO_DA_MIDIA, versao: str | None = None) -> bytes:
+    """Baixa a mídia de um contato pelo id que veio no webhook (foto, figurinha). Lança ErroWhatsApp."""
+    from urllib.parse import urlsplit
+
+    dados = _pedir("GET", str(midia_id), token, versao)
+    url, tamanho = str(dados.get("url") or ""), int(dados.get("file_size") or 0)
+    servidor = (urlsplit(url).hostname or "").lower()
+    if not url.startswith("https://") or not any(servidor == s or servidor.endswith("." + s) for s in SERVIDORES_DA_MIDIA):
+        raise ErroWhatsApp("A Meta não devolveu um endereço válido para baixar a mídia.")
+    if tamanho > maximo:
+        raise ErroWhatsApp(f"A mídia tem {tamanho // 1_000_000} MB: grande demais para guardar.", CODIGO_GRANDE_DEMAIS)
+    try:
+        r = httpx.request("GET", url, timeout=60, follow_redirects=False, headers={"Authorization": f"Bearer {token}"})
+    except httpx.HTTPError:
+        raise ErroWhatsApp("Sem conexão com a API do WhatsApp. Confira a internet.") from None
+    if r.status_code != 200:
+        raise ErroWhatsApp(f"A Meta não entregou a mídia (situação {r.status_code}).", _codigo_do_erro(r))
+    if len(r.content) > maximo:
+        raise ErroWhatsApp("A mídia é grande demais para guardar.", CODIGO_GRANDE_DEMAIS)
+    return r.content
+
+
 # ---------------------------------------------------------------- modelos (templates)
 
 def app_do_token(token: str, versao: str | None = None) -> str:
@@ -303,14 +334,19 @@ def ler_webhook(dados: dict) -> tuple[list[dict], list[dict]]:
             numero_id = str((valor.get("metadata") or {}).get("phone_number_id") or "")
             nomes = {c.get("wa_id", ""): (c.get("profile") or {}).get("name", "") for c in valor.get("contacts", [])}
             for m in valor.get("messages", []):
+                tipo = str(m.get("type") or "")
+                # foto e figurinha: o id da mídia, para baixar (a Meta guarda só 7 dias) e mostrar na tela API Oficial
+                midia = (m.get(tipo) or {}) if tipo in TIPOS_DE_IMAGEM else {}
                 texto = ((m.get("text") or {}).get("body") or (m.get("button") or {}).get("text")
-                         or ((m.get("interactive") or {}).get("button_reply") or {}).get("title") or f"[{m.get('type')}]")
+                         or ((m.get("interactive") or {}).get("button_reply") or {}).get("title")
+                         or str(midia.get("caption") or "").strip()  # a legenda da foto
+                         or f"[{m.get('type')}]")
                 # botão de resposta rápida de um modelo: o payload que o sistema mandou junto (ex.: renov:renovar:123)
                 botao = str((m.get("button") or {}).get("payload")
                             or ((m.get("interactive") or {}).get("button_reply") or {}).get("id") or "")
                 recebidas.append({"de": m.get("from", ""), "texto": texto, "id": m.get("id", ""), "numero_id": numero_id,
-                                  "nome": nomes.get(m.get("from", ""), ""), "botao": botao[:256],
-                                  "tipo": str(m.get("type") or "")})
+                                  "nome": nomes.get(m.get("from", ""), ""), "botao": botao[:256], "tipo": tipo,
+                                  "midia_id": str(midia.get("id") or "")[:120]})
             for s in valor.get("statuses", []):
                 erros = s.get("errors") or [{}]
                 status.append({"id": s.get("id", ""), "status": s.get("status", ""), "numero_id": numero_id,

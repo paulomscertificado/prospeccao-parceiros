@@ -296,6 +296,15 @@ def _fila_whatsapp_oficial() -> None:
             log.info("API oficial do WhatsApp: %s avisos enviados", r["enviados"])
 
 
+def _fotos_whatsapp_oficial() -> None:
+    from . import whatsapp_oficial
+
+    with sessao() as db:  # foto que um contato mandou para o número oficial: baixa da Meta (ela guarda só 7 dias)
+        baixadas = whatsapp_oficial.baixar_imagens_recebidas(db)
+        if baixadas:
+            log.info("API oficial do WhatsApp: %s fotos de contatos baixadas", baixadas)
+
+
 def _sincronizar_whatsapp() -> None:
     with sessao() as db:
         r = sdr.sincronizar_whatsapp_conectado(db)
@@ -377,6 +386,7 @@ def rodada(numero: int | None) -> None:
     _passo("fila_email", _fila_email)
     _passo("fila_whatsapp", _fila_whatsapp)
     _passo("fila_whatsapp_oficial", _fila_whatsapp_oficial)
+    _passo("fotos_whatsapp_oficial", _fotos_whatsapp_oficial)
     _passo("sincronizar_whatsapp", _sincronizar_whatsapp)
     if _na_vez(numero, "ultima_leitura_email", 5):
         _passo("ler_emails", _ler_emails)

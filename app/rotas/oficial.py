@@ -26,8 +26,7 @@ rotas = APIRouter()
 LIMITE_CONVERSAS = 200  # conversas na lista (as mais recentes primeiro)
 LIMITE_MENSAGENS = 300  # mensagens mostradas da conversa aberta (as últimas)
 NOMES_DO_TIPO = {"botao": "tocou no botão", "modelo": "aviso (modelo aprovado pela Meta)"}
-MIDIAS = {"[image]": "Imagem", "[audio]": "Áudio", "[video]": "Vídeo", "[document]": "Documento",
-          "[sticker]": "Figurinha", "[location]": "Localização", "[contacts]": "Contato", "[reaction]": "Reação"}
+MIDIAS = whatsapp_oficial.NOMES_DAS_MIDIAS
 EXTENSOES = {"image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp"}
 
 
@@ -103,6 +102,30 @@ def _partes(texto: str) -> dict:
     return {"arte": False, "texto": texto}
 
 
+def _midia(m: MensagemOficial, imagens: set[int]) -> dict:
+    """Mídia que chegou: a foto aparece (com a legenda, se veio); senão, o que é e por que não aparece. Foto e figurinha
+    o relógio baixa da Meta em até 1 minuto (pedido da Maria em 23/11/2026); áudio, vídeo e documento não aparecem."""
+    legenda = "" if m.texto in MIDIAS else (m.texto or "")
+    if m.id in imagens:
+        return {"rotulo": "", "legenda": legenda}
+    nome = MIDIAS.get(m.texto, "Imagem" if m.midia_id else "Mídia")
+    if not m.midia_id:
+        return {"rotulo": f"{nome} (não aparece aqui)", "legenda": legenda}
+    if whatsapp_oficial.foto_perdida(m):
+        return {"rotulo": f"{nome}: a Meta não entregou, não dá para ver aqui", "legenda": legenda}
+    return {"rotulo": f"{nome}: aparece aqui em instantes", "legenda": legenda}
+
+
+def _previa(m: MensagemOficial | None) -> str:
+    """A linha de baixo de cada conversa da lista: a última mensagem (foto com o 📷, como no WhatsApp)."""
+    if m is None:
+        return ""
+    texto = _partes(m.texto)["texto"]
+    if m.tipo == "midia":
+        texto = ("📷 " if m.midia_id else "") + MIDIAS.get(texto, texto)
+    return ("↗ " if m.direcao == "saida" else "") + texto.replace("\n", " ")
+
+
 def _iniciais(nome: str, telefone: str) -> str:
     partes = [p for p in (nome or "").split() if p[:1].isalnum()]
     if partes:
@@ -144,7 +167,8 @@ def tela_oficial(request: Request, telefone: str = "", busca: str = "",
     return tela(request, "oficial.html", {
         "contas": contas, "conversas": conversas, "aberta": aberta, "mensagens": mensagens, "busca": busca,
         "chave": chave, "abre_lead": abre_lead, "marca_da_tela": _marca(db), "NOMES_DO_TIPO": NOMES_DO_TIPO,
-        "MIDIAS": MIDIAS, "iniciais": _iniciais, "quando": _quando, "partes": _partes, "imagens": imagens})
+        "iniciais": _iniciais, "quando": _quando, "partes": _partes, "imagens": imagens, "midia": _midia,
+        "previa": _previa})
 
 
 @rotas.get("/oficial/imagem/{mensagem_id:int}")
