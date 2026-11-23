@@ -192,8 +192,22 @@ Oficial". Item **API Oficial** no menu (`rotas/oficial.py`, `templates/oficial.h
   ativa da AR com a permissão, com os módulos da AR; sem o Admin Master). Não tem "Compartilhar": é da empresa, e quem
   vê é quem tem a permissão (para tirar alguém, exceção NEGAR em Configurações > Exceções por pessoa). Botões "Abrir
   as conversas" (`/oficial`) e "Configurar" (`#oficial`, só dentro da AR). Teste: `testes/test_numero_oficial_na_tela.py`.
+- **A imagem do aviso** (23/11/2026, pedido da Maria: "não consigo ver a imagem das mensagens para saber se saíram
+  corretas"): a mensagem que foi com a arte guarda uma cópia da imagem que subiu para a Meta (tabela
+  `imagens_oficiais`, modelo `ImagemOficial`; `guardar_conversa(..., imagem=)` em `enviar_toque` e no aviso de exemplo,
+  que guarda a arte de exemplo). A de `artes_aviso` sai em 10 dias (`renovacao.DIAS_GUARDANDO_ARTE`); a cópia fica o
+  prazo da conversa e sai junto (`apagar_conversas_antigas`). A tela mostra a imagem em cima do texto, 300 px (espaço
+  reservado pelo formato 1080 x 1350 da arte, a conversa não pula ao carregar), e o clique abre inteira numa aba nova
+  (`/oficial/imagem/<id da mensagem>`, `oficial.ver`, AR conferida pelo isolamento). A imagem é achada pelo número da
+  mensagem E pelo `wamid` (`whatsapp_oficial.imagens_das_mensagens`): `imagens_oficiais` fica fora do backup (~200 KB
+  por aviso), e depois de restaurar um backup um número de mensagem reaproveitado nunca mostra a imagem de outra.
+  Aviso com a arte sem a imagem guardada: "A imagem deste aviso não está guardada aqui." Os avisos que saíram antes
+  ganharam a imagem na publicação (`guardar_imagens_que_faltam`, no `criar_tabelas`; acha a arte pela mensagem do
+  sistema com o mesmo `wamid` → tarefa → `artes_aviso`). Foto que o CLIENTE manda para o número oficial continua só
+  "Imagem (não aparece aqui)": baixar a mídia da Meta ainda não foi feito. Teste: `testes/test_imagem_api_oficial.py`.
 - **Guarda**: o mesmo prazo da cópia das conversas (`guarda_conversas_meses`, 12 meses; `leads_servico.apagar_conversas_antigas`).
-- Testes: `testes/test_tela_api_oficial.py` e a conferência no `test_whatsapp_oficial_renovacao.py`.
+- Testes: `testes/test_tela_api_oficial.py`, `testes/test_imagem_api_oficial.py` e a conferência no
+  `test_whatsapp_oficial_renovacao.py`.
 
 ## Passo a passo na Meta (o que a AR faz)
 

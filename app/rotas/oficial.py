@@ -10,13 +10,14 @@ fala com o cliente pelo próprio WhatsApp ou por telefone.
 
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import Response
 from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import Session
 
 from .. import autorizacao, util, whatsapp_oficial
 from ..banco import obter_db
-from ..modelos import ContaWhatsAppOficial, Lead, MensagemOficial, Usuario
+from ..modelos import ContaWhatsAppOficial, ImagemOficial, Lead, MensagemOficial, Usuario
 from ..seguranca import exige
 from ..web import tela
 
@@ -27,6 +28,7 @@ LIMITE_MENSAGENS = 300  # mensagens mostradas da conversa aberta (as últimas)
 NOMES_DO_TIPO = {"botao": "tocou no botão", "modelo": "aviso (modelo aprovado pela Meta)"}
 MIDIAS = {"[image]": "Imagem", "[audio]": "Áudio", "[video]": "Vídeo", "[document]": "Documento",
           "[sticker]": "Figurinha", "[location]": "Localização", "[contacts]": "Contato", "[reaction]": "Reação"}
+EXTENSOES = {"image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp"}
 
 
 def _marca(db: Session) -> str:
@@ -135,10 +137,26 @@ def tela_oficial(request: Request, telefone: str = "", busca: str = "",
                 aberta["nao_lidas"] = 0
     abre_lead = {c["lead"].id for c in conversas + ([aberta] if aberta else [])
                  if c and c.get("lead") is not None and autorizacao.pode(usuario, "leads.ver", c["lead"])}
+    # pedido da Maria em 23/11/2026 ("não consigo ver a imagem das mensagens para saber se saíram corretas"): a arte
+    # que foi no aviso aparece dentro da mensagem, como no WhatsApp
+    imagens = set(db.execute(whatsapp_oficial.imagens_das_mensagens([m.id for m in mensagens],
+                                                                    ImagemOficial.mensagem_id)).scalars())
     return tela(request, "oficial.html", {
         "contas": contas, "conversas": conversas, "aberta": aberta, "mensagens": mensagens, "busca": busca,
         "chave": chave, "abre_lead": abre_lead, "marca_da_tela": _marca(db), "NOMES_DO_TIPO": NOMES_DO_TIPO,
-        "MIDIAS": MIDIAS, "iniciais": _iniciais, "quando": _quando, "partes": _partes})
+        "MIDIAS": MIDIAS, "iniciais": _iniciais, "quando": _quando, "partes": _partes, "imagens": imagens})
+
+
+@rotas.get("/oficial/imagem/{mensagem_id:int}")
+def imagem_da_mensagem(mensagem_id: int, usuario: Usuario = Depends(exige("oficial.ver")),
+                       db: Session = Depends(obter_db)):
+    """A imagem que foi na mensagem (a arte do aviso): dentro da conversa e, com um clique, inteira numa aba nova."""
+    linha = db.execute(whatsapp_oficial.imagens_das_mensagens([mensagem_id]).limit(1)).scalars().first()
+    if linha is None or not linha.imagem:
+        raise HTTPException(404)
+    nome = f"aviso-{mensagem_id}.{EXTENSOES.get(linha.tipo, 'png')}"
+    return Response(linha.imagem, media_type=linha.tipo or "image/png",
+                    headers={"Cache-Control": "private, max-age=86400", "Content-Disposition": f'inline; filename="{nome}"'})
 
 
 @rotas.get("/oficial/marca")

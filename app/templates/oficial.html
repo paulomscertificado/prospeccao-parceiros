@@ -46,6 +46,12 @@
   .bolha.falhou { background: #fde8e6; }
   .bolha .erro { color: var(--erro); font-size: .78rem; margin-top: 4px; }
   .bolha .midia { font-style: italic; color: #4b5a6b; }
+  /* a arte que foi no aviso, em cima do texto (como no WhatsApp); clique = a imagem inteira numa aba nova */
+  .bolha .imagem { display: block; margin: 3px -5px 7px; width: fit-content; }
+  .bolha .imagem img { display: block; width: 300px; max-width: 100%; height: auto; border-radius: 8px;
+                       background: #d9e4ee; object-fit: contain; }
+  .bolha .imagem:hover img { filter: brightness(.96); }
+  .bolha .sem-imagem { font-size: .78rem; font-style: italic; color: #6b7686; margin: 2px 0 4px; }
   .rodape-conversa { border-top: 1px solid var(--borda); padding: 10px 16px; background: #fff; font-size: .82rem; color: #6b7686; }
   .vazio-chat { margin: auto; text-align: center; color: #6b7686; max-width: 360px; padding: 20px; }
   @media (max-width: 860px) {
@@ -100,6 +106,9 @@
         {% set pt = partes(m.texto) %}
         <div class="bolha {{ m.direcao }} {{ 'falhou' if m.status == 'falhou' }}">
           {% if m.tipo in NOMES_DO_TIPO %}<div class="tipo">{{ NOMES_DO_TIPO[m.tipo] }}{{ ' · com a arte do aviso' if pt.arte }}</div>{% endif %}
+          {% if m.id in imagens %}<a class="imagem" href="/oficial/imagem/{{ m.id }}" target="_blank" rel="noopener" title="Abrir a imagem inteira numa aba nova">
+            <img src="/oficial/imagem/{{ m.id }}" alt="Imagem que foi junto com esta mensagem" width="1080" height="1350"></a>
+          {% elif pt.arte %}<div class="sem-imagem">A imagem deste aviso não está guardada aqui.</div>{% endif %}
           <span class="texto">{% if m.tipo == 'midia' %}<span class="midia">{{ MIDIAS.get(m.texto, 'Mídia') }} (não aparece aqui)</span>{% else %}{{ pt.texto }}{% endif %}</span>
           <span class="meta">{{ m.criado_em.strftime('%H:%M') }}{% if m.direcao == 'saida' %}
             {% if m.status == 'lida' %} <span class="lida" title="Lida">✓✓ lida</span>{% elif m.status == 'entregue' %} <span title="Entregue">✓✓</span>{% elif m.status == 'enviada' %} <span title="Enviada">✓</span>{% elif m.status == 'falhou' %} <span title="Não entregue">não entregue</span>{% endif %}{% endif %}</span>
@@ -120,7 +129,15 @@
   // a conversa aberta mostra o fim; com a aba à vista, confere a cada 20 s se chegou algo novo e recarrega
   (function () {
     var caixa = document.getElementById('mensagens');
-    if (caixa) caixa.scrollTop = caixa.scrollHeight;
+    if (caixa) {
+      caixa.scrollTop = caixa.scrollHeight;
+      // a imagem de um aviso terminou de carregar: quem estava no fim da conversa continua no fim
+      var noFim = true;
+      caixa.addEventListener('scroll', function () { noFim = caixa.scrollHeight - caixa.scrollTop - caixa.clientHeight < 60; });
+      caixa.querySelectorAll('.imagem img').forEach(function (img) {
+        img.addEventListener('load', function () { if (noFim) caixa.scrollTop = caixa.scrollHeight; });
+      });
+    }
     var marca = {{ marca_da_tela|tojson }};
     // a conversa aberta: o aviso de mensagem nova (static/notificacoes.js) não toca para ela com a tela à vista
     window.conversaAberta = {{ ({'tipo': 'oficial', 'telefone': chave} if chave else none)|tojson }};

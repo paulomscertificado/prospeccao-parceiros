@@ -70,6 +70,8 @@ O modo nuvem liga sozinho quando a variável `VERCEL` existe (a Vercel cria) ou 
   conversas do WhatsApp (`mensagens_whatsapp`) ficam fora do backup: são cópia das do WhatsApp Leads (que tem o próprio
   backup) e eram 3/4 dos ~55 MB de cada backup. A restauração não mexe nelas e, se faltarem, volta o
   `wl_conv_ultimo_id` para a maior que ficou (`restaurar_backup._reabrir_conversas`): o WhatsApp Leads manda de novo.
+  Também ficam fora as imagens dos avisos do número oficial (`imagens_oficiais`, ~200 KB cada, 23/11/2026): só servem
+  para ver na tela API Oficial, e a tela confere o `wamid` para nunca mostrar a imagem de outra mensagem.
 - **Tráfego do Supabase (egress, 5 GB/mês no grátis).** Em 14/11/2026 o mês estava em 7,44 GB. Medido com
   `extensions.pg_stat_statements` (linhas devolvidas por consulta; uma consulta de linha só numa tabela larga gasta
   mais com a descrição das colunas do que com o dado). Cortes feitos: status das mensagens da ponte e dos envios numa

@@ -42,8 +42,9 @@ TENTATIVA = PASTA / "ultima_tentativa.txt"
 FICAM = 14  # dias guardados (aqui e fora do computador)
 # base: grande e reimportável; artes: imagens de poucos dias; conversas do WhatsApp: são cópia das do WhatsApp Leads
 # (que tem o próprio backup) e eram 3/4 do tráfego do backup no Supabase grátis (14/11/2026). Ao restaurar, o
-# WhatsApp Leads manda de novo o que faltar (restaurar_backup._reabrir_conversas).
-FORA_DO_BACKUP = {"base_receita", "artes_aviso", "mensagens_whatsapp"}
+# WhatsApp Leads manda de novo o que faltar (restaurar_backup._reabrir_conversas). Imagens do número oficial (a arte
+# de cada aviso, ~200 KB; 23/11/2026): só para ver na tela API Oficial; sem elas a tela avisa e o texto continua.
+FORA_DO_BACKUP = {"base_receita", "artes_aviso", "mensagens_whatsapp", "imagens_oficiais"}
 EXTENSAO = ".cripto"
 CABECALHO = b"MS-BACKUP-1\n"
 NOME_PASTA_FORA = "Backups Prospeccao MS"

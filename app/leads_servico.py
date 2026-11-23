@@ -272,6 +272,12 @@ def apagar_conversas_antigas(db: Session, lote: int = 5000) -> int:
                 .execution_options(sem_filtro_de_ar=True))
     apagadas += db.execute(delete(MensagemOficial).where(MensagemOficial.id.in_(oficiais.scalar_subquery()))
                            .execution_options(sem_filtro_de_ar=True)).rowcount or 0
+    from .modelos import ImagemOficial  # a imagem que foi na mensagem do número oficial: sai junto com ela
+
+    imagens = (select(ImagemOficial.id).where(ImagemOficial.criado_em < limite).limit(lote)
+               .execution_options(sem_filtro_de_ar=True))
+    db.execute(delete(ImagemOficial).where(ImagemOficial.id.in_(imagens.scalar_subquery()))
+               .execution_options(sem_filtro_de_ar=True))
     if apagadas:
         registrar_log(db, None, "apagou_conversas_antigas", "mensagens_whatsapp", None,
                       f"{apagadas} mensagens com mais de {meses} meses saíram da cópia na nuvem (prazo de guarda)")

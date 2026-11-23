@@ -274,6 +274,7 @@ SITUACAO_DA_META = {"sent": "enviada", "delivered": "entregue", "read": "lida", 
 ORDEM_DA_SITUACAO = {"enviada": 1, "entregue": 2, "lida": 3}  # a Meta pode avisar fora de ordem: nunca volta
 TIPO_QUE_CHEGA = {"text": "texto", "button": "botao", "interactive": "botao"}  # o resto (imagem, áudio...) = mídia
 MARCA_DA_ARTE = "[com a arte do aviso]\n"  # 1ª linha do aviso que foi com a arte (a tela mostra como etiqueta)
+PREFIXO_DO_EXEMPLO = "[aviso de exemplo] "  # o aviso de exemplo do teste da tela (Configurações > WhatsApp)
 
 
 def chave_da_conversa(telefone: str) -> str:
@@ -282,10 +283,12 @@ def chave_da_conversa(telefone: str) -> str:
 
 
 def guardar_conversa(db, conta: ContaWhatsAppOficial, telefone: str, direcao: str, texto: str, tipo: str = "texto",
-                     wamid: str = "", nome: str = "", lead_id: int | None = None, status: str = ""):
+                     wamid: str = "", nome: str = "", lead_id: int | None = None, status: str = "",
+                     imagem: bytes | None = None):
     """Guarda uma mensagem do número oficial (a que saiu ou a que chegou) para a tela API Oficial, na AR da conta. A
-    Meta às vezes manda o mesmo evento de novo: a mensagem com o mesmo id não entra duas vezes. Devolve a linha nova
-    (None = já estava ou sem telefone)."""
+    Meta às vezes manda o mesmo evento de novo: a mensagem com o mesmo id não entra duas vezes. `imagem`: a que foi
+    junto (a arte do aviso), guardada para a tela mostrar dentro da mensagem. Devolve a linha nova (None = já estava ou
+    sem telefone)."""
     from .modelos import MensagemOficial
 
     chave = chave_da_conversa(telefone)
@@ -300,7 +303,66 @@ def guardar_conversa(db, conta: ContaWhatsAppOficial, telefone: str, direcao: st
                             lida=direcao != "entrada")
     db.add(linha)
     db.flush()
+    if imagem:
+        guardar_imagem(db, linha, imagem)
     return linha
+
+
+def guardar_imagem(db, mensagem, imagem: bytes):
+    """Cópia da imagem que foi na mensagem do número oficial (tabela imagens_oficiais; a tela API Oficial mostra)."""
+    from .modelos import ImagemOficial
+    from .visual import tipo_da_imagem
+
+    tipo = tipo_da_imagem(imagem[:16])
+    if not tipo:
+        return None
+    linha = ImagemOficial(tenant_id=mensagem.tenant_id, mensagem_id=mensagem.id, wamid=mensagem.wamid or "", tipo=tipo,
+                          imagem=imagem)
+    db.add(linha)
+    db.flush()
+    return linha
+
+
+def imagens_das_mensagens(ids: list[int], *colunas):
+    """Consulta das imagens dessas mensagens do número oficial (a mesma mensagem: o número e o id da Meta). Sem
+    `colunas`, as linhas inteiras."""
+    from sqlalchemy import and_
+
+    from .modelos import ImagemOficial, MensagemOficial
+
+    return (select(*(colunas or (ImagemOficial,)))
+            .join(MensagemOficial, and_(MensagemOficial.id == ImagemOficial.mensagem_id,
+                                        MensagemOficial.wamid == ImagemOficial.wamid))
+            .where(ImagemOficial.mensagem_id.in_(ids)))
+
+
+def guardar_imagens_que_faltam(db) -> int:
+    """Os avisos com a arte que saíram pelo número oficial antes de a tela mostrar a imagem (23/11/2026): copia a arte
+    que ainda está guardada (artes_aviso fica 10 dias; achada pelo id da mensagem na Meta -> tarefa do aviso) ou, no
+    aviso de exemplo do teste, a arte de exemplo. Pode rodar de novo: só mexe nos avisos ainda sem a imagem."""
+    from .modelos import ArteAviso, ImagemOficial, Mensagem, MensagemOficial
+
+    sem = {"sem_filtro_de_ar": True}
+    tem_imagem = select(ImagemOficial.id).where(ImagemOficial.mensagem_id == MensagemOficial.id,
+                                                ImagemOficial.wamid == MensagemOficial.wamid).exists()
+    faltam = db.execute(select(MensagemOficial).where(
+        MensagemOficial.direcao == "saida", MensagemOficial.texto.contains(MARCA_DA_ARTE.strip()), ~tem_imagem)
+        .order_by(MensagemOficial.id).execution_options(**sem)).scalars().all()
+    feitas = 0
+    for m in faltam:
+        if m.texto.startswith(PREFIXO_DO_EXEMPLO):
+            imagem = IMAGEM_DE_EXEMPLO.read_bytes()
+        else:
+            tarefa_id = db.execute(select(Mensagem.tarefa_id).where(
+                Mensagem.id_externo == m.wamid, Mensagem.tarefa_id.is_not(None)).limit(1)
+                .execution_options(**sem)).scalar() if m.wamid else None
+            arte = db.execute(select(ArteAviso).where(ArteAviso.tarefa_id == tarefa_id, ArteAviso.ponte_id == 0)
+                              .order_by(ArteAviso.id.desc()).limit(1).execution_options(**sem)
+                              ).scalars().first() if tarefa_id else None
+            imagem = arte.imagem if arte is not None else None
+        if imagem and guardar_imagem(db, m, imagem) is not None:
+            feitas += 1
+    return feitas
 
 
 def atualizar_entrega(db, wamid: str, status_da_meta: str, erro: str = "") -> bool:
@@ -563,12 +625,12 @@ def enviar_teste_renovacao(db, conta: ContaWhatsAppOficial, telefone: str, nome:
         modelo = arte if arte is not None and arte.status == "APPROVED" else texto
     if modelo is None or modelo.status != "APPROVED":
         raise whatsapp_cloud.ErroWhatsApp("Ainda não há modelo do aviso aprovado pela Meta.")
-    imagem_id = (whatsapp_cloud.subir_midia(conta.phone_number_id, token(conta), IMAGEM_DE_EXEMPLO.read_bytes())
-                 if modelo.com_imagem else "")
+    exemplo = IMAGEM_DE_EXEMPLO.read_bytes() if modelo.com_imagem else None
+    imagem_id = whatsapp_cloud.subir_midia(conta.phone_number_id, token(conta), exemplo) if exemplo else ""
     wamid = whatsapp_cloud.enviar_modelo(conta.phone_number_id, token(conta), telefone, modelo.nome, modelo.idioma,
                                          EXEMPLO_DOS_VALORES, imagem_id=imagem_id)
-    guardar_conversa(db, conta, telefone, "saida", "[aviso de exemplo] " + texto_do_aviso(
-        modelo, EXEMPLO_DOS_VALORES, bool(imagem_id)), "modelo", wamid or "")
+    guardar_conversa(db, conta, telefone, "saida", PREFIXO_DO_EXEMPLO + texto_do_aviso(
+        modelo, EXEMPLO_DOS_VALORES, bool(imagem_id)), "modelo", wamid or "", imagem=exemplo if imagem_id else None)
     return modelo.nome
 
 
@@ -664,7 +726,7 @@ def enviar_toque(db, t, usuario=None, pode_pedir_arte: bool = True):
                               assunto="[com a arte do aviso de vencimento]" if arte else "")
     msg.conexao = ("oficial:" + conta.phone_number_id)[:40]
     guardar_conversa(db, conta, lead.whatsapp, "saida", texto_do_aviso(modelo, parametros, bool(arte)), "modelo",
-                     wamid or "", lead_id=lead.id)  # a tela API Oficial mostra o aviso como o cliente viu
+                     wamid or "", lead_id=lead.id, imagem=arte)  # a tela API Oficial mostra o aviso como o cliente viu
     t.status, t.concluida_em = "feita", agora()
     t.resultado = "Enviada pela API oficial da Meta" + (f" por {usuario.nome}" if usuario else "")
     nome_do_aviso = config.ANGULOS.get(t.angulo) or renovacao.ANGULOS.get(t.angulo) or t.acao or "aviso"

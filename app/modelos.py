@@ -212,6 +212,22 @@ class MensagemOficial(DaAR, Base):
     atualizado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)  # a situação da entrega mudou
 
 
+class ImagemOficial(DaAR, Base):
+    """A imagem que foi numa mensagem do número oficial (a arte do aviso de vencimento, a de exemplo do teste), para a
+    tela API Oficial mostrar dentro da mensagem (pedido da Maria em 23/11/2026: "não consigo ver a imagem das mensagens
+    para saber se saíram corretas"). É uma cópia: a de artes_aviso sai em 10 dias. Fica o mesmo prazo da conversa
+    (guarda_conversas_meses) e não vai no backup (como as artes)."""
+    __tablename__ = "imagens_oficiais"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    mensagem_id: Mapped[int] = mapped_column(Integer, index=True)  # mensagens_oficiais.id
+    # o id da mensagem na Meta, conferido junto: depois de restaurar um backup (que não leva as imagens), um número de
+    # mensagem reaproveitado nunca mostra a imagem de outra
+    wamid: Mapped[str] = mapped_column(String(160), default="")
+    tipo: Mapped[str] = mapped_column(String(40), default="image/png")
+    imagem: Mapped[bytes] = mapped_column(LargeBinary, deferred=True)
+    criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, index=True)
+
+
 class ConexaoWhatsApp(DaAR, Base):
     """Um número de WhatsApp ligado no computador da MS: o principal ou o de um usuário. Ver app/conexoes.py."""
     __tablename__ = "conexoes_whatsapp"

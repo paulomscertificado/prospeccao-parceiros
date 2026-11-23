@@ -334,6 +334,9 @@ def criar_tabelas() -> None:
         base_receita.ajustar_base_antiga(db)
         migrar_conversas_com_nono(db)
         marcar_conversas_respondidas(db)
+        from . import whatsapp_oficial
+
+        whatsapp_oficial.guardar_imagens_que_faltam(db)  # 23/11/2026: a arte dos avisos que já tinham saído
         from . import marca
 
         marca.garantir(db)  # white label, Fase 5: a marca da AR MS e os textos da MS só nela
@@ -357,6 +360,7 @@ def _versao_do_esquema() -> str:
     partes += ["dados:conversas-com-nono"]  # ajuste de dados novo (migrar_conversas_com_nono): roda uma vez na nuvem
     partes += ["dados:cadencias-sem-repeticao"]
     partes += ["dados:conversas-respondidas-lidas"]  # marcar_conversas_respondidas: roda uma vez na nuvem
+    partes += ["dados:imagens-dos-avisos-oficiais"]  # whatsapp_oficial.guardar_imagens_que_faltam: idem
     partes += [f"indice:{nome}" for nome, *_ in INDICES_PARCIAIS]  # índice parcial novo: a nuvem cria na publicação
     partes += ["dados:marca-das-ars"]  # marca.garantir: a marca da AR MS e os textos da MS só nela (Fase 5)  # modelos._remover_cadencias_repetidas: roda uma vez na nuvem
     from .modelos import CADENCIAS_SDR_EXTRAS

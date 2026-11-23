@@ -705,7 +705,9 @@ mandar SAIR deixa de receber mensagens. Por enquanto, responda pelo app WhatsApp
 Tudo o que ele manda e tudo o que chega nele aparece no menu **API Oficial**, separado das Conversas: a lista das
 conversas (a mais recente primeiro, com as mensagens novas em destaque) e, ao clicar, a conversa com os avisos que
 saíram (com ✓ enviada, ✓✓ entregue e ✓✓ lida, ou o motivo de não ter sido entregue) e tudo o que o cliente escreveu ou
-tocou nos botões, inclusive de quem não é cliente cadastrado. O número vermelho ao lado de **API Oficial** é quantas
+tocou nos botões, inclusive de quem não é cliente cadastrado. O aviso que foi com a arte mostra a **imagem** em cima do
+texto, como no WhatsApp: dá para conferir se saiu certa (nome, certificado, vencimento). Clique na imagem para vê-la
+inteira numa aba nova. A imagem fica guardada o mesmo tempo da conversa (12 meses). O número vermelho ao lado de **API Oficial** é quantas
 mensagens novas chegaram (some quando alguém abre a conversa). Para responder, fale com o cliente pelo seu WhatsApp ou
 por telefone (responder pelo número oficial, de dentro do sistema, é o próximo passo). O item só aparece na marca que
 tem a API oficial configurada.
