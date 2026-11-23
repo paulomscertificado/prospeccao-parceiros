@@ -103,45 +103,27 @@ def tela(request: Request, nome: str, contexto: dict | None = None, status_code:
     mostrar_vendas = mostrar_agenda = False
     wl = {"disponivel": False, "conectado": False}
     if usuario and usuario.perfil != "parceiro":
-        from sqlalchemy import func, select
-
         from .banco import FabricaSessao, ler_config
-        from .modelos import Notificacao
 
         with FabricaSessao() as db:
             from .banco import usar_config_da_ar
 
             usar_config_da_ar(db, request.session.get("ar_entrada") if usuario.master else usuario.tenant_id)
-            avisos_novos = db.execute(select(func.count(Notificacao.id)).where(
-                Notificacao.usuario_id == usuario.id, Notificacao.lida.is_(False))).scalar() or 0
             mostrar_vendas = ler_config(db, "mostrar_vendas") == "1"
             mostrar_agenda = ler_config(db, "mostrar_agenda") == "1"
-            from . import isolamento
+            from . import isolamento, novidades
 
             isolamento.ligar(db, usuario, request.session.get("ar_entrada") if usuario.master else None)  # a AR de quem vê
-            if autorizacao.pode(usuario, "oportunidades.ver"):
-                # O número do menu Oportunidades: as novas da AR de quem vê, a mesma conta da aba "Novas" (antes eram
-                # os avisos não lidos do sininho, que já estão em "Avisos (N)" no rodapé: no Grupo Certy o menu dizia 6
-                # e a tela, 0 novas; pedido da Maria em 19/11/2026)
-                from .modelos import Lead, Oportunidade
-
-                oportunidades_novas = db.execute(select(func.count(Oportunidade.id)).join(
-                    Lead, Oportunidade.lead_id == Lead.id).where(Oportunidade.status == "nova")).scalar() or 0
-            if autorizacao.pode(usuario, "oficial.ver"):
-                # Item "API Oficial" (21/11/2026): só na AR que tem a API oficial; o número vermelho = mensagens novas
-                from .modelos import ContaWhatsAppOficial, MensagemOficial
-
-                tem_api_oficial = db.execute(select(ContaWhatsAppOficial.id).where(
-                    ContaWhatsAppOficial.token_cripto != "").limit(1)).first() is not None
-                if tem_api_oficial:
-                    oficial_nao_lidas = db.execute(select(func.count(MensagemOficial.id)).where(
-                        MensagemOficial.direcao == "entrada", MensagemOficial.lida.is_(False))).scalar() or 0
-            if autorizacao.pode(usuario, "conversas.ver"):
-                # Item "Conversas" (23/11/2026, pedido da Maria: "assim como oportunidades tem um contador"): as
-                # mensagens recebidas não lidas nos números que a pessoa vê (a soma dos números da lista da tela)
-                from . import conexoes
-
-                conversas_nao_lidas = conexoes.mensagens_nao_lidas(db, usuario)
+            # Os números vermelhos do menu (o navegador os atualiza depois sozinho, static/notificacoes.js):
+            # Oportunidades = as novas da AR de quem vê, a mesma conta da aba "Novas" (19/11/2026); API Oficial = as
+            # mensagens novas, só na AR que tem a API oficial (21/11/2026); Conversas = as recebidas não lidas nos
+            # números que a pessoa vê (23/11/2026); Avisos = o sininho
+            conta = novidades.contadores(db, usuario)
+            avisos_novos = conta["avisos"]
+            oportunidades_novas = conta.get("oportunidades", 0)
+            tem_api_oficial = "oficial" in conta
+            oficial_nao_lidas = conta.get("oficial", 0)
+            conversas_nao_lidas = conta.get("conversas", 0)
         from . import conexoes
 
         with FabricaSessao() as db:

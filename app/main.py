@@ -106,7 +106,9 @@ from .rotas import (admin, agenda, api, auth, comercial, conversas, email_contas
                     leads, master, painel, permissoes, portal, renovacao, sdr, visuais, whatsapp)
 from .rotas import assertiva as assertiva_rotas  # noqa: E402
 from .rotas import oficial as oficial_rotas  # noqa: E402
+from .rotas import novidades as novidades_rotas  # noqa: E402
 
 for modulo in (auth, painel, sdr, leads, agenda, comercial, admin, permissoes, conversas, envios, fila, whatsapp,
-               email_contas, empresas_novas, renovacao, visuais, portal, master, assertiva_rotas, oficial_rotas, api):
+               email_contas, empresas_novas, renovacao, visuais, portal, master, assertiva_rotas, oficial_rotas,
+               novidades_rotas, api):
     app.include_router(modulo.rotas)

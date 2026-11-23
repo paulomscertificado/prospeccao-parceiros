@@ -41,6 +41,19 @@ no navegador, de qualquer lugar: não precisa do `iniciar.bat`. O passo a passo 
   O **número vermelho** ao lado de **Conversas** no menu é quantas mensagens recebidas ainda não foram lidas nos
   números que você vê. Elas ficam lidas quando alguém abre a conversa nessa tela ou responde pelo celular do número
   (ou pela tela Conversas). Resposta automática (da IA ou da campanha) não conta como lida.
+  Acima da lista, **Não lidas** mostra só as conversas com mensagem nova (**Tudo** volta a mostrar todas).
+- **Avisos como no WhatsApp:** com o sistema aberto no navegador (pode estar em outra aba), quando chega mensagem nas
+  Conversas, no número oficial (API Oficial) ou uma resposta de campanha:
+  - toca um **som**;
+  - os **números vermelhos do menu** mudam sozinhos, sem recarregar a página;
+  - o **título da aba** mostra quantas novidades há, por exemplo "(3) Leads";
+  - com os avisos na tela ligados, aparece um **aviso no canto da tela do computador** quando o sistema está em outra
+    aba ou minimizado. Clicar no aviso abre a conversa ou a oportunidade.
+
+  No rodapé do menu ficam dois botões: **🔊 Som ligado** (clique para desligar ou ligar de novo; ao ligar, ele toca o
+  som) e **🔔 Ativar avisos na tela** (clique e escolha **Permitir** na pergunta do navegador). Se aparecer "Avisos
+  bloqueados no navegador", libere no cadeado ao lado do endereço do site > Notificações > Permitir. O navegador só
+  deixa tocar som depois de um clique na página. A conversa que está aberta na tela não avisa, como no WhatsApp.
   As conversas antigas (até 1 ano) chegam quando o celular é conectado pelo QR code. Para puxar de novo: menu
   WhatsApp > Desligar este número > Conectar com QR code.
 - **WhatsApp** (em **Configurações > Comunicação**; quem não vê as Configurações, como os vendedores, acha no menu

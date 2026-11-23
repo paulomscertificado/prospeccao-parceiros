@@ -11,6 +11,12 @@
   .chat-busca input { width: 100%; padding: 9px 12px 9px 34px; border-radius: 999px; background: #fff; }
   .chat-busca svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: #98a4b3; }
   .chat-itens { flex: 1; overflow-y: auto; }
+  /* "Tudo" e "Não lidas", como os filtros do WhatsApp (23/11/2026) */
+  .filtros-chat { display: flex; gap: 6px; margin-top: 10px; }
+  .chip { font: inherit; font-size: .78rem; border: 1px solid var(--borda); background: #fff; color: #4b5a6b;
+          border-radius: 999px; padding: 4px 12px; cursor: pointer; }
+  .chip:hover { background: #f1f5fa; }
+  .chip.ativo { background: #e1f5ea; border-color: #b7e4c9; color: #146c43; font-weight: 600; }
   .chat-item { display: flex; gap: 11px; align-items: center; padding: 11px 14px; cursor: pointer; color: inherit;
                border-bottom: 1px solid #eef1f5; position: relative; }
   .chat-item:hover { background: #f1f5fa; text-decoration: none; }
@@ -94,7 +100,11 @@
       {% if not numeros %}<div class="aviso aviso-alerta" style="margin:0 0 8px">Você ainda não tem número. <a href="/whatsapp">Conecte o seu WhatsApp</a>.</div>{% endif %}
       <div class="chat-busca">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14zM21 21l-5-5"/></svg>
-      <input type="search" id="busca" placeholder="Buscar por nome ou telefone" aria-label="Buscar conversa"></div></div>
+      <input type="search" id="busca" placeholder="Buscar por nome ou telefone" aria-label="Buscar conversa"></div>
+      <div class="filtros-chat" role="group" aria-label="Mostrar">
+        <button type="button" class="chip ativo" data-filtro="">Tudo</button>
+        <button type="button" class="chip" data-filtro="nao_lidas">Não lidas</button>
+      </div></div>
     <div class="chat-itens" id="lista"><p class="vazio" style="padding:16px">Carregando...</p></div>
   </aside>
 
@@ -145,7 +155,12 @@ let numeroAtual = new URLSearchParams(location.search).get('numero') || {{ numer
 const NOMES_NUMEROS = Object.fromEntries({{ numeros|json }}.map(n => [n.id, n.nome]));
 const filtroNumero = () => (document.getElementById('numero') || {}).value || '';
 let modoNovo = false;
+let soNaoLidas = false;  // filtro "Não lidas" da lista
 let assinatura = '';
+// A conversa aberta: o aviso de mensagem nova (static/notificacoes.js) não toca para ela com a tela à vista
+Object.defineProperty(window, 'conversaAberta', {
+  get: () => (atual && !modoNovo ? { tipo: 'conversa', telefone: atual, numero: numeroAtual } : null),
+});
 // "marca" do que já está na tela: o sistema responde só "igual" quando nada mudou (gasta pouco do banco da nuvem)
 let marcaConversa = '', marcaLista = '', chaveLista = '';
 const el = id => document.getElementById(id);
@@ -189,18 +204,19 @@ function marcarAtiva() {
 }
 
 async function carregarLista(forcar) {
-  const busca = el('busca').value, numero = filtroNumero(), chave = busca + '|' + numero;
+  const busca = el('busca').value, numero = filtroNumero(), filtro = soNaoLidas ? '1' : '';
+  const chave = busca + '|' + numero + '|' + filtro;
   const marca = !forcar && chave === chaveLista ? marcaLista : '';
   let d;
   try { d = await (await fetch('/conversas/api/lista?busca=' + encodeURIComponent(busca) + '&numero=' + encodeURIComponent(numero)
-                               + (marca ? '&marca=' + encodeURIComponent(marca) : ''))).json(); } catch (e) { return; }
+                               + (filtro ? '&nao_lidas=1' : '') + (marca ? '&marca=' + encodeURIComponent(marca) : ''))).json(); } catch (e) { return; }
   mostrarSituacao(d.situacao);
   if (d.igual) return;  // nada mudou: a lista continua a mesma
   const contador = el('contador-conversas');  // o número vermelho do menu: abriu a conversa, ele baixa na hora
   if (contador && typeof d.nao_lidas_total === 'number') {
     contador.textContent = d.nao_lidas_total; contador.hidden = !d.nao_lidas_total;
   }
-  if (busca !== el('busca').value || numero !== filtroNumero()) return;  // a busca mudou enquanto esperava
+  if (busca !== el('busca').value || numero !== filtroNumero() || filtro !== (soNaoLidas ? '1' : '')) return;  // a busca mudou enquanto esperava
   marcaLista = d.marca || ''; chaveLista = chave;
   el('lista').innerHTML = d.conversas.length ? d.conversas.map(c => `
     <a class="chat-item ${c.telefone === atual && c.numero === numeroAtual && !modoNovo ? 'ativa' : ''} ${c.nao_lidas ? 'nao-lida' : ''}" data-tel="${c.telefone}" data-numero="${c.numero}">
@@ -211,7 +227,7 @@ async function carregarLista(forcar) {
           ${c.nao_lidas ? `<span class="qtd">${c.nao_lidas}</span>` : ''}</div>
         ${d.varios_numeros && !filtroNumero() ? `<div class="pequeno suave">📱 ${escapar(c.numero_nome)}</div>` : ''}
       </div>
-    </a>`).join('') : '<p class="vazio" style="padding:16px">Nenhuma conversa encontrada.</p>';
+    </a>`).join('') : `<p class="vazio" style="padding:16px">${soNaoLidas ? 'Nenhuma conversa não lida.' : 'Nenhuma conversa encontrada.'}</p>`;
   el('lista').querySelectorAll('[data-tel]').forEach(a => a.addEventListener('click', () => abrir(a.dataset.tel, a.dataset.numero)));
 }
 
@@ -306,6 +322,15 @@ el('texto').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shift
 el('texto').addEventListener('input', ajustarAltura);
 let espera; el('busca').addEventListener('input', () => { clearTimeout(espera); espera = setTimeout(carregarLista, 300); });
 if (el('numero')) el('numero').addEventListener('change', () => { if (filtroNumero()) numeroAtual = filtroNumero(); carregarLista(); });
+document.querySelectorAll('.filtros-chat .chip').forEach(b => b.addEventListener('click', () => {
+  soNaoLidas = b.dataset.filtro === 'nao_lidas';
+  document.querySelectorAll('.filtros-chat .chip').forEach(x => x.classList.toggle('ativo', x === b));
+  carregarLista(true);
+}));
+// Chegou mensagem (aviso do static/notificacoes.js): a lista e a conversa aberta se atualizam na hora
+document.addEventListener('novidades', e => {
+  if (((e.detail || {}).novas || []).some(n => n.tipo === 'conversa')) { carregarLista(); carregarConversa(false); }
+});
 
 function fecharNome() { el('form-nome').style.display = 'none'; el('area-nome').style.display = ''; el('editar-nome').style.display = modoNovo ? 'none' : ''; }
 el('editar-nome').addEventListener('click', () => {

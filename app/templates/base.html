@@ -48,13 +48,18 @@
     {% for link, nome, icone in menu %}
       <a class="item {{ 'ativo' if (caminho == link or (link not in ['/', '/portal'] and caminho.startswith(link))
             or (link == '/configuracoes' and caminho.startswith(('/permissoes', '/categorias', '/conhecimento', '/whatsapp', '/email')))) }}" href="{{ link }}">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ ICONES[icone] }}"/></svg>{{ nome }}{% if link == '/oportunidades' and oportunidades_novas %}<span class="contador" title="Oportunidades novas esperando atendimento">{{ oportunidades_novas }}</span>{% endif %}{% if link == '/oficial' and oficial_nao_lidas %}<span class="contador" title="Mensagens novas no número oficial">{{ oficial_nao_lidas }}</span>{% endif %}{% if link == '/conversas' %}<span class="contador" id="contador-conversas" title="Mensagens novas nas conversas"{% if not conversas_nao_lidas %} hidden{% endif %}>{{ conversas_nao_lidas }}</span>{% endif %}{% if link == '/whatsapp' %}<span class="ponto {{ 'verde' if wl.conectado else ('amarelo' if wl.disponivel else 'vermelho') }}" style="margin-left:auto" title="WhatsApp {{ 'conectado' if wl.conectado else ('aguardando QR code' if wl.estado_codigo == 'aguardando_qr' else ('desconectado' if wl.disponivel else 'desligado')) }}"></span>{% endif %}</a>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ ICONES[icone] }}"/></svg>{{ nome }}{% if link == '/oportunidades' %}<span class="contador" id="contador-oportunidades" title="Oportunidades novas esperando atendimento"{% if not oportunidades_novas %} hidden{% endif %}>{{ oportunidades_novas }}</span>{% endif %}{% if link == '/oficial' %}<span class="contador" id="contador-oficial" title="Mensagens novas no número oficial"{% if not oficial_nao_lidas %} hidden{% endif %}>{{ oficial_nao_lidas }}</span>{% endif %}{% if link == '/conversas' %}<span class="contador" id="contador-conversas" title="Mensagens novas nas conversas"{% if not conversas_nao_lidas %} hidden{% endif %}>{{ conversas_nao_lidas }}</span>{% endif %}{% if link == '/whatsapp' %}<span class="ponto {{ 'verde' if wl.conectado else ('amarelo' if wl.disponivel else 'vermelho') }}" style="margin-left:auto" title="WhatsApp {{ 'conectado' if wl.conectado else ('aguardando QR code' if wl.estado_codigo == 'aguardando_qr' else ('desconectado' if wl.disponivel else 'desligado')) }}"></span>{% endif %}</a>
     {% endfor %}
     <div class="rodape">
       <div><b>{{ usuario.nome }}</b></div>
       <div class="suave" style="color:var(--menu-suave)">{{ usuario.perfil_nome }}</div>
       {% if usuario.master %}<div style="margin-top:6px"><a href="/master">Painel master</a></div>{% endif %}
-      <div style="margin-top:6px"><a href="/notificacoes">Avisos{{ ' (' ~ avisos_novos ~ ')' if avisos_novos }}</a> · <a href="/minha-conta">Minha conta</a> · <a href="/sair">Sair</a></div>
+      <div style="margin-top:6px"><a href="/notificacoes" id="link-avisos">Avisos{{ ' (' ~ avisos_novos ~ ')' if avisos_novos }}</a> · <a href="/minha-conta">Minha conta</a> · <a href="/sair">Sair</a></div>
+      {% if usuario.perfil != 'parceiro' %}{# avisos como no WhatsApp: som e aviso na tela do computador (static/notificacoes.js) #}
+      <div class="notif-config" id="notif-config" hidden>
+        <button type="button" id="notif-som" title="Toca um som quando chega mensagem ou resposta de campanha">Som ligado</button>
+        <button type="button" id="notif-tela" title="Mostra um aviso no canto da tela do computador, mesmo com o sistema em outra aba">Ativar avisos na tela</button>
+      </div>{% endif %}
     </div>
   </nav>
   <main class="conteudo">
@@ -69,6 +74,7 @@
   {% block publico %}{% endblock %}
 {% endif %}
 <script src="/static/app.js?v=2"></script>
+{% if usuario and usuario.perfil != 'parceiro' %}<script src="/static/notificacoes.js?v=1"></script>{% endif %}
 {% block scripts %}{% endblock %}
 </body>
 </html>

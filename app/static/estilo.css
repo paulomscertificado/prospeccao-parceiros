@@ -71,6 +71,13 @@ hr { border: 0; border-top: 1px solid var(--borda); margin: 16px 0; }
 .menu a.item.ativo { background: rgba(255, 255, 255, .14); color: #fff; font-weight: 600; }
 .menu .rodape { margin-top: auto; padding: 12px 8px 0; font-size: .82rem; border-top: 1px solid rgba(255,255,255,.1); }
 .menu .rodape a { color: #fff; }
+/* Som e aviso na tela do computador (static/notificacoes.js, 23/11/2026) */
+.notif-config { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-top: 8px; }
+.notif-config button { font: inherit; font-size: .76rem; color: #fff; background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(255, 255, 255, .16); border-radius: 999px; padding: 3px 10px; cursor: pointer; }
+.notif-config button:hover:not([disabled]) { background: rgba(255, 255, 255, .16); }
+.notif-config button[disabled] { cursor: default; opacity: .75; }
+.notif-config button.desligado { opacity: .6; }
 .conteudo { flex: 1; min-width: 0; padding: 22px 28px 40px; }
 .topo-celular { display: none; }
 .cabecalho { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }

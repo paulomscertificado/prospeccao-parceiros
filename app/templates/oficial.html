@@ -122,6 +122,11 @@
     var caixa = document.getElementById('mensagens');
     if (caixa) caixa.scrollTop = caixa.scrollHeight;
     var marca = {{ marca_da_tela|tojson }};
+    // a conversa aberta: o aviso de mensagem nova (static/notificacoes.js) não toca para ela com a tela à vista
+    window.conversaAberta = {{ ({'tipo': 'oficial', 'telefone': chave} if chave else none)|tojson }};
+    document.addEventListener('novidades', function (e) {  // chegou mensagem no número oficial: atualiza já
+      if (((e.detail || {}).novas || []).some(function (n) { return n.tipo === 'oficial'; })) window.location.reload();
+    });
     setInterval(function () {
       if (document.visibilityState !== 'visible') return;
       fetch('/oficial/marca', {credentials: 'same-origin'}).then(function (r) { return r.ok ? r.json() : null; })

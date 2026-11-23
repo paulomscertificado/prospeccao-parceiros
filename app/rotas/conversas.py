@@ -122,26 +122,32 @@ def tela_conversas(request: Request, telefone: str = "", usuario: Usuario = Depe
 
 
 @rotas.get("/conversas/api/lista")
-def lista(busca: str = "", numero: str = "", marca: str = "", usuario: Usuario = Depends(exige("conversas.ver")),
-          db: Session = Depends(obter_db)):
+def lista(busca: str = "", numero: str = "", marca: str = "", nao_lidas: str = "",
+          usuario: Usuario = Depends(exige("conversas.ver")), db: Session = Depends(obter_db)):
     _tela_vista(db)
     numeros = _numeros(db, usuario, numero)
     situacao = _situacao(db, numero or _numero_padrao(db, usuario))
+    so_nao_lidas = nao_lidas == "1"  # filtro "Não lidas", como no WhatsApp (23/11/2026)
     # Nenhuma mensagem nova (de nenhum número), nada lido e nenhum nome mudado desde a última vez: a lista é a mesma e
     # não é refeita (é a consulta mais pesada da tela). O maior id vem do índice principal, sem passar pelas mensagens.
     ultima = db.execute(select(func.max(MensagemWhatsApp.id)).execution_options(sem_filtro_de_ar=True)).scalar()
-    atual = _marca(ultima, ler_config(db, VERSAO), sorted(numeros), busca.strip(), numero)
+    atual = _marca(ultima, ler_config(db, VERSAO), sorted(numeros), busca.strip(), numero, so_nao_lidas)
     if marca and marca == atual:
         return JSONResponse({"igual": True, "marca": atual, "situacao": situacao})
     nomes_numeros = {c.id: c.nome for c in conexoes.todas(db)}
+    nao_lidas_da_conversa = func.sum(((MensagemWhatsApp.direcao == "entrada") & MensagemWhatsApp.lida.is_(False))
+                                     .cast(MensagemWhatsApp.id.type))
     # Uma linha por contato e número, a conversa mais recente primeiro (pela data da mensagem)
     consulta = (select(MensagemWhatsApp.conexao, MensagemWhatsApp.telefone,
-                       func.max(MensagemWhatsApp.criado_em).label("ultima_em"),
-                       func.sum(((MensagemWhatsApp.direcao == "entrada") & MensagemWhatsApp.lida.is_(False))
-                                .cast(MensagemWhatsApp.id.type)).label("nao_lidas"))
+                       func.max(MensagemWhatsApp.criado_em).label("ultima_em"), nao_lidas_da_conversa.label("nao_lidas"))
                 .where(MensagemWhatsApp.conexao.in_(numeros or [""]))
                 .group_by(MensagemWhatsApp.conexao, MensagemWhatsApp.telefone)
                 .order_by(func.max(MensagemWhatsApp.criado_em).desc()).limit(200))
+    if so_nao_lidas:  # só as conversas com recebida não lida (pelo índice das não lidas, sem passar por todas)
+        com_nao_lidas = select(MensagemWhatsApp.telefone).where(
+            MensagemWhatsApp.conexao.in_(numeros or [""]), MensagemWhatsApp.direcao == "entrada",
+            MensagemWhatsApp.lida == False)  # noqa: E712
+        consulta = consulta.where(MensagemWhatsApp.telefone.in_(com_nao_lidas)).having(nao_lidas_da_conversa > 0)
     termo = busca.strip()
     if termo:
         filtros = [MensagemWhatsApp.nome.ilike(f"%{termo}%"),

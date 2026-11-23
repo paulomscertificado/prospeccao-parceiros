@@ -172,6 +172,27 @@ celular e 73 pela tela até 23/11/2026): sem essa regra, o número só crescia. 
 `criar_indices_parciais`; a marca `indice:<nome>` faz a nuvem criar na publicação). Teste: `testes/test_contador_conversas.py`.
 O da API Oficial (`oficial_nao_lidas`) já existia: ver `docs/whatsapp-oficial.md`.
 
+**Avisos como no WhatsApp** (23/11/2026, pedido da Maria: "replique o funcionamento de notificações do WhatsApp para o
+sistema, além de que adicione esse som para quando alguém responder em alguma conversa ou algum disparo de alguma
+campanha"): `static/notificacoes.js` (em todas as telas da equipe, `base.html`) pergunta a `GET /novidades`
+(`rotas/novidades.py` → `app/novidades.resumo`, porteiro `usuario_logado`, parceiro recebe vazio) a cada 15 s com a aba
+à vista e 30 s escondida, mandando até onde já viu (`c` = `mensagens_whatsapp.id`, `o` = `mensagens_oficiais.id`, `n` =
+`notificacoes.id`; guardado no `localStorage` com a hora: mais de 10 min sem olhar = recomeça sem avisar o que chegou,
+para não abrir o sistema com uma enxurrada de avisos). A resposta traz os contadores do menu
+(`novidades.contadores`, o mesmo cálculo do `web.tela`), os maiores ids e as novidades (até 5 de cada tipo, só não
+lidas): **conversa** (recebida nos números que a pessoa vê, `conexoes.acessiveis`), **oficial** (recebida no número
+oficial da AR, com `oficial.ver`) e **resposta** (aviso do sininho da pessoa com link `/oportunidades...`, criado por
+`sdr.notificar` na resposta de campanha; os outros avisos do sininho só mudam o "Avisos (N)"). O navegador atualiza
+os números (`#contador-conversas`, `#contador-oficial`, `#contador-oportunidades`, `#link-avisos`), põe "(N)" no
+título da aba (Conversas + API Oficial + Oportunidades), toca `static/sons/notificacao.wav` (o som que a Maria
+mandou, 0,7 s) uma vez por pergunta e, com a permissão do navegador (`Notification`, botão "Ativar avisos na tela" no
+rodapé do menu) e o sistema fora da frente, mostra até 3 avisos na tela do computador (`tag` por conversa; o clique
+abre o `link`, só endereço do próprio sistema). Som ligado/desligado fica no navegador (`ms_novidades_som`). Com
+várias abas, a primeira que vê a novidade avisa (as outras comparam com o guardado). Conversa aberta na tela à vista não
+avisa (`window.conversaAberta` das telas Conversas e API Oficial); essas telas se atualizam na hora com o evento
+`novidades`. Tela Conversas: filtros **Tudo** / **Não lidas** (`/conversas/api/lista?nao_lidas=1`: só as conversas
+com recebida não lida, pelo índice das não lidas + `HAVING`). Teste: `testes/test_novidades.py`.
+
 Sem sinal do computador por mais que o intervalo dele + 2 minutos (pelo menos 3 min: de dia, 3 min; à noite, 7 min;
 `whatsapp_leads.espera_do_computador` usa a `espera` que ele informa, ou a regra do horário se ele não informar), a
 tela mostra "WhatsApp desligado" e o botão de envio avisa em vez de deixar a mensagem esperando sem prazo. Até
