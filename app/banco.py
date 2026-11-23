@@ -274,6 +274,34 @@ def migrar_conversas_com_nono(db: Session) -> int:
     return total
 
 
+def marcar_conversas_respondidas(db: Session) -> int:
+    """Cópia das conversas do WhatsApp (23/11/2026): a recebida que alguém já respondeu pelo celular ou por uma tela
+    passa a contar como lida, para o número vermelho do menu Conversas não começar com as conversas respondidas pelo
+    celular, que ninguém abriu na tela. Daqui em diante isso é feito quando a resposta chega pela ponte
+    (conexoes.marcar_respondidas). Pode rodar de novo: só mexe no que ainda está como não lido."""
+    from . import conexoes
+
+    return conexoes.marcar_respondidas(db)
+
+
+# Índices parciais (só as linhas que interessam), criados também em tabelas que já existem (o create_all só cria os
+# índices de tabela nova): (nome, tabela, colunas, condição)
+INDICES_PARCIAIS = (
+    # o número vermelho do menu Conversas (conexoes.mensagens_nao_lidas) conta só as recebidas não lidas, a cada tela
+    ("ix_mensagens_whatsapp_nao_lidas", "mensagens_whatsapp", "conexao", "direcao = 'entrada' AND NOT lida"),
+)
+
+
+def criar_indices_parciais() -> None:
+    from sqlalchemy import text
+
+    with motor.begin() as con:
+        if motor.dialect.name == "postgresql":
+            con.execute(text("SELECT pg_advisory_xact_lock(724501)"))  # uma cópia da nuvem por vez
+        for nome, tabela, colunas, condicao in INDICES_PARCIAIS:
+            con.execute(text(f"CREATE INDEX IF NOT EXISTS {nome} ON {tabela} ({colunas}) WHERE {condicao}"))
+
+
 def criar_tabelas() -> None:
     from . import base_receita, bases_importadas, modelos  # noqa: F401  (registra as tabelas)
 
@@ -287,6 +315,7 @@ def criar_tabelas() -> None:
     else:
         Base.metadata.create_all(motor)
     migrar_colunas()
+    criar_indices_parciais()
     from . import ars
 
     with motor.begin() as con:  # white label: as ARs de hoje existem desde o início (isolamento.py)
@@ -304,6 +333,7 @@ def criar_tabelas() -> None:
         migrar_status(db)
         base_receita.ajustar_base_antiga(db)
         migrar_conversas_com_nono(db)
+        marcar_conversas_respondidas(db)
         from . import marca
 
         marca.garantir(db)  # white label, Fase 5: a marca da AR MS e os textos da MS só nela
@@ -326,6 +356,8 @@ def _versao_do_esquema() -> str:
     partes += [f"{p.codigo}:{p.padrao}" for p in CATALOGO]  # permissão nova: a nuvem dá o padrão aos papéis
     partes += ["dados:conversas-com-nono"]  # ajuste de dados novo (migrar_conversas_com_nono): roda uma vez na nuvem
     partes += ["dados:cadencias-sem-repeticao"]
+    partes += ["dados:conversas-respondidas-lidas"]  # marcar_conversas_respondidas: roda uma vez na nuvem
+    partes += [f"indice:{nome}" for nome, *_ in INDICES_PARCIAIS]  # índice parcial novo: a nuvem cria na publicação
     partes += ["dados:marca-das-ars"]  # marca.garantir: a marca da AR MS e os textos da MS só nela (Fase 5)  # modelos._remover_cadencias_repetidas: roda uma vez na nuvem
     from .modelos import CADENCIAS_SDR_EXTRAS
 

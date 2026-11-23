@@ -504,6 +504,24 @@ def pessoas_visiveis(usuario: Usuario | None, permissao: str, pessoas) -> list:
     return [p for p in pessoas if ids is None or p.id in ids]
 
 
+def quem_tem(db: Session, permissao: str, ar: int | None) -> list[Usuario]:
+    """As pessoas ativas da equipe da AR `ar` (sem o portal do parceiro e sem o Admin Master, que é da plataforma) que
+    têm a permissão, com os módulos ligados nessa AR. Para as telas que mostram "quem vê" (o número oficial na tela
+    WhatsApp, pedido da Maria em 23/11/2026). Calcula sem guardar nada nas pessoas (a conta é a da AR `ar`)."""
+    from .banco import usar_config_da_ar
+
+    if permissao not in POR_CODIGO:
+        raise ValueError(f"Permissão desconhecida: {permissao}")
+    anterior = db.info.get("ar_config")
+    usar_config_da_ar(db, ar)
+    try:
+        pessoas = db.execute(select(Usuario).where(Usuario.ativo.is_(True), Usuario.perfil != "parceiro",
+                                                   Usuario.tenant_id == ar).order_by(Usuario.nome)).scalars().all()
+        return [p for p in pessoas if permissao in _calcular(db, p)[0]]
+    finally:
+        usar_config_da_ar(db, anterior)
+
+
 def dono_de(obj) -> set[int | None]:
     """Quem é o dono do registro, para conferir o alcance."""
     nome = type(obj).__name__

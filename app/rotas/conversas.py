@@ -169,7 +169,9 @@ def lista(busca: str = "", numero: str = "", marca: str = "", usuario: Usuario =
                           "nome": nome, "ultima": m.texto[:120], "ultima_direcao": m.direcao,
                           "quando": _quando_curto(m.criado_em), "nao_lidas": int(nao_lidas or 0)})
     return JSONResponse({"conversas": resultado, "situacao": situacao, "varios_numeros": len(_numeros(db, usuario)) > 1,
-                         "marca": atual})
+                         "marca": atual,
+                         # o número vermelho do menu (23/11/2026): abriu a conversa, ele baixa sem recarregar a tela
+                         "nao_lidas_total": conexoes.mensagens_nao_lidas(db, usuario)})
 
 
 def _ultimas_mensagens(db: Session, conexoes_: set, telefones: set) -> dict:

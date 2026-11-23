@@ -1,0 +1,31 @@
+{# Número da API oficial da Meta na tela WhatsApp (pedido da Maria em 23/11/2026: "a API não aparece aqui ... preciso
+   compartilhar as conversas com a equipe"). É da empresa, não de uma pessoa: não tem o "Compartilhar"; as conversas
+   aparecem no menu API Oficial para quem tem a permissão. Variável: numeros_oficiais (rotas/whatsapp.py). #}
+{% if numeros_oficiais %}
+<h2 style="margin:4px 0 10px"><span class="etiqueta">Número oficial (API da Meta)</span></h2>
+<div class="numeros" style="margin-bottom:22px">
+  {% for o in numeros_oficiais %}
+  <div class="cartao numero" id="numero-oficial-{{ o.id }}">
+    <div class="topo-numero">
+      <div class="icone-numero" style="background:var(--verde)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-3.8-.9L3 21l1.9-5.2A8.4 8.4 0 0 1 3.6 11.5 8.5 8.5 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5zM8.5 11.5l2.5 2.5 4.5-5"/></svg></div>
+      <div class="titulo"><b>{{ o.nome }}</b>
+        <span class="pequeno suave">Da empresa{% if o.marca %} · {{ o.marca }}{% endif %} · API oficial da Meta</span></div>
+      <span class="selo {{ 'selo-ok' if o.conectado else 'selo-alerta' }}">{{ 'Conectado' if o.conectado else 'Não confirmado' }}</span>
+    </div>
+    <div class="pequeno">{{ o.numero or '' }}{% if o.testado_em %} <span class="suave">· conferido em {{ o.testado_em|datahora }}</span>{% endif %}</div>
+    <p class="pequeno" style="margin:0">Não precisa compartilhar: as conversas deste número aparecem no menu <b>API Oficial</b>
+      para todos da equipe que têm a permissão "Ver as conversas da API oficial do WhatsApp".</p>
+    <div class="pequeno quem-ve"><b>Quem vê as conversas ({{ o.quem_ve|length }}):</b>
+      {{ o.quem_ve|join(', ') if o.quem_ve else 'ninguém por enquanto' }}</div>
+    <div class="grupo-btn">
+      {% if pode('oficial.ver') %}<a class="btn btn-primario btn-pequeno" href="/oficial">Abrir as conversas</a>{% endif %}
+      {% if oficial_ar and pode('whatsapp.gerenciar_todos') %}<a class="btn btn-pequeno" href="#oficial">Configurar</a>
+      {% elif pode('whatsapp.gerenciar_todos') %}<span class="pequeno suave">Para configurar: Painel master &gt; Entrar na AR.</span>{% endif %}
+    </div>
+    <p class="pequeno suave" style="margin:0">Responder por este número pelo sistema ainda não dá: a equipe fala com o cliente
+      pelo próprio WhatsApp ou por telefone.{% if pode('permissoes.gerenciar') %} Para tirar alguém:
+      <a href="/permissoes?aba=usuarios">Exceções por pessoa</a>.{% endif %}</p>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}

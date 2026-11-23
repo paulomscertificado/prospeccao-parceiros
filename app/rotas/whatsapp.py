@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from .. import autorizacao, config, conexoes, marca, whatsapp_oficial
 from ..banco import agora, obter_db
 from ..integracoes import whatsapp_cloud, whatsapp_leads
-from ..modelos import ComandoWhatsApp, ConexaoWhatsApp, Usuario
+from ..modelos import ComandoWhatsApp, ConexaoWhatsApp, ContaWhatsAppOficial, Usuario
 from ..seguranca import exige, registrar_log, verificar_csrf
 from ..web import avisar, tela, voltar
 
@@ -56,6 +56,25 @@ def _estado(db: Session, usuario: Usuario) -> dict:
             "regras": base.get("regras") or {}}
 
 
+def _numeros_oficiais(db: Session, usuario: Usuario) -> list[dict]:
+    """O número da API oficial de cada AR que a pessoa enxerga (a dela; o Admin Master fora de uma AR vê o de todas),
+    com quem da AR vê as conversas no menu API Oficial (pedido da Maria em 23/11/2026: "a API não aparece aqui ... preciso
+    compartilhar as conversas com a equipe"). É da empresa, não de uma pessoa: não tem o "Compartilhar"; quem vê é
+    quem tem a permissão "Ver as conversas da API oficial do WhatsApp" (o papel, ou uma exceção por pessoa)."""
+    if not (autorizacao.pode(usuario, "oficial.ver") or autorizacao.pode(usuario, "whatsapp.gerenciar_todos")):
+        return []
+    contas = db.execute(select(ContaWhatsAppOficial).where(ContaWhatsAppOficial.token_cripto != "")
+                        .order_by(ContaWhatsAppOficial.tenant_id, ContaWhatsAppOficial.id)).scalars().all()
+    cartoes = []
+    for conta in contas:
+        s = whatsapp_oficial.situacao(conta)
+        cartoes.append({"id": conta.id, "nome": conta.nome or "Número oficial", "numero": s.get("numero") or conta.numero,
+                        "marca": marca.da_ar(db, conta.tenant_id)["nome"] if conta.tenant_id else "",
+                        "conectado": bool(s) and s.get("ativado") is not False, "testado_em": conta.testado_em,
+                        "quem_ve": [p.nome for p in autorizacao.quem_tem(db, "oficial.ver", conta.tenant_id)]})
+    return cartoes
+
+
 def _endereco_do_webhook(request: Request) -> str:
     """Endereço público do webhook, para colar no painel da Meta (na Vercel o pedido chega por um proxy https)."""
     esquema = request.headers.get("x-forwarded-proto") or request.url.scheme
@@ -79,6 +98,7 @@ def tela_whatsapp(request: Request, usuario: Usuario = Depends(exige("whatsapp.v
                   + "\n\n" + whatsapp_oficial.RODAPE_RENOVACAO)
     return tela(request, "whatsapp.html", {"secao": "whatsapp", "estado": estado, "regras": estado["regras"], "equipe": equipe_,
                                            "url_local": config.WHATSAPP_LEADS_URL + "/whatsapp",
+                                           "numeros_oficiais": _numeros_oficiais(db, usuario),
                                            "oficial_ar": ar_oficial, "oficial": oficial,
                                            "oficial_situacao": whatsapp_oficial.situacao(oficial),
                                            "webhook_url": _endereco_do_webhook(request),

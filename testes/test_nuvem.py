@@ -260,7 +260,8 @@ def test_conversas_copiadas_e_envio_para_qualquer_numero(cliente, nuvem):
     assert pagina.status_code == 200 and "Nova mensagem" in pagina.text and 'href="/conversas"' in pagina.text
     lista = cliente.get("/conversas/api/lista").json()["conversas"]
     carla = next(c for c in lista if c["telefone"] == "81977770001")
-    assert carla["nome"] == "Carla Cliente" and carla["nao_lidas"] == 1 and carla["ultima_direcao"] == "saida"
+    # respondeu pela tela ("manual"): a recebida antes da resposta já conta como lida (23/11/2026, número do menu)
+    assert carla["nome"] == "Carla Cliente" and carla["nao_lidas"] == 0 and carla["ultima_direcao"] == "saida"
     assert cliente.get("/conversas/api/lista?busca=carla").json()["conversas"][0]["telefone"] == "81977770001"
     c = cliente.get("/conversas/api/conversa/81977770001").json()
     assert [m["direcao"] for m in c["mensagens"]] == ["entrada", "saida"]

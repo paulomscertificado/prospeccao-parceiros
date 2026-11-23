@@ -158,6 +158,20 @@ faz a nuvem rodar uma vez). A busca por número acha com ou sem o 9. Enquanto h�
 O que se escreve na tela vira `ponte_whatsapp.manual = 1` → `integracao.enviar_manual` → fila "manual" (sai na
 hora). Opt-out da Prospecção bloqueia; quando o número é de um lead, entra no histórico dele.
 
+**Número vermelho do menu Conversas** (23/11/2026, pedido da Maria: "assim como oportunidades tem um contador de
+mensagens coloque também em conversas e api oficial"): `conexoes.mensagens_nao_lidas` = recebidas com `lida` falso nos
+números que a pessoa vê (`conexoes.acessiveis`, a soma das bolinhas da lista), calculado em `web.tela` com a AR de quem
+vê; a lista (`/conversas/api/lista`) devolve `nao_lidas_total` e a tela acerta o número do menu sem recarregar. Lida =
+alguém abriu a conversa na tela (`conversas._marcar_lidas`) **ou respondeu como gente**: saída com origem `celular` ou
+`manual` (`conexoes.ORIGENS_DE_GENTE`) deixa lidas as recebidas até a hora dela na mesma conversa
+(`conexoes.marcar_respondidas`, chamado em `api._guardar_conversas` para as conversas que chegaram no lote). Resposta da
+IA (`ia`), da automação e da campanha (`sdr`) não conta. A equipe responde quase tudo pelo celular (4.477 respostas pelo
+celular e 73 pela tela até 23/11/2026): sem essa regra, o número só crescia. As antigas foram acertadas uma vez por
+`banco.marcar_conversas_respondidas` (em `criar_tabelas`, marca `dados:conversas-respondidas-lidas`). A contagem usa o
+índice parcial `ix_mensagens_whatsapp_nao_lidas` (`banco.INDICES_PARCIAIS`, criado também em tabela que já existe por
+`criar_indices_parciais`; a marca `indice:<nome>` faz a nuvem criar na publicação). Teste: `testes/test_contador_conversas.py`.
+O da API Oficial (`oficial_nao_lidas`) já existia: ver `docs/whatsapp-oficial.md`.
+
 Sem sinal do computador por mais que o intervalo dele + 2 minutos (pelo menos 3 min: de dia, 3 min; à noite, 7 min;
 `whatsapp_leads.espera_do_computador` usa a `espera` que ele informa, ou a regra do horário se ele não informar), a
 tela mostra "WhatsApp desligado" e o botão de envio avisa em vez de deixar a mensagem esperando sem prazo. Até

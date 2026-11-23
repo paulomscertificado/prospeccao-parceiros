@@ -38,6 +38,9 @@ no navegador, de qualquer lugar: não precisa do `iniciar.bat`. O passo a passo 
   do banco da nuvem, ela só baixa a conversa de novo quando algo mudou (mensagem nova, status, mensagem lida).
   Para trocar o nome de um contato, abra a conversa e clique em **✏️ Editar nome** (o nome muda também no
   WhatsApp Leads).
+  O **número vermelho** ao lado de **Conversas** no menu é quantas mensagens recebidas ainda não foram lidas nos
+  números que você vê. Elas ficam lidas quando alguém abre a conversa nessa tela ou responde pelo celular do número
+  (ou pela tela Conversas). Resposta automática (da IA ou da campanha) não conta como lida.
   As conversas antigas (até 1 ano) chegam quando o celular é conectado pelo QR code. Para puxar de novo: menu
   WhatsApp > Desligar este número > Conectar com QR code.
 - **WhatsApp** (em **Configurações > Comunicação**; quem não vê as Configurações, como os vendedores, acha no menu
@@ -690,8 +693,15 @@ Tudo o que ele manda e tudo o que chega nele aparece no menu **API Oficial**, se
 conversas (a mais recente primeiro, com as mensagens novas em destaque) e, ao clicar, a conversa com os avisos que
 saíram (com ✓ enviada, ✓✓ entregue e ✓✓ lida, ou o motivo de não ter sido entregue) e tudo o que o cliente escreveu ou
 tocou nos botões, inclusive de quem não é cliente cadastrado. O número vermelho ao lado de **API Oficial** é quantas
-mensagens novas chegaram. Para responder, fale com o cliente pelo seu WhatsApp ou por telefone (responder pelo número
-oficial, de dentro do sistema, é o próximo passo). O item só aparece na marca que tem a API oficial configurada.
+mensagens novas chegaram (some quando alguém abre a conversa). Para responder, fale com o cliente pelo seu WhatsApp ou
+por telefone (responder pelo número oficial, de dentro do sistema, é o próximo passo). O item só aparece na marca que
+tem a API oficial configurada.
+
+**Quem vê as conversas do número oficial:** ele não precisa ser compartilhado, porque é da empresa, não de uma pessoa.
+Todos da equipe da marca com a permissão "Ver as conversas da API oficial do WhatsApp" veem as conversas no menu
+**API Oficial** (essa permissão vem ligada em todos os papéis). Em **Configurações > WhatsApp**, o quadro **Número
+oficial (API da Meta)** mostra o número e a lista de quem vê. Para tirar alguém: **Configurações > Exceções por
+pessoa**.
 
 Como fica: os mesmos dias e horários de sempre, a arte do aviso em cima (quem tem vários certificados recebe a lista
 no texto) e sem o limite de 20 por dia do QR code (a Meta cobra por mensagem). Quando o cliente toca em um botão:
@@ -827,7 +837,8 @@ Sem e-mail ou número, os disparos dela esperam e ela recebe um aviso para cadas
 quem não vê as Configurações), cada um conecta o próprio número pelo
 QR code. A IA SDR manda os WhatsApps dos leads de cada pessoa pelo número dela (ou por um compartilhado com ela);
 sem número, as mensagens esperam e a pessoa recebe um aviso para conectar. Em **Conversas**, cada um vê só as conversas do
-próprio número e dos números compartilhados com ele.
+próprio número e dos números compartilhados com ele. O número oficial da API da Meta aparece na mesma tela, no quadro
+**Número oficial (API da Meta)**, e não precisa ser compartilhado (ver "Quem vê as conversas do número oficial").
 **Compartilhar um número:** no cartão do número, **Compartilhar este número** → "Toda a equipe" ou escolha as
 pessoas. O dono do número, o administrador e o gestor escolhem com quem compartilhar; só o dono e o administrador
 conectam, pausam ou desligam. Quem não é o dono não pode se incluir, não pode liberar para toda a equipe e não mexe no

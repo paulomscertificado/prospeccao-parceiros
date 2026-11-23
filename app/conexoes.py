@@ -12,13 +12,17 @@ Regras:
 
 import json
 
-from sqlalchemy import select
+from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy.orm import aliased
 
 from . import autorizacao, config
 from .integracoes import whatsapp_leads
-from .modelos import Campanha, ConexaoWhatsApp, Lead, Tarefa, Usuario
+from .modelos import Campanha, ConexaoWhatsApp, Lead, MensagemWhatsApp, Tarefa, Usuario
 
 PRINCIPAL = "principal"
+# Resposta de gente: pelo celular do número ou por uma tela Conversas (a do sistema ou a do WhatsApp Leads). Resposta
+# da IA, da automação ou da campanha não conta como "alguém leu" (marcar_respondidas).
+ORIGENS_DE_GENTE = ("celular", "manual")
 
 
 class SemNumero(Exception):
@@ -82,6 +86,38 @@ def pode_disparar(quem: Usuario, c: ConexaoWhatsApp) -> bool:
 
 def acessiveis(db, usuario: Usuario) -> list[ConexaoWhatsApp]:
     return [c for c in todas(db) if pode_usar(usuario, c)]
+
+
+def mensagens_nao_lidas(db, usuario: Usuario) -> int:
+    """O número vermelho do menu Conversas (pedido da Maria em 23/11/2026: "assim como oportunidades tem um contador"):
+    as mensagens recebidas que ninguém leu nos números cujas conversas a pessoa vê, a soma dos números da lista da
+    tela. Ficam lidas quando alguém abre a conversa na tela Conversas ou responde (marcar_respondidas)."""
+    ids = [c.id for c in acessiveis(db, usuario)]
+    if not ids:
+        return 0
+    return db.execute(select(func.count(MensagemWhatsApp.id)).where(
+        MensagemWhatsApp.conexao.in_(ids), MensagemWhatsApp.direcao == "entrada",
+        MensagemWhatsApp.lida == False)).scalar() or 0  # noqa: E712  ("= false" usa o índice das não lidas, banco.py)
+
+
+def marcar_respondidas(db, conversas: set[tuple[str, str]] | None = None) -> int:
+    """A mensagem recebida que alguém já respondeu (pelo celular do número ou por uma tela Conversas) conta como lida: a
+    equipe responde quase tudo pelo celular (até 23/11/2026, 4.477 respostas pelo celular e 73 pela tela) e, sem isso,
+    o número do menu Conversas só crescia. `conversas` = {(número, telefone)} que acabaram de chegar pela ponte; None
+    = todas (o ajuste de uma vez, banco.marcar_conversas_respondidas). Devolve quantas ficaram lidas."""
+    resposta = aliased(MensagemWhatsApp)
+    respondida = select(resposta.id).where(
+        resposta.conexao == MensagemWhatsApp.conexao, resposta.telefone == MensagemWhatsApp.telefone,
+        resposta.direcao == "saida", resposta.origem.in_(ORIGENS_DE_GENTE),
+        resposta.criado_em >= MensagemWhatsApp.criado_em).exists()
+    filtros = [MensagemWhatsApp.direcao == "entrada", MensagemWhatsApp.lida.is_(False), respondida]
+    if conversas is not None:
+        if not conversas:
+            return 0
+        filtros.append(or_(*(and_(MensagemWhatsApp.conexao == numero, MensagemWhatsApp.telefone == telefone)
+                             for numero, telefone in conversas)))
+    return db.execute(update(MensagemWhatsApp).where(*filtros).values(lida=True)
+                      .execution_options(synchronize_session=False)).rowcount or 0
 
 
 def minha(db, usuario: Usuario, criar: bool = False) -> ConexaoWhatsApp | None:

@@ -98,7 +98,7 @@ def avisar(request: Request, texto: str, tipo: str = "ok") -> None:
 
 def tela(request: Request, nome: str, contexto: dict | None = None, status_code: int = 200):
     usuario = getattr(request.state, "usuario", None)
-    avisos_novos = oportunidades_novas = oficial_nao_lidas = 0
+    avisos_novos = oportunidades_novas = oficial_nao_lidas = conversas_nao_lidas = 0
     tem_api_oficial = False
     mostrar_vendas = mostrar_agenda = False
     wl = {"disponivel": False, "conectado": False}
@@ -136,6 +136,12 @@ def tela(request: Request, nome: str, contexto: dict | None = None, status_code:
                 if tem_api_oficial:
                     oficial_nao_lidas = db.execute(select(func.count(MensagemOficial.id)).where(
                         MensagemOficial.direcao == "entrada", MensagemOficial.lida.is_(False))).scalar() or 0
+            if autorizacao.pode(usuario, "conversas.ver"):
+                # Item "Conversas" (23/11/2026, pedido da Maria: "assim como oportunidades tem um contador"): as
+                # mensagens recebidas não lidas nos números que a pessoa vê (a soma dos números da lista da tela)
+                from . import conexoes
+
+                conversas_nao_lidas = conexoes.mensagens_nao_lidas(db, usuario)
         from . import conexoes
 
         with FabricaSessao() as db:
@@ -157,6 +163,7 @@ def tela(request: Request, nome: str, contexto: dict | None = None, status_code:
         "avisos_novos": avisos_novos,
         "oportunidades_novas": oportunidades_novas,
         "oficial_nao_lidas": oficial_nao_lidas,
+        "conversas_nao_lidas": conversas_nao_lidas,
         "wl": wl,
         "csrf": token_csrf(request),
         "avisos": request.session.pop("avisos", []),

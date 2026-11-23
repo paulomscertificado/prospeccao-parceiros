@@ -12,7 +12,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 from sqlalchemy import func, or_, select, update
 
-from .. import config, mensagens, relogio, sdr, trabalhos, util, whatsapp_oficial
+from .. import config, conexoes, mensagens, relogio, sdr, trabalhos, util, whatsapp_oficial
 from ..rotinas import responder_automaticamente, rodada
 from ..banco import agora, gravar_config, ler_config_int, ler_config_json, sessao, usar_config_da_ar
 from ..integracoes import whatsapp_cloud
@@ -330,6 +330,7 @@ def _guardar_conversas(db, conversas: dict) -> None:
     mensagens = conversas.get("mensagens") or []
     ids = [int(m["id"]) for m in mensagens]
     existentes = set(db.execute(select(MensagemWhatsApp.id_wl).where(MensagemWhatsApp.id_wl.in_(ids))).scalars()) if ids else set()
+    tocadas = set()  # conversas com resposta de gente ou recebida não lida: a recebida já respondida fica lida
     for m in mensagens:
         if int(m["id"]) in existentes:
             continue
@@ -339,12 +340,19 @@ def _guardar_conversas(db, conversas: dict) -> None:
             criado = datetime.fromisoformat(str(m.get("criado_em", ""))[:19])
         except ValueError:
             criado = agora()
-        db.add(MensagemWhatsApp(id_wl=int(m["id"]), telefone=telefone[:20], nome=str(m.get("nome") or "")[:200],
+        nova = MensagemWhatsApp(id_wl=int(m["id"]), telefone=telefone[:20], nome=str(m.get("nome") or "")[:200],
                                 conexao=str(m.get("conexao") or "principal")[:40],
                                 direcao=str(m.get("direcao", ""))[:10], texto=str(m.get("texto") or ""),
                                 status=str(m.get("status") or "")[:20], erro=str(m.get("erro") or "")[:500],
                                 origem=str(m.get("origem") or "")[:30], criado_em=criado,
-                                lida=m.get("direcao") != "entrada" or m.get("origem") == "historico"))
+                                lida=m.get("direcao") != "entrada" or m.get("origem") == "historico")
+        db.add(nova)
+        if (nova.direcao == "saida" and nova.origem in conexoes.ORIGENS_DE_GENTE) or (
+                nova.direcao == "entrada" and not nova.lida):
+            tocadas.add((nova.conexao, nova.telefone))
+    if tocadas:  # respondeu pelo celular ou por uma tela = leu (o número vermelho do menu Conversas, 23/11/2026)
+        db.flush()
+        conexoes.marcar_respondidas(db, tocadas)
     # Status das mensagens: UMA consulta, só com as colunas que mudam. Antes era uma consulta por mensagem, com a linha
     # inteira, a cada 30 s (3 s com a tela aberta): era o que mais gastava o tráfego do Supabase (14/11/2026).
     novos = {int(s["id"]): (str(s.get("status") or "")[:20], str(s.get("erro") or "")[:500])

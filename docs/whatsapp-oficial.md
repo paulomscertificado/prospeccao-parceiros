@@ -182,7 +182,16 @@ Oficial". Item **API Oficial** no menu (`rotas/oficial.py`, `templates/oficial.h
   as que chegaram como lidas. Com a aba à vista, confere a cada 20 s (`/oficial/marca`) e recarrega se algo mudou.
 - **Quem vê**: permissão `oficial.ver` (equipe toda, como as Oportunidades), módulo `api_oficial` (por AR, só o Admin
   Master liga e desliga; ligado por padrão) e o item só aparece na AR que tem a API oficial configurada, com o número
-  vermelho das mensagens novas (`web.tela`: `tem_api_oficial`, `oficial_nao_lidas`). Cada AR só vê as do número dela.
+  vermelho das mensagens novas (`web.tela`: `tem_api_oficial`, `oficial_nao_lidas`; some quando alguém abre a
+  conversa). Cada AR só vê as do número dela.
+- **Na tela WhatsApp** (23/11/2026, pedido da Maria: "a API não aparece aqui por quê? pois preciso compartilhar as
+  conversas com a equipe"): quadro "Número oficial (API da Meta)" junto dos números do QR code
+  (`templates/_numero_oficial.html`, `rotas/whatsapp._numeros_oficiais`), para quem tem `oficial.ver` ou
+  `whatsapp.gerenciar_todos`: o número de cada AR que a pessoa enxerga (o Admin Master fora de uma AR vê o de todas),
+  a situação do último teste e **quem vê as conversas** (`autorizacao.quem_tem(db, "oficial.ver", ar)`: a equipe
+  ativa da AR com a permissão, com os módulos da AR; sem o Admin Master). Não tem "Compartilhar": é da empresa, e quem
+  vê é quem tem a permissão (para tirar alguém, exceção NEGAR em Configurações > Exceções por pessoa). Botões "Abrir
+  as conversas" (`/oficial`) e "Configurar" (`#oficial`, só dentro da AR). Teste: `testes/test_numero_oficial_na_tela.py`.
 - **Guarda**: o mesmo prazo da cópia das conversas (`guarda_conversas_meses`, 12 meses; `leads_servico.apagar_conversas_antigas`).
 - Testes: `testes/test_tela_api_oficial.py` e a conferência no `test_whatsapp_oficial_renovacao.py`.
 

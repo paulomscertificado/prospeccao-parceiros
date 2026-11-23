@@ -196,6 +196,10 @@ async function carregarLista(forcar) {
                                + (marca ? '&marca=' + encodeURIComponent(marca) : ''))).json(); } catch (e) { return; }
   mostrarSituacao(d.situacao);
   if (d.igual) return;  // nada mudou: a lista continua a mesma
+  const contador = el('contador-conversas');  // o número vermelho do menu: abriu a conversa, ele baixa na hora
+  if (contador && typeof d.nao_lidas_total === 'number') {
+    contador.textContent = d.nao_lidas_total; contador.hidden = !d.nao_lidas_total;
+  }
   if (busca !== el('busca').value || numero !== filtroNumero()) return;  // a busca mudou enquanto esperava
   marcaLista = d.marca || ''; chaveLista = chave;
   el('lista').innerHTML = d.conversas.length ? d.conversas.map(c => `

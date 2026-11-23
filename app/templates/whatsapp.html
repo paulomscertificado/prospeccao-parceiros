@@ -24,6 +24,7 @@
   <p>Neste computador, a conexão e as regras ficam na tela do próprio WhatsApp Leads.</p>
   <a class="btn btn-primario" href="{{ url_local }}" target="_blank" rel="noopener">Abrir o WhatsApp Leads</a>
 </div>
+{% include "_numero_oficial.html" %}
 {% else %}
 <div id="aviso-computador" class="aviso aviso-erro" style="display:none"></div>
 <div id="aviso-pedido" class="aviso aviso-info" style="display:none"></div>
@@ -58,6 +59,8 @@
   {% for n in outros %}{% include "_numero_whatsapp.html" %}{% endfor %}
 </div>
 {% endif %}
+
+{% include "_numero_oficial.html" %}
 
 {% if pode('whatsapp.regras') %}
 <form class="cartao" method="post" action="/whatsapp/comando">
