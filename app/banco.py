@@ -86,6 +86,9 @@ CHAVES_DA_AR = frozenset({
     # a página do site que desenha a arte do aviso (23/11/2026): cada marca a sua; só vale o valor próprio da AR
     # (renovacao.url_da_arte), nunca o da plataforma, para a arte de uma marca não ir com o aviso de outra
     "renov_arte_url",
+    # quem assina e por qual número saem os avisos (23/11/2026): eram da plataforma, e salvar o quadro 4 dentro do Grupo
+    # Certy apagou os da MS (a tela dentro de uma AR só lista as pessoas e os números dela)
+    "renov_dono_id", "renov_conexao",
     # módulos (autorizacao.MODULOS): cada AR tem os seus, mas só o Admin Master liga e desliga (Fase 3). Todo módulo
     # novo entra aqui E em CHAVES_SO_MASTER (testes/test_modulos_por_ar.py confere): fora daqui, o Painel master
     # gravava na plataforma e ligar/desligar em uma AR valia para todas (a Assertiva, até 19/11/2026)

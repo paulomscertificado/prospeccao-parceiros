@@ -11,9 +11,10 @@ from datetime import date, timedelta
 from sqlalchemy import select
 
 from app import renovacao, whatsapp_oficial
-from app.banco import agora, gravar_config, ler_config, sessao, usar_config_da_ar
+from app.banco import (agora, config_propria_da_ar, gravar_config, gravar_config_da_ar, ler_config, sessao,
+                       usar_config_da_ar)
 from app.integracoes import whatsapp_cloud
-from app.modelos import AgendamentoOficial, Lead, MensagemOficial, Tarefa, Usuario
+from app.modelos import AgendamentoOficial, ConfiguracaoAR, Lead, MensagemOficial, Tarefa, Usuario
 from app.seguranca import resumir_senha
 from conftest import SENHA, csrf_de
 from test_whatsapp_oficial import _entrar, _zerar_limite
@@ -279,6 +280,8 @@ def test_tela_renovacao_liga_o_calendario_e_publica(cliente, monkeypatch):
         _conta(db).flow_agenda_id = ""
         pessoa_id = _atendente(db).id
         antes = {c: ler_config(db, c) for c in renovacao.PADRAO}  # o formulário grava todo o quadro: tudo volta
+        # o Admin Master fora das ARs mexe na Renovação da AR MS (23/11/2026): o que é de cada AR fica nela
+        antes_ms = {c: config_propria_da_ar(db, _ar_ms(db), c) for c in renovacao.PADRAO}
         db.commit()
     try:
         pagina = cliente.get("/renovacao").text
@@ -288,11 +291,21 @@ def test_tela_renovacao_liga_o_calendario_e_publica(cliente, monkeypatch):
             "hora": "07:45", "hora_fim": "18:00", "agenda": "on", "agenda_usuario_id": str(pessoa_id)})
         assert r.status_code == 200 and "passa a receber o calendário" in r.text
         with sessao() as db:
+            usar_config_da_ar(db, _ar_ms(db))
             assert ler_config(db, "renov_agenda") == "1" and ler_config(db, "renov_agenda_usuario_id") == str(pessoa_id)
+            usar_config_da_ar(db, None)
             assert whatsapp_oficial.conta_da_ar(db, _ar_ms(db)).flow_agenda_id == FLOW_ID  # publicado ao ligar
     finally:
         with sessao() as db:
             _voltar(db, antes)
+            ms = _ar_ms(db)
+            for chave, valor in antes_ms.items():
+                linha = db.get(ConfiguracaoAR, (ms, chave))
+                if valor is None and linha is not None:
+                    db.delete(linha)
+                elif valor is not None:
+                    gravar_config_da_ar(db, ms, chave, valor)
+            db.commit()
 
 
 def test_le_a_resposta_do_calendario_no_webhook():

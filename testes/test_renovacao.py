@@ -714,6 +714,12 @@ def test_escolher_o_numero_do_teste_e_dos_disparos(cliente, csrf, monkeypatch):
     cliente.post("/renovacao/configurar", data={"csrf": csrf, "canal_whatsapp": "on", "canal_email": "on",
                                                 "maximo_dia": "40", "hora": "07:45", "conexao": "u903", "arte": "on"})
     with sessao() as db:
+        from app import marca
+        from app.banco import usar_config_da_ar
+
+        # o número dos disparos é de cada AR (23/11/2026): o Admin Master fora das ARs grava o da AR MS, que a tela
+        # e a campanha automática do dia leem
+        usar_config_da_ar(db, marca.ar_padrao(db))
         assert renovacao.cfg(db, "renov_conexao") == "u903"
         renovacao.importar(db, renovacao.ler_planilha("r.xlsx", _planilha([
             _linha(12, "9800001", "e-CNPJ A1 12 meses", "NUMERO ESCOLHIDO LTDA", "11222333000181", "ANA NUMERO",
@@ -721,9 +727,7 @@ def test_escolher_o_numero_do_teste_e_dos_disparos(cliente, csrf, monkeypatch):
         camp = renovacao.criar_campanha(db, _admin(db), 10)
         assert camp.conexao_id == "u903"
         _limpar(db)
-        from app.banco import gravar_config
-
-        gravar_config(db, "renov_conexao", "")
+        gravar_config(db, "renov_conexao", "")  # o da AR MS volta a vazio
 
 
 

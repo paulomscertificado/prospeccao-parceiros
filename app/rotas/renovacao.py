@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from .. import autorizacao, marca, renovacao, util
 from .. import visual as _visual
-from ..banco import gravar_config, gravar_config_da_ar, ler_config_int, obter_db
+from ..banco import gravar_config, gravar_config_da_ar, ler_config_int, obter_db, usar_config_da_ar
 from ..modelos import Certificado, Tarefa, Usuario
 from ..seguranca import diferencas, exige, registrar_log, verificar_csrf
 from ..web import avisar, tela, voltar
@@ -72,6 +72,7 @@ def _endereco_da_lista(ver: str, busca: str = "") -> str:
 @rotas.get("/renovacao")
 def tela_renovacao(request: Request, ver: str = "avisar", q: str = "", usuario: Usuario = Depends(exige("campanhas.configurar")),
                    db: Session = Depends(obter_db)):
+    _na_ar_da_renovacao(db, request, usuario)
     hoje = date.today()
     ver = ver if ver in FILTROS else "avisar"
     busca = q.strip()[:80]
@@ -172,6 +173,7 @@ async def importar(request: Request, arquivo: UploadFile = File(...), usuario: U
 async def montar(request: Request, usuario: Usuario = Depends(exige("campanhas.configurar")),
                  db: Session = Depends(obter_db)):
     form = await request.form()
+    _na_ar_da_renovacao(db, request, usuario)
     quantidade = util.para_int(form.get("quantidade"))
     if quantidade not in renovacao.QUANTIDADES:
         quantidade = renovacao.QUANTIDADES[0]
@@ -193,12 +195,20 @@ def _ar_da_renovacao(db, request: Request, usuario: Usuario):
     return marca.ar_da_tela(request, usuario) or marca.ar_padrao(db)
 
 
+def _na_ar_da_renovacao(db, request: Request, usuario: Usuario) -> int | None:
+    """As configurações de cada AR (dono, número, API oficial, calendário, arte) lidas e gravadas na AR da tela: o Admin
+    Master fora das ARs mexe nas da AR MS (como a rodada diária, renovacao.rodada_diaria), nunca nas da plataforma."""
+    ar = _ar_da_renovacao(db, request, usuario)
+    usar_config_da_ar(db, ar)
+    return ar
+
+
 def _arte_da_marca(db, request: Request, usuario: Usuario) -> dict:
     """Para os quadros 1 e 4: a página da arte do aviso da marca da tela (vazio: a marca não tem e sai só o texto)."""
     ar = _ar_da_renovacao(db, request, usuario)
     m = marca.da_ar(db, ar)
     return {"url_da_arte": renovacao.url_da_arte(db, ar), "nome_da_marca_renov": m["nome"],
-            "arte_padrao": renovacao.URL_DA_ARTE if m["e_ms"] else ""}
+            "arte_padrao": renovacao.URL_DA_ARTE if m["e_ms"] else "", "marca_principal": m["e_ms"]}
 
 
 def _api_oficial(db, request: Request, usuario: Usuario) -> dict:
@@ -216,6 +226,7 @@ def _api_oficial(db, request: Request, usuario: Usuario) -> dict:
 async def configurar(request: Request, usuario: Usuario = Depends(exige("campanhas.configurar")),
                      db: Session = Depends(obter_db)):
     form = await request.form()
+    _na_ar_da_renovacao(db, request, usuario)
     canais = ",".join(c for c in ("whatsapp", "email") if form.get(f"canal_{c}"))
     if not canais:
         avisar(request, "Escolha pelo menos um canal (WhatsApp ou e-mail).", "erro")
@@ -404,6 +415,7 @@ async def testar(request: Request, usuario: Usuario = Depends(exige("campanhas.c
                  db: Session = Depends(obter_db)):
     """Área de teste (como a da IA SDR): os avisos chegam no WhatsApp ou no e-mail de quem testa, com "[TESTE]"."""
     form = await request.form()
+    _na_ar_da_renovacao(db, request, usuario)
     canal = "email" if form.get("canal") == "email" else "whatsapp"
     if canal == "email":
         destino = str(form.get("email_teste", "")).strip()

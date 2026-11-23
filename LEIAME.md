@@ -550,7 +550,11 @@ renovação novo antes, para entrarem os clientes de janeiro).
   o endereço (começando com https://) no quadro 4; ao salvar, o sistema abre a página e confere se ela tem o desenho da
   arte. Pode ser o endereço da página do site onde a ferramenta aparece, também em site feito no **Wix**: o sistema
   acha a ferramenta dentro da página e guarda o endereço dela. Nas artes das outras marcas, o "FALTAM N DIAS" vai
-  numa etiqueta branca no alto, ao lado de "AVISO DE VENCIMENTO". Em branco: a MS volta para a arte do site da MS, e as outras marcas mandam os avisos só com o texto. O teste
+  numa etiqueta branca no alto, ao lado de "AVISO DE VENCIMENTO".
+- **Cada marca com o seu dono e o seu número:** o **dono das campanhas de renovação** e o **número dos disparos**
+  são de cada marca. Salvar o quadro 4 dentro de uma marca não muda os da outra. O resto do quadro 4 (campanha do
+  dia, dias dos avisos, horários, feriados e canais) ainda vale para todas: a tela das outras marcas avisa isso. Fora
+  das marcas, o administrador master mexe na Renovação da MS. Em branco: a MS volta para a arte do site da MS, e as outras marcas mandam os avisos só com o texto. O teste
   do quadro 1 já usa a arte da marca em que você está.
 - **Testar antes (quadro 1, "Testar os avisos"):** como o teste da IA SDR. Escolha também **por qual número** o teste
   sai (número em modo teste: a tela avisa que não chega de verdade). Escolha um cliente da planilha (ou o

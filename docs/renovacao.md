@@ -116,7 +116,15 @@ base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renova
    numa moldura (`_ferramenta_na_moldura`): `<iframe src>` ou, no Wix, o "HTML incorporado"
    (`www-<site>.filesusr.com/html/...`, achado nos dados da página, módulo `thunderbolt-features` em
    `siteassets.parastorage.com`): grava o endereço da ferramenta (o site do Grupo Certy é Wix, 23/11/2026; se eles
-   mudarem o HTML incorporado, o endereço pode mudar: colar a página de novo). `arte_do_toque` e o teste (`enviar_teste(ar=)`, o cliente fictício usa a AR
+   mudarem o HTML incorporado, o endereço pode mudar: colar a página de novo).
+   **Dono e número de cada AR** (23/11/2026): salvar o quadro 4 dentro do Grupo Certy apagou o dono (Paulo Lucas) e o
+   número dos disparos da MS, porque a tela dentro de uma AR só lista as pessoas e os números dela e os dois eram da
+   plataforma. `renov_dono_id` e `renov_conexao` entraram em `banco.CHAVES_DA_AR`; as rotas da Renovação trabalham na
+   AR da tela (`_na_ar_da_renovacao`: o Admin Master fora das ARs mexe nos da AR MS) e a `rodada_diaria` lê os da AR
+   MS. O resto do quadro 4 (campanha do dia, dias, horários, feriados, canais) continua da plataforma: as filas leem
+   alguns sem a AR da tarefa. A tela das outras marcas avisa o que é só delas. O teste do quadro 1 sai com a marca da
+   AR da tela (`textos_do_contato(ar=)`: o Admin Master dentro do Grupo Certy recebia "da MS"). Testes:
+   `testes/test_renovacao_dono_por_ar.py`. `arte_do_toque` e o teste (`enviar_teste(ar=)`, o cliente fictício usa a AR
    da tela) mandam `"url"` junto; o WhatsApp Leads confere de novo (`arte_aviso.endereco_da_arte`) e guarda uma cópia
    por página. Sem a arte na tela, o "Arte do aviso junto" vai escondido no formulário (salvar o quadro 4 numa AR sem
    arte não desliga a arte da MS: `renov_arte` é da plataforma). Testes: `testes/test_arte_por_marca.py`.

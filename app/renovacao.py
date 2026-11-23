@@ -1066,21 +1066,26 @@ def _com_apresentacao(modelo: str, frase: str) -> str:
     return f"{achada.group(1)} {frase}" + (f" {achada.group(2)}" if achada.group(2) else "") + quebra + resto
 
 
-def textos_do_contato(db, contato: Contato, usuario: Usuario | None, primeiro: str = "") -> dict:
+def textos_do_contato(db, contato: Contato, usuario: Usuario | None, primeiro: str = "",
+                      ar: int | None = None) -> dict:
     """Mensagens dos 4 avisos para o contato (WhatsApp, e-mail com a assinatura e assunto). `primeiro`: o aviso que é
     o primeiro contato da campanha quando não é o 1º aviso (entrou tarde ou atrasou; pedido da Maria em 19/11/2026):
     como o 1º aviso, ele diz quem escreve ("Aqui é Thamires, da Grupo Certy.", com a marca de quem é a campanha) e,
-    no WhatsApp, traz a frase do SAIR."""
+    no WhatsApp, traz a frase do SAIR. `ar`: a marca das mensagens quando não é a da pessoa (o teste do Admin Master
+    dentro de uma AR sai com a marca dela)."""
     from . import marca
 
     vendedor = util.primeiro_nome(usuario.nome) if usuario and usuario.perfil != "parceiro" else "a equipe"
-    m = marca.da_pessoa(usuario)
-    assinatura = marca.assinatura(usuario, vendedor)
+    # mensagem de uma AR que não é a da pessoa (o Admin Master testando dentro dela): a marca da AR, sem a empresa que
+    # a pessoa representa na Minha conta
+    quem = None if ar is not None and usuario is not None and getattr(usuario, "tenant_id", None) != ar else usuario
+    m = marca.da_pessoa(quem, ar)
+    assinatura = marca.assinatura(quem, vendedor, ar)
     valores = {"responsavel": util.primeiro_nome(contato.responsavel), "vencimentos": bloco_vencimentos(contato.certificados),
                "data": f"{contato.vencimento:%d/%m/%Y}", "vendedor": vendedor, "minha_empresa": m["nome"]}
 
     def trocar(modelo: str) -> str:
-        texto = marca.aplicar(modelo or "", usuario)  # só no modelo: o nome do cliente nunca é trocado
+        texto = marca.aplicar(modelo or "", quem, ar)  # só no modelo: o nome do cliente nunca é trocado
         if not valores["responsavel"]:
             texto = re.sub(r",?[ \t]*\{responsavel\}", "", texto)  # "Olá, {responsavel}!" vira "Olá!"
         return re.sub(r"\{(" + "|".join(CAMPOS_DA_MENSAGEM) + r")\}", lambda x: valores[x.group(1)], texto)
@@ -1852,7 +1857,11 @@ def mudar_situacao(db, cert: Certificado, situacao: str, usuario: Usuario | None
 def rodada_diaria() -> str:
     """Chamado pelo relógio (a cada 15 min): uma vez por dia, depois do horário configurado, monta a campanha do dia
     com quem entrou nos 30 dias antes do vencimento. Devolve o que aconteceu ("" = nada a fazer)."""
+    from . import marca
+    from .banco import usar_config_da_ar
+
     with sessao() as db:
+        usar_config_da_ar(db, marca.ar_padrao(db))  # a campanha automática é a da AR MS: o dono e o número dela
         if cfg(db, "renov_ativo") != "1":
             return ""
         hoje = date.today()
@@ -2192,7 +2201,7 @@ def enviar_teste(db, usuario: Usuario, cert_id: int, canal: str, destino: str, a
 
     remetente = dono(db) or usuario
     contato = contato_do_teste(db, cert_id, remetente)
-    textos = textos_do_contato(db, contato, remetente)
+    textos = textos_do_contato(db, contato, remetente, ar=ar)  # a marca da AR da tela (o Admin Master não tem a sua)
     angulos = list(ANGULOS) if avisos == "todos" else [avisos if avisos in ANGULOS else "renov_aviso"]
     cert = contato.certificados[0]
     # a arte é de UM certificado: com vários no mesmo contato, o cliente recebe a lista no texto (o teste mostra igual)
