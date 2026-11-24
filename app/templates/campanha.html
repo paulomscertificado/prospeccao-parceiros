@@ -74,7 +74,7 @@
     <div class="campos">
       <div><label>1. Qual campanha testar</label>
         <select name="campanha_teste" id="campanha-teste">
-          {% for t in testaveis %}<option value="{{ t.id }}" data-email="{{ t.email }}" data-whatsapp="{{ t.whatsapp }}" {{ 'selected' if t.id == c.id }}>{{ t.nome }} ({{ t.whatsapp }} WhatsApp · {{ t.email }} e-mail)</option>{% endfor %}
+          {% for t in testaveis %}<option value="{{ t.id }}" data-email="{{ t.email }}" data-whatsapp="{{ t.whatsapp }}" data-dica-email="{{ t.dicas.email }}" data-desde-email="{{ t.dicas.email_desde }}" data-dica-whatsapp="{{ t.dicas.whatsapp }}" data-desde-whatsapp="{{ t.dicas.whatsapp_desde }}" {{ 'selected' if t.id == c.id }}>{{ t.nome }} ({{ t.whatsapp }} WhatsApp · {{ t.email }} e-mail)</option>{% endfor %}
         </select></div>
       <div><label>2. Testar qual canal</label>
         <select name="canal_teste" id="canal-teste">
@@ -84,9 +84,10 @@
       <div id="campo-whatsapp"><label>3. Seu WhatsApp (recebe o teste)</label><input type="text" inputmode="tel" name="whatsapp_teste" placeholder="(81) 99999-0000"></div>
       <div id="campo-email"><label>3. Seu e-mail (recebe o teste)</label><input type="email" name="email_teste" value="{{ usuario.email }}"></div>
       <div><label>Mensagens de quantas empresas</label><select name="empresas">{% for n in [1, 2, 3, 5] %}<option>{{ n }}</option>{% endfor %}</select></div>
-      <div><label>Quais toques</label><select name="toques"><option value="primeiro">Só o primeiro contato</option><option value="todos">Todos os 4 toques</option></select></div>
+      <div><label>Quais toques</label><select name="toques" id="toques-teste"><option value="primeiro">Só o primeiro contato</option><option value="todos">Todos os 4 toques</option></select></div>
     </div>
     <p class="pequeno suave" id="aviso-canal"></p>
+    <div class="aviso aviso-info" id="dica-visual" hidden>🎨 <span id="dica-visual-texto"></span><span id="dica-ver-todos" hidden> Para ver no teste, escolha <b>“Todos os 4 toques”</b> em “Quais toques”. <button type="button" class="btn btn-pequeno" id="botao-todos-toques">Escolher “Todos os 4 toques”</button></span></div>
     <p class="pequeno suave">Chega com "[TESTE]" e o nome da empresa, do jeito que o lead receberia. Não conta nos limites e não muda nada
       na campanha. O WhatsApp de teste sai pelo seu número conectado.</p>
     <button class="btn btn-primario" id="botao-teste">Enviar teste para mim</button>
@@ -105,7 +106,19 @@
     aviso.textContent = qtd[canal.value] ? qtd[canal.value] + " mensagens de " + nome + " nesta campanha."
                                          : "Esta campanha não tem mensagens de " + nome + ". Escolha o outro canal ou outra campanha.";
     botao.disabled = !qtd[canal.value];
+    atualizarDica();
   }
+  // o HTML do e-mail e a imagem do WhatsApp: em que toque começam e como ver no teste (23/11/2026)
+  const toques = document.getElementById("toques-teste"), dica = document.getElementById("dica-visual");
+  function atualizarDica() {
+    const op = camp.selectedOptions[0], qual = canal.value === "email" ? "Email" : "Whatsapp";
+    const texto = op.dataset["dica" + qual] || "", desde = +(op.dataset["desde" + qual] || 0);
+    document.getElementById("dica-visual-texto").textContent = texto;
+    dica.hidden = !texto;
+    document.getElementById("dica-ver-todos").hidden = !(desde === 2 && toques.value === "primeiro");
+  }
+  document.getElementById("botao-todos-toques").addEventListener("click", () => { toques.value = "todos"; atualizarDica(); });
+  toques.addEventListener("change", atualizarDica);
   camp.addEventListener("change", () => atualizar(true));
   canal.addEventListener("change", () => atualizar(false));
   atualizar(true);

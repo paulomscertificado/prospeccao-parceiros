@@ -39,6 +39,8 @@ Na página da campanha, antes de aprovar, você pode:
 - **🧪 Testar antes de aprovar:**
   - escolha a campanha, o canal (WhatsApp ou e-mail) e o seu contato;
   - as mensagens chegam para você com **[TESTE]**;
+  - o 1º e-mail sai só em texto; a arte (ou o e-mail com a marca) começa no 2º toque: para vê-la no teste,
+    escolha **Todos os 4 toques** (a tela avisa e, depois do envio, diz quantos foram com o HTML);
   - **nenhum lead recebe nada**.
 - **Editar** o texto de qualquer toque, nas duas versões.
 - **Trocar o canal** de um toque, de e-mail para WhatsApp ou o contrário.

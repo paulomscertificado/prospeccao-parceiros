@@ -162,7 +162,9 @@ e do WhatsApp e manda um e-mail de teste para você.
 - O **e-mail** sai com o HTML e também com a versão em texto (exigência dos filtros de spam).
 - No **WhatsApp** vai a imagem com o texto do toque embaixo, **só para quem já conversou com a MS**. Para contato frio
   sai só o texto, para proteger o número contra bloqueio.
-- O botão **Testar** da campanha manda o e-mail com o visual e o WhatsApp com a imagem para você mesmo.
+- O botão **Testar** da campanha manda o e-mail com o visual e o WhatsApp com a imagem para você mesmo. Com o
+  visual **do 2º toque em diante**, o 1º contato chega **só em texto**: para ver a arte no teste, escolha **Todos os 4
+  toques** em "Quais toques" (a tela avisa e tem um botão para isso; depois do envio ela diz quantos foram com o HTML).
 
 **E-mail com a marca (padrão):** sem um visual escolhido, a IA SDR e as Empresas novas podem mandar **do 2º e-mail em
 diante** um e-mail em HTML leve, feito sozinho com o **logo e a cor da marca** (Configurações > Marca): uma faixa com o
@@ -949,6 +951,7 @@ permissão, a conta para de enviar na hora.
 | Arquivar ou excluir uma campanha | Na lista de campanhas (ou dentro da campanha): **Arquivar** tira da lista (veja em "Arquivadas"); **Excluir** apaga a campanha e cancela o que estava programado. As empresas continuam em Leads. Cada pessoa vê e mexe só nas próprias campanhas (administrador e gestor veem todas) |
 | Onde envio os WhatsApps da campanha? | Dentro da campanha aprovada, em **WhatsApp de hoje**: um botão por mensagem, sai pelo seu número |
 | Como testo uma campanha antes de aprovar? | Na campanha, cartão **Testar antes de aprovar**: escolha a campanha e o canal (WhatsApp ou e-mail); as mensagens chegam no SEU e-mail/WhatsApp com "[TESTE]". Nenhum lead recebe nada e não conta nos limites |
+| Testei e o e-mail chegou só em texto. O HTML não funciona? | Funciona: o **1º e-mail** sai só em texto (com a arte "do 2º toque em diante" e com o e-mail com a marca). No teste, escolha **Todos os 4 toques**: o 1º chega em texto e os outros com a arte. A tela do teste avisa isso. Se a campanha foi criada com o **Visual** em "Só texto (sem visual)", nenhum e-mail leva a arte (só o e-mail com a marca, se estiver ligado) |
 | A campanha tem empresas sem WhatsApp. O que faço? | Empresas que só têm telefone fixo entram na campanha também. No cartão **Pesquisar WhatsApp** da campanha, clique em Google/Instagram, ache o número e salve: as mensagens passam a ir para ele |
 | A campanha tem mensagem de WhatsApp e de e-mail? | Sim. Cada toque tem os dois modelos lado a lado. Se achar o e-mail (ou o WhatsApp) da empresa, clique em **Enviar este toque por e-mail/WhatsApp** |
 | Onde vejo os modelos de cada segmento? | Em **Cadências > Templates de mensagem**, escolha o segmento. São 15 por segmento (8 de WhatsApp e 7 de e-mail); dá para editar. No lead, aparecem os do segmento dele |

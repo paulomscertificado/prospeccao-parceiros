@@ -132,6 +132,8 @@ automático de ângulos/CTAs, fila em Redis para volumes acima de milhares de en
 
 `campanhas.enviar_teste` (ação `/campanhas/{id}/testar`): a pessoa escolhe a campanha (`campanha_teste`, qualquer uma que ela pode ver, aguardando/ativa/pausada), o canal (`canal_teste` = whatsapp ou email) e o destino dela; vão os toques daquele canal de 1 a 5 empresas (só o primeiro ou todos), com "[TESTE]". A tela mostra quantas mensagens de cada canal a campanha tem (`mensagens_para_teste`). Não grava `Mensagem` nos leads, não conta nos limites, não muda a campanha; fica só no log (`testou_campanha`).
 
+Aviso do HTML (23/11/2026, pedido da Maria: o teste do 1º contato chegou só em texto e parecia que o HTML não saía): cada campanha da lista leva `visual.dicas_do_teste` (em que toque começam o HTML do e-mail, da arte ou do e-mail com a marca, e a imagem do WhatsApp; `data-dica-*`/`data-desde-*` no `<option>`). A tela mostra o aviso do canal escolhido e, quando o HTML começa no 2º toque e o teste é "Só o primeiro contato", o botão "Escolher “Todos os 4 toques”". `enviar_teste` devolve `com_visual` (e-mails com o HTML ou WhatsApps com a imagem) e `visual.depois_do_teste` completa o aviso de enviado ("2 com o HTML; o 1º contato vai só em texto") ou explica num alerta por que foi só texto (o 1º contato sai assim, ou a campanha não tem arte no e-mail). Testes: `testes/test_teste_da_campanha.py`.
+
 Canal: a IA não faz ligações. Com WhatsApp permitido, o celular informado à Receita vira o WhatsApp do lead (`celular_do_lead`), com o 9 da frente (`util.celular`: a Receita e a CNPJá guardam quase todos os celulares no formato antigo, sem o 9; até 16/11/2026 só valia celular já com o 9, e nenhuma empresa da lista da CNPJá saía com WhatsApp). Empresas só com telefone fixo também entram (depois das que têm canal): a cadência cria passos de WhatsApp sem número, os ids vão para `Campanha.so_fixo` e a campanha mostra o cartão "Pesquisar WhatsApp" (links de busca + campo para salvar, ação `whatsapp-lead`). `cadencias.aplicar` nunca cria ligação/LinkedIn em campanha da IA, e `aprovar` cancela ligações de campanhas antigas.
 
 Dois modelos: cada toque da campanha da IA guarda o texto de WhatsApp e o de e-mail (`Tarefa.mensagem_whatsapp`, `mensagem_email`, `assunto_email`); `mensagem`/`assunto` são os do canal escolhido. Na campanha os dois aparecem lado a lado e editáveis; a ação `trocar-canal` passa o toque para o outro canal.
@@ -619,7 +621,8 @@ cliente rápido". Antes cada pessoa via só as respostas dos leads dela e tinha 
   conversou); vai em `PonteWhatsApp.midia_id`, a troca da ponte manda `{"midia": {id, hash, tipo}}` e o computador baixa em
   `GET /api/ponte/midia/<id>` (token da ponte), confere o hash, guarda em `whatsapp-leads/dados/midia/<hash>` e envia
   com `send_image` + legenda pela mesma fila. A Mensagem registrada ganha `assunto = "[com imagem: <visual>]"`.
-  O teste da campanha (`campanhas.testar`) usa o visual e manda a imagem mesmo sem conversa (vai para quem testa).
+  O teste da campanha (`campanhas.testar`) usa o visual e manda a imagem mesmo sem conversa (vai para quem testa);
+  a área de teste avisa em que toque o visual começa (ver "Testar antes de aprovar").
 - Testes: `testes/test_visual.py` (e `whatsapp-leads/testes/teste_ponta_a_ponta.py`, parte 24).
 - **E-mail com a marca (padrão)** (pedido da Maria em 16/11/2026: "Do 2º e-mail em diante"): sem visual de e-mail na
   campanha, `visual.html_do_email` usa `visual.html_da_marca` quando `usa_html_da_marca`: o **módulo** "email_html"

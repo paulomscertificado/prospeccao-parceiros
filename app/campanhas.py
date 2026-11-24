@@ -737,7 +737,7 @@ def enviar_teste(db, camp: Campanha, usuario: Usuario, canal: str, destino: str,
                  empresas: int = 1, todos_os_toques: bool = False) -> dict:
     """Ambiente de teste: manda as mensagens de UM canal da campanha (e-mail ou WhatsApp) para o e-mail/WhatsApp DE
     QUEM ESTÁ TESTANDO, com "[TESTE]" no começo. Nenhum lead recebe nada, nada conta nos limites e a campanha
-    não muda de situação."""
+    não muda de situação. "com_visual" = quantos foram com o HTML (e-mail) ou a imagem (WhatsApp) do visual."""
     from . import conexoes
     from .integracoes import email_smtp, whatsapp_leads
 
@@ -755,7 +755,7 @@ def enviar_teste(db, camp: Campanha, usuario: Usuario, canal: str, destino: str,
         elif not todos_os_toques:
             continue
         escolhidas.append(t)
-    feito = {"enviadas": 0, "erros": []}
+    feito = {"enviadas": 0, "erros": [], "com_visual": 0}
     numero, conta = "", None
     if canal == "email" and escolhidas:
         try:
@@ -782,9 +782,10 @@ def enviar_teste(db, camp: Campanha, usuario: Usuario, canal: str, destino: str,
                 # a marca da AR da campanha (o Admin Master testa por dentro da AR)
                 assunto = marca.aplicar(assunto, usuario, camp.tenant_id)
                 texto = marca.aplicar(texto, usuario, camp.tenant_id)
+                html = visual.html_do_email(db, t, t.lead, usuario, f"{rotulo}\n\n{texto}")
                 email_smtp.enviar(destino, f"[TESTE] {assunto or marca.da_pessoa(usuario, camp.tenant_id)['nome']}",
-                                  f"{rotulo}\n\n{texto}", lead_id=None, conta=conta,
-                                  html=visual.html_do_email(db, t, t.lead, usuario, f"{rotulo}\n\n{texto}"))
+                                  f"{rotulo}\n\n{texto}", lead_id=None, conta=conta, html=html)
+                feito["com_visual"] += bool(html)
             else:
                 # no teste a imagem vai mesmo para contato frio: quem recebe é a própria pessoa que testa
                 imagem = visual.imagem_do_whatsapp(db, t, t.lead, so_para_quem_conversou=False)
@@ -794,6 +795,7 @@ def enviar_teste(db, camp: Campanha, usuario: Usuario, canal: str, destino: str,
                                       usuario_id=usuario.id, conexao=numero, midia_id=imagem.id if imagem else None,
                                       arte=None if imagem or not config.WHATSAPP_PONTE
                                       else renovacao.arte_do_toque(db, t))
+                feito["com_visual"] += bool(imagem)
             feito["enviadas"] += 1
         except (email_smtp.ErroEmail, whatsapp_leads.ErroWhatsAppLeads) as erro:
             feito["erros"].append(f"{'E-mail' if canal == 'email' else 'WhatsApp'}: {erro}")

@@ -719,6 +719,7 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(exige("c
     if camp not in testaveis:
         testaveis.insert(0, camp)
     contagem = campanhas.mensagens_para_teste(db, [t.id for t in testaveis])
+    marca_ligada = visual.html_da_marca_ligado(db)
     from .. import bases_importadas
 
     # Renovação e Empresas novas têm área própria (só para quem as configura): o menu marca a área e o "Voltar" leva
@@ -727,7 +728,9 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(exige("c
     pode_gerenciar = autorizacao.pode(usuario, "campanhas.gerenciar", camp)
     return tela(request, "campanha.html", {
         "nome_base": bases_importadas.nome(db, camp.base or "receita"),
-        "testaveis": [{"id": t.id, "nome": t.nome, **contagem[t.id]} for t in testaveis],
+        # com o aviso de cada uma: em que toque o HTML do e-mail e a imagem do WhatsApp começam (23/11/2026)
+        "testaveis": [{"id": t.id, "nome": t.nome, **contagem[t.id], "dicas": visual.dicas_do_teste(db, t, marca_ligada)}
+                      for t in testaveis],
         "so_fixo": so_fixo,
         "emails_invalidos": campanhas.emails_invalidos(db, camp),
         "responsaveis_diferentes": campanhas.responsaveis_diferentes(db, camp),
@@ -916,14 +919,20 @@ async def acao_campanha(request: Request, cid: int, acao: str, usuario: Usuario 
         if invalido:
             avisar(request, invalido, "erro")
         else:
+            todos = form.get("toques") == "todos"
             r = campanhas.enviar_teste(db, alvo, usuario, canal, destino, util.para_int(form.get("empresas")) or 1,
-                                       form.get("toques") == "todos")
+                                       todos)
             registrar_log(db, usuario, "testou_campanha", "campanha", alvo.id,
                           f"{r['enviadas']} mensagens de {canal} de teste para {destino}", request)
             if r["enviadas"]:
                 para = destino if canal == "email" else util.formatar_telefone(destino[2:])
+                # quantos foram com o HTML (ou a imagem) e, se foi só texto, por que e como ver (23/11/2026)
+                junto, alerta = visual.depois_do_teste(db, alvo, canal, r["enviadas"], r["com_visual"], todos)
                 avisar(request, f"Teste da campanha \"{alvo.nome}\" enviado: {r['enviadas']} "
-                                f"{'e-mail(s)' if canal == 'email' else 'WhatsApp(s)'} para {para}. Nenhum lead recebeu nada.")
+                                f"{'e-mail(s)' if canal == 'email' else 'WhatsApp(s)'} para {para}"
+                                + (f" ({junto})" if junto else "") + ". Nenhum lead recebeu nada.")
+                if alerta:
+                    avisar(request, alerta, "alerta")
             for erro in r["erros"]:
                 avisar(request, erro, "erro")
             if not r["enviadas"] and not r["erros"]:

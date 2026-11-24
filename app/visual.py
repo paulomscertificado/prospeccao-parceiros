@@ -340,3 +340,68 @@ def resumo_da_campanha(db, camp: Campanha) -> str:
     canais = [("e-mail" if c == "email" else "WhatsApp (só para quem já conversou)")
               for c in camp.visual_canais.split(",") if c in CANAIS]
     return f"{visual.nome} · {' e '.join(canais)} · {TOQUES.get(camp.visual_toques, '').lower()}"
+
+
+# ---------------------------------------------------------------- No teste da campanha
+
+def _no_teste(db, camp: Campanha, marca_ligada: bool | None = None) -> dict[str, tuple[int, str]]:
+    """{canal: (desde, regra)}: em que toque o HTML do e-mail e a imagem do WhatsApp começam nesta campanha (desde 0 =
+    em nenhum, 1 = em todos, 2 = do 2º em diante: o 1º contato sai só em texto) e a regra dita para a pessoa. A mesma
+    regra do envio (html_do_email, imagem_do_whatsapp), lida da campanha sem olhar toque por toque."""
+    resposta = {"email": (0, ""), "whatsapp": (0, "")}
+    if camp.tipo == "renovacao":  # a Renovação manda a arte do aviso e tem o teste próprio (tela Renovação)
+        return resposta
+    escolhido = db.get(VisualCampanha, camp.visual_id) if camp.visual_id else None
+    if escolhido is not None and not escolhido.ativo:
+        escolhido = None
+    canais = (camp.visual_canais or "").split(",")
+    desde = 1 if camp.visual_toques == "todos" else 2
+    if escolhido is not None and "email" in canais and (escolhido.html or "").strip():
+        resposta["email"] = (desde, f'a arte "{escolhido.nome}" vai '
+                                    + ("em todos os e-mails" if desde == 1 else "do 2º toque em diante"))
+    elif camp.tipo in TIPOS_COM_HTML_DA_MARCA and camp.email_html is not False and (
+            html_da_marca_ligado(db) if marca_ligada is None else marca_ligada):
+        resposta["email"] = (2, "o e-mail com a marca vai do 2º e-mail em diante")
+    if escolhido is not None and "whatsapp" in canais and escolhido.imagem_hash:
+        resposta["whatsapp"] = (desde, f'a imagem da arte "{escolhido.nome}" vai '
+                                       + ("em todas as mensagens" if desde == 1 else "do 2º toque em diante"))
+    return resposta
+
+
+def dicas_do_teste(db, camp: Campanha, marca_ligada: bool | None = None) -> dict:
+    """O aviso da área "Testar antes de aprovar" para cada canal da campanha, antes do envio (pedido da Maria em
+    23/11/2026: o teste do 1º contato chegou só em texto e parecia que o HTML não saía). {"email": texto,
+    "email_desde": n, "whatsapp": texto, "whatsapp_desde": n}; com desde 2 a tela oferece "Todos os 4 toques"."""
+    dicas = {}
+    for canal, (desde, regra) in _no_teste(db, camp, marca_ligada).items():
+        texto = ""
+        if desde:
+            texto = regra[:1].upper() + regra[1:] + (": o 1º contato sai só em texto." if desde == 2 else ".")
+            if canal == "whatsapp":
+                texto += " No envio de verdade, a imagem só vai para quem já conversou; no teste, ela vem para você."
+        elif canal == "email" and camp.tipo != "renovacao":
+            onde = "na tela Empresas novas" if camp.tipo == "empresas_novas" else "no passo 4 da Nova campanha"
+            texto = (f"Os e-mails desta campanha saem só em texto: ela não tem arte no e-mail (a arte se escolhe "
+                     f'{onde}, em "Visual").')
+        dicas[canal], dicas[f"{canal}_desde"] = texto, desde
+    return dicas
+
+
+def depois_do_teste(db, camp: Campanha, canal: str, enviadas: int, com_visual: int,
+                    todos_os_toques: bool = False) -> tuple[str, str]:
+    """Depois do teste: (o que completa o aviso de enviado, alerta). Ex.: ("2 com o HTML; o 1º contato vai só em
+    texto", "") ou, quando foi só o 1º contato e o HTML começa no 2º, ("", "O teste foi só em texto porque ...")."""
+    if not enviadas:
+        return "", ""
+    desde, regra = _no_teste(db, camp)[canal]
+    o_que = "o HTML" if canal == "email" else "a imagem"
+    if com_visual >= enviadas:
+        return (f"todos com {o_que}" if enviadas > 1 else f"com {o_que}"), ""
+    if com_visual:
+        return f"{com_visual} com {o_que}" + ("; o 1º contato vai só em texto" if desde == 2 else ""), ""
+    if desde == 2 and not todos_os_toques:
+        return "", (f"O teste foi só em texto porque o 1º contato sai assim: {regra}. Para ver, teste de novo "
+                    f'escolhendo "Todos os 4 toques" em "Quais toques".')
+    if canal == "email" and not desde:
+        return "", dicas_do_teste(db, camp)["email"]
+    return "", ""
