@@ -63,6 +63,7 @@
   .bolha.saida[data-i] { cursor: pointer; }  /* clique: os "Dados da mensagem" (Entregue e Lida, como no WhatsApp) */
   .bolha.erro { background: #fde8e6; }
   .bolha.enviando { opacity: .7; }
+  .bolha.apagada .texto { font-style: italic; color: #6b7686; }  /* "Você apagou esta mensagem", como no WhatsApp */
   .bolha .midia { font-style: italic; color: #4b5a6b; }
   .seguida { margin-top: 1px; }
 
@@ -173,6 +174,7 @@ let marcaConversa = '', marcaLista = '', chaveLista = '';
 const el = id => document.getElementById(id);
 const escapar = t => (t || '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 const STATUS = { na_fila: '🕓', enviada: '<span class="ok">✓</span>', erro: '⚠️ não saiu', cancelada: 'cancelada', recebida: '' };
+const APAGADA = '🚫 Você apagou esta mensagem';
 // ✓ saiu; ✓✓ o contato recebeu; ✓✓ azul o contato leu (as confirmações do WhatsApp, 23/11/2026)
 const tique = m => m.status === 'enviada' && m.lida ? '<span class="lido" title="Lida">✓✓</span>'
   : (m.status === 'enviada' && m.entregue ? '<span class="entregue" title="Entregue">✓✓</span>' : (STATUS[m.status] || ''));
@@ -234,7 +236,7 @@ async function carregarLista(forcar) {
       <div class="avatar" style="background:${cor(c.telefone)}">${escapar(iniciais(c.nome, c.telefone))}</div>
       <div class="info">
         <div class="linha"><span class="nome">${escapar(c.nome || c.telefone_formatado)}</span><span class="hora">${c.quando}</span></div>
-        <div class="linha"><span class="previa">${c.ultima_direcao === 'saida' ? 'Você: ' : ''}${escapar(c.ultima.replace(/\s+/g, ' '))}</span>
+        <div class="linha"><span class="previa">${c.ultima_direcao === 'saida' && !c.ultima_apagada ? 'Você: ' : ''}${escapar(c.ultima.replace(/\s+/g, ' '))}</span>
           ${c.nao_lidas ? `<span class="qtd">${c.nao_lidas}</span>` : ''}</div>
         ${d.varios_numeros && !filtroNumero() ? `<div class="pequeno suave">📱 ${escapar(c.numero_nome)}</div>` : ''}
       </div>
@@ -268,7 +270,8 @@ async function carregarConversa(rolar, forcar) {
     + '. Clique no número para ver essa conversa.' : '';
   marcaConversa = d.marca || '';
   const todas = d.mensagens.concat(d.enviando.map(m => ({ ...m, direcao: 'saida', enviando: true })));
-  const nova = JSON.stringify(todas.map(m => [m.texto, m.status, m.hora, m.entregue || '', m.lida || '']));
+  const nova = JSON.stringify(todas.map(m => [m.texto, m.status, m.hora, m.entregue || '', m.lida || '',
+                                              m.apagada || '', m.pode_apagar ? 1 : 0]));
   if (nova === assinatura && !rolar) { mostrarSituacao(d.situacao); return; }  // nada mudou: não redesenha
   assinatura = nova;
   const caixa = el('mensagens');
@@ -277,10 +280,13 @@ async function carregarConversa(rolar, forcar) {
   mensagensNaTela = todas;
   for (const [i, m] of todas.entries()) {
     if (m.dia !== diaAnterior) { html += `<div class="dia"><span>${rotuloDia(m.dia)}</span></div>`; diaAnterior = m.dia; direcaoAnterior = ''; }
-    const classes = ['bolha', m.direcao, m.status === 'erro' ? 'erro' : '', m.enviando ? 'enviando' : '', m.direcao === direcaoAnterior ? 'seguida' : ''];
-    const situacao = m.enviando ? '🕓' : (m.direcao === 'saida' ? tique(m) : '');
+    const classes = ['bolha', m.direcao, m.status === 'erro' ? 'erro' : '', m.enviando ? 'enviando' : '',
+                     m.apagada ? 'apagada' : '', m.direcao === direcaoAnterior ? 'seguida' : ''];
+    // apagada para todos: como no WhatsApp, fica só o aviso (o texto aparece nos dados da mensagem)
+    const situacao = m.enviando ? '🕓' : (m.direcao === 'saida' && !m.apagada ? tique(m) : '');
     const dados = m.direcao === 'saida' && !m.enviando ? ` data-i="${i}"` : '';
-    html += `<div class="${classes.join(' ')}"${dados} title="${escapar(m.erro || (dados ? 'Clique para ver os dados da mensagem' : ''))}"><span class="texto">${textoMensagem(m.texto)}</span>`
+    const dica = m.erro || (dados ? (m.pode_apagar ? 'Clique para ver os dados da mensagem ou apagar para todos' : 'Clique para ver os dados da mensagem') : '');
+    html += `<div class="${classes.join(' ')}"${dados} title="${escapar(dica)}"><span class="texto">${m.apagada ? APAGADA : textoMensagem(m.texto)}</span>`
           + `<span class="meta">${m.hora}${situacao ? ' ' + situacao : ''}</span></div>`;
     direcaoAnterior = m.direcao;
   }
@@ -311,14 +317,45 @@ el('c-outros').addEventListener('click', e => {
   abrir(atual, a.dataset.numero);
 });
 
-// clique numa mensagem que saiu: os "Dados da mensagem" (quando o contato recebeu e quando leu), como no WhatsApp
+// clique numa mensagem que saiu: os "Dados da mensagem" (quando o contato recebeu e quando leu), como no WhatsApp, e o
+// botão "Apagar para todos" (até 2 dias depois do envio)
 el('mensagens').addEventListener('click', e => {
   const bolha = e.target.closest('.bolha[data-i]');
   const m = bolha && mensagensNaTela[Number(bolha.dataset.i)];
   if (!m || (window.getSelection && String(window.getSelection()))) return;  // selecionando o texto: não abre
   abrirDadosMensagem({ texto: m.texto, hora: m.hora, entregue: m.entregue, lida: m.lida,
-                       erro: m.status === 'erro' ? (m.erro || 'a mensagem não saiu') : '' });
+                       erro: m.status === 'erro' ? (m.erro || 'a mensagem não saiu') : '',
+                       apagada: m.apagada, apagada_por: m.apagada_por,
+                       apagar: m.pode_apagar ? botao => apagarMensagem(m, botao) : null });
 });
+
+// "Apagar para todos" (24/11/2026): o computador do WhatsApp pega o pedido em poucos segundos; a tela espera até 1 minuto
+const esperar = ms => new Promise(ok => setTimeout(ok, ms));
+async function apagarMensagem(m, botao) {
+  if (!confirm('Apagar esta mensagem para todos?\n\nEla some do WhatsApp do contato (lá aparece "Esta mensagem foi apagada"), '
+               + 'como no WhatsApp. Não dá para desfazer.')) return;
+  const rotulo = botao.textContent;
+  botao.disabled = true; botao.textContent = 'Apagando...';
+  try {
+    const r = await postarJSON('/conversas/api/mensagem/' + m.id + '/apagar', {});
+    for (let volta = 0; volta < 30; volta++) {
+      await esperar(2000);
+      let s;
+      try { s = await (await fetch('/conversas/api/apagar/' + r.pedido)).json(); } catch (e) { continue; }
+      if (s.situacao === 'erro') throw new Error('Não deu para apagar: ' + (s.erro || 'o WhatsApp recusou') + '.');
+      if (s.situacao === 'apagada') {
+        fecharDadosMensagem(); aviso('Mensagem apagada para todos.');
+        assinatura = ''; carregarConversa(false, true); carregarLista(true);
+        return;
+      }
+    }
+    fecharDadosMensagem();
+    aviso('Pedido feito: a mensagem some do WhatsApp do contato assim que o computador do WhatsApp responder.');
+  } catch (e) {
+    alert(e.message);
+    botao.disabled = false; botao.textContent = rotulo;
+  }
+}
 
 el('nova').addEventListener('click', () => {
   modoNovo = true;

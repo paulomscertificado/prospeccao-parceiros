@@ -9,29 +9,38 @@ A tela se atualiza sozinha (a conversa aberta a cada 5 s, a lista a cada 15 s). 
 (Supabase), cada atualização manda a "marca" do que a tela já tem e o sistema só responde "igual" quando nada mudou;
 a conversa e a lista inteiras só vão de novo quando algo mudou (17/11/2026: a conversa inteira, até 300 mensagens,
 ia a cada 5 s e a lista era refeita a cada 15 s passando por todas as mensagens; era o que mais gastava).
+
+"Apagar para todos", como no WhatsApp (24/11/2026, pedido da Maria): clicando numa mensagem que saiu, os "Dados da
+mensagem" trazem o botão. O pedido vai pela ponte (comando "apagar_mensagem"; o WhatsApp Leads apaga do WhatsApp do
+contato) e a mensagem fica "Você apagou esta mensagem" aqui, com quem apagou; o texto continua guardado.
 """
 
 import hashlib
 import json
 import secrets
+from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session
 
-from .. import config, conexoes, sdr, util
+from .. import autorizacao, config, conexoes, sdr, util
 from ..banco import agora, gravar_config, ler_config, obter_db
 from ..integracoes import whatsapp_leads
 from ..leads_servico import historico, pode_ver
 from ..modelos import ComandoWhatsApp, ContatoWhatsApp, MensagemWhatsApp, PonteWhatsApp, Usuario
-from ..seguranca import exige, verificar_csrf
+from ..seguranca import exige, registrar_log, verificar_csrf
 from ..web import tela
 
 rotas = APIRouter()
 
 TELA_ABERTA = "wl_conversas_vista_em"  # com a tela aberta, a ponte com o computador do WhatsApp troca a cada 10 s
 VERSAO = "wl_conversas_versao"  # muda quando mensagens são lidas ou um nome muda: as listas abertas se atualizam
+# O WhatsApp só apaga para todos até uns 2 dias depois do envio ("cerca de 2 dias", diz a Central de Ajuda dele): o
+# mesmo prazo do WhatsApp Leads (whatsapp.HORAS_PARA_APAGAR), que confere de novo pela hora em que a mensagem saiu
+HORAS_PARA_APAGAR = 48
+APAGADA = "🚫 Você apagou esta mensagem"
 
 
 def _chave(telefone: str) -> str:
@@ -121,6 +130,34 @@ def _marca(*partes) -> str:
     return hashlib.sha256(json.dumps(partes, default=str).encode()).hexdigest()[:20]
 
 
+def _motivo_para_nao_apagar(m: MensagemWhatsApp) -> str:
+    """Por que esta mensagem não pode ser apagada para todos ("" = pode): como no WhatsApp, só a que saiu e chegou ao
+    WhatsApp, até 2 dias depois do envio."""
+    if m.apagada_em:
+        return "Esta mensagem já foi apagada."
+    if m.direcao != "saida":
+        return "Só dá para apagar as mensagens que saíram por este número (como no WhatsApp)."
+    if m.status != "enviada" or not m.id_wl:
+        return "Esta mensagem não chegou a sair: não há o que apagar no WhatsApp do contato."
+    if m.criado_em < agora() - timedelta(hours=HORAS_PARA_APAGAR):
+        return "O WhatsApp só deixa apagar para todos até 2 dias depois do envio."
+    return ""
+
+
+def mensagem_apagada(db: Session, comando: ComandoWhatsApp) -> None:
+    """O WhatsApp Leads apagou a mensagem para todos (o comando "apagar_mensagem" voltou sem erro, /api/ponte/retorno):
+    a cópia daqui passa a mostrar "Você apagou esta mensagem", com quem pediu."""
+    try:
+        dados = json.loads(comando.dados or "{}")
+        id_wl = int(dados.get("id_wl") or 0) if isinstance(dados, dict) else 0
+    except (TypeError, ValueError):
+        return
+    m = db.execute(select(MensagemWhatsApp).where(MensagemWhatsApp.id_wl == id_wl)).scalars().first() if id_wl else None
+    if m is not None and m.apagada_em is None:
+        m.apagada_em, m.apagada_por_id = agora(), comando.usuario_id
+        _mudou(db)  # a lista também mostra (se era a última mensagem da conversa)
+
+
 def _marcar_lidas(db: Session, da_conversa: tuple) -> None:
     """As mensagens recebidas da conversa ficam lidas (a lista tira o número de não lidas)."""
     feitas = db.execute(update(MensagemWhatsApp).where(*da_conversa, MensagemWhatsApp.direcao == "entrada",
@@ -199,7 +236,8 @@ def lista(busca: str = "", numero: str = "", marca: str = "", nao_lidas: str = "
         nome = escolhidos.get(m.telefone) or m.nome or nomes.get(m.telefone, "")
         resultado.append({"telefone": m.telefone, "telefone_formatado": util.formatar_telefone(m.telefone),
                           "numero": conexao, "numero_nome": nomes_numeros.get(conexao, conexao),
-                          "nome": nome, "ultima": m.texto[:120], "ultima_direcao": m.direcao,
+                          "nome": nome, "ultima": APAGADA if m.apagada_em else m.texto[:120],
+                          "ultima_direcao": m.direcao, "ultima_apagada": bool(m.apagada_em),
                           "quando": _quando_curto(m.criado_em), "nao_lidas": int(nao_lidas or 0)})
     return JSONResponse({"conversas": resultado, "situacao": situacao, "varios_numeros": len(_numeros(db, usuario)) > 1,
                          "marca": atual,
@@ -215,7 +253,7 @@ def _ultimas_mensagens(db: Session, conexoes_: set, telefones: set) -> dict:
                                    order_by=(MensagemWhatsApp.criado_em.desc(), MensagemWhatsApp.id.desc())).label("n")
     sub = (select(MensagemWhatsApp.conexao, MensagemWhatsApp.telefone, MensagemWhatsApp.nome,
                   func.substr(MensagemWhatsApp.texto, 1, 120).label("texto"), MensagemWhatsApp.direcao,
-                  MensagemWhatsApp.criado_em, ordem)
+                  MensagemWhatsApp.criado_em, MensagemWhatsApp.apagada_em, ordem)
            .where(MensagemWhatsApp.conexao.in_(conexoes_), MensagemWhatsApp.telefone.in_(telefones)).subquery())
     return {(r.conexao, r.telefone): r for r in db.execute(select(sub).where(sub.c.n == 1)).all()}
 
@@ -262,37 +300,47 @@ def conversa(telefone: str, numero: str = "", marca: str = "", usuario: Usuario 
     # Primeiro só o que muda: as 30 mensagens mais novas (id e status, sem o texto) e o que está saindo agora. A conversa
     # inteira (até 300 mensagens, com o texto) só vai quando algo mudou: numa conversa longa eram ~60 KB a cada 5 s.
     recentes = db.execute(select(MensagemWhatsApp.id, MensagemWhatsApp.status, MensagemWhatsApp.direcao,
-                                 MensagemWhatsApp.lida, MensagemWhatsApp.entregue_em, MensagemWhatsApp.visualizada_em)
+                                 MensagemWhatsApp.lida, MensagemWhatsApp.entregue_em, MensagemWhatsApp.visualizada_em,
+                                 MensagemWhatsApp.apagada_em)
                           .where(*da_conversa).order_by(MensagemWhatsApp.id.desc()).limit(30)).all()
     pendentes = [p for p in db.execute(select(PonteWhatsApp).where(
         PonteWhatsApp.manual.is_(True), PonteWhatsApp.conexao == numero,
         PonteWhatsApp.status.in_(["aguardando", "retirada"])).order_by(PonteWhatsApp.id)).scalars().all()
         if _chave(p.telefone) == chave]
-    # o contato recebeu ou leu (✓✓): também muda a marca, e a conversa aberta se redesenha
-    atual = _marca(chave, numero, [(r.id, r.status, bool(r.entregue_em), bool(r.visualizada_em)) for r in recentes],
-                   [p.id for p in pendentes])
+    # o contato recebeu ou leu (✓✓) ou a mensagem foi apagada: também muda a marca, e a conversa aberta se redesenha
+    atual = _marca(chave, numero, [(r.id, r.status, bool(r.entregue_em), bool(r.visualizada_em), bool(r.apagada_em))
+                                   for r in recentes], [p.id for p in pendentes])
     igual = bool(marca) and marca == atual
     if not igual or any(r.direcao == "entrada" and not r.lida for r in recentes):
         _marcar_lidas(db, da_conversa)
     if igual:
         return JSONResponse({"igual": True, "marca": atual, "situacao": _situacao(db, numero)})
-    mensagens = list(db.execute(select(MensagemWhatsApp.direcao, MensagemWhatsApp.texto, MensagemWhatsApp.status,
-                                       MensagemWhatsApp.erro, MensagemWhatsApp.origem, MensagemWhatsApp.nome,
-                                       MensagemWhatsApp.criado_em, MensagemWhatsApp.entregue_em,
-                                       MensagemWhatsApp.visualizada_em).where(*da_conversa)
+    mensagens = list(db.execute(select(MensagemWhatsApp.id, MensagemWhatsApp.id_wl, MensagemWhatsApp.direcao,
+                                       MensagemWhatsApp.texto, MensagemWhatsApp.status, MensagemWhatsApp.erro,
+                                       MensagemWhatsApp.origem, MensagemWhatsApp.nome, MensagemWhatsApp.criado_em,
+                                       MensagemWhatsApp.entregue_em, MensagemWhatsApp.visualizada_em,
+                                       MensagemWhatsApp.apagada_em, MensagemWhatsApp.apagada_por_id).where(*da_conversa)
                                 .order_by(MensagemWhatsApp.criado_em.desc(), MensagemWhatsApp.id.desc())
                                 .limit(300)).all())[::-1]
     lead = sdr.lead_pelo_telefone(db, chave)
     escolhido = db.get(ContatoWhatsApp, chave)
     nome = (escolhido.nome if escolhido and escolhido.nome else "") \
         or next((m.nome for m in reversed(mensagens) if m.nome), "") or (lead.responsavel or lead.empresa if lead else "")
+    # "Apagar para todos" (24/11/2026): quem responde pelas Conversas, nas mensagens que ainda dá para apagar
+    pode_apagar = autorizacao.pode(usuario, "conversas.enviar") and config.WHATSAPP_PONTE
+    ids_apagaram = {m.apagada_por_id for m in mensagens if m.apagada_por_id}
+    quem_apagou = dict(db.execute(select(Usuario.id, Usuario.nome).where(Usuario.id.in_(ids_apagaram))).all()) \
+        if ids_apagaram else {}
     return JSONResponse({
         "telefone": chave, "telefone_formatado": util.formatar_telefone(chave), "nome": nome, "numero": numero,
-        "mensagens": [{"direcao": m.direcao, "texto": m.texto, "status": m.status, "erro": m.erro, "origem": m.origem,
-                       "quando": m.criado_em.strftime("%d/%m %H:%M"), "dia": m.criado_em.strftime("%Y-%m-%d"),
-                       "hora": m.criado_em.strftime("%H:%M"),
+        "mensagens": [{"id": m.id, "direcao": m.direcao, "texto": m.texto, "status": m.status, "erro": m.erro,
+                       "origem": m.origem, "quando": m.criado_em.strftime("%d/%m %H:%M"),
+                       "dia": m.criado_em.strftime("%Y-%m-%d"), "hora": m.criado_em.strftime("%H:%M"),
                        # "Dados da mensagem" (23/11/2026): quando o contato recebeu e quando leu
-                       "entregue": util.quando_extenso(m.entregue_em), "lida": util.quando_extenso(m.visualizada_em)}
+                       "entregue": util.quando_extenso(m.entregue_em), "lida": util.quando_extenso(m.visualizada_em),
+                       "apagada": util.quando_extenso(m.apagada_em),
+                       "apagada_por": quem_apagou.get(m.apagada_por_id, ""),
+                       "pode_apagar": bool(pode_apagar) and not _motivo_para_nao_apagar(m)}
                       for m in mensagens],
         "enviando": [{"texto": p.texto, "quando": p.criado_em.strftime("%d/%m %H:%M"),
                       "dia": p.criado_em.strftime("%Y-%m-%d"), "hora": p.criado_em.strftime("%H:%M")} for p in pendentes],
@@ -351,3 +399,38 @@ async def editar_nome(request: Request, usuario: Usuario = Depends(exige("conver
         return JSONResponse({"erro": "Este telefone já tem um nome guardado por outra AR."}, status_code=409)
     db.commit()
     return {"ok": True, "nome": nome[:200]}
+
+
+@rotas.post("/conversas/api/mensagem/{mid}/apagar", dependencies=[Depends(verificar_csrf)])
+def apagar_para_todos(mid: int, request: Request, usuario: Usuario = Depends(exige("conversas.enviar")),
+                      db: Session = Depends(obter_db)):
+    """"Apagar para todos", como no WhatsApp (pedido da Maria em 24/11/2026: "suba a opção de apagar mensagem"): a
+    mensagem que saiu some do WhatsApp do contato. Pode quem responde pelas Conversas, nos números que vê (os mesmos do
+    envio). O pedido vai para o WhatsApp Leads pela ponte; a tela acompanha em /conversas/api/apagar/{pedido}."""
+    m = db.execute(select(MensagemWhatsApp).where(MensagemWhatsApp.id == mid)).scalars().first()
+    if m is None or m.conexao not in _numeros(db, usuario):
+        return JSONResponse({"erro": "Mensagem não encontrada."}, status_code=404)
+    motivo = _motivo_para_nao_apagar(m)
+    if motivo:
+        return JSONResponse({"erro": motivo}, status_code=409)
+    if not config.WHATSAPP_PONTE:
+        return JSONResponse({"erro": "Neste computador, use a tela Conversas do próprio WhatsApp Leads."}, status_code=400)
+    pedido = ComandoWhatsApp(acao="apagar_mensagem", usuario_id=usuario.id,
+                             dados=json.dumps({"conexao": m.conexao, "id_wl": m.id_wl}))
+    db.add(pedido)
+    db.flush()
+    registrar_log(db, usuario, "apagou_mensagem_whatsapp", "mensagem_whatsapp", m.id,
+                  f"Apagar para todos (Conversas): mensagem de {m.criado_em:%d/%m %H:%M} para {m.telefone}, "
+                  f"pelo número {m.conexao}", request, modulo="Conversas")
+    db.commit()
+    return {"ok": True, "pedido": pedido.id}
+
+
+@rotas.get("/conversas/api/apagar/{pedido}")
+def situacao_do_apagar(pedido: int, usuario: Usuario = Depends(exige("conversas.enviar")),
+                       db: Session = Depends(obter_db)):
+    """Como está o "Apagar para todos" que a pessoa pediu: esperando o WhatsApp Leads, apagada ou erro (com o motivo)."""
+    c = db.execute(select(ComandoWhatsApp).where(ComandoWhatsApp.id == pedido)).scalars().first()
+    if c is None or c.acao != "apagar_mensagem" or c.usuario_id != usuario.id:
+        return JSONResponse({"erro": "Pedido não encontrado."}, status_code=404)
+    return {"situacao": {"feito": "apagada", "erro": "erro"}.get(c.status, "esperando"), "erro": c.erro or ""}

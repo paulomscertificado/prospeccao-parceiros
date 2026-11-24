@@ -191,6 +191,10 @@ class MensagemWhatsApp(DaAR, Base):
     # confirmações do WhatsApp, guardadas no WhatsApp Leads). `lida` é outra coisa: a equipe abriu a que chegou.
     entregue_em: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     visualizada_em: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # "Apagar para todos", como no WhatsApp (24/11/2026, pedido da Maria): quando a que saiu foi apagada do WhatsApp do
+    # contato e quem apagou pela tela Conversas (vazio = pelo celular do número). O texto continua aqui, como registro.
+    apagada_em: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    apagada_por_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class MensagemOficial(DaAR, Base):

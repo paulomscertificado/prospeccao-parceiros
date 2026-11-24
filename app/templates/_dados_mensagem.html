@@ -1,6 +1,8 @@
 {# "Dados da mensagem" como no WhatsApp (pedido da Maria em 23/11/2026): clicando numa mensagem que saiu, quando o
    contato recebeu (Entregue) e quando leu (Lida). Usado nas telas Conversas e API Oficial; quem abre é
-   abrirDadosMensagem({texto, hora, entregue, lida, erro}) (os textos já formatados, ex.: "Hoje às 13:50"). #}
+   abrirDadosMensagem({texto, hora, entregue, lida, erro}) (os textos já formatados, ex.: "Hoje às 13:50").
+   Na tela Conversas também "Apagar para todos" (24/11/2026): {apagada, apagada_por} mostram quando e quem apagou e
+   {apagar: função(botão)} mostra o botão; fecharDadosMensagem() fecha. #}
 <style>
   .dados-mensagem { width: min(420px, 94vw); border: 0; border-radius: 14px; padding: 0; box-shadow: 0 18px 50px rgba(16, 24, 40, .25); }
   .dados-mensagem::backdrop { background: rgba(16, 24, 40, .35); }
@@ -18,6 +20,8 @@
   .dados-mensagem .dm-icone.lida { color: #1d8fe1; }
   .dados-mensagem .dm-icone.erro { letter-spacing: 0; }
   .dados-mensagem .dm-valor { color: #6b7686; font-size: .86rem; margin-top: 2px; }
+  .dados-mensagem .dm-acoes { padding: 14px 18px 16px; border-top: 1px solid #eef1f5; }
+  .dados-mensagem .dm-acoes .dm-valor { margin-top: 8px; }
 </style>
 <dialog id="dados-mensagem" class="dados-mensagem" aria-labelledby="dm-titulo">
   <div class="dm-topo"><button type="button" class="dm-fechar" id="dm-fechar" aria-label="Fechar">✕</button>
@@ -29,10 +33,17 @@
     <div><b>Entregue</b><div class="dm-valor" id="dm-entregue">-</div></div></div>
   <div class="dm-linha" id="dm-linha-erro" hidden><span class="dm-icone erro" aria-hidden="true">⚠️</span>
     <div><b>Não entregue</b><div class="dm-valor" id="dm-erro"></div></div></div>
+  <div class="dm-linha" id="dm-linha-apagada" hidden><span class="dm-icone erro" aria-hidden="true">🚫</span>
+    <div><b>Apagada para todos</b><div class="dm-valor" id="dm-apagada"></div></div></div>
+  <div class="dm-acoes" id="dm-acoes" hidden>
+    <button type="button" class="btn btn-perigo btn-pequeno" id="dm-apagar">🗑️ Apagar para todos</button>
+    <div class="dm-valor">Some do WhatsApp do contato, como no WhatsApp. Dá para apagar até 2 dias depois do envio.</div>
+  </div>
 </dialog>
 <script>
   (function () {
     var caixa = document.getElementById('dados-mensagem');
+    var apagar = null;  // o que o botão "Apagar para todos" faz nesta mensagem (null = sem o botão)
     window.abrirDadosMensagem = function (d) {
       d = d || {};
       document.getElementById('dm-texto').textContent = d.texto || '';
@@ -41,9 +52,17 @@
       document.getElementById('dm-entregue').textContent = d.entregue || '-';
       document.getElementById('dm-erro').textContent = d.erro || '';
       document.getElementById('dm-linha-erro').hidden = !d.erro;
+      document.getElementById('dm-apagada').textContent = (d.apagada || '') + (d.apagada_por ? ', por ' + d.apagada_por : '');
+      document.getElementById('dm-linha-apagada').hidden = !d.apagada;
+      apagar = typeof d.apagar === 'function' ? d.apagar : null;
+      var botao = document.getElementById('dm-apagar');
+      botao.disabled = false; botao.textContent = '🗑️ Apagar para todos';
+      document.getElementById('dm-acoes').hidden = !apagar;
       if (typeof caixa.showModal === 'function') caixa.showModal(); else caixa.setAttribute('open', '');
     };
     function fechar() { if (typeof caixa.close === 'function') caixa.close(); else caixa.removeAttribute('open'); }
+    window.fecharDadosMensagem = fechar;
+    document.getElementById('dm-apagar').addEventListener('click', function () { if (apagar) apagar(this); });
     document.getElementById('dm-fechar').addEventListener('click', fechar);
     caixa.addEventListener('click', function (e) { if (e.target === caixa) fechar(); });  // clique fora fecha
   })();

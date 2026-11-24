@@ -363,7 +363,8 @@ def _guardar_conversas(db, conversas: dict) -> None:
                                 origem=str(m.get("origem") or "")[:30], criado_em=criado,
                                 lida=m.get("direcao") != "entrada" or m.get("origem") == "historico",
                                 entregue_em=_data_wl(m.get("entregue_em")),
-                                visualizada_em=_data_wl(m.get("visualizada_em")))
+                                visualizada_em=_data_wl(m.get("visualizada_em")),
+                                apagada_em=_data_wl(m.get("apagada_em")))
         db.add(nova)
         if (nova.direcao == "saida" and nova.origem in conexoes.ORIGENS_DE_GENTE) or (
                 nova.direcao == "entrada" and not nova.lida):
@@ -373,21 +374,25 @@ def _guardar_conversas(db, conversas: dict) -> None:
         conexoes.marcar_respondidas(db, tocadas)
     # Status das mensagens: UMA consulta, só com as colunas que mudam. Antes era uma consulta por mensagem, com a linha
     # inteira, a cada 30 s (3 s com a tela aberta): era o que mais gastava o tráfego do Supabase (14/11/2026).
-    # Também a hora em que o contato recebeu e leu ("Dados da mensagem", 23/11/2026): só entra, nunca some.
+    # Também a hora em que o contato recebeu e leu ("Dados da mensagem", 23/11/2026) e a em que a mensagem foi apagada
+    # para todos (24/11/2026): só entram, nunca somem.
     novos = {int(s["id"]): (str(s.get("status") or "")[:20], str(s.get("erro") or "")[:500],
-                            _data_wl(s.get("entregue_em")), _data_wl(s.get("visualizada_em")))
+                            _data_wl(s.get("entregue_em")), _data_wl(s.get("visualizada_em")),
+                            _data_wl(s.get("apagada_em")))
              for s in conversas.get("status") or []}
     if novos:
-        for id_, id_wl, atual, erro, entregue, visualizada in db.execute(
+        for id_, id_wl, atual, erro, entregue, visualizada, apagada in db.execute(
                 select(MensagemWhatsApp.id, MensagemWhatsApp.id_wl, MensagemWhatsApp.status, MensagemWhatsApp.erro,
-                       MensagemWhatsApp.entregue_em, MensagemWhatsApp.visualizada_em)
+                       MensagemWhatsApp.entregue_em, MensagemWhatsApp.visualizada_em, MensagemWhatsApp.apagada_em)
                 .where(MensagemWhatsApp.id_wl.in_(list(novos)))).all():
-            status, erro_novo, entregue_nova, visualizada_nova = novos[id_wl]
+            status, erro_novo, entregue_nova, visualizada_nova, apagada_nova = novos[id_wl]
             valores = {"status": status, "erro": erro_novo} if (atual, erro or "") != (status, erro_novo) else {}
             if entregue_nova and entregue_nova != entregue:
                 valores["entregue_em"] = entregue_nova
             if visualizada_nova and visualizada_nova != visualizada:
                 valores["visualizada_em"] = visualizada_nova
+            if apagada_nova and not apagada:
+                valores["apagada_em"] = apagada_nova
             if valores:
                 db.execute(update(MensagemWhatsApp).where(MensagemWhatsApp.id == id_).values(**valores))
     if "ultimo_id" in conversas:
@@ -436,6 +441,10 @@ async def ponte_retorno(request: Request):
             comando = db.get(ComandoWhatsApp, int(c.get("id") or 0))
             if comando:
                 comando.status, comando.erro = ("erro", str(c["erro"])[:500]) if c.get("erro") else ("feito", "")
+                if comando.acao == "apagar_mensagem" and comando.status == "feito":  # "Apagar para todos" (Conversas)
+                    from .conversas import mensagem_apagada
+
+                    mensagem_apagada(db, comando)
         if dados.get("status"):  # status logo depois dos pedidos (ex.: QR code novo)
             _gravar_status(db, dados["status"])
         if dados.get("conversas"):

@@ -169,6 +169,25 @@ conversa com o contato, o mais recente primeiro); a tela mostra o aviso `#c-outr
 pelo ..." com o nome que abre a de lá. Em 24/11/2026, 79 contatos tinham conversa em 2 números ou mais.
 Teste: `testes/test_conversa_numero_certo.py`.
 
+**Apagar para todos** (24/11/2026, pedido da Maria: "suba a opção de apagar mensagem no whatsapp lead"): nos "Dados da
+mensagem" (`_dados_mensagem.html`, `abrirDadosMensagem({..., apagada, apagada_por, apagar})`) o botão aparece quando a
+conversa diz `pode_apagar` (permissão `conversas.enviar`, ponte ligada e `conversas._motivo_para_nao_apagar` vazio:
+saída, `status` enviada, com `id_wl`, ainda não apagada e `criado_em` há menos de `HORAS_PARA_APAGAR` = 48 h, o prazo
+de "cerca de 2 dias" do WhatsApp). `POST /conversas/api/mensagem/{id}/apagar` (CSRF; 404 se o número não está entre os
+que a pessoa vê, `_numeros`, como no envio; 409 com o motivo) cria o `comandos_whatsapp` `apagar_mensagem` com
+`{"conexao", "id_wl"}` e registra `apagou_mensagem_whatsapp` no registro de atividades; a tela pergunta a
+`GET /conversas/api/apagar/{pedido}` (só quem pediu) a cada 2 s por até 1 min: `esperando`, `apagada` ou `erro` (com o
+motivo que o WhatsApp Leads devolveu). No WhatsApp Leads, `integracao.apagar_mensagem` confere de novo (mesmo número,
+enviada, 48 h pela hora em que saiu; número em modo teste recusa a de verdade, a do modo teste só fica marcada) e pede
+ao WhatsApp o "apagar para todos" (`ConectorQR.apagar` → neonize `revoke_message(chat, eu, id)`), grava
+`mensagens.apagada_em` e `recibo_em` (o status vai de novo para a nuvem com `apagada_em`). Na volta,
+`api.ponte_retorno` chama `conversas.mensagem_apagada` (comando feito → `mensagens_whatsapp.apagada_em` e
+`apagada_por_id`); o status (`_guardar_conversas`) também grava `apagada_em` se faltar. A conversa e a lista mostram
+"🚫 Você apagou esta mensagem" (a lista sem o "Você:"); o texto continua guardado (aparece nos Dados da mensagem).
+A tela API Oficial não tem o botão (não foi pedido; antes de fazer, conferir na Meta se a Cloud API apaga mensagem
+enviada: em 24/11/2026 a documentação só falava do aviso de mensagem apagada pelo cliente). Teste:
+`testes/test_apagar_mensagem.py` (e a parte 26 do `whatsapp-leads/testes/teste_ponta_a_ponta.py`).
+
 **Número vermelho do menu Conversas** (23/11/2026, pedido da Maria: "assim como oportunidades tem um contador de
 mensagens coloque também em conversas e api oficial"): `conexoes.mensagens_nao_lidas` = recebidas com `lida` falso nos
 números que a pessoa vê (`conexoes.acessiveis`, a soma das bolinhas da lista), calculado em `web.tela` com a AR de quem
