@@ -114,6 +114,14 @@ def montar_html(visual: VisualCampanha, texto: str, valores: dict, link_descadas
     tem_descadastro = "{{descadastro}}" in html.replace(" ", "")
     html = re.sub(r"\{\{\s*mensagem\s*\}\}", lambda _m: texto_em_html(texto), html)
     html = re.sub(r"\{\{\s*descadastro\s*\}\}", lambda _m: rodape_link, html)
+
+    # campo vazio (empresa sem o nome do responsável): "Olá, {{nome}}!" vira "Olá!" e "Oi {{nome}}, tudo bem?" vira
+    # "Oi, tudo bem?", como no texto (mensagens.aplicar_variaveis); antes a arte saía com "Olá, ! Tudo bem?" (23/11/2026)
+    def sem_o_vazio(m):
+        return "" if not str(valores.get(m.group(1)) or "").strip() else m.group(0)
+
+    html = re.sub(r"[ \t]*,[ \t]*\{\{\s*(\w+)\s*\}\}(?=[ \t]*[!?.])", sem_o_vazio, html)
+    html = re.sub(r"[ \t]+\{\{\s*(\w+)\s*\}\}(?=[ \t]*,)", sem_o_vazio, html)
     html = re.sub(r"\{\{\s*(\w+)\s*\}\}", lambda m: html_lib.escape(str(valores.get(m.group(1), ""))), html)
     if not tem_descadastro:
         rodape = (f'<div style="font-family:Arial,sans-serif;font-size:12px;color:#777;margin:18px 0 0;'

@@ -615,6 +615,9 @@ cliente rápido". Antes cada pessoa via só as respostas dos leads dela e tinha 
   (`novas_visual_id/canais/toques` na configuração, copiados para a campanha diária em `empresas_novas.criar_campanha`).
   `Campanha.visual_id`, `visual_canais` ("email,whatsapp") e `visual_toques` ("seguintes" ou "todos");
   `cadencias.aplicar` marca `Tarefa.com_visual` com `visual.no_toque` (índice do passo).
+  O campo chama "Sua arte (visual)" e, com "Nenhuma arte", mostra o aviso amarelo `#sem-arte` (23/11/2026: as campanhas
+  115 e 116 da Maria saíram sem a arte; ela achou que o "E-mail em HTML com a marca" era a arte).
+  `visual.montar_html` tira a vírgula antes de um campo vazio ("Olá, {{nome}}!" sem o nome vira "Olá!"; antes "Olá, !").
 - Envio: `campanhas._enviar_email_da_tarefa` monta `visual.html_do_email` ({{mensagem}} = texto do toque, escapado;
   {{descadastro}} ou rodapé automático) e `email_smtp.enviar(html=...)` manda multipart/alternative (texto + HTML).
   `sdr.enviar_whatsapp_conectado` pede `visual.imagem_do_whatsapp`: só com `campanhas.whatsapp_liberado` (quem já

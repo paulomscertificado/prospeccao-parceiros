@@ -158,7 +158,9 @@ visual: o **HTML do e-mail** (cole o código; escreva `{{mensagem}}` onde entra 
 e do WhatsApp e manda um e-mail de teste para você.
 - Na **Nova campanha (IA SDR)** e na configuração das **Empresas novas** (passo 5) escolha o visual, os canais (e-mail,
   WhatsApp) e os toques: **do 2º toque em diante** (recomendado: o 1º contato frio responde melhor só com texto) ou
-  **em todos**.
+  **em todos**. A arte se escolhe no campo **Sua arte (visual)**: com "Nenhuma arte", a tela avisa em amarelo que os
+  e-mails não levam a sua arte. O **E-mail em HTML com a marca** é outro e-mail, mais simples, feito pelo sistema.
+- Empresa sem o nome do responsável: o "Olá, {{nome}}!" da arte vira "Olá!".
 - O **e-mail** sai com o HTML e também com a versão em texto (exigência dos filtros de spam).
 - No **WhatsApp** vai a imagem com o texto do toque embaixo, **só para quem já conversou com a MS**. Para contato frio
   sai só o texto, para proteger o número contra bloqueio.

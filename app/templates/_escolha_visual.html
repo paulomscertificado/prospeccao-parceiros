@@ -12,9 +12,9 @@
   {% endif %}
   {% if visuais %}
   <div class="campos" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)">
-    <div><label for="visual_id">Visual</label>
+    <div><label for="visual_id">Sua arte (visual)</label>
       <select name="visual_id" id="visual_id">
-        <option value="">Só texto (sem visual)</option>
+        <option value="">Nenhuma arte</option>
         {% for v in visuais %}<option value="{{ v.id }}" {{ 'selected' if visual_atual == v.id }}>{{ v.nome }}{{ '' if (v.html or '').strip() else ' (ainda sem HTML)' }}{{ '' if v.imagem_hash else ' (ainda sem imagem)' }}</option>{% endfor %}
       </select></div>
     <div><label>Em quais toques</label>
@@ -23,6 +23,16 @@
         <option value="todos" {{ 'selected' if visual_toques == 'todos' }}>Em todos os toques</option>
       </select></div>
   </div>
+  <div class="aviso aviso-alerta" id="sem-arte" style="margin:8px 0 0" {{ 'hidden' if visual_atual }}>⚠️ <b>Nenhuma arte escolhida:</b> os e-mails não levam a sua arte (visual).{% if email_html_liberado %} O “E-mail em HTML com a marca” é outro e-mail, mais simples, feito pelo sistema com o logo e a cor da marca.{% endif %} Para mandar a sua arte, escolha-a em “Sua arte (visual)”.</div>
+  <script>
+  (function () {  // o aviso some quando a arte é escolhida (pedido da Maria em 23/11/2026: duas campanhas saíram sem a arte)
+    const arte = document.getElementById("visual_id"), aviso = document.getElementById("sem-arte");
+    if (!arte || !aviso) return;
+    const mostrar = () => { aviso.hidden = !!arte.value; };
+    arte.addEventListener("change", mostrar);
+    mostrar();
+  })();
+  </script>
   <div style="margin-top:6px">
     <label class="marcar"><input type="checkbox" name="visual_email" {{ 'checked' if 'email' in (visual_canais or 'email') }}> ✉️ E-mail com o HTML do visual</label>
     <label class="marcar"><input type="checkbox" name="visual_whatsapp" {{ 'checked' if 'whatsapp' in (visual_canais or '') }}> 💬 WhatsApp com a imagem do visual (o texto vai embaixo)</label>

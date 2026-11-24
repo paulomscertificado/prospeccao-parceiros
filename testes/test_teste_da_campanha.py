@@ -136,3 +136,25 @@ def test_tela_e_envio_do_teste(cliente, monkeypatch):
         for t in db.execute(select(Tarefa).where(Tarefa.campanha_id == cid)).scalars():
             t.status = "cancelada"
         db.get(VisualCampanha, vid).ativo = False
+
+
+def test_arte_sem_o_nome_do_responsavel():
+    """A arte "Escritorios contabeis" começa com "Olá, {{nome}}!": sem o nome, saía "Olá, ! Tudo bem?" (23/11/2026)."""
+    arte = VisualCampanha(nome="x", html="<p>Olá, {{nome}}! Tudo bem? Oi {{nome}}, como vai? Conheci a {{empresa}}.</p>")
+    assert "<p>Olá! Tudo bem? Oi, como vai? Conheci a Empresa X.</p>" in visual.montar_html(
+        arte, "", {"nome": "", "empresa": "Empresa X"})
+    assert "<p>Olá, Ana! Tudo bem? Oi Ana, como vai? Conheci a Empresa X.</p>" in visual.montar_html(
+        arte, "", {"nome": "Ana", "empresa": "Empresa X"})
+
+
+def test_nova_campanha_avisa_quando_nenhuma_arte_foi_escolhida(cliente):
+    """As campanhas 115 e 116 saíram sem a arte: o campo virou "Sua arte (visual)" e "Nenhuma arte" mostra um aviso."""
+    with sessao() as db:
+        vid = _visual(db, "Arte Nova Campanha Teste").id
+    pagina = html_lib.unescape(cliente.get("/campanhas/nova").text)
+    assert "Sua arte (visual)" in pagina and '<option value="">Nenhuma arte</option>' in pagina
+    aviso = pagina[pagina.index('id="sem-arte"'):]
+    assert aviso.split(">", 1)[0].count("hidden") == 0  # nada escolhido: o aviso aparece
+    assert "Nenhuma arte escolhida:" in aviso and "os e-mails não levam a sua arte" in aviso
+    with sessao() as db:
+        db.get(VisualCampanha, vid).ativo = False
