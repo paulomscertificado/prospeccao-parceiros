@@ -847,12 +847,36 @@ def test_campanha_automatica_so_comeca_na_data_escolhida(cliente, monkeypatch):
         _limpar(db)
 
 
+# O quadro 4 grava na marca da tela (o Admin Master fora das ARs: a AR MS), desde 24/11/2026 tudo da Renovação é de cada
+# marca: os testes da tela leem na marca e limpam o que ficou nela (senão vale para os testes seguintes).
+DA_MARCA = ("renov_ativo", "renov_hora", "renov_maximo_dia", "renov_canais", "renov_arte", "renov_email_html",
+            "renov_dias", "renov_hora_inicio", "renov_hora_fim", "renov_feriados", "renov_ativo_desde", "renov_mensagens")
+
+
+def _na_marca_da_tela(db) -> int:
+    from app.banco import usar_config_da_ar
+    from app.modelos import Tenant
+
+    ms = db.execute(select(Tenant.id).where(Tenant.slug == "ms")).scalar()
+    usar_config_da_ar(db, ms)
+    return ms
+
+
+def _limpar_a_marca(db) -> None:
+    from app.modelos import ConfiguracaoAR
+
+    ms = _na_marca_da_tela(db)
+    db.execute(delete(ConfiguracaoAR).where(ConfiguracaoAR.tenant_id == ms, ConfiguracaoAR.chave.in_(DA_MARCA)))
+    db.info.pop("config_ar", None)  # os valores da marca ficam guardados na sessão
+
+
 def test_tela_salva_dias_horario_e_inicio(cliente, csrf):
     r = cliente.post("/renovacao/configurar", data={
         "csrf": csrf, "canal_whatsapp": "on", "canal_email": "on", "maximo_dia": "40", "hora": "07:45", "arte": "on",
         "dias": "1, 12, 3, 6", "hora_inicio": "10:00", "ativo_desde": "2027-01-01"})
     assert r.status_code == 200
     with sessao() as db:
+        _na_marca_da_tela(db)
         assert renovacao.dias_aviso(db) == (12, 6, 3, 1) and renovacao.hora_inicio(db) == "10:00"
         assert renovacao.cfg(db, "renov_ativo_desde") == "2027-01-01"
     pagina = cliente.get("/renovacao").text
@@ -865,6 +889,7 @@ def test_tela_salva_dias_horario_e_inicio(cliente, csrf):
 
         for chave in ("renov_dias", "renov_hora_inicio", "renov_ativo_desde"):
             gravar_config(db, chave, "")
+        _limpar_a_marca(db)
 
 
 
@@ -1002,6 +1027,7 @@ def test_tela_salva_ate_que_horas_os_avisos_saem(cliente, csrf):
     r = cliente.post("/renovacao/configurar", data={**base, "hora_fim": "17:30"})
     assert r.status_code == 200
     with sessao() as db:
+        _na_marca_da_tela(db)
         assert renovacao.hora_fim(db) == "17:30"
         assert "das 10:00 às 17:30" in renovacao.fora_do_horario(db, datetime(2026, 11, 14, 11, 0))
     pagina = cliente.get("/renovacao").text
@@ -1009,9 +1035,9 @@ def test_tela_salva_ate_que_horas_os_avisos_saem(cliente, csrf):
     r = cliente.post("/renovacao/configurar", data={**base, "hora_fim": "09:00"})
     assert "precisa ser depois do inicial" in r.text
     with sessao() as db:
+        _na_marca_da_tela(db)
         assert renovacao.hora_fim(db) == "17:30"  # nada mudou
-        for chave in ("renov_hora_inicio", "renov_hora_fim"):
-            gravar_config(db, chave, "")
+        _limpar_a_marca(db)
         db.commit()
         assert renovacao.hora_fim(db) == "18:00"
 
@@ -1174,6 +1200,7 @@ def test_tela_salva_os_outros_feriados(cliente, csrf):
     r = cliente.post("/renovacao/configurar", data={**base, "feriados": "8/12, 24/06/2027"})
     assert r.status_code == 200 and "Configuração salva" in r.text
     with sessao() as db:
+        _na_marca_da_tela(db)
         assert renovacao.cfg(db, "renov_feriados") == "08/12, 24/06/2027"
     pagina = cliente.get("/renovacao").text
     assert 'name="feriados" value="08/12, 24/06/2027"' in pagina and "Outros feriados" in pagina
@@ -1181,8 +1208,9 @@ def test_tela_salva_os_outros_feriados(cliente, csrf):
     r = cliente.post("/renovacao/configurar", data={**base, "feriados": "31/02, 08/12"})
     assert "Não entendi estes feriados: 31/02" in r.text
     with sessao() as db:
+        _na_marca_da_tela(db)
         assert renovacao.cfg(db, "renov_feriados") == "08/12, 24/06/2027"  # nada mudou
-        gravar_config(db, "renov_feriados", "")
+        _limpar_a_marca(db)
         db.commit()
 
 

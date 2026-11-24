@@ -69,8 +69,8 @@ def agora() -> datetime:
 
 # White label, Fase 2 parte 2: as configurações que cada AR tem as suas (documento do plano, "Configurações: plataforma,
 # AR ou pessoa"). Sem valor próprio, a AR usa o da plataforma. As outras chaves são da plataforma: só o Admin Master
-# muda (proteção dos números, alertas, módulos, base da Receita, estado da ponte...). Renovação e Empresas novas ficam
-# da plataforma até as decisões da CNPJá e da planilha por AR.
+# muda (proteção dos números, alertas, módulos, base da Receita, estado da ponte...). As Empresas novas ficam da
+# plataforma; a Renovação é de cada marca desde 24/11/2026 (cada uma com a sua planilha de clientes).
 CHAVES_DA_AR = frozenset({
     "empresa_nome", "link_parceria", "texto_comissao", "programa_parceria", "limite_diario_whatsapp",
     "limite_diario_email", "horas_entre_contatos_whatsapp", "horas_entre_contatos_email", "pular_fim_de_semana",
@@ -89,6 +89,12 @@ CHAVES_DA_AR = frozenset({
     # quem assina e por qual número saem os avisos (23/11/2026): eram da plataforma, e salvar o quadro 4 dentro do Grupo
     # Certy apagou os da MS (a tela dentro de uma AR só lista as pessoas e os números dela)
     "renov_dono_id", "renov_conexao",
+    # o resto da Renovação (24/11/2026, pedido da Maria: "só separe a parte de renovação, que cada uma tem a sua base
+    # de dados interna"): dias dos avisos, horário, outros feriados, canais, arte, textos, campanha automática e o que
+    # a tela guarda (última importação e rodada). Antes, salvar o quadro 4 numa marca mudava o das outras
+    "renov_ativo", "renov_hora", "renov_maximo_dia", "renov_canais", "renov_arte", "renov_email_html", "renov_dias",
+    "renov_hora_inicio", "renov_hora_fim", "renov_feriados", "renov_ativo_desde", "renov_mensagens",
+    "renov_ultima_rodada", "renov_ultimo_resultado", "renov_ultima_importacao",
     # módulos (autorizacao.MODULOS): cada AR tem os seus, mas só o Admin Master liga e desliga (Fase 3). Todo módulo
     # novo entra aqui E em CHAVES_SO_MASTER (testes/test_modulos_por_ar.py confere): fora daqui, o Painel master
     # gravava na plataforma e ligar/desligar em uma AR valia para todas (a Assertiva, até 19/11/2026)
@@ -119,6 +125,21 @@ def usar_config_da_ar(db: Session, ar: int | None) -> None:
         db.info.pop("ar_config", None)
     else:
         db.info["ar_config"] = ar
+
+
+@contextmanager
+def config_da_ar(db: Session, ar: int | None):
+    """Por um momento, as configurações da AR `ar` (ex.: o horário da Renovação da marca de uma campanha, 24/11/2026);
+    depois volta ao que estava. None = as da plataforma (na tela: as da pessoa)."""
+    tinha, antes = "ar_config" in db.info, db.info.get("ar_config")
+    usar_config_da_ar(db, ar)
+    try:
+        yield
+    finally:
+        if tinha:
+            db.info["ar_config"] = antes
+        else:
+            db.info.pop("ar_config", None)
 
 
 def algum_valor(db: Session, chave: str, valor: str) -> bool:

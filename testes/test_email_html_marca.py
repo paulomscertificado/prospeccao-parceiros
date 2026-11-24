@@ -225,11 +225,14 @@ def test_renovacao_tem_o_botao_e_o_email_sem_arte_sai_com_a_marca(cliente, monke
                 "maximo_dia": "40", "hora_fim": "18:00"}
         cliente.post("/renovacao/configurar", data=form)  # botão desmarcado
         with sessao() as db:
+            # o quadro 4 grava na marca da tela (o Admin Master fora das ARs: a AR MS; tudo de cada marca desde 24/11/2026)
+            usar_config_da_ar(db, db.execute(select(Tenant.id).where(Tenant.slug == "ms")).scalar())
             assert renovacao.cfg(db, "renov_email_html") == "0"
             assert db.get(Campanha, camp_id).email_html is False  # a campanha em andamento também
             assert not visual.usa_html_da_marca_na_renovacao(db, db.get(Tarefa, toques[1].id))
         cliente.post("/renovacao/configurar", data={**form, "email_html": "on"})
         with sessao() as db:
+            usar_config_da_ar(db, db.execute(select(Tenant.id).where(Tenant.slug == "ms")).scalar())
             assert renovacao.cfg(db, "renov_email_html") == "1" and db.get(Campanha, camp_id).email_html is True
     finally:
         with sessao() as db:

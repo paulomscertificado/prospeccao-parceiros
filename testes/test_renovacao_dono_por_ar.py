@@ -43,7 +43,7 @@ def test_salvar_dentro_de_outra_ar_nao_apaga_o_dono_nem_o_numero_da_ms(cliente, 
     try:
         cliente.post(f"/master/entrar/{certy}", data={"csrf": csrf, "motivo": "configurar a renovação do Grupo Certy"})
         pagina = " ".join(cliente.get("/renovacao").text.split())
-        assert "vale para todas as marcas" in pagina  # o aviso do que é de cada marca
+        assert "Mudar aqui não muda nas outras marcas" in pagina  # desde 24/11/2026 tudo é de cada marca
         # dentro do Grupo Certy, as listas não têm o dono nem o número da MS: o formulário vai com os dois vazios
         r = cliente.post("/renovacao/configurar", data={"csrf": csrf, **BASE, "dono_id": "", "conexao": ""})
         assert r.status_code == 200 and "Configuração salva" in r.text
@@ -59,7 +59,7 @@ def test_salvar_dentro_de_outra_ar_nao_apaga_o_dono_nem_o_numero_da_ms(cliente, 
             assert config_propria_da_ar(db, ms, "renov_dono_id") == dono_ms
             assert config_propria_da_ar(db, ms, "renov_conexao") == ""  # "Automático", gravado só na MS
             assert ler_config(db, "renov_conexao") == "principal"  # o da plataforma não mudou
-        assert "vale para todas as marcas" not in " ".join(cliente.get("/renovacao").text.split())
+        assert "Mudar aqui não muda nas outras marcas" not in " ".join(cliente.get("/renovacao").text.split())
     finally:
         cliente.post("/master/sair", data={"csrf": csrf})
         _zerar_limite()

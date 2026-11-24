@@ -109,9 +109,9 @@
 <form method="post" action="/renovacao/configurar" id="configurar" class="cartao">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <h2>4. Campanha automática, quem envia e por qual número</h2>
-  {% if not marca_principal %}<p class="aviso aviso-alerta">Neste quadro, são só de {{ nome_da_marca_renov }}: o dono das
-    campanhas, o número dos disparos, a API oficial, o calendário e o endereço da arte. O resto (campanha do dia, dias
-    dos avisos, horários, feriados e canais) vale para todas as marcas: mudar aqui muda também nas outras.</p>{% endif %}
+  {% if not marca_principal %}<p class="aviso aviso-info">Tudo na Renovação é só de {{ nome_da_marca_renov }}: dono, número,
+    dias dos avisos, horários, feriados, canais, arte e textos. Mudar aqui não muda nas outras marcas. A campanha
+    automática do dia ainda não roda para {{ nome_da_marca_renov }}: monte as campanhas pelo quadro 3.</p>{% endif %}
   <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap">
     <label class="interruptor"><input type="checkbox" name="ativo" {{ 'checked' if cfg.renov_ativo == '1' }}>
       <span class="trilho" aria-hidden="true"></span>

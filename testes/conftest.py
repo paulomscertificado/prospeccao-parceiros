@@ -68,3 +68,28 @@ def ligar_modulos(*modulos: str, ligado: bool = True):
 @pytest.fixture()
 def csrf(cliente):
     return csrf_de(cliente.get("/minha-conta").text)
+
+
+# Desde 24/11/2026 toda a Renovação é de cada marca: o que um teste salva pela tela (quadro 4, textos, importação) fica
+# na AR MS ou no Grupo Certy. Antes ficava na plataforma, e cada teste limpava o dele; agora, depois de cada teste,
+# as marcas voltam a usar o da plataforma (o dono, o número, a API oficial, o calendário e a arte já eram de cada marca
+# antes e os testes deles cuidam disso).
+RENOVACAO_DA_MARCA = ("renov_ativo", "renov_hora", "renov_maximo_dia", "renov_canais", "renov_arte", "renov_email_html",
+                      "renov_dias", "renov_hora_inicio", "renov_hora_fim", "renov_feriados", "renov_ativo_desde",
+                      "renov_mensagens", "renov_ultima_rodada", "renov_ultimo_resultado", "renov_ultima_importacao")
+
+
+@pytest.fixture(autouse=True)
+def _renovacao_das_marcas_limpa():
+    yield
+    from sqlalchemy import delete
+    from sqlalchemy.exc import OperationalError, ProgrammingError
+
+    from app.banco import sessao
+    from app.modelos import ConfiguracaoAR
+
+    try:
+        with sessao() as db:
+            db.execute(delete(ConfiguracaoAR).where(ConfiguracaoAR.chave.in_(RENOVACAO_DA_MARCA)))
+    except (OperationalError, ProgrammingError):  # o banco ainda não foi criado (teste que não usa o sistema)
+        pass

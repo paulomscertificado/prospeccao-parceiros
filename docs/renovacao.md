@@ -121,8 +121,16 @@ base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renova
    número dos disparos da MS, porque a tela dentro de uma AR só lista as pessoas e os números dela e os dois eram da
    plataforma. `renov_dono_id` e `renov_conexao` entraram em `banco.CHAVES_DA_AR`; as rotas da Renovação trabalham na
    AR da tela (`_na_ar_da_renovacao`: o Admin Master fora das ARs mexe nos da AR MS) e a `rodada_diaria` lê os da AR
-   MS. O resto do quadro 4 (campanha do dia, dias, horários, feriados, canais) continua da plataforma: as filas leem
-   alguns sem a AR da tarefa. A tela das outras marcas avisa o que é só delas. O teste do quadro 1 sai com a marca da
+   MS. **Desde 24/11/2026 (pedido da Maria: "só separe a parte de renovação, que cada uma tem a sua base de dados
+   interna") todo o resto também é de cada marca**: `renov_ativo`, `renov_hora`, `renov_maximo_dia`, `renov_canais`,
+   `renov_arte`, `renov_email_html`, `renov_dias`, `renov_hora_inicio`, `renov_hora_fim`, `renov_feriados`,
+   `renov_ativo_desde`, `renov_mensagens`, `renov_ultima_rodada`, `renov_ultimo_resultado` e `renov_ultima_importacao`
+   em `banco.CHAVES_DA_AR` (sem valor próprio, a marca usa o da plataforma). As filas de e-mail e de WhatsApp tiram da
+   rodada só os avisos das marcas fora do horário (`renovacao.ars_fora_do_horario` + `das_marcas`); a fila oficial já
+   lia por tarefa; `remarcar_feriados` roda marca por marca; Disparar, Minha fila e o planejamento da campanha usam a
+   marca dela (`banco.config_da_ar`); importar e os textos gravam na marca da tela. A campanha automática do dia
+   continua só da AR MS (`rodada_diaria`). A tela das outras marcas diz que tudo ali é delas. Testes:
+   `testes/test_renovacao_por_marca.py`. O teste do quadro 1 sai com a marca da
    AR da tela (`textos_do_contato(ar=)`: o Admin Master dentro do Grupo Certy recebia "da MS"). Testes:
    `testes/test_renovacao_dono_por_ar.py`. `arte_do_toque` e o teste (`enviar_teste(ar=)`, o cliente fictício usa a AR
    da tela) mandam `"url"` junto; o WhatsApp Leads confere de novo (`arte_aviso.endereco_da_arte`) e guarda uma cópia

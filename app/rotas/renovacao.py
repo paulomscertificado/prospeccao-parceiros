@@ -152,6 +152,7 @@ async def importar(request: Request, arquivo: UploadFile = File(...), usuario: U
     if not registros:
         avisar(request, "Não achei nenhum certificado na planilha (as linhas estão sem data de vencimento?).", "erro")
         return voltar("/renovacao")
+    _na_ar_da_renovacao(db, request, usuario)  # a "Última importação" fica na marca da tela (24/11/2026)
     r = renovacao.importar(db, registros, usuario, (arquivo.filename or "")[:80])
     registrar_log(db, usuario, "importou_renovacao", "certificado", None,
                   f"{r['novos']} novos, {r['atualizados']} atualizados, {r['linhas']} linhas ({arquivo.filename})", request)
@@ -393,6 +394,7 @@ async def salvar_mensagens(request: Request, usuario: Usuario = Depends(exige("c
             avisar(request, "Tire as frases de spam (\"excelente oportunidade\", \"promoção\", \"não perca\"...).", "erro")
             return voltar("/renovacao#mensagens")
         novas[angulo] = item
+    _na_ar_da_renovacao(db, request, usuario)  # os textos dos avisos são de cada marca (24/11/2026)
     gravar_config(db, "renov_mensagens", json.dumps(novas, ensure_ascii=False))
     registrar_log(db, usuario, "editou_mensagens_renovacao", "configuracao", None, request=request)
     db.commit()
@@ -403,6 +405,7 @@ async def salvar_mensagens(request: Request, usuario: Usuario = Depends(exige("c
 @rotas.post("/renovacao/restaurar-mensagens", dependencies=[Depends(verificar_csrf)])
 def restaurar_mensagens(request: Request, usuario: Usuario = Depends(exige("campanhas.configurar")),
                         db: Session = Depends(obter_db)):
+    _na_ar_da_renovacao(db, request, usuario)
     gravar_config(db, "renov_mensagens", "")
     registrar_log(db, usuario, "restaurou_mensagens_renovacao", "configuracao", None, request=request)
     db.commit()

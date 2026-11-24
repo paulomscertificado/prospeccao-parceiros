@@ -414,8 +414,10 @@ def _hora_minima(db, camp: Campanha) -> str:
     if camp.tipo != "renovacao":
         return ""
     from . import renovacao
+    from .banco import config_da_ar
 
-    return renovacao.hora_inicio(db)
+    with config_da_ar(db, camp.tenant_id):  # o horário da Renovação da marca da campanha (24/11/2026)
+        return renovacao.hora_inicio(db)
 
 
 def _hora_maxima(db, camp: Campanha) -> str:
@@ -423,8 +425,10 @@ def _hora_maxima(db, camp: Campanha) -> str:
     if camp.tipo != "renovacao":
         return ""
     from . import renovacao
+    from .banco import config_da_ar
 
-    return renovacao.hora_fim(db)
+    with config_da_ar(db, camp.tenant_id):
+        return renovacao.hora_fim(db)
 
 
 def _feriados(db, camp: Campanha) -> frozenset:
@@ -436,8 +440,10 @@ def _feriados(db, camp: Campanha) -> frozenset:
     dono = db.get(Usuario, camp.usuario_id) if camp.usuario_id else None
     if camp.tipo == "renovacao":
         from . import renovacao
+        from .banco import config_da_ar
 
-        return renovacao.dias_sem_envio(db, dono)
+        with config_da_ar(db, camp.tenant_id):  # os "Outros feriados" da Renovação da marca da campanha
+            return renovacao.dias_sem_envio(db, dono)
     return feriados.dias_sem_envio(db, dono)
 
 
@@ -911,8 +917,12 @@ def processar_fila(db, maximo: int = 25) -> dict:
                        # nunca dois e-mails automáticos para a mesma empresa em menos de 20 h (17/11/2026)
                        ~_recebeu_ha_pouco(db, "email", Tarefa.lead_id))
                 .order_by(Tarefa.data, Tarefa.hora, Tarefa.id).limit(max(maximo * 3, 400)))
-    if renovacao.fora_do_horario(db):  # Renovação: só de segunda a sexta, das 10:00 às 18:00 (pedido da Maria)
-        consulta = consulta.where(Campanha.tipo != renovacao.TIPO_CAMPANHA)
+    # Renovação: só de segunda a sexta, no horário e fora dos feriados DA MARCA (pedido da Maria; cada marca o seu
+    # desde 24/11/2026): saem da rodada só os avisos das marcas que estão fora do horário agora
+    fora = renovacao.ars_fora_do_horario(db)
+    if fora:
+        consulta = consulta.where(~and_(Campanha.tipo == renovacao.TIPO_CAMPANHA,
+                                        renovacao.das_marcas(Tarefa.tenant_id, fora)))
     campanhas_no_limite: set[int] = set()
     ars_paradas: set = set()  # AR que chegou ao limite dela nesta rodada: só ela espera (fila justa)
     receberam: set[int] = set()  # empresas que já ganharam e-mail nesta rodada (sem a pausa de 3-4 min: testes)
@@ -1190,8 +1200,11 @@ def _enviar_toque(db, t: Tarefa, usuario: Usuario) -> str:
 
         camp = db.get(Campanha, t.campanha_id)
         if camp is not None and camp.tipo == renovacao.TIPO_CAMPANHA:
-            fora = renovacao.fora_do_horario(
-                db, margem_minutos=renovacao.MARGEM_WHATSAPP_MINUTOS if t.canal == "whatsapp" else 0)
+            from .banco import config_da_ar
+
+            with config_da_ar(db, camp.tenant_id):  # o horário da Renovação da marca da campanha (24/11/2026)
+                fora = renovacao.fora_do_horario(
+                    db, margem_minutos=renovacao.MARGEM_WHATSAPP_MINUTOS if t.canal == "whatsapp" else 0)
             if fora:
                 return fora + "."
     if t.canal == "email" and not lead.email:
@@ -1200,8 +1213,11 @@ def _enviar_toque(db, t: Tarefa, usuario: Usuario) -> str:
     if bloqueio:
         return bloqueio
     from . import renovacao
+    from .banco import config_da_ar
 
-    if not renovacao.ajustar_a_etapa(db, t):  # Renovação: o texto da etapa dos dias que faltam (19/11/2026)
+    with config_da_ar(db, t.tenant_id):  # os dias e os textos da Renovação da marca do aviso (24/11/2026)
+        segue = renovacao.ajustar_a_etapa(db, t)  # Renovação: o texto da etapa dos dias que faltam (19/11/2026)
+    if not segue:
         return "Este aviso não sai mais: o aviso desta etapa já foi enviado para este cliente."
     t.status = "pendente"
     if t.canal == "email":
@@ -1246,9 +1262,11 @@ def disparar(db, camp: Campanha, usuario: Usuario, canal: str) -> dict:
         return feito
     if camp.tipo == "renovacao":
         from . import renovacao
+        from .banco import config_da_ar
 
-        fora = renovacao.fora_do_horario(
-            db, margem_minutos=renovacao.MARGEM_WHATSAPP_MINUTOS if canal == "whatsapp" else 0)
+        with config_da_ar(db, camp.tenant_id):  # o horário da Renovação da marca da campanha (24/11/2026)
+            fora = renovacao.fora_do_horario(
+                db, margem_minutos=renovacao.MARGEM_WHATSAPP_MINUTOS if canal == "whatsapp" else 0)
         if fora:
             feito["parou"] = fora
             return feito
@@ -1265,8 +1283,11 @@ def disparar(db, camp: Campanha, usuario: Usuario, canal: str) -> dict:
             continue
         if camp.tipo == "renovacao":
             from . import renovacao
+            from .banco import config_da_ar
 
-            if not renovacao.ajustar_a_etapa(db, t):  # o texto da etapa dos dias que faltam (19/11/2026)
+            with config_da_ar(db, camp.tenant_id):  # os dias e os textos da Renovação da marca (24/11/2026)
+                segue = renovacao.ajustar_a_etapa(db, t)
+            if not segue:  # o texto da etapa dos dias que faltam (19/11/2026)
                 feito["bloqueados"] += 1
                 feito["motivos"]["o aviso desta etapa já tinha saído"] += 1
                 continue
@@ -1643,8 +1664,11 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
                 .limit(200))
     # Renovação: só de segunda a sexta, das 10:00 às 18:00 (pedido da Maria em 13/11/2026). O WhatsApp para uns minutos
     # antes do fim: ainda passa pela fila do computador do WhatsApp Leads e precisa chegar dentro do horário.
-    if renovacao.fora_do_horario(db, margem_minutos=renovacao.MARGEM_WHATSAPP_MINUTOS):
-        consulta = consulta.where(Campanha.tipo != renovacao.TIPO_CAMPANHA)
+    # Cada marca com o horário e os feriados dela (24/11/2026).
+    fora = renovacao.ars_fora_do_horario(db, margem_minutos=renovacao.MARGEM_WHATSAPP_MINUTOS)
+    if fora:
+        consulta = consulta.where(~and_(Campanha.tipo == renovacao.TIPO_CAMPANHA,
+                                        renovacao.das_marcas(Tarefa.tenant_id, fora)))
     automaticas = campanhas_que_saem_sozinhas(db)
     campanhas_no_limite: set[int] = set()
     ars_paradas: set = set()  # AR que chegou a um limite dela nesta rodada: só ela espera (fila justa)

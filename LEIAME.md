@@ -480,6 +480,10 @@ Menu **Renovação**. O sistema avisa os clientes da MS antes de o certificado d
 antes**, pelo WhatsApp e pelo e-mail. Os clientes vêm do **Relatório de renovação** que vocês exportam do sistema da
 certificadora.
 
+**Cada marca tem a sua Renovação** (desde 24/11/2026): a planilha, os clientes, as campanhas e todas as configurações
+(dono, número, dias dos avisos, horários, feriados, canais, arte e textos) são só da marca. O que uma marca muda não
+muda nas outras. A campanha automática do dia, por enquanto, roda só para a MS.
+
 **Passo a passo:**
 1. **Teste primeiro** (quadro **1. Testar os avisos**, ver abaixo): mande os avisos para o seu WhatsApp e confira.
 2. Exporte o **Relatório de renovação** (Excel) no sistema da certificadora. Em **Renovação**, no quadro

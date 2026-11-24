@@ -400,6 +400,29 @@ def fora_do_horario(db, momento: datetime | None = None, margem_minutos: int = 0
     return ""
 
 
+def ars_fora_do_horario(db, momento: datetime | None = None, margem_minutos: int = 0) -> set:
+    """As marcas cuja Renovação está fora do horário agora: cada uma tem os dias, o horário e os feriados dela
+    (24/11/2026). As filas tiram da rodada só os avisos dessas marcas. None = os avisos sem marca (a plataforma)."""
+    from .banco import config_da_ar
+    from .modelos import Tenant
+
+    fora = set()
+    for ar in [None, *db.execute(select(Tenant.id).execution_options(sem_filtro_de_ar=True)).scalars()]:
+        with config_da_ar(db, ar):
+            if fora_do_horario(db, momento, margem_minutos):
+                fora.add(ar)
+    return fora
+
+
+def das_marcas(coluna, ars) -> object:
+    """Condição SQL "a linha é de uma destas marcas" (None na lista = as linhas sem marca)."""
+    from sqlalchemy import false
+
+    ids = [a for a in ars if a is not None]
+    partes = ([coluna.in_(ids)] if ids else []) + ([coluna.is_(None)] if None in ars else [])
+    return or_(*partes) if partes else false()
+
+
 def garantir_cadencia(db):
     from .modelos import Cadencia, PassoCadencia
 
@@ -1621,6 +1644,23 @@ def _dia_que_cabe(dia: date, vencimento: date, antes: date | None, depois: date 
 
 
 def remarcar_feriados(db, hoje: date | None = None, aplicar: bool = True) -> dict:
+    """Os avisos em aberto marcados para um feriado mudam de dia (ver _remarcar_feriados_da_marca), cada marca com os
+    feriados, o horário e os dias dela (24/11/2026). Devolve as contas de todas juntas."""
+    from .banco import config_da_ar
+
+    ars = set(db.execute(select(Campanha.tenant_id).where(
+        Campanha.tipo == TIPO_CAMPANHA, Campanha.status.in_(("aguardando_aprovacao", "ativa", "pausada")))).scalars())
+    feito = {"remarcados": 0, "cancelados": 0, "so_email": 0, "mudancas": Counter()}
+    for ar in sorted(ars, key=lambda a: a or 0):
+        with config_da_ar(db, ar):
+            parte = _remarcar_feriados_da_marca(db, hoje, aplicar, ar)
+        for chave in ("remarcados", "cancelados", "so_email"):
+            feito[chave] += parte[chave]
+        feito["mudancas"].update(parte["mudancas"])
+    return feito
+
+
+def _remarcar_feriados_da_marca(db, hoje: date | None, aplicar: bool, ar: int | None) -> dict:
     """Avisos de renovação em aberto marcados para um feriado (a campanha piloto foi montada antes desta regra, ou um
     feriado escrito depois na tela) mudam de dia (pedido da Maria em 13/11/2026: "pular feriados"): o dia útil mais
     perto, antes do feriado se der, respeitando as regras de sempre (2 dias entre os avisos do contato, nada depois do
@@ -1635,7 +1675,8 @@ def remarcar_feriados(db, hoje: date | None = None, aplicar: bool = True) -> dic
     abertos = ("pendente", "rascunho")
     # os feriados de quem é cada campanha (nacionais, "Outros feriados" e os do estado e da cidade dela: 18/11/2026)
     donos = dict(db.execute(select(Campanha.id, Campanha.usuario_id).where(
-        Campanha.tipo == TIPO_CAMPANHA, Campanha.status.in_(("aguardando_aprovacao", "ativa", "pausada")))).all())
+        Campanha.tipo == TIPO_CAMPANHA, Campanha.status.in_(("aguardando_aprovacao", "ativa", "pausada")),
+        das_marcas(Campanha.tenant_id, {ar}))).all())  # só as campanhas desta marca
     por_dono = {uid: dias_sem_envio(db, db.get(Usuario, uid) if uid else None) for uid in set(donos.values())}
     sem_envio_da = {cid: por_dono[uid] for cid, uid in donos.items()}
     sem_envio = frozenset().union(*por_dono.values()) if por_dono else frozenset()
@@ -1643,6 +1684,7 @@ def remarcar_feriados(db, hoje: date | None = None, aplicar: bool = True) -> dic
     feito = {"remarcados": 0, "cancelados": 0, "so_email": 0, "mudancas": Counter()}
     em_feriado = [t for t in db.execute(select(Tarefa).join(Campanha, Tarefa.campanha_id == Campanha.id).where(
         Campanha.tipo == TIPO_CAMPANHA, Campanha.status.in_(("aguardando_aprovacao", "ativa", "pausada")),
+        das_marcas(Campanha.tenant_id, {ar}),
         Tarefa.tipo == "prospeccao", Tarefa.status.in_(abertos), Tarefa.data >= hoje,
         Tarefa.data.in_(sorted(sem_envio)))).scalars().all()
         if t.data in sem_envio_da.get(t.campanha_id, frozenset())] if sem_envio else []
