@@ -652,7 +652,11 @@ Muitos e-mails da base da Receita estão desatualizados. O sistema tira esses en
   Na primeira vez, ele também lê as devoluções dos últimos 60 dias que já estão na caixa.
 - Lead marcado: os próximos e-mails da campanha para ele são cancelados, e a ficha mostra o selo vermelho
   **"não existe"** ao lado do e-mail. Se você corrigir o endereço em **Editar**, ele volta a receber.
-- "Caixa cheia" e outras recusas temporárias **não** tiram o e-mail.
+- Recusa temporária (caixa cheia, servidor da empresa fora do ar) **não** tira o e-mail enquanto o servidor de envio
+  ainda está tentando (no Gmail, o aviso "Delivery Status Notification (**Delay**)"). Quando ele **desiste** depois de
+  alguns dias ("Delivery Status Notification (**Failure)**"), o e-mail não foi entregue: o lead é marcado ("caixa de
+  entrada cheia há dias" ou "o servidor do e-mail não recebe mensagens") e os próximos e-mails para ele são cancelados.
+  Recusa por limite de envio ou reputação de quem envia não tira o e-mail (o endereço existe).
 - Na página da campanha, o botão **Conferir e-mails** faz a conferência de todos de uma vez.
 - **Corrigir e reenviar:** na página da campanha aparece o quadro **"E-mails que não existem"**, com as empresas
   marcadas, o motivo e botões para pesquisar no site, no Google e no Instagram. Digite o e-mail certo e clique em

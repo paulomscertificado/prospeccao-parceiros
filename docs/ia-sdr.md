@@ -434,7 +434,12 @@ Empresas novas, que virou um painel em 4 passos (estados por caixinha, `name="uf
 - **Devoluções** (`email_imap.ler_devolucoes` + `rotinas._ler_devolucoes`, a cada 5 min junto com as respostas):
   identifica DSN (multipart/report, mailer-daemon/postmaster + assunto), extrai `Final-Recipient`/`X-Failed-Recipients`
   ou o e-mail citado no texto e o Message-ID original; só devolução permanente (5.x.x ou texto "não encontrado",
-  "user unknown"...) marca. 1ª leitura por caixa: 60 dias (`devolucoes_lidas:<conta>` em config).
+  "user unknown"...) marca. 1ª leitura por caixa: 60 dias (`devolucoes_lidas_v2:<conta>` em config).
+  Desde 24/11/2026 (pedido da Maria: "identifique quando os e-mails estão retornando ... para cancelar o envio") também
+  marca quando o servidor de envio desistiu (`Action: failed` ou assunto "(Failure)") com 4.1.x/4.2.x/4.4.x: caixa cheia
+  ou servidor do destinatário fora do ar depois de dias de tentativas (2 leads da imagem dela, 3 e-mails cada). O aviso
+  de atraso (`Action: delayed`, "(Delay)") e 4.7.x (limite/reputação) não marcam. A chave passou a `_v2` para reler os
+  60 dias uma vez com a regra nova.
 - `marcar_invalido` cancela os toques de e-mail pendentes/rascunho e grava no histórico.
 - Quadro **E-mails que não existem** na campanha (`campanhas.emails_invalidos`) com correção em linha
   (`POST /campanhas/{id}/corrigir-email`, `campanhas.corrigir_email`): valida o endereço novo (formato + DNS),

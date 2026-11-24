@@ -167,7 +167,7 @@ def texto_de_devolucao(texto: str) -> bool:
 def analisar_devolucao(msg) -> dict:
     """Lê uma mensagem de devolução (email.message.Message). Devolve
     {"destinatarios": [...], "permanente": bool, "motivo": str, "ids_originais": [...]}."""
-    destinatarios, status, diagnostico, ids_originais, textos = [], "", "", [], []
+    destinatarios, status, diagnostico, acao, ids_originais, textos = [], "", "", "", [], []
     falhos = msg.get_all("X-Failed-Recipients") or []
     for f in falhos:
         destinatarios += _EMAIL.findall(f)
@@ -182,6 +182,7 @@ def analisar_devolucao(msg) -> dict:
                         destinatarios += _EMAIL.findall(bloco.get(chave))
                 status = status or (bloco.get("Status") or "").strip()
                 diagnostico = diagnostico or (bloco.get("Diagnostic-Code") or "").strip()
+                acao = acao or (bloco.get("Action") or "").strip().lower()  # failed = desistiu; delayed = tentando
         elif tipo in ("text/rfc822-headers", "message/rfc822"):
             carga = parte.get_payload()
             texto = carga if isinstance(carga, str) else str(carga[0]) if isinstance(carga, list) and carga else ""
@@ -198,11 +199,24 @@ def analisar_devolucao(msg) -> dict:
         destinatarios = _EMAIL.findall(texto)
     referencias = re.findall(r"<[^<>\s]+>", (msg.get("In-Reply-To") or "") + " " + (msg.get("References") or ""))
     junto = f"{status} {diagnostico} {texto}"
-    if status.startswith("4") or (not status.startswith("5") and _TEMPORARIO.search(junto)):
+    # O servidor de envio DESISTIU depois de dias tentando (Gmail: "Delivery Status Notification (Failure)", Action:
+    # failed): com caixa cheia (4.2.x), servidor do destinatário fora do ar (4.4.x) ou endereço (4.1.x), o e-mail não
+    # foi entregue e não adianta mandar de novo (pedido da Maria em 24/11/2026: "identifique quando os e-mails estão
+    # retornando ... para cancelar o envio"). O aviso de atraso ("(Delay)", Action: delayed) não: ainda está tentando.
+    # Recusa por limite de envio ou reputação do remetente (4.7.x) também não: o endereço existe.
+    assunto = str(msg.get("Subject") or "").lower()
+    desistiu = acao == "failed" or "(failure)" in assunto
+    adiado = (acao == "delayed" or "(delay)" in assunto) and not desistiu
+    nao_entregue = desistiu and status.startswith(("4.1.", "4.2.", "4.4."))
+    if adiado:
+        permanente = False
+    elif status.startswith("5") or nao_entregue:
+        permanente = True
+    elif status.startswith("4") or _TEMPORARIO.search(junto):
         permanente = False
     else:
-        permanente = status.startswith("5") or bool(_PERMANENTE.search(junto))
-    motivo = _motivo(status, diagnostico, texto, permanente)
+        permanente = bool(_PERMANENTE.search(junto))
+    motivo = _motivo(status, diagnostico, texto, permanente, nao_entregue)
     vistos = []
     for d in destinatarios:
         d = d.lower().strip(".")
@@ -212,8 +226,12 @@ def analisar_devolucao(msg) -> dict:
             "ids_originais": [i[:120] for i in ids_originais + referencias]}
 
 
-def _motivo(status: str, diagnostico: str, texto: str, permanente: bool) -> str:
+def _motivo(status: str, diagnostico: str, texto: str, permanente: bool, nao_entregue: bool = False) -> str:
     t = f"{diagnostico} {texto}".lower()
+    if nao_entregue:  # o servidor de envio desistiu depois de dias tentando
+        if status.startswith("4.2.") or re.search(r"quota|out of storage|caixa .{0,15}cheia|mailbox (is )?full", t):
+            return "a caixa de entrada está cheia há dias: o e-mail voltou sem ser entregue"
+        return "o servidor do e-mail não recebe mensagens: voltou depois de dias de tentativas"
     if re.search(r"dom[íi]nio|domain|dns|nxdomain", t) and re.search(r"n[ãa]o|not|couldn|exist", t):
         return "o domínio do e-mail não existe (devolvido pelo servidor)"
     if not permanente:

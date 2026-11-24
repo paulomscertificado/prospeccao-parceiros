@@ -144,7 +144,8 @@ def _ler_devolucoes(conta, enviados: dict) -> int:
     from . import contas_email, email_validacao
     from .banco import agora, gravar_config
 
-    marca = "devolucoes_lidas:" + contas_email.chave(conta)
+    # v2 (24/11/2026): com a regra nova (o servidor de envio desistiu = não entregue), relê uma vez os últimos 60 dias
+    marca = "devolucoes_lidas_v2:" + contas_email.chave(conta)
     with sessao() as db:
         ja_leu = ler_config(db, marca)
     desde = agora() - timedelta(days=email_imap.DIAS_DE_LEITURA if ja_leu else DIAS_DEVOLUCOES_1A_VEZ)

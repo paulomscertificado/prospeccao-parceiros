@@ -324,3 +324,86 @@ def test_devolucao_que_escapar_nao_e_processada_nem_respondida(cliente, monkeypa
         lead.email_invalido = True
         assert rotinas.responder_automaticamente(db, lead, "email", {"resposta_sugerida": "Obrigado pelo retorno!"}) \
             is False  # e-mail que não existe nunca recebe resposta automática
+
+
+# ---------------------------------------------------------------- O servidor de envio desistiu (24/11/2026)
+# Pedido da Maria: "identifique quando os e-mails estão retornando para minha caixa ... para cancelar o envio". As
+# devoluções da imagem dela eram do Gmail "(Failure)" com 4.2.2 (caixa cheia há dias) e 4.4.1 (servidor da empresa fora
+# do ar): o Gmail desistiu de entregar, mas o sistema lia o "4" como recusa passageira e seguia mandando.
+
+GMAIL_ADIADO = b"""From: Mail Delivery Subsystem <mailer-daemon@googlemail.com>
+Subject: Delivery Status Notification (Delay)
+Content-Type: multipart/report; boundary="D"; report-type=delivery-status
+
+--D
+Content-Type: text/plain; charset="UTF-8"
+
+Ocorreu um problema na entrega da mensagem para cheia@gmail.com.
+
+--D
+Content-Type: message/delivery-status
+
+Reporting-MTA: dns; googlemail.com
+
+Final-Recipient: rfc822; cheia@gmail.com
+Action: delayed
+Status: 4.2.2
+Diagnostic-Code: smtp; 452-4.2.2 The recipient's inbox is out of storage space.
+
+--D--
+"""
+GMAIL_CHEIA_DESISTIU = GMAIL_ADIADO.replace(b"(Delay)", b"(Failure)").replace(b"Action: delayed", b"Action: failed")
+GMAIL_LIMITE = GMAIL_CHEIA_DESISTIU.replace(b"4.2.2", b"4.7.0").replace(
+    b"The recipient's inbox is out of storage space.", b"Try again later, sender rate limited.")
+GMAIL_SERVIDOR_FORA = b"""From: Mail Delivery Subsystem <mailer-daemon@googlemail.com>
+Subject: Delivery Status Notification (Failure)
+Content-Type: multipart/report; boundary="F"; report-type=delivery-status
+
+--F
+Content-Type: text/plain; charset="UTF-8"
+
+Ocorreu um problema na entrega da mensagem para info@servidorfora.com.br.
+
+--F
+Content-Type: message/delivery-status
+
+Final-Recipient: rfc822; info@servidorfora.com.br
+Action: failed
+Status: 4.4.1
+Diagnostic-Code: smtp; The recipient server did not accept our requests to connect. [servidorfora.com.br 1.2.3.4: timed out]
+
+--F
+Content-Type: text/rfc822-headers
+
+Message-ID: <enviado-fora@mscertificados.com.br>
+
+--F--
+"""
+
+
+def test_aviso_de_atraso_nao_tira_o_email():
+    d = email_validacao.analisar_devolucao(email.message_from_bytes(GMAIL_ADIADO))
+    assert d["destinatarios"] == ["cheia@gmail.com"] and d["permanente"] is False  # o Gmail ainda está tentando
+
+
+def test_servidor_que_desistiu_tira_o_email():
+    cheia = email_validacao.analisar_devolucao(email.message_from_bytes(GMAIL_CHEIA_DESISTIU))
+    assert cheia["permanente"] is True and "caixa de entrada está cheia há dias" in cheia["motivo"]
+    fora = email_validacao.analisar_devolucao(email.message_from_bytes(GMAIL_SERVIDOR_FORA))
+    assert fora["destinatarios"] == ["info@servidorfora.com.br"] and fora["permanente"] is True
+    assert "servidor do e-mail não recebe mensagens" in fora["motivo"]
+    assert "<enviado-fora@mscertificados.com.br>" in fora["ids_originais"]
+    # recusa por limite de envio ou reputação de quem envia (4.7.x): o endereço existe, não tira
+    assert email_validacao.analisar_devolucao(email.message_from_bytes(GMAIL_LIMITE))["permanente"] is False
+
+
+def test_devolucao_em_que_o_servidor_desistiu_cancela_os_emails(cliente, monkeypatch):
+    lead_id, tarefa_id = _lead_com_toque("info@servidorfora.com.br")
+    analises = [email_validacao.analisar_devolucao(email.message_from_bytes(b))
+                for b in (GMAIL_ADIADO, GMAIL_SERVIDOR_FORA)]
+    monkeypatch.setattr(email_imap, "ler_devolucoes", lambda desde, conta=None: analises)
+    assert rotinas._ler_devolucoes(None, {}) == 1
+    with sessao() as db:
+        lead = db.get(Lead, lead_id)
+        assert lead.email_invalido and "servidor do e-mail não recebe mensagens" in lead.email_motivo
+        assert db.get(Tarefa, tarefa_id).status == "cancelada"
