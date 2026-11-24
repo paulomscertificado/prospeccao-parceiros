@@ -52,7 +52,10 @@ VERSAO = "wl_conversas_versao"  # muda quando mensagens são lidas ou um nome mu
 # O WhatsApp só apaga para todos até uns 2 dias depois do envio ("cerca de 2 dias", diz a Central de Ajuda dele): o
 # mesmo prazo do WhatsApp Leads (whatsapp.HORAS_PARA_APAGAR), que confere de novo pela hora em que a mensagem saiu
 HORAS_PARA_APAGAR = 48
+# Apagada para todos: some do WhatsApp do contato, mas aqui fica (24/11/2026, pedido da Maria: "apague para o cliente
+# mas não para nós", como o sistema de atendimento dela): o aviso em vermelho e o texto embaixo, nas duas direções
 APAGADA = "🚫 Você apagou esta mensagem"
+APAGADA_PELO_CONTATO = "🚫 Essa mensagem foi apagada pelo contato"
 # Arquivos que dá para mandar pelo 📎 (24/11/2026): extensão -> tipo. Foto sai como foto; o resto, como documento.
 TIPOS_DE_ARQUIVO = {
     ".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp",
@@ -184,7 +187,7 @@ def _motivo_para_nao_apagar(m: MensagemWhatsApp) -> str:
 
 def mensagem_apagada(db: Session, comando: ComandoWhatsApp) -> None:
     """O WhatsApp Leads apagou a mensagem para todos (o comando "apagar_mensagem" voltou sem erro, /api/ponte/retorno):
-    a cópia daqui passa a mostrar "Você apagou esta mensagem", com quem pediu."""
+    a cópia daqui passa a mostrar "Você apagou esta mensagem" com o texto embaixo (para nós ela não some) e quem pediu."""
     try:
         dados = json.loads(comando.dados or "{}")
         id_wl = int(dados.get("id_wl") or 0) if isinstance(dados, dict) else 0
@@ -274,7 +277,8 @@ def lista(busca: str = "", numero: str = "", marca: str = "", nao_lidas: str = "
         nome = escolhidos.get(m.telefone) or m.nome or nomes.get(m.telefone, "")
         resultado.append({"telefone": m.telefone, "telefone_formatado": util.formatar_telefone(m.telefone),
                           "numero": conexao, "numero_nome": nomes_numeros.get(conexao, conexao),
-                          "nome": nome, "ultima": APAGADA if m.apagada_em else m.texto[:120],
+                          "nome": nome, "ultima": (APAGADA if m.direcao == "saida" else APAGADA_PELO_CONTATO)
+                          if m.apagada_em else m.texto[:120],
                           "ultima_direcao": m.direcao, "ultima_apagada": bool(m.apagada_em),
                           "quando": _quando_curto(m.criado_em), "nao_lidas": int(nao_lidas or 0)})
     return JSONResponse({"conversas": resultado, "situacao": situacao, "varios_numeros": len(_numeros(db, usuario)) > 1,

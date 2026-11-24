@@ -466,6 +466,7 @@ def _guardar_conversas(db, conversas: dict) -> None:
                             _data_wl(s.get("entregue_em")), _data_wl(s.get("visualizada_em")),
                             _data_wl(s.get("apagada_em")))
              for s in conversas.get("status") or []}
+    apagou_alguma = False
     if novos:
         for id_, id_wl, atual, erro, entregue, visualizada, apagada in db.execute(
                 select(MensagemWhatsApp.id, MensagemWhatsApp.id_wl, MensagemWhatsApp.status, MensagemWhatsApp.erro,
@@ -477,10 +478,15 @@ def _guardar_conversas(db, conversas: dict) -> None:
                 valores["entregue_em"] = entregue_nova
             if visualizada_nova and visualizada_nova != visualizada:
                 valores["visualizada_em"] = visualizada_nova
-            if apagada_nova and not apagada:
+            if apagada_nova and not apagada:  # também a recebida que o contato apagou (o texto fica, 24/11/2026)
                 valores["apagada_em"] = apagada_nova
+                apagou_alguma = True
             if valores:
                 db.execute(update(MensagemWhatsApp).where(MensagemWhatsApp.id == id_).values(**valores))
+    if apagou_alguma:  # a lista aberta mostra o aviso, se era a última mensagem da conversa
+        from .conversas import _mudou
+
+        _mudou(db)
     if "ultimo_id" in conversas:
         gravar_config(db, "wl_conv_ultimo_id", str(int(conversas["ultimo_id"])))
     gravar_config(db, "wl_conv_pendente", "1" if len(mensagens) >= 300 else "0")

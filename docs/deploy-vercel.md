@@ -183,10 +183,18 @@ ao WhatsApp o "apagar para todos" (`ConectorQR.apagar` → neonize `revoke_messa
 `mensagens.apagada_em` e `recibo_em` (o status vai de novo para a nuvem com `apagada_em`). Na volta,
 `api.ponte_retorno` chama `conversas.mensagem_apagada` (comando feito → `mensagens_whatsapp.apagada_em` e
 `apagada_por_id`); o status (`_guardar_conversas`) também grava `apagada_em` se faltar. A conversa e a lista mostram
-"🚫 Você apagou esta mensagem" (a lista sem o "Você:"); o texto continua guardado (aparece nos Dados da mensagem).
+"🚫 Você apagou esta mensagem" (a lista sem o "Você:"). **Para nós a mensagem não some** (24/11/2026, pedido da Maria:
+"apague para o cliente mas não para nós", como o sistema de atendimento dela): a bolha mostra o aviso em vermelho
+(`.aviso-apagada`) em cima do texto em itálico, com a foto/o áudio/o arquivo e os ✓✓. A recebida que o **contato** apagou
+também: o WhatsApp Leads reconhece o aviso do WhatsApp (`whatsapp.mensagem_que_apagou`: protocolMessage REVOKE) e grava
+`apagada_em` na mensagem do mesmo número, da mesma conversa e do lado de quem apagou (`whatsapp.apagada_no_whatsapp`;
+também a que o celular do número apagou), sem criar mensagem nova; `conversas_desde` manda no status também as recebidas
+com `recibo_em` recente, e `_guardar_conversas` grava `apagada_em` e muda a versão das conversas (as listas abertas se
+atualizam). Recebida apagada = "🚫 Essa mensagem foi apagada pelo contato" (`conversas.APAGADA_PELO_CONTATO`, na
+bolha e na lista).
 A tela API Oficial não tem o botão (não foi pedido; antes de fazer, conferir na Meta se a Cloud API apaga mensagem
 enviada: em 24/11/2026 a documentação só falava do aviso de mensagem apagada pelo cliente). Teste:
-`testes/test_apagar_mensagem.py` (e a parte 26 do `whatsapp-leads/testes/teste_ponta_a_ponta.py`).
+`testes/test_apagar_mensagem.py` (e as partes 26 e 29 do `whatsapp-leads/testes/teste_ponta_a_ponta.py`).
 
 **Fotos e áudios** (24/11/2026, pedido da Maria: "faça com que whatsapp leads também consiga ler imagens e reproduzir
 áudios"): o WhatsApp Leads baixa a foto, a figurinha e o áudio de cada mensagem nova (as que chegam e as que saem pelo

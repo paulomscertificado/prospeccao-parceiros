@@ -51,10 +51,12 @@ no navegador, de qualquer lugar: não precisa do `iniciar.bat`. O passo a passo 
   **Lida** ("-" enquanto não aconteceu; quem desligou a confirmação de leitura no WhatsApp nunca aparece como lida). O
   mesmo vale na tela **API Oficial**. As mensagens de antes de 23/11/2026 não têm essas horas.
   **Apagar para todos**, como no WhatsApp: clique na mensagem que saiu e, nos **Dados da mensagem**, em
-  **🗑️ Apagar para todos** (confirme). Ela some do WhatsApp do contato (lá aparece "Esta mensagem foi apagada") e,
-  na conversa, fica **🚫 Você apagou esta mensagem**; nos Dados da mensagem aparecem quando e quem apagou, e o texto
-  que foi apagado. Leva alguns segundos (o pedido vai ao computador do WhatsApp). Como no WhatsApp, só dá para
-  apagar **até 2 dias depois do envio** e só as mensagens que saíram (não as que o contato mandou). O número precisa
+  **🗑️ Apagar para todos** (confirme). Ela some do WhatsApp do contato (lá aparece "Esta mensagem foi apagada"), mas
+  **para nós ela continua aparecendo**: o aviso **🚫 Você apagou esta mensagem** em vermelho em cima e o texto em
+  itálico embaixo; nos Dados da mensagem aparecem quando e quem apagou. Quando o **contato** apaga uma mensagem que ele
+  mandou, ela também fica, com o aviso **🚫 Essa mensagem foi apagada pelo contato** (desde 24/11/2026). No celular do
+  número, o próprio WhatsApp mostra só "Você apagou esta mensagem" (lá não dá para mudar). Leva alguns segundos (o
+  pedido vai ao computador do WhatsApp). Como no WhatsApp, só dá para apagar **até 2 dias depois do envio** e só as mensagens que saíram (não as que o contato mandou). O número precisa
   estar conectado pelo QR code: em modo teste a mensagem não sai de verdade, então não há o que apagar. A tela
   **API Oficial** (número oficial) não tem esse botão.
   **Fotos e áudios:** a foto (e a figurinha) aparece dentro da mensagem, como no WhatsApp; clique nela para abrir

@@ -1,7 +1,9 @@
 """Conversas: "Apagar para todos", como no WhatsApp (24/11/2026, pedido da Maria: "suba a opção de apagar mensagem no
 whatsapp lead"). A mensagem que saiu some do WhatsApp do contato pelo WhatsApp Leads (comando "apagar_mensagem" da
 ponte) e a conversa mostra "Você apagou esta mensagem", com quem apagou. Só a que saiu e chegou ao WhatsApp, só até 2
-dias depois do envio e só nos números de quem pede (os mesmos do envio pela tela)."""
+dias depois do envio e só nos números de quem pede (os mesmos do envio pela tela).
+Para nós ela não some (24/11/2026, "apague para o cliente mas não para nós"): o aviso fica em cima do texto, também na
+que o contato apagou ("Essa mensagem foi apagada pelo contato")."""
 
 from datetime import timedelta
 
@@ -143,3 +145,43 @@ def test_apagar_para_todos(cliente, monkeypatch):
     _retorno(cliente, status=[{"id": id_celular, "status": "enviada", "erro": "", "apagada_em": _hora(minutes=5)}])
     pelo_celular = _da_conversa(paula, numero)["Apagada pelo celular"]
     assert pelo_celular["apagada"] and pelo_celular["apagada_por"] == "" and not pelo_celular["pode_apagar"]
+
+
+def test_apagada_pelo_contato_fica_com_o_texto(cliente, monkeypatch):
+    """O contato apagou para todos uma mensagem que mandou: a hora vem do WhatsApp Leads com o status da mensagem e a
+    conversa mostra o aviso com o texto embaixo (para nós ela não some); a lista mostra o aviso."""
+    from app import config
+    from app.banco import ler_config
+    from app.rotas.conversas import VERSAO
+
+    monkeypatch.setattr(config, "WHATSAPP_PONTE", True)
+    monkeypatch.setattr(config, "WHATSAPP_PONTE_TOKEN", TOKEN)
+    pid = _usuario("lia.apagar@teste.com.br", "Lia Apagar")
+    numero = f"u{pid}"
+    _pela_ponte(cliente, numero, [
+        {"direcao": "saida", "texto": "Bom dia! Tudo bem?", "status": "enviada", "criado_em": _hora(minutes=20)},
+        {"direcao": "entrada", "texto": "Mandei errado", "status": "recebida", "origem": "",
+         "criado_em": _hora(minutes=10)}])
+    lia, _ = _entrar("lia.apagar@teste.com.br")
+    assert not _da_conversa(lia, numero)["Mandei errado"]["apagada"]
+    with sessao() as db:
+        id_wl = db.execute(select(MensagemWhatsApp.id_wl).where(MensagemWhatsApp.texto == "Mandei errado")).scalar()
+        versao = ler_config(db, VERSAO)
+    _retorno(cliente, status=[{"id": id_wl, "status": "recebida", "erro": "", "apagada_em": _hora(minutes=1)}])
+    m = _da_conversa(lia, numero)["Mandei errado"]
+    assert m["apagada"] and m["direcao"] == "entrada" and m["texto"] == "Mandei errado" and not m["pode_apagar"]
+    lista = lia.get(f"/conversas/api/lista?numero={numero}").json()["conversas"]
+    ultima = [c for c in lista if c["telefone"] == TELEFONE][0]
+    assert ultima["ultima"] == "🚫 Essa mensagem foi apagada pelo contato" and ultima["ultima_apagada"]
+    with sessao() as db:
+        assert ler_config(db, VERSAO) != versao  # as listas abertas se atualizam
+        assert db.execute(select(MensagemWhatsApp.texto).where(MensagemWhatsApp.id_wl == id_wl)).scalar() \
+            == "Mandei errado"
+
+    # o contato apagou antes de a cópia vir para cá: entra já apagada, com o texto
+    _pela_ponte(cliente, numero, [{"direcao": "entrada", "texto": "Apaguei rapidinho", "status": "recebida",
+                                   "origem": "", "criado_em": _hora(minutes=1), "apagada_em": _hora(seconds=30)}])
+    m2 = _da_conversa(lia, numero)["Apaguei rapidinho"]
+    assert m2["apagada"] and m2["texto"] == "Apaguei rapidinho"
+    pagina = lia.get(f"/conversas?telefone={TELEFONE}&numero={numero}").text
+    assert "Essa mensagem foi apagada pelo contato" in pagina and "aviso-apagada" in pagina

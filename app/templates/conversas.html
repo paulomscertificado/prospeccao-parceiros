@@ -63,7 +63,10 @@
   .bolha.saida[data-i] { cursor: pointer; }  /* clique: os "Dados da mensagem" (Entregue e Lida, como no WhatsApp) */
   .bolha.erro { background: #fde8e6; }
   .bolha.enviando { opacity: .7; }
-  .bolha.apagada .texto { font-style: italic; color: #6b7686; }  /* "Você apagou esta mensagem", como no WhatsApp */
+  /* apagada para todos (24/11/2026, "apague para o cliente mas não para nós"): sumiu do WhatsApp do contato, mas aqui
+     fica, com o aviso em vermelho em cima e o texto em itálico embaixo, como no sistema de atendimento da Maria */
+  .bolha .aviso-apagada { display: block; margin-bottom: 2px; color: var(--erro); font-size: .8rem; font-weight: 600; }
+  .bolha.apagada .texto { font-style: italic; }
   /* foto (ou figurinha) e áudio dentro da mensagem, como no WhatsApp (24/11/2026); clique na foto = inteira numa aba nova */
   .bolha .foto { display: block; margin: 0 -5px 6px; width: fit-content; }
   .bolha .foto img { display: block; width: auto; max-width: min(300px, 100%); max-height: 360px; min-width: 60px;
@@ -200,7 +203,7 @@ let marcaConversa = '', marcaLista = '', chaveLista = '';
 const el = id => document.getElementById(id);
 const escapar = t => (t || '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 const STATUS = { na_fila: '🕓', enviada: '<span class="ok">✓</span>', erro: '⚠️ não saiu', cancelada: 'cancelada', recebida: '' };
-const APAGADA = '🚫 Você apagou esta mensagem';
+const APAGADA = '🚫 Você apagou esta mensagem', APAGADA_PELO_CONTATO = '🚫 Essa mensagem foi apagada pelo contato';
 // ✓ saiu; ✓✓ o contato recebeu; ✓✓ azul o contato leu (as confirmações do WhatsApp, 23/11/2026)
 const tique = m => m.status === 'enviada' && m.lida ? '<span class="lido" title="Lida">✓✓</span>'
   : (m.status === 'enviada' && m.entregue ? '<span class="entregue" title="Entregue">✓✓</span>' : (STATUS[m.status] || ''));
@@ -336,14 +339,18 @@ async function carregarConversa(rolar, forcar) {
     if (m.dia !== diaAnterior) { html += `<div class="dia"><span>${rotuloDia(m.dia)}</span></div>`; diaAnterior = m.dia; direcaoAnterior = ''; }
     const classes = ['bolha', m.direcao, m.status === 'erro' ? 'erro' : '', m.enviando ? 'enviando' : '',
                      m.apagada ? 'apagada' : '', m.direcao === direcaoAnterior ? 'seguida' : ''];
-    // apagada para todos: como no WhatsApp, fica só o aviso (o texto aparece nos dados da mensagem)
-    const situacao = m.enviando ? '🕓' : (m.direcao === 'saida' && !m.apagada ? tique(m) : '');
+    // apagada para todos (por nós ou pelo contato): sumiu do WhatsApp do contato, mas aqui fica, com o aviso em vermelho
+    // em cima e o texto (e a foto, o áudio ou o arquivo) embaixo (24/11/2026, "apague para o cliente mas não para nós")
+    const situacao = m.enviando ? '🕓' : (m.direcao === 'saida' ? tique(m) : '');
     const dados = m.direcao === 'saida' && !m.enviando ? ` data-i="${i}"` : '';
     const dica = m.erro || (dados ? (m.pode_apagar ? 'Clique para ver os dados da mensagem ou apagar para todos' : 'Clique para ver os dados da mensagem') : '');
-    const comAnexo = m.anexo && !m.apagada;  // a foto ou o áudio dentro da mensagem, com a legenda embaixo
-    html += `<div class="${classes.join(' ')}"${dados} title="${escapar(dica)}">${comAnexo ? anexoMensagem(m) : ''}`
-          + `<span class="texto">${m.apagada ? APAGADA : (comAnexo ? legendaDoAnexo(m) : (m.enviando && m.arquivo
-              ? '📎 <b>' + escapar(m.arquivo) + '</b>' + (m.texto ? '<br>' + escapar(m.texto) : '') : textoMensagem(m.texto)))}</span>`
+    const apagada = !m.apagada ? '' : (m.direcao === 'saida'
+      ? `<span class="aviso-apagada" title="Apagada do WhatsApp do contato. Aqui no sistema ela continua guardada.">${APAGADA}</span>`
+      : `<span class="aviso-apagada" title="O contato apagou esta mensagem no WhatsApp dele. Aqui no sistema ela continua guardada.">${APAGADA_PELO_CONTATO}</span>`);
+    const comAnexo = m.anexo;  // a foto ou o áudio dentro da mensagem, com a legenda embaixo
+    html += `<div class="${classes.join(' ')}"${dados} title="${escapar(dica)}">${apagada}${comAnexo ? anexoMensagem(m) : ''}`
+          + `<span class="texto">${comAnexo ? legendaDoAnexo(m) : (m.enviando && m.arquivo
+              ? '📎 <b>' + escapar(m.arquivo) + '</b>' + (m.texto ? '<br>' + escapar(m.texto) : '') : textoMensagem(m.texto))}</span>`
           + `<span class="meta">${m.hora}${situacao ? ' ' + situacao : ''}</span></div>`;
     direcaoAnterior = m.direcao;
   }
@@ -394,8 +401,8 @@ el('mensagens').addEventListener('click', e => {
 // "Apagar para todos" (24/11/2026): o computador do WhatsApp pega o pedido em poucos segundos; a tela espera até 1 minuto
 const esperar = ms => new Promise(ok => setTimeout(ok, ms));
 async function apagarMensagem(m, botao) {
-  if (!confirm('Apagar esta mensagem para todos?\n\nEla some do WhatsApp do contato (lá aparece "Esta mensagem foi apagada"), '
-               + 'como no WhatsApp. Não dá para desfazer.')) return;
+  if (!confirm('Apagar esta mensagem para todos?\n\nEla some do WhatsApp do contato (lá aparece "Esta mensagem foi apagada"). '
+               + 'Aqui no sistema ela continua aparecendo, marcada como apagada. Não dá para desfazer.')) return;
   const rotulo = botao.textContent;
   botao.disabled = true; botao.textContent = 'Apagando...';
   try {
@@ -406,7 +413,7 @@ async function apagarMensagem(m, botao) {
       try { s = await (await fetch('/conversas/api/apagar/' + r.pedido)).json(); } catch (e) { continue; }
       if (s.situacao === 'erro') throw new Error('Não deu para apagar: ' + (s.erro || 'o WhatsApp recusou') + '.');
       if (s.situacao === 'apagada') {
-        fecharDadosMensagem(); aviso('Mensagem apagada para todos.');
+        fecharDadosMensagem(); aviso('Mensagem apagada do WhatsApp do contato. Aqui ela continua guardada.');
         assinatura = ''; carregarConversa(false, true); carregarLista(true);
         return;
       }
