@@ -64,6 +64,12 @@
   .bolha.erro { background: #fde8e6; }
   .bolha.enviando { opacity: .7; }
   .bolha.apagada .texto { font-style: italic; color: #6b7686; }  /* "Você apagou esta mensagem", como no WhatsApp */
+  /* foto (ou figurinha) e áudio dentro da mensagem, como no WhatsApp (24/11/2026); clique na foto = inteira numa aba nova */
+  .bolha .foto { display: block; margin: 0 -5px 6px; width: fit-content; }
+  .bolha .foto img { display: block; width: auto; max-width: min(300px, 100%); max-height: 360px; min-width: 60px;
+                     min-height: 60px; border-radius: 8px; background: #eef1f5; }
+  .bolha .foto:hover img { filter: brightness(.96); }
+  .bolha .audio { display: block; width: 280px; max-width: 100%; height: 40px; margin: 2px 0 4px; }
   .bolha .midia { font-style: italic; color: #4b5a6b; }
   .seguida { margin-top: 1px; }
 
@@ -194,6 +200,15 @@ function textoMensagem(t) {
   const icone = { 'áudio': '🎤', imagem: '📷', 'vídeo': '🎬', documento: '📄', figurinha: '🏷️', contato: '👤', 'localização': '📍' }[m[1]];
   return `<span class="midia">${icone} ${m[1][0].toUpperCase() + m[1].slice(1)}</span>${m[2] ? '<br>' + escapar(m[2]) : ''}`;
 }
+// A foto (ou figurinha) e o áudio que vieram na mensagem (24/11/2026): a foto abre inteira numa aba nova com um clique
+function anexoMensagem(m) {
+  const url = escapar(m.anexo_url);
+  if (m.anexo === 'audio') return `<audio class="audio" controls preload="none" src="${url}"></audio>`;
+  return `<a class="foto" href="${url}" target="_blank" rel="noopener" title="Abrir a imagem inteira numa aba nova">`
+       + `<img src="${url}" alt="Imagem da conversa" loading="lazy"></a>`;
+}
+// com a foto ou o áudio na tela, sai o rótulo "[imagem]"/"[áudio]" e fica só a legenda
+const legendaDoAnexo = t => escapar((t || '').replace(/^\[(imagem|figurinha|áudio)\]\s*/, ''));
 function rotuloDia(dia) {
   const hoje = new Date(); const d = new Date(dia + 'T12:00:00');
   const dif = Math.round((new Date(hoje.toDateString()) - new Date(d.toDateString())) / 86400000);
@@ -271,8 +286,12 @@ async function carregarConversa(rolar, forcar) {
   marcaConversa = d.marca || '';
   const todas = d.mensagens.concat(d.enviando.map(m => ({ ...m, direcao: 'saida', enviando: true })));
   const nova = JSON.stringify(todas.map(m => [m.texto, m.status, m.hora, m.entregue || '', m.lida || '',
-                                              m.apagada || '', m.pode_apagar ? 1 : 0]));
+                                              m.apagada || '', m.pode_apagar ? 1 : 0, m.anexo || '']));
   if (nova === assinatura && !rolar) { mostrarSituacao(d.situacao); return; }  // nada mudou: não redesenha
+  // um áudio tocando não é interrompido: a conversa se redesenha numa próxima volta, quando ele parar
+  if (!rolar && [...el('mensagens').querySelectorAll('audio')].some(a => !a.paused)) {
+    marcaConversa = ''; mostrarSituacao(d.situacao); return;
+  }
   assinatura = nova;
   const caixa = el('mensagens');
   const noFim = caixa.scrollHeight - caixa.scrollTop - caixa.clientHeight < 60;
@@ -286,12 +305,18 @@ async function carregarConversa(rolar, forcar) {
     const situacao = m.enviando ? '🕓' : (m.direcao === 'saida' && !m.apagada ? tique(m) : '');
     const dados = m.direcao === 'saida' && !m.enviando ? ` data-i="${i}"` : '';
     const dica = m.erro || (dados ? (m.pode_apagar ? 'Clique para ver os dados da mensagem ou apagar para todos' : 'Clique para ver os dados da mensagem') : '');
-    html += `<div class="${classes.join(' ')}"${dados} title="${escapar(dica)}"><span class="texto">${m.apagada ? APAGADA : textoMensagem(m.texto)}</span>`
+    const comAnexo = m.anexo && !m.apagada;  // a foto ou o áudio dentro da mensagem, com a legenda embaixo
+    html += `<div class="${classes.join(' ')}"${dados} title="${escapar(dica)}">${comAnexo ? anexoMensagem(m) : ''}`
+          + `<span class="texto">${m.apagada ? APAGADA : (comAnexo ? legendaDoAnexo(m.texto) : textoMensagem(m.texto))}</span>`
           + `<span class="meta">${m.hora}${situacao ? ' ' + situacao : ''}</span></div>`;
     direcaoAnterior = m.direcao;
   }
   caixa.innerHTML = html || '<div class="vazio-chat"><p>Nenhuma mensagem ainda.</p></div>';
   if (rolar || noFim) caixa.scrollTop = caixa.scrollHeight;
+  // a foto terminou de carregar: quem estava no fim da conversa continua no fim
+  if (rolar || noFim) caixa.querySelectorAll('.foto img').forEach(img => img.addEventListener('load', () => {
+    if (caixa.scrollHeight - caixa.scrollTop - caixa.clientHeight < 400) caixa.scrollTop = caixa.scrollHeight;
+  }, { once: true }));
   mostrarSituacao(d.situacao);
 }
 
@@ -320,6 +345,7 @@ el('c-outros').addEventListener('click', e => {
 // clique numa mensagem que saiu: os "Dados da mensagem" (quando o contato recebeu e quando leu), como no WhatsApp, e o
 // botão "Apagar para todos" (até 2 dias depois do envio)
 el('mensagens').addEventListener('click', e => {
+  if (e.target.closest('a, audio')) return;  // clique na foto (abre inteira) ou no áudio (toca): não abre os dados
   const bolha = e.target.closest('.bolha[data-i]');
   const m = bolha && mensagensNaTela[Number(bolha.dataset.i)];
   if (!m || (window.getSelection && String(window.getSelection()))) return;  // selecionando o texto: não abre

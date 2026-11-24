@@ -57,6 +57,12 @@ no navegador, de qualquer lugar: não precisa do `iniciar.bat`. O passo a passo 
   apagar **até 2 dias depois do envio** e só as mensagens que saíram (não as que o contato mandou). O número precisa
   estar conectado pelo QR code: em modo teste a mensagem não sai de verdade, então não há o que apagar. A tela
   **API Oficial** (número oficial) não tem esse botão.
+  **Fotos e áudios:** a foto (e a figurinha) aparece dentro da mensagem, como no WhatsApp; clique nela para abrir
+  inteira numa aba nova. O áudio aparece com o botão ▶ para ouvir ali mesmo (também os que a equipe manda pelo
+  celular do número). Vale para as mensagens que chegaram depois de 24/11/2026: as de antes continuam só com o
+  "📷 Imagem" / "🎤 Áudio". A foto ou o áudio pode levar alguns segundos a mais que o texto para aparecer. Vídeo e
+  documento continuam só com o nome (abra no celular do número), e a foto ou o áudio de **visualização única** também:
+  como no WhatsApp Web, ela só abre no celular.
 - **Avisos como no WhatsApp:** com o sistema aberto no navegador (pode estar em outra aba), quando chega mensagem nas
   Conversas, no número oficial (API Oficial) ou uma resposta de campanha:
   - toca um **som**;

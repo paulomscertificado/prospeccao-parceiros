@@ -188,6 +188,20 @@ A tela API Oficial não tem o botão (não foi pedido; antes de fazer, conferir 
 enviada: em 24/11/2026 a documentação só falava do aviso de mensagem apagada pelo cliente). Teste:
 `testes/test_apagar_mensagem.py` (e a parte 26 do `whatsapp-leads/testes/teste_ponta_a_ponta.py`).
 
+**Fotos e áudios** (24/11/2026, pedido da Maria: "faça com que whatsapp leads também consiga ler imagens e reproduzir
+áudios"): o WhatsApp Leads baixa a foto, a figurinha e o áudio de cada mensagem nova (as que chegam e as que saem pelo
+celular do número; `whatsapp.guardar_anexo`, o áudio vira mp3 pelo ffmpeg do servidor) e, depois de a mensagem chegar
+à nuvem, manda o arquivo em `POST /api/ponte/anexo/<id_wl>` (senha da ponte, o tipo no content-type: jpeg, png, webp,
+gif, mp3, ogg, m4a/mp4, aac; até 15 MB; 409 se a mensagem ainda não chegou, 415/413 recusa de vez). Fica em
+`anexos_whatsapp` (AR da mensagem, fora do backup, sai com o prazo da conversa em
+`leads_servico.apagar_conversas_antigas`) e a mensagem ganha `mensagens_whatsapp.anexo` = `imagem`/`audio` (entra na
+marca da conversa: a tela aberta se redesenha quando o arquivo chega). A conversa traz `anexo` e `anexo_url`
+(`/conversas/anexo/<id>`: `conversas.ver` e número que a pessoa vê, como a conversa; aceita `Range`, que o Safari do
+iPhone exige para tocar áudio). A tela mostra a foto (clique = inteira numa aba nova) e um `<audio>` com a legenda
+embaixo; com um áudio tocando, a conversa não se redesenha até ele parar. As mensagens de antes não têm o arquivo (o
+WhatsApp Leads só baixa as novas). Vídeo, documento e visualização única (como no WhatsApp Web): só o rótulo. Teste: `testes/test_anexos_conversas.py` (e a
+parte 27 do `whatsapp-leads/testes/teste_ponta_a_ponta.py`).
+
 **Número vermelho do menu Conversas** (23/11/2026, pedido da Maria: "assim como oportunidades tem um contador de
 mensagens coloque também em conversas e api oficial"): `conexoes.mensagens_nao_lidas` = recebidas com `lida` falso nos
 números que a pessoa vê (`conexoes.acessiveis`, a soma das bolinhas da lista), calculado em `web.tela` com a AR de quem

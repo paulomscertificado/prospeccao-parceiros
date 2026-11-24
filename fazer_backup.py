@@ -44,7 +44,8 @@ FICAM = 14  # dias guardados (aqui e fora do computador)
 # (que tem o próprio backup) e eram 3/4 do tráfego do backup no Supabase grátis (14/11/2026). Ao restaurar, o
 # WhatsApp Leads manda de novo o que faltar (restaurar_backup._reabrir_conversas). Imagens do número oficial (a arte
 # de cada aviso, ~200 KB; 23/11/2026): só para ver na tela API Oficial; sem elas a tela avisa e o texto continua.
-FORA_DO_BACKUP = {"base_receita", "artes_aviso", "mensagens_whatsapp", "imagens_oficiais"}
+# Fotos e áudios das Conversas (anexos_whatsapp, 24/11/2026): como a cópia das conversas, ficam de fora.
+FORA_DO_BACKUP = {"base_receita", "artes_aviso", "mensagens_whatsapp", "imagens_oficiais", "anexos_whatsapp"}
 EXTENSAO = ".cripto"
 CABECALHO = b"MS-BACKUP-1\n"
 NOME_PASTA_FORA = "Backups Prospeccao MS"

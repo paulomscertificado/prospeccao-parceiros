@@ -282,6 +282,12 @@ def apagar_conversas_antigas(db: Session, lote: int = 5000) -> int:
                .execution_options(sem_filtro_de_ar=True))
     db.execute(delete(ImagemOficial).where(ImagemOficial.id.in_(imagens.scalar_subquery()))
                .execution_options(sem_filtro_de_ar=True))
+    from .modelos import AnexoWhatsApp  # as fotos e os áudios das Conversas: o mesmo prazo
+
+    anexos = (select(AnexoWhatsApp.id).where(AnexoWhatsApp.criado_em < limite).limit(lote)
+              .execution_options(sem_filtro_de_ar=True))
+    db.execute(delete(AnexoWhatsApp).where(AnexoWhatsApp.id.in_(anexos.scalar_subquery()))
+               .execution_options(sem_filtro_de_ar=True))
     if apagadas:
         registrar_log(db, None, "apagou_conversas_antigas", "mensagens_whatsapp", None,
                       f"{apagadas} mensagens com mais de {meses} meses saíram da cópia na nuvem (prazo de guarda)")

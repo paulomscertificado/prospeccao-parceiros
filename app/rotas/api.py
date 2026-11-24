@@ -227,6 +227,40 @@ async def ponte_arte(request: Request, pid: int):
     return {"ok": True}
 
 
+# Foto, figurinha e áudio das Conversas (24/11/2026): o tipo que a tela mostra/toca -> o que a mensagem tem
+TIPOS_DE_ANEXO = {"image/jpeg": "imagem", "image/png": "imagem", "image/webp": "imagem", "image/gif": "imagem",
+                  "audio/mpeg": "audio", "audio/ogg": "audio", "audio/mp4": "audio", "audio/aac": "audio"}
+MAXIMO_ANEXO = 15 * 1024 * 1024
+
+
+@rotas.post("/ponte/anexo/{id_wl:int}")
+async def ponte_anexo(request: Request, id_wl: int):
+    """A foto, a figurinha ou o áudio da mensagem `id_wl` do WhatsApp Leads (senha da ponte; corpo = o arquivo, o tipo no
+    content-type): fica em anexos_whatsapp e a tela Conversas mostra a foto e toca o áudio dentro da mensagem (pedido
+    da Maria em 24/11/2026). 409 = a mensagem ainda não chegou aqui (o computador manda de novo na próxima troca)."""
+    from ..modelos import AnexoWhatsApp
+
+    if not _ponte_autorizada(request):
+        return JSONResponse({"erro": "token inválido"}, status_code=403)
+    tipo = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
+    if tipo not in TIPOS_DE_ANEXO:
+        return JSONResponse({"erro": "tipo de arquivo que a tela não mostra"}, status_code=415)
+    dados = await request.body()
+    if not dados or len(dados) > MAXIMO_ANEXO:
+        return JSONResponse({"erro": "arquivo vazio ou grande demais"}, status_code=413)
+    with sessao() as db:
+        m = db.execute(select(MensagemWhatsApp).where(MensagemWhatsApp.id_wl == id_wl)).scalars().first()
+        if m is None:
+            return JSONResponse({"erro": "a mensagem ainda não chegou"}, status_code=409)
+        anexo = db.execute(select(AnexoWhatsApp).where(AnexoWhatsApp.id_wl == id_wl)).scalars().first()
+        if anexo is None:  # da mesma AR da mensagem (a ponte não tem AR)
+            db.add(AnexoWhatsApp(id_wl=id_wl, tipo=tipo, dados=dados, tamanho=len(dados), tenant_id=m.tenant_id))
+        else:
+            anexo.tipo, anexo.dados, anexo.tamanho = tipo, dados, len(dados)
+        m.anexo = TIPOS_DE_ANEXO[tipo]
+    return {"ok": True}
+
+
 @rotas.post("/ponte/arte-pedido/{cid:int}")
 async def ponte_arte_pedido(request: Request, cid: int):
     """A arte de um aviso da Renovação que vai pela API oficial da Meta: a nuvem pediu ao computador do WhatsApp Leads

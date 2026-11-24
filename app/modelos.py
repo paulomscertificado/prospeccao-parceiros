@@ -195,6 +195,21 @@ class MensagemWhatsApp(DaAR, Base):
     # contato e quem apagou pela tela Conversas (vazio = pelo celular do número). O texto continua aqui, como registro.
     apagada_em: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     apagada_por_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # a mensagem tem foto ("imagem", também a figurinha) ou áudio ("audio") guardado em anexos_whatsapp (24/11/2026)
+    anexo: Mapped[str] = mapped_column(String(10), default="", server_default="")
+
+
+class AnexoWhatsApp(DaAR, Base):
+    """A foto, a figurinha ou o áudio de uma mensagem da tela Conversas (pedido da Maria em 24/11/2026: "faça com que
+    whatsapp leads também consiga ler imagens e reproduzir áudios"), baixado pelo WhatsApp Leads e mandado pela ponte
+    (/api/ponte/anexo/<id_wl>). Fica o mesmo prazo da conversa (guarda_conversas_meses) e não vai no backup."""
+    __tablename__ = "anexos_whatsapp"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    id_wl: Mapped[int] = mapped_column(Integer, unique=True, index=True)  # mensagens_whatsapp.id_wl
+    tipo: Mapped[str] = mapped_column(String(40), default="")  # image/jpeg, image/webp, audio/mpeg, audio/ogg...
+    dados: Mapped[bytes] = mapped_column(LargeBinary, deferred=True)
+    tamanho: Mapped[int] = mapped_column(Integer, default=0)
+    criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, index=True)
 
 
 class MensagemOficial(DaAR, Base):

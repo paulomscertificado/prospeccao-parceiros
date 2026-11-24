@@ -13,23 +13,28 @@ ia a cada 5 s e a lista era refeita a cada 15 s passando por todas as mensagens;
 "Apagar para todos", como no WhatsApp (24/11/2026, pedido da Maria): clicando numa mensagem que saiu, os "Dados da
 mensagem" trazem o botão. O pedido vai pela ponte (comando "apagar_mensagem"; o WhatsApp Leads apaga do WhatsApp do
 contato) e a mensagem fica "Você apagou esta mensagem" aqui, com quem apagou; o texto continua guardado.
+
+Fotos e áudios (24/11/2026, pedido da Maria: "faça com que whatsapp leads também consiga ler imagens e reproduzir
+áudios"): o WhatsApp Leads baixa a foto, a figurinha e o áudio e manda pela ponte (/api/ponte/anexo/<id_wl>, tabela
+anexos_whatsapp); a conversa mostra a foto e toca o áudio dentro da mensagem (/conversas/anexo/<id>).
 """
 
 import hashlib
 import json
+import re
 import secrets
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy import func, or_, select, update
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, undefer
 
 from .. import autorizacao, config, conexoes, sdr, util
 from ..banco import agora, gravar_config, ler_config, obter_db
 from ..integracoes import whatsapp_leads
 from ..leads_servico import historico, pode_ver
-from ..modelos import ComandoWhatsApp, ContatoWhatsApp, MensagemWhatsApp, PonteWhatsApp, Usuario
+from ..modelos import AnexoWhatsApp, ComandoWhatsApp, ContatoWhatsApp, MensagemWhatsApp, PonteWhatsApp, Usuario
 from ..seguranca import exige, registrar_log, verificar_csrf
 from ..web import tela
 
@@ -301,15 +306,16 @@ def conversa(telefone: str, numero: str = "", marca: str = "", usuario: Usuario 
     # inteira (até 300 mensagens, com o texto) só vai quando algo mudou: numa conversa longa eram ~60 KB a cada 5 s.
     recentes = db.execute(select(MensagemWhatsApp.id, MensagemWhatsApp.status, MensagemWhatsApp.direcao,
                                  MensagemWhatsApp.lida, MensagemWhatsApp.entregue_em, MensagemWhatsApp.visualizada_em,
-                                 MensagemWhatsApp.apagada_em)
+                                 MensagemWhatsApp.apagada_em, MensagemWhatsApp.anexo)
                           .where(*da_conversa).order_by(MensagemWhatsApp.id.desc()).limit(30)).all()
     pendentes = [p for p in db.execute(select(PonteWhatsApp).where(
         PonteWhatsApp.manual.is_(True), PonteWhatsApp.conexao == numero,
         PonteWhatsApp.status.in_(["aguardando", "retirada"])).order_by(PonteWhatsApp.id)).scalars().all()
         if _chave(p.telefone) == chave]
-    # o contato recebeu ou leu (✓✓) ou a mensagem foi apagada: também muda a marca, e a conversa aberta se redesenha
-    atual = _marca(chave, numero, [(r.id, r.status, bool(r.entregue_em), bool(r.visualizada_em), bool(r.apagada_em))
-                                   for r in recentes], [p.id for p in pendentes])
+    # o contato recebeu ou leu (✓✓), a mensagem foi apagada ou a foto/o áudio chegou: também muda a marca, e a conversa
+    # aberta se redesenha
+    atual = _marca(chave, numero, [(r.id, r.status, bool(r.entregue_em), bool(r.visualizada_em), bool(r.apagada_em),
+                                    r.anexo) for r in recentes], [p.id for p in pendentes])
     igual = bool(marca) and marca == atual
     if not igual or any(r.direcao == "entrada" and not r.lida for r in recentes):
         _marcar_lidas(db, da_conversa)
@@ -319,7 +325,8 @@ def conversa(telefone: str, numero: str = "", marca: str = "", usuario: Usuario 
                                        MensagemWhatsApp.texto, MensagemWhatsApp.status, MensagemWhatsApp.erro,
                                        MensagemWhatsApp.origem, MensagemWhatsApp.nome, MensagemWhatsApp.criado_em,
                                        MensagemWhatsApp.entregue_em, MensagemWhatsApp.visualizada_em,
-                                       MensagemWhatsApp.apagada_em, MensagemWhatsApp.apagada_por_id).where(*da_conversa)
+                                       MensagemWhatsApp.apagada_em, MensagemWhatsApp.apagada_por_id,
+                                       MensagemWhatsApp.anexo).where(*da_conversa)
                                 .order_by(MensagemWhatsApp.criado_em.desc(), MensagemWhatsApp.id.desc())
                                 .limit(300)).all())[::-1]
     lead = sdr.lead_pelo_telefone(db, chave)
@@ -340,6 +347,8 @@ def conversa(telefone: str, numero: str = "", marca: str = "", usuario: Usuario 
                        "entregue": util.quando_extenso(m.entregue_em), "lida": util.quando_extenso(m.visualizada_em),
                        "apagada": util.quando_extenso(m.apagada_em),
                        "apagada_por": quem_apagou.get(m.apagada_por_id, ""),
+                       # a foto (ou figurinha) e o áudio dentro da mensagem (24/11/2026)
+                       "anexo": m.anexo or "", "anexo_url": f"/conversas/anexo/{m.id}" if m.anexo else "",
                        "pode_apagar": bool(pode_apagar) and not _motivo_para_nao_apagar(m)}
                       for m in mensagens],
         "enviando": [{"texto": p.texto, "quando": p.criado_em.strftime("%d/%m %H:%M"),
@@ -399,6 +408,46 @@ async def editar_nome(request: Request, usuario: Usuario = Depends(exige("conver
         return JSONResponse({"erro": "Este telefone já tem um nome guardado por outra AR."}, status_code=409)
     db.commit()
     return {"ok": True, "nome": nome[:200]}
+
+
+EXTENSOES_DO_ANEXO = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif",
+                      "audio/mpeg": "mp3", "audio/ogg": "ogg", "audio/mp4": "m4a", "audio/aac": "aac"}
+
+
+def _em_partes(request: Request, dados: bytes, tipo: str, cabecalhos: dict) -> Response:
+    """O arquivo inteiro ou só o pedaço pedido (cabeçalho Range): o Safari do iPhone pede o áudio aos pedaços e não
+    toca se a resposta vier sempre inteira."""
+    total = len(dados)
+    faixa = re.fullmatch(r"bytes=(\d*)-(\d*)", (request.headers.get("range") or "").strip())
+    if not faixa or not (faixa.group(1) or faixa.group(2)):
+        return Response(dados, media_type=tipo, headers=cabecalhos)
+    if faixa.group(1):
+        inicio = int(faixa.group(1))
+        fim = min(int(faixa.group(2)), total - 1) if faixa.group(2) else total - 1
+    else:  # "bytes=-500": os últimos 500
+        inicio, fim = max(total - int(faixa.group(2)), 0), total - 1
+    if inicio >= total or inicio > fim:
+        return Response(status_code=416, headers={**cabecalhos, "Content-Range": f"bytes */{total}"})
+    return Response(dados[inicio:fim + 1], status_code=206, media_type=tipo,
+                    headers={**cabecalhos, "Content-Range": f"bytes {inicio}-{fim}/{total}"})
+
+
+@rotas.get("/conversas/anexo/{mid}")
+def anexo_da_mensagem(mid: int, request: Request, usuario: Usuario = Depends(exige("conversas.ver")),
+                      db: Session = Depends(obter_db)):
+    """A foto (ou figurinha) e o áudio da mensagem (24/11/2026): dentro da conversa e, a foto, inteira numa aba nova
+    com um clique. Só nos números cujas conversas a pessoa vê (como a conversa)."""
+    m = db.execute(select(MensagemWhatsApp).where(MensagemWhatsApp.id == mid)).scalars().first()
+    if m is None or not m.anexo or m.conexao not in _numeros(db, usuario):
+        return JSONResponse({"erro": "Arquivo não encontrado."}, status_code=404)
+    anexo = db.execute(select(AnexoWhatsApp).where(AnexoWhatsApp.id_wl == m.id_wl)
+                       .options(undefer(AnexoWhatsApp.dados))).scalars().first()
+    if anexo is None or not anexo.dados:
+        return JSONResponse({"erro": "Arquivo não encontrado."}, status_code=404)
+    nome = f"whatsapp-{mid}.{EXTENSOES_DO_ANEXO.get(anexo.tipo, 'bin')}"
+    return _em_partes(request, anexo.dados, anexo.tipo or "application/octet-stream", {
+        "Cache-Control": "private, max-age=86400", "Accept-Ranges": "bytes", "X-Content-Type-Options": "nosniff",
+        "Content-Disposition": f'inline; filename="{nome}"'})
 
 
 @rotas.post("/conversas/api/mensagem/{mid}/apagar", dependencies=[Depends(verificar_csrf)])
