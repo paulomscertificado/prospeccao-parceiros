@@ -296,6 +296,7 @@
 </style>
 <div class="cartao" id="mensagens"><h2>Mensagens ({{ resumo.tarefas|length }})</h2>
   <p class="suave">Cada empresa tem mensagens próprias. Você pode editar qualquer texto ou tirar uma empresa da campanha antes de aprovar.</p>
+  {% if html_dos_toques.values()|selectattr('tipo', 'ne', 'texto')|list %}<p class="pequeno">🎨 <b>E-mails em HTML:</b> o 1º toque vai em texto e, do 2º em diante, vai só o HTML. Em cada e-mail, “Ver o e-mail em HTML” mostra como ele chega para a empresa.</p>{% endif %}
   {% set ns = namespace(lead=None) %}
   {% for t in resumo.tarefas %}
     {% if t.lead_id != ns.lead %}{% set ns.lead = t.lead_id %}
@@ -306,7 +307,8 @@
           <button class="btn btn-pequeno btn-perigo">Tirar da campanha</button></form>{% endif %}</h3>
       {% if t.lead.motivo_potencial %}<p class="pequeno suave">Motivo: {{ t.lead.motivo_potencial }}</p>{% endif %}
     {% endif %}
-    <details {{ 'open' if loop.first }}><summary>{{ t.data|data }}{% if t.hora %} às {{ t.hora }}{% endif %} · {{ CANAIS.get(t.canal, t.canal) }} · {{ config.ANGULOS.get(t.angulo, t.acao) }} <span class="selo">{{ t.status }}</span></summary>
+    {% set h = html_dos_toques.get(t.id) %}
+    <details {{ 'open' if loop.first }}><summary>{{ t.data|data }}{% if t.hora %} às {{ t.hora }}{% endif %} · {{ CANAIS.get(t.canal, t.canal) }} · {{ config.ANGULOS.get(t.angulo, t.acao) }} <span class="selo">{{ t.status }}</span>{% if h %} {% if h.tipo == 'texto' %}<span class="selo">só texto</span>{% else %}<span class="selo selo-azul">🎨 HTML{{ ': ' ~ h.nome if h.tipo == 'arte' else ' com a marca' }}</span>{% endif %}{% endif %}</summary>
       <form method="post" action="/campanhas/{{ c.id }}/editar-mensagem" style="margin:6px 0 10px">
         <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="tarefa_id" value="{{ t.id }}">
         {% set tem_outro = t.mensagem_email if t.canal == 'whatsapp' else t.mensagem_whatsapp %}
@@ -333,8 +335,21 @@
           {% if tem_outro or t.canal == 'whatsapp' %}<button class="btn btn-pequeno btn-verde" formaction="/fila/enviar/{{ t.id }}" name="canal" value="whatsapp"
                   data-confirmar="Enviar agora este toque pelo WhatsApp? (salve os textos antes, se mudou algo)">💬 Enviar agora por WhatsApp</button>{% endif %}
           {% elif t.status == 'rascunho' %}<span class="pequeno suave">Para enviar, aprove a campanha: depois aparecem os botões "Enviar agora por e-mail / WhatsApp".</span>{% endif %}{% endif %}
-      </form></details>
+      </form>
+      {% if h and h.tipo != 'texto' %}
+      {% if h.inteira %}<p class="pequeno">🎨 Este e-mail vai só com a arte “{{ h.nome }}” em HTML: o texto do e-mail acima não vai para a empresa.</p>{% endif %}
+      <details class="previa-html" data-src="/campanhas/{{ c.id }}/toque/{{ t.id }}/html" style="margin:0 0 10px"><summary class="pequeno"><b>🎨 Ver o e-mail em HTML</b> (como chega para a empresa)</summary>
+        <iframe sandbox="" title="E-mail em HTML deste toque" style="width:100%;max-width:720px;height:620px;border:1px solid #d9e2ec;border-radius:8px;background:#fff;margin-top:6px"></iframe></details>
+      {% elif h %}<p class="pequeno suave" style="margin:0 0 10px">✉️ Este e-mail vai só em texto (sem HTML).</p>{% endif %}
+      </details>
   {% else %}<p class="vazio">Nenhuma mensagem.</p>{% endfor %}
+  <script>
+  // a prévia do HTML só é buscada quando a pessoa abre (a campanha pode ter muitos e-mails)
+  document.querySelectorAll("details.previa-html").forEach(d => d.addEventListener("toggle", () => {
+    const quadro = d.querySelector("iframe");
+    if (d.open && !quadro.getAttribute("src")) quadro.src = d.dataset.src;
+  }));
+  </script>
 </div>
 {% endif %}
 {% endblock %}

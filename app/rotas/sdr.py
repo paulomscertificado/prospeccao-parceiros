@@ -726,8 +726,11 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(exige("c
     # para lá; para os outros, a lista de Campanhas
     area = AREAS_DAS_CAMPANHAS.get(camp.tipo) if autorizacao.pode(usuario, "campanhas.configurar") else None
     pode_gerenciar = autorizacao.pode(usuario, "campanhas.gerenciar", camp)
+    resumo = campanhas.resumo_aprovacao(db, camp)
     return tela(request, "campanha.html", {
         "nome_base": bases_importadas.nome(db, camp.base or "receita"),
+        # área de mensagens: se o e-mail de cada toque vai em texto ou em HTML, com a prévia (23/11/2026)
+        "html_dos_toques": visual.html_dos_toques(db, camp, resumo["tarefas"]),
         # com o aviso de cada uma: em que toque o HTML do e-mail e a imagem do WhatsApp começam (23/11/2026)
         "testaveis": [{"id": t.id, "nome": t.nome, **contagem[t.id], "dicas": visual.dicas_do_teste(db, t, marca_ligada)}
                       for t in testaveis],
@@ -743,7 +746,7 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(exige("c
         "pode_whatsapp_sozinho": autorizacao.pode(usuario, "campanhas.whatsapp_sozinho"),
         "pode_gerenciar": pode_gerenciar,
         "dono": db.get(Usuario, camp.usuario_id) if camp.usuario_id else None,
-        "c": camp, "resumo": campanhas.resumo_aprovacao(db, camp), "nomes_categorias": nomes,
+        "c": camp, "resumo": resumo, "nomes_categorias": nomes,
         "rodando": camp.status == "gerando", "pode_aprovar": pode_gerenciar,
         "aprovador": db.get(Usuario, camp.aprovado_por_id) if camp.aprovado_por_id else None,
         "caminho": area[0] if area else request.url.path,
@@ -752,6 +755,29 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(exige("c
         # aprovação: as vagas de WhatsApp do número e quanto a campanha pede (23/11/2026)
         "vagas": vagas.da_campanha(db, camp) if camp.status == "aguardando_aprovacao" else None,
     })
+
+
+@rotas.get("/campanhas/{cid:int}/toque/{tid:int}/html")
+def html_do_toque(cid: int, tid: int, usuario: Usuario = Depends(exige("campanhas.ver")), db: Session = Depends(obter_db)):
+    """O e-mail em HTML de um toque, do jeito que a empresa vai receber: a prévia da área de mensagens (pedido da Maria
+    em 23/11/2026). O descadastro vai com um endereço de exemplo: clicar na prévia não pode tirar a empresa da lista."""
+    from fastapi.responses import HTMLResponse
+
+    from .. import conexoes, marca
+
+    camp = _campanha(db, cid, usuario)
+    t = db.get(Tarefa, tid)
+    if t is None or t.campanha_id != camp.id or t.canal != "email" or t.lead is None:
+        raise HTTPException(404)
+    quem = conexoes.responsavel(db, t.lead, usuario, t)
+    html = visual.html_do_email(db, t, t.lead, quem, marca.aplicar(t.mensagem, quem),
+                                f"{config.URL_PUBLICA}/descadastrar/exemplo")
+    if not html:
+        html = ('<p style="font-family:Arial,sans-serif;font-size:14px;color:#555;margin:16px">Este e-mail vai só em '
+                'texto, sem HTML.</p>')
+    # numa moldura da própria tela (sandbox: nada do e-mail roda como página do sistema)
+    return HTMLResponse(html, headers={"X-Frame-Options": "SAMEORIGIN",
+                                       "Content-Security-Policy": "sandbox; frame-ancestors 'self'"})
 
 
 def _texto_das_vagas(nas_vagas: dict) -> str:

@@ -784,7 +784,8 @@ def enviar_teste(db, camp: Campanha, usuario: Usuario, canal: str, destino: str,
                 texto = marca.aplicar(texto, usuario, camp.tenant_id)
                 html = visual.html_do_email(db, t, t.lead, usuario, f"{rotulo}\n\n{texto}")
                 email_smtp.enviar(destino, f"[TESTE] {assunto or marca.da_pessoa(usuario, camp.tenant_id)['nome']}",
-                                  f"{rotulo}\n\n{texto}", lead_id=None, conta=conta, html=html)
+                                  f"{rotulo}\n\n{visual.texto_que_vai(db, t, texto, html)}", lead_id=None, conta=conta,
+                                  html=html)
                 feito["com_visual"] += bool(html)
             else:
                 # no teste a imagem vai mesmo para contato frio: quem recebe é a própria pessoa que testa
@@ -1061,6 +1062,7 @@ def _enviar_email_da_tarefa(db, t: Tarefa, usuario: Usuario | None, resultado: s
     quem = conexoes.responsavel(db, lead, usuario, t)
     t.assunto, t.mensagem = marca.aplicar(t.assunto, quem), marca.aplicar(t.mensagem, quem)
     html = visual.html_do_email(db, t, lead, quem, t.mensagem, email_smtp.link_descadastro(lead.id))
+    corpo = visual.texto_que_vai(db, t, t.mensagem, html)  # do 2º toque em diante, só o HTML (23/11/2026)
     imagens = {}
     if not html:  # Renovação: a arte do aviso que foi no WhatsApp do mesmo aviso vai também no e-mail
         from . import renovacao
@@ -1069,13 +1071,13 @@ def _enviar_email_da_tarefa(db, t: Tarefa, usuario: Usuario | None, resultado: s
         if not html and visual.usa_html_da_marca_na_renovacao(db, t):  # sem a arte: o e-mail com a marca
             html = visual.html_da_marca(db, t.tenant_id, t.mensagem, email_smtp.link_descadastro(lead.id))
     try:
-        id_externo = email_smtp.enviar(lead.email, t.assunto or marca.da_pessoa(quem)["nome"], t.mensagem,
+        id_externo = email_smtp.enviar(lead.email, t.assunto or marca.da_pessoa(quem)["nome"], corpo,
                                        lead_id=lead.id, conta=conta, html=html, **({"imagens": imagens} if imagens else {}))
     except email_smtp.ErroEmail as erro:
         do_lead = isinstance(erro, email_smtp.ErroDestinatario)
         if not do_lead and not registrar_erro_da_caixa:
             return str(erro) or "erro no servidor de e-mail"
-        falha = mensagens.registrar(db, lead.id, "email", t.mensagem, usuario, modo="api", status="falhou",
+        falha = mensagens.registrar(db, lead.id, "email", corpo, usuario, modo="api", status="falhou",
                                     assunto=t.assunto, tarefa_id=t.id, erro=str(erro), campanha_id=t.campanha_id,
                                     angulo=t.angulo, categoria_id=lead.categoria_id)
         falha.conexao = contas_email.chave(conta)
@@ -1085,7 +1087,7 @@ def _enviar_email_da_tarefa(db, t: Tarefa, usuario: Usuario | None, resultado: s
             historico(db, lead.id, "sistema", f"E-mail recusado: {erro} Confira o endereço do lead.", usuario, "email")
             return DESTINATARIO_RECUSADO
         return str(erro) or "erro no servidor de e-mail"
-    saiu = mensagens.registrar(db, lead.id, "email", t.mensagem, usuario, modo="api", status="enviada",
+    saiu = mensagens.registrar(db, lead.id, "email", corpo, usuario, modo="api", status="enviada",
                                assunto=t.assunto, tarefa_id=t.id, id_externo=id_externo, campanha_id=t.campanha_id,
                                angulo=t.angulo, categoria_id=lead.categoria_id)
     saiu.conexao = contas_email.chave(conta)

@@ -161,6 +161,11 @@ e do WhatsApp e manda um e-mail de teste para você.
   **em todos**. A arte se escolhe no campo **Sua arte (visual)**: com "Nenhuma arte", a tela avisa em amarelo que os
   e-mails não levam a sua arte. O **E-mail em HTML com a marca** é outro e-mail, mais simples, feito pelo sistema.
 - Empresa sem o nome do responsável: o "Olá, {{nome}}!" da arte vira "Olá!".
+- **Regra do HTML:** o 1º toque vai em texto e, do 2º em diante, vai **só o HTML**. Com uma arte que é o e-mail
+  inteiro (sem `{{mensagem}}`, como a "Escritorios contabeis"), o texto do toque não vai: a cópia em texto que segue
+  escondida dentro do e-mail (para o filtro de spam e para quem não abre HTML) é a da própria arte.
+- Na campanha, a área **Mensagens** mostra em cada e-mail se ele vai **só texto** ou **🎨 HTML**; abra **Ver o e-mail em
+  HTML** para ver como ele chega para a empresa (com os dados dela).
 - O **e-mail** sai com o HTML e também com a versão em texto (exigência dos filtros de spam).
 - No **WhatsApp** vai a imagem com o texto do toque embaixo, **só para quem já conversou com a MS**. Para contato frio
   sai só o texto, para proteger o número contra bloqueio.

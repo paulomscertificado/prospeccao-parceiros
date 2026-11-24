@@ -350,6 +350,72 @@ def resumo_da_campanha(db, camp: Campanha) -> str:
     return f"{visual.nome} · {' e '.join(canais)} · {TOQUES.get(camp.visual_toques, '').lower()}"
 
 
+# ---------------------------------------------------------------- Só o HTML do 2º toque em diante
+
+def arte_inteira(arte: VisualCampanha | None) -> bool:
+    """A arte é o e-mail inteiro: não tem {{mensagem}}, então o texto do toque não entra nela (ex.: "Escritorios
+    contabeis", um e-mail de apresentação completo)."""
+    return bool(arte is not None and (arte.html or "").strip() and not re.search(r"\{\{\s*mensagem\s*\}\}", arte.html))
+
+
+def texto_do_html(html: str) -> str:
+    """O texto de um e-mail em HTML, para a versão em texto que vai junto dele: sem os estilos, com os parágrafos e as
+    quebras de linha, e o endereço de cada botão ou link entre parênteses."""
+    corpo = re.sub(r"<(head|style|title|script)\b.*?</\1\s*>", " ", html or "", flags=re.S | re.I)
+
+    def link(m):  # o endereço só entra quando o texto do link já não é ele ("mscertificados.com.br")
+        endereco, rotulo = html_lib.unescape(m.group(1)).strip(), m.group(2)
+        visivel = html_lib.unescape(re.sub(r"<[^>]+>", " ", rotulo))
+        if not endereco.startswith("http") or endereco.split("://", 1)[-1].rstrip("/") in visivel:
+            return rotulo
+        return f"{rotulo} ({endereco})"
+
+    corpo = re.sub(r"<a\b[^>]*?href\s*=\s*[\"']([^\"']+)[\"'][^>]*>(.*?)</a\s*>", link, corpo, flags=re.S | re.I)
+    corpo = re.sub(r"<br\s*/?>", "\n", corpo, flags=re.I)
+    corpo = re.sub(r"</(p|div|tr|li|h[1-6]|table|td)\s*>", "\n", corpo, flags=re.I)
+    corpo = html_lib.unescape(re.sub(r"<[^>]+>", " ", corpo))
+    linhas = [re.sub(r"[ \t\u00a0]+", " ", linha).strip() for linha in corpo.splitlines()]
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(linhas)).strip()
+
+
+def texto_que_vai(db, tarefa: Tarefa | None, texto: str, html: str) -> str:
+    """O texto que vai junto do e-mail (a versão em texto, escondida quando o programa mostra o HTML). Regra da Maria
+    (23/11/2026): o 1º toque vai em texto e, do 2º em diante, vai só o HTML. Com a arte que é o e-mail inteiro, o texto
+    do toque não vai: a versão em texto é a da própria arte. Com a arte que recebe o texto ({{mensagem}}) e com o e-mail
+    com a marca, o texto do toque já está dentro do HTML."""
+    if html and arte_inteira(_da_tarefa(db, tarefa, "email")):
+        return texto_do_html(html)
+    return texto
+
+
+def html_dos_toques(db, camp: Campanha, tarefas: list[Tarefa]) -> dict[int, dict]:
+    """Para a área de mensagens da campanha (pedido da Maria em 23/11/2026: "mostre também as mensagens montadas em
+    HTML"): como sai o e-mail de cada toque. {tarefa_id: {"tipo": "arte" | "marca" | "texto", "nome": nome da arte,
+    "inteira": a arte é o e-mail inteiro (o texto do toque não vai)}}. A mesma regra do envio (html_do_email), com uma
+    consulta só para achar o 1º e-mail de cada empresa (visual.primeiro_email)."""
+    if camp.tipo == "renovacao":  # a Renovação manda a arte do aviso (tela Renovação)
+        return {}
+    com_marca = (camp.tipo in TIPOS_COM_HTML_DA_MARCA and camp.email_html is not False and html_da_marca_ligado(db))
+    primeiros: dict[int, int] = {}
+    if com_marca:
+        for tid, lid in db.execute(select(Tarefa.id, Tarefa.lead_id).where(
+                Tarefa.campanha_id == camp.id, Tarefa.canal == "email",
+                Tarefa.status.in_(("feita", "pendente", "rascunho"))).order_by(Tarefa.data, Tarefa.id)):
+            primeiros.setdefault(lid, tid)
+    resposta = {}
+    for t in tarefas:
+        if t.canal != "email":
+            continue
+        arte = _da_tarefa(db, t, "email")
+        if arte is not None and (arte.html or "").strip():
+            resposta[t.id] = {"tipo": "arte", "nome": arte.nome, "inteira": arte_inteira(arte)}
+        elif com_marca and t.lead_id and primeiros.get(t.lead_id) != t.id:
+            resposta[t.id] = {"tipo": "marca", "nome": "", "inteira": False}
+        else:
+            resposta[t.id] = {"tipo": "texto", "nome": "", "inteira": False}
+    return resposta
+
+
 # ---------------------------------------------------------------- No teste da campanha
 
 def _no_teste(db, camp: Campanha, marca_ligada: bool | None = None) -> dict[str, tuple[int, str]]:

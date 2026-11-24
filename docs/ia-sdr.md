@@ -618,6 +618,13 @@ cliente rápido". Antes cada pessoa via só as respostas dos leads dela e tinha 
   O campo chama "Sua arte (visual)" e, com "Nenhuma arte", mostra o aviso amarelo `#sem-arte` (23/11/2026: as campanhas
   115 e 116 da Maria saíram sem a arte; ela achou que o "E-mail em HTML com a marca" era a arte).
   `visual.montar_html` tira a vírgula antes de um campo vazio ("Olá, {{nome}}!" sem o nome vira "Olá!"; antes "Olá, !").
+- Regra do HTML (23/11/2026, pedido da Maria: "você envia o primeiro toque em texto e no segundo toque o HTML apenas, e
+  segue com HTML"): `visual.texto_que_vai` dá a versão em texto do e-mail; com a arte que é o e-mail inteiro
+  (`visual.arte_inteira`: sem {{mensagem}}) é `visual.texto_do_html(html)`, não o texto do toque, e a `Mensagem`
+  registrada guarda esse texto (o que a empresa recebeu). Vale no envio (`campanhas._enviar_email_da_tarefa`) e no teste.
+- Área de mensagens da campanha: `visual.html_dos_toques` (texto / arte / marca por toque, uma consulta para o 1º
+  e-mail de cada empresa) dá os selos "só texto" e "🎨 HTML" e a prévia `GET /campanhas/{id}/toque/{tarefa}/html`
+  (`rotas/sdr.html_do_toque`, campanhas.ver; descadastro de exemplo; iframe sandbox buscado só ao abrir).
 - Envio: `campanhas._enviar_email_da_tarefa` monta `visual.html_do_email` ({{mensagem}} = texto do toque, escapado;
   {{descadastro}} ou rodapé automático) e `email_smtp.enviar(html=...)` manda multipart/alternative (texto + HTML).
   `sdr.enviar_whatsapp_conectado` pede `visual.imagem_do_whatsapp`: só com `campanhas.whatsapp_liberado` (quem já
