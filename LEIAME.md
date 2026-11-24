@@ -42,6 +42,10 @@ no navegador, de qualquer lugar: não precisa do `iniciar.bat`. O passo a passo 
   números que você vê. Elas ficam lidas quando alguém abre a conversa nessa tela ou responde pelo celular do número
   (ou pela tela Conversas). Resposta automática (da IA ou da campanha) não conta como lida.
   Acima da lista, **Não lidas** mostra só as conversas com mensagem nova (**Tudo** volta a mostrar todas).
+  O mesmo contato pode ter uma conversa em cada número (por exemplo, a 1ª mensagem saiu pelo número principal e a
+  resposta chegou pelo WhatsApp de um vendedor). O **Ver conversa** das Oportunidades abre pelo número em que a
+  conversa está (o da mensagem mais recente), e a conversa avisa no alto quando o contato também tem conversa por
+  outro número que você vê: clique no nome do número para abrir a conversa de lá.
   Nas mensagens que saíram, como no WhatsApp: **✓** saiu, **✓✓** o contato recebeu, **✓✓ azul** o contato leu.
   Clique numa mensagem que saiu para ver os **Dados da mensagem**: a hora em que foi **Entregue** e em que foi
   **Lida** ("-" enquanto não aconteceu; quem desligou a confirmação de leitura no WhatsApp nunca aparece como lida). O
@@ -301,7 +305,7 @@ ou descarta, o aviso some do sininho de todos. São 4 abas:
   (e por qual número a mensagem saiu), o contato do cliente, o que enviamos, o que o lead respondeu e o que a IA
   entendeu. Botões: **Marcar como atendido** (depois de responder o cliente: a resposta sai da lista e a automação do
   lead para; o responsável pelo lead continua o mesmo), **Iniciar WhatsApp**, **Ver conversa** (abre a conversa em
-  Conversas) e **Descartar**: para descartar é preciso **escolher o motivo** (sem interesse, já renovou, já tem
+  Conversas, pelo número em que ela está) e **Descartar**: para descartar é preciso **escolher o motivo** (sem interesse, já renovou, já tem
   parceiro, resposta de robô, pessoa errada...). O motivo aparece na aba Descartadas e ensina o que ajustar nas
   campanhas.
   **Já renovou:** quando o cliente da Renovação diz que já renovou, descarte com esse motivo: o certificado dele vira

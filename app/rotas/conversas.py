@@ -84,6 +84,29 @@ def _numero_padrao(db: Session, usuario: Usuario) -> str:
     return acessiveis[0].id if acessiveis else ""
 
 
+def _numero_da_conversa(db: Session, chave: str, numeros: list[str]) -> str:
+    """Entre os números que a pessoa vê, o da mensagem mais recente com este contato ("" = nenhum). O "Ver conversa"
+    das Oportunidades abre a conversa sem dizer o número: a tela abria o número padrão (o principal), vazio, e a
+    resposta, que tinha chegado pelo WhatsApp do Paulo Lucas, não aparecia (24/11/2026, pedido da Maria)."""
+    if not chave or not numeros:
+        return ""
+    return db.execute(select(MensagemWhatsApp.conexao)
+                      .where(MensagemWhatsApp.telefone == chave, MensagemWhatsApp.conexao.in_(numeros))
+                      .order_by(MensagemWhatsApp.criado_em.desc(), MensagemWhatsApp.id.desc()).limit(1)).scalar() or ""
+
+
+def _outros_numeros(db: Session, chave: str, numeros: list[str], aberto: str) -> list[str]:
+    """Os outros números (dos que a pessoa vê) que também conversaram com este contato, o mais recente primeiro: a
+    conversa aberta avisa e abre a de lá com um clique (em 24/11/2026, 79 contatos tinham conversa em 2 números ou mais)."""
+    outros = [n for n in numeros if n != aberto]
+    if not chave or not outros:
+        return []
+    return list(db.execute(select(MensagemWhatsApp.conexao)
+                           .where(MensagemWhatsApp.telefone == chave, MensagemWhatsApp.conexao.in_(outros))
+                           .group_by(MensagemWhatsApp.conexao)
+                           .order_by(func.max(MensagemWhatsApp.criado_em).desc())).scalars())
+
+
 def _tela_vista(db: Session) -> None:
     whatsapp_leads.marcar_tela(db, TELA_ABERTA)
 
@@ -109,16 +132,20 @@ def _marcar_lidas(db: Session, da_conversa: tuple) -> None:
 
 
 @rotas.get("/conversas")
-def tela_conversas(request: Request, telefone: str = "", usuario: Usuario = Depends(exige("conversas.ver")),
-                   db: Session = Depends(obter_db)):
+def tela_conversas(request: Request, telefone: str = "", numero: str = "",
+                   usuario: Usuario = Depends(exige("conversas.ver")), db: Session = Depends(obter_db)):
     _tela_vista(db)
     base = whatsapp_leads.status()
     numeros = [{"id": c.id, "nome": c.nome, "minha": c.dono_id == usuario.id,
                 "conectado": bool(conexoes.situacao(c.id, base).get("conectado"))} for c in conexoes.acessiveis(db, usuario)]
+    chave = _chave(telefone) if telefone else ""
+    ids = [n["id"] for n in numeros]
+    # Sem o número (o "Ver conversa" das Oportunidades) ou com um que a pessoa não vê: abre pelo número em que a
+    # conversa com o contato está (a mensagem mais recente); sem conversa, pelo número padrão
+    inicial = numero if numero in ids else (_numero_da_conversa(db, chave, ids) or _numero_padrao(db, usuario))
     db.commit()
-    return tela(request, "conversas.html", {"telefone_inicial": _chave(telefone) if telefone else "",
-                                            "ponte": config.WHATSAPP_PONTE, "numeros": numeros,
-                                            "numero_padrao": _numero_padrao(db, usuario)})
+    return tela(request, "conversas.html", {"telefone_inicial": chave, "ponte": config.WHATSAPP_PONTE,
+                                            "numeros": numeros, "numero_inicial": inicial})
 
 
 @rotas.get("/conversas/api/lista")
@@ -225,7 +252,9 @@ def conversa(telefone: str, numero: str = "", marca: str = "", usuario: Usuario 
              db: Session = Depends(obter_db)):
     _tela_vista(db)
     chave = _chave(telefone)
-    numero = numero if numero in _numeros(db, usuario) else _numero_padrao(db, usuario)
+    numeros = _numeros(db, usuario)
+    # sem número (ou com um que a pessoa não vê): o da conversa com o contato, senão o padrão
+    numero = numero if numero in numeros else (_numero_da_conversa(db, chave, numeros) or _numero_padrao(db, usuario))
     if not numero:
         return JSONResponse({"erro": "Você ainda não tem número de WhatsApp. Conecte em WhatsApp > Meu WhatsApp."},
                             status_code=403)
@@ -269,6 +298,8 @@ def conversa(telefone: str, numero: str = "", marca: str = "", usuario: Usuario 
                       "dia": p.criado_em.strftime("%Y-%m-%d"), "hora": p.criado_em.strftime("%H:%M")} for p in pendentes],
         "lead": {"id": lead.id, "empresa": lead.empresa, "status": lead.status, "opt_out": lead.opt_out}
         if lead and pode_ver(usuario, lead) else None,
+        # o mesmo contato também conversou por outro número da pessoa: a tela avisa e abre a de lá (24/11/2026)
+        "outros_numeros": _outros_numeros(db, chave, numeros, numero),
         "situacao": _situacao(db, numero),
         "marca": atual,
     })

@@ -159,6 +159,15 @@ mensagem escrita na tela (com o 9) ia para outra conversa e "sumia". As linhas a
 faz a nuvem rodar uma vez). A busca por número acha com ou sem o 9. Enquanto há lote cheio (`wl_conv_pendente`) a ponte troca a cada 3 s.
 O que se escreve na tela vira `ponte_whatsapp.manual = 1` → `integracao.enviar_manual` → fila "manual" (sai na
 hora). Opt-out da Prospecção bloqueia; quando o número é de um lead, entra no histórico dele.
+**Qual número abre** (24/11/2026, pedido da Maria: a resposta do Diego chegou pelo WhatsApp do Paulo Lucas e a da
+Milena também, mas o "Ver conversa" das Oportunidades abria o número principal, vazio ou só com a 1ª mensagem): a
+conversa é de um contato **num número** (`telefone` + `conexao`). `/conversas?telefone=` sem `numero` (ou com um que a
+pessoa não vê) abre pelo número da mensagem mais recente com o contato entre os que ela vê
+(`conversas._numero_da_conversa`); sem conversa, pelo número padrão (`_numero_padrao`). A API da conversa faz o mesmo
+sem `numero`, e a resposta inteira traz `outros_numeros` (`_outros_numeros`: os outros números que a pessoa vê com
+conversa com o contato, o mais recente primeiro); a tela mostra o aviso `#c-outros` "Este contato também tem conversa
+pelo ..." com o nome que abre a de lá. Em 24/11/2026, 79 contatos tinham conversa em 2 números ou mais.
+Teste: `testes/test_conversa_numero_certo.py`.
 
 **Número vermelho do menu Conversas** (23/11/2026, pedido da Maria: "assim como oportunidades tem um contador de
 mensagens coloque também em conversas e api oficial"): `conexoes.mensagens_nao_lidas` = recebidas com `lida` falso nos

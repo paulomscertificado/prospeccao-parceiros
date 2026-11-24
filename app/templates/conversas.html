@@ -36,6 +36,7 @@
   .avatar.pequeno { width: 38px; height: 38px; font-size: .82rem; }
 
   .chat-conversa { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+  #c-outros a { text-decoration: underline; }  /* o aviso do outro número: o nome abre a conversa de lá */
   .chat-topo { display: flex; align-items: center; gap: 12px; padding: 11px 18px; border-bottom: 1px solid var(--borda); background: #fff; min-height: 64px; }
   .chat-topo .titulo { flex: 1; min-width: 0; }
   .chat-topo .titulo b { font-size: 1rem; }
@@ -133,6 +134,7 @@
         <button type="button" class="botao-icone" id="editar-nome" title="Editar o nome do contato">✏️ Editar nome</button>
       </div>
       <div id="c-optout" class="aviso aviso-erro" style="display:none;margin:0;border-radius:0">Este contato pediu para não receber mensagens (opt-out).</div>
+      <div id="c-outros" class="aviso aviso-info" style="display:none;margin:0;border-radius:0"></div>
       <div class="chat-mensagens" id="mensagens"></div>
       <div class="chat-escrever">
         <div id="nova-campos" class="nova-campos" style="display:none">
@@ -155,7 +157,8 @@
 {% block scripts %}
 <script>
 let atual = {{ telefone_inicial|json }} || '';
-let numeroAtual = new URLSearchParams(location.search).get('numero') || {{ numero_padrao|json }} || '';
+// o número da conversa: o que veio no endereço, senão o número em que a conversa com o contato está (o sistema escolhe)
+let numeroAtual = {{ numero_inicial|json }} || '';
 const NOMES_NUMEROS = Object.fromEntries({{ numeros|json }}.map(n => [n.id, n.nome]));
 const filtroNumero = () => (document.getElementById('numero') || {}).value || '';
 let modoNovo = false;
@@ -257,6 +260,12 @@ async function carregarConversa(rolar, forcar) {
   }
   el('c-lead').innerHTML = d.lead ? `· Lead: <a href="/leads/${d.lead.id}">${escapar(d.lead.empresa)}</a> <span class="selo selo-azul">${escapar(d.lead.status)}</span>` : '';
   el('c-optout').style.display = d.lead && d.lead.opt_out ? '' : 'none';
+  // o mesmo contato também conversou por outro número (dos que a pessoa vê): avisa e abre a conversa de lá num clique
+  const outros = d.outros_numeros || [];
+  el('c-outros').style.display = outros.length ? '' : 'none';
+  el('c-outros').innerHTML = outros.length ? 'Este contato também tem conversa pelo ' + outros.map(n =>
+    `<a href="#" data-numero="${escapar(n)}"><b>${escapar(NOMES_NUMEROS[n] || n)}</b></a>`).join(' e pelo ')
+    + '. Clique no número para ver essa conversa.' : '';
   marcaConversa = d.marca || '';
   const todas = d.mensagens.concat(d.enviando.map(m => ({ ...m, direcao: 'saida', enviando: true })));
   const nova = JSON.stringify(todas.map(m => [m.texto, m.status, m.hora, m.entregue || '', m.lida || '']));
@@ -295,6 +304,13 @@ function abrir(telefone, numero) {
   el('texto').focus();
 }
 
+el('c-outros').addEventListener('click', e => {
+  const a = e.target.closest('a[data-numero]');
+  if (!a) return;
+  e.preventDefault();
+  abrir(atual, a.dataset.numero);
+});
+
 // clique numa mensagem que saiu: os "Dados da mensagem" (quando o contato recebeu e quando leu), como no WhatsApp
 el('mensagens').addEventListener('click', e => {
   const bolha = e.target.closest('.bolha[data-i]');
@@ -312,7 +328,7 @@ el('nova').addEventListener('click', () => {
   el('c-nome').textContent = 'Nova mensagem'; el('c-telefone').textContent = 'Para qualquer celular, com DDD'; el('c-lead').innerHTML = '';
   el('c-avatar').textContent = '+'; el('c-avatar').style.background = 'var(--verde)';
   el('editar-nome').style.display = 'none'; fecharNome();
-  el('c-optout').style.display = 'none';
+  el('c-optout').style.display = 'none'; el('c-outros').style.display = 'none';
   el('mensagens').innerHTML = '<div class="vazio-chat"><p>Digite o celular, o nome (opcional) e a mensagem.</p></div>';
   el('novo-telefone').value = ''; el('novo-nome').value = '';
   el('novo-telefone').focus();
