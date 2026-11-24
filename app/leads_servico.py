@@ -255,9 +255,12 @@ def apagar_conversas_antigas(db: Session, lote: int = 5000) -> int:
     """LGPD (decisão de 14/11/2026): tira da cópia na nuvem as conversas do WhatsApp mais antigas que o prazo de guarda
     (configuração guarda_conversas_meses; 0 = sem prazo). As originais ficam nos celulares e no WhatsApp Leads. Um lote
     por vez (a rotina de hora em hora chama de novo); vale para todas as ARs."""
-    from .modelos import MensagemWhatsApp
+    from .modelos import ArquivoEnvio, MensagemWhatsApp
     from .seguranca import registrar_log
 
+    # arquivo da tela Conversas que nunca saiu (o WhatsApp Leads não confirmou em 7 dias): não fica guardado à toa
+    db.execute(delete(ArquivoEnvio).where(ArquivoEnvio.criado_em < agora() - timedelta(days=7))
+               .execution_options(sem_filtro_de_ar=True))
     meses = ler_config_int(db, "guarda_conversas_meses", 0)
     if meses <= 0:
         return 0

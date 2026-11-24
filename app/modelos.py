@@ -120,7 +120,24 @@ class PonteWhatsApp(DaAR, Base):
     midia_id: Mapped[int | None] = mapped_column(Integer, nullable=True)  # imagem do visual (app/visual.py)
     # aviso de vencimento (Renovação): os dados da arte do site, em JSON; o computador do WhatsApp Leads desenha
     arte: Mapped[str] = mapped_column(Text, default="")
+    # arquivo escolhido na tela Conversas (arquivos_envio; 24/11/2026): o computador baixa e manda junto
+    arquivo_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
+
+
+class ArquivoEnvio(DaAR, Base):
+    """Arquivo escolhido na tela Conversas para mandar pelo WhatsApp (pedido da Maria em 24/11/2026: "dê também a
+    possibilidade de enviar arquivos"), esperando o computador do WhatsApp Leads buscar (/api/ponte/arquivo/<id>).
+    Quando ele confirma a mensagem, o arquivo vira o anexo dela (anexos_whatsapp) e sai daqui; não vai no backup."""
+    __tablename__ = "arquivos_envio"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nome: Mapped[str] = mapped_column(String(200), default="")
+    tipo: Mapped[str] = mapped_column(String(120), default="")
+    dados: Mapped[bytes] = mapped_column(LargeBinary, deferred=True)
+    tamanho: Mapped[int] = mapped_column(Integer, default=0)
+    hash: Mapped[str] = mapped_column(String(64), default="")  # sha256: o computador confere o que baixou
+    usuario_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, index=True)
 
 
 class ArteAviso(DaAR, Base):
@@ -210,6 +227,8 @@ class AnexoWhatsApp(DaAR, Base):
     dados: Mapped[bytes] = mapped_column(LargeBinary, deferred=True)
     tamanho: Mapped[int] = mapped_column(Integer, default=0)
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, index=True)
+    # nome do arquivo que a equipe mandou pela tela (o PDF, a planilha...); vazio nos que chegam
+    nome: Mapped[str] = mapped_column(String(200), default="", server_default="")
 
 
 class MensagemOficial(DaAR, Base):

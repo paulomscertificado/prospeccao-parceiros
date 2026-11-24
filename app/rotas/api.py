@@ -200,6 +200,41 @@ def ponte_midia(request: Request, mid: int):
                         headers={"X-Hash": v.imagem_hash})
 
 
+@rotas.get("/ponte/arquivo/{aid:int}")
+def ponte_arquivo(request: Request, aid: int):
+    """Arquivo escolhido na tela Conversas para o computador com o WhatsApp Leads mandar (senha da ponte; ele confere
+    o hash)."""
+    from fastapi.responses import Response
+
+    from ..modelos import ArquivoEnvio
+
+    if not _ponte_autorizada(request):
+        return JSONResponse({"erro": "token inválido"}, status_code=403)
+    with sessao() as db:
+        a = db.get(ArquivoEnvio, aid)
+        if a is None or not a.dados:
+            return JSONResponse({"erro": "arquivo não encontrado"}, status_code=404)
+        return Response(a.dados, media_type=a.tipo or "application/octet-stream", headers={"X-Hash": a.hash})
+
+
+def _arquivo_enviado(db, item: PonteWhatsApp, id_wl, deu_certo: bool) -> None:
+    """O WhatsApp Leads respondeu sobre a mensagem com arquivo da tela Conversas: saiu para a fila de lá = o arquivo vira
+    o anexo da mensagem (a conversa mostra a foto, toca o áudio ou dá o link do documento); com erro, não fica."""
+    from ..modelos import AnexoWhatsApp, ArquivoEnvio
+
+    a = db.get(ArquivoEnvio, item.arquivo_id)
+    if a is None:
+        return
+    try:
+        id_wl = int(id_wl or 0)
+    except (TypeError, ValueError):
+        id_wl = 0
+    if deu_certo and id_wl and db.execute(select(AnexoWhatsApp.id).where(AnexoWhatsApp.id_wl == id_wl)).first() is None:
+        db.add(AnexoWhatsApp(id_wl=id_wl, tipo=a.tipo, nome=a.nome, dados=a.dados, tamanho=a.tamanho,
+                             tenant_id=item.tenant_id))
+    db.delete(a)
+
+
 @rotas.post("/ponte/arte/{pid:int}")
 async def ponte_arte(request: Request, pid: int):
     """A arte do aviso de vencimento que o computador desenhou para a mensagem `pid` da ponte (senha da ponte): fica
@@ -315,6 +350,12 @@ async def ponte_troca(request: Request):
                 v = db.get(VisualCampanha, item.midia_id)
                 if v is not None and v.imagem_hash:
                     envio["midia"] = {"id": v.id, "hash": v.imagem_hash, "tipo": v.imagem_tipo}
+            if item.arquivo_id:  # arquivo da tela Conversas: o computador baixa em /api/ponte/arquivo/<id>
+                from ..modelos import ArquivoEnvio
+
+                a = db.get(ArquivoEnvio, item.arquivo_id)
+                if a is not None:
+                    envio["arquivo"] = {"id": a.id, "hash": a.hash, "tipo": a.tipo, "nome": a.nome}
             envios.append(envio)
         comandos = []
         for c in db.execute(select(ComandoWhatsApp).where(ComandoWhatsApp.status == "aguardando")
@@ -381,6 +422,7 @@ def _guardar_conversas(db, conversas: dict) -> None:
     ids = [int(m["id"]) for m in mensagens]
     existentes = set(db.execute(select(MensagemWhatsApp.id_wl).where(MensagemWhatsApp.id_wl.in_(ids))).scalars()) if ids else set()
     tocadas = set()  # conversas com resposta de gente ou recebida não lida: a recebida já respondida fica lida
+    criadas = []  # as mensagens novas deste lote (o anexo do arquivo mandado pela tela, logo abaixo)
     for m in mensagens:
         if int(m["id"]) in existentes:
             continue
@@ -400,9 +442,19 @@ def _guardar_conversas(db, conversas: dict) -> None:
                                 visualizada_em=_data_wl(m.get("visualizada_em")),
                                 apagada_em=_data_wl(m.get("apagada_em")))
         db.add(nova)
+        criadas.append(nova)
         if (nova.direcao == "saida" and nova.origem in conexoes.ORIGENS_DE_GENTE) or (
                 nova.direcao == "entrada" and not nova.lida):
             tocadas.add((nova.conexao, nova.telefone))
+    if criadas:  # a mensagem com o arquivo mandado pela tela Conversas: o anexo entrou antes dela (confirmados)
+        from ..modelos import AnexoWhatsApp
+        from .conversas import tipo_de_anexo
+
+        tipos = dict(db.execute(select(AnexoWhatsApp.id_wl, AnexoWhatsApp.tipo)
+                                .where(AnexoWhatsApp.id_wl.in_([n.id_wl for n in criadas]))).all())
+        for nova in criadas:
+            if nova.id_wl in tipos:
+                nova.anexo = tipo_de_anexo(tipos[nova.id_wl])
     if tocadas:  # respondeu pelo celular ou por uma tela = leu (o número vermelho do menu Conversas, 23/11/2026)
         db.flush()
         conexoes.marcar_respondidas(db, tocadas)
@@ -471,6 +523,8 @@ async def ponte_retorno(request: Request):
                 item.status, item.id_wl = "na_fila", str(c.get("id_wl", ""))
                 if msg:
                     msg.id_externo = item.id_wl
+            if item.arquivo_id:  # arquivo da tela Conversas: vira o anexo da mensagem (ou sai, se não foi)
+                _arquivo_enviado(db, item, c.get("id_wl"), not c.get("erro"))
         for c in dados.get("comandos") or []:
             comando = db.get(ComandoWhatsApp, int(c.get("id") or 0))
             if comando:

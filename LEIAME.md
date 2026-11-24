@@ -63,6 +63,12 @@ no navegador, de qualquer lugar: não precisa do `iniciar.bat`. O passo a passo 
   "📷 Imagem" / "🎤 Áudio". A foto ou o áudio pode levar alguns segundos a mais que o texto para aparecer. Vídeo e
   documento continuam só com o nome (abra no celular do número), e a foto ou o áudio de **visualização única** também:
   como no WhatsApp Web, ela só abre no celular.
+  **Enviar arquivo (📎):** clique no clipe ao lado da caixa de texto e escolha o arquivo (PDF, foto JPG/PNG, Word,
+  Excel, PowerPoint, texto, XML, ZIP, áudio ou vídeo MP4; até 15 MB). O que você escrever vai como legenda (pode
+  ficar em branco). A foto chega ao cliente como foto; o resto, como documento, com o nome do arquivo. Para desistir,
+  clique no ✕ ao lado do nome. Na conversa, o arquivo enviado aparece com o 📄 e o nome: clique para abrir (PDF) ou
+  baixar (Word, planilha...). Vale também na **+ Nova mensagem** e segue as regras do envio de texto (o número que você
+  usa, quem pediu SAIR não recebe).
 - **Avisos como no WhatsApp:** com o sistema aberto no navegador (pode estar em outra aba), quando chega mensagem nas
   Conversas, no número oficial (API Oficial) ou uma resposta de campanha:
   - toca um **som**;

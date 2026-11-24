@@ -145,7 +145,7 @@ def status(usar_cache: bool = True) -> dict:
 
 def enviar(telefone: str, nome: str, texto: str, resposta: bool = False, db=None, manual: bool = False,
            usuario_id: int | None = None, conexao: str = "principal", midia_id: int | None = None,
-           arte: dict | None = None) -> str:
+           arte: dict | None = None, arquivo_id: int | None = None) -> str:
     """Coloca a mensagem na fila do WhatsApp Leads. Devolve o id da mensagem lá
     (na ponte: "p" + id da espera aqui; vira o id de lá quando o computador confirmar).
     midia_id: visual (app/visual.py) cuja imagem vai junto, com o texto como legenda (só pela ponte).
@@ -161,7 +161,7 @@ def enviar(telefone: str, nome: str, texto: str, resposta: bool = False, db=None
 
         item = PonteWhatsApp(telefone=telefone, nome=nome[:200], texto=texto, resposta=resposta, manual=manual,
                              usuario_id=usuario_id, conexao=conexao or "principal", midia_id=midia_id,
-                             arte=json.dumps(arte, ensure_ascii=False) if arte else "")
+                             arte=json.dumps(arte, ensure_ascii=False) if arte else "", arquivo_id=arquivo_id)
         if db is not None:
             db.add(item)
             db.flush()

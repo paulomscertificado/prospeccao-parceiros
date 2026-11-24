@@ -17,6 +17,10 @@ contato) e a mensagem fica "Você apagou esta mensagem" aqui, com quem apagou; o
 Fotos e áudios (24/11/2026, pedido da Maria: "faça com que whatsapp leads também consiga ler imagens e reproduzir
 áudios"): o WhatsApp Leads baixa a foto, a figurinha e o áudio e manda pela ponte (/api/ponte/anexo/<id_wl>, tabela
 anexos_whatsapp); a conversa mostra a foto e toca o áudio dentro da mensagem (/conversas/anexo/<id>).
+
+Enviar arquivo (24/11/2026, "dê também a possibilidade de enviar arquivos"): o 📎 da tela manda o arquivo
+(/conversas/api/enviar-arquivo, até 15 MB) com o texto como legenda. Ele espera em arquivos_envio até o WhatsApp Leads
+buscar (/api/ponte/arquivo/<id>); confirmada a mensagem, vira o anexo dela (a conversa mostra a foto ou o link).
 """
 
 import hashlib
@@ -24,6 +28,8 @@ import json
 import re
 import secrets
 from datetime import timedelta
+from pathlib import PurePosixPath
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, Response
@@ -34,7 +40,8 @@ from .. import autorizacao, config, conexoes, sdr, util
 from ..banco import agora, gravar_config, ler_config, obter_db
 from ..integracoes import whatsapp_leads
 from ..leads_servico import historico, pode_ver
-from ..modelos import AnexoWhatsApp, ComandoWhatsApp, ContatoWhatsApp, MensagemWhatsApp, PonteWhatsApp, Usuario
+from ..modelos import (AnexoWhatsApp, ArquivoEnvio, ComandoWhatsApp, ContatoWhatsApp, MensagemWhatsApp, PonteWhatsApp,
+                       Usuario)
 from ..seguranca import exige, registrar_log, verificar_csrf
 from ..web import tela
 
@@ -46,6 +53,32 @@ VERSAO = "wl_conversas_versao"  # muda quando mensagens são lidas ou um nome mu
 # mesmo prazo do WhatsApp Leads (whatsapp.HORAS_PARA_APAGAR), que confere de novo pela hora em que a mensagem saiu
 HORAS_PARA_APAGAR = 48
 APAGADA = "🚫 Você apagou esta mensagem"
+# Arquivos que dá para mandar pelo 📎 (24/11/2026): extensão -> tipo. Foto sai como foto; o resto, como documento.
+TIPOS_DE_ARQUIVO = {
+    ".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp",
+    ".doc": "application/msword",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".xls": "application/vnd.ms-excel", ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".ppt": "application/vnd.ms-powerpoint",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".txt": "text/plain", ".csv": "text/csv", ".xml": "application/xml", ".zip": "application/zip",
+    ".rar": "application/vnd.rar", ".mp3": "audio/mpeg", ".ogg": "audio/ogg", ".m4a": "audio/mp4", ".mp4": "video/mp4"}
+MAXIMO_ARQUIVO = 15 * 1024 * 1024
+ABRE_NO_NAVEGADOR = {"application/pdf"}  # além de foto e áudio; o resto (Word, planilha...) é baixado
+
+
+def tipo_de_anexo(tipo: str) -> str:
+    """O que a conversa mostra para o arquivo: "imagem" (a foto), "audio" (o tocador) ou "documento" (o link)."""
+    if tipo in ("image/jpeg", "image/png", "image/webp", "image/gif"):
+        return "imagem"
+    return "audio" if (tipo or "").startswith("audio/") else "documento"
+
+
+def _nome_do_arquivo(nome: str) -> str:
+    """O nome como o contato vai ver: sem pastas, sem caracteres que o Windows recusa, até 150 letras."""
+    nome = PurePosixPath((nome or "").replace("\\", "/")).name
+    nome = re.sub(r'[\x00-\x1f<>:"/\\|?*]', "", nome).strip(" .")
+    return nome[-150:] or "arquivo"
 
 
 def _chave(telefone: str) -> str:
@@ -338,6 +371,12 @@ def conversa(telefone: str, numero: str = "", marca: str = "", usuario: Usuario 
     ids_apagaram = {m.apagada_por_id for m in mensagens if m.apagada_por_id}
     quem_apagou = dict(db.execute(select(Usuario.id, Usuario.nome).where(Usuario.id.in_(ids_apagaram))).all()) \
         if ids_apagaram else {}
+    com_nome = [m.id_wl for m in mensagens if m.anexo == "documento"]  # o nome do arquivo mandado pela tela
+    nomes_anexos = dict(db.execute(select(AnexoWhatsApp.id_wl, AnexoWhatsApp.nome)
+                                   .where(AnexoWhatsApp.id_wl.in_(com_nome))).all()) if com_nome else {}
+    ids_arquivos = [p.arquivo_id for p in pendentes if p.arquivo_id]  # saindo agora, com arquivo
+    nomes_arquivos = dict(db.execute(select(ArquivoEnvio.id, ArquivoEnvio.nome)
+                                     .where(ArquivoEnvio.id.in_(ids_arquivos))).all()) if ids_arquivos else {}
     return JSONResponse({
         "telefone": chave, "telefone_formatado": util.formatar_telefone(chave), "nome": nome, "numero": numero,
         "mensagens": [{"id": m.id, "direcao": m.direcao, "texto": m.texto, "status": m.status, "erro": m.erro,
@@ -349,10 +388,12 @@ def conversa(telefone: str, numero: str = "", marca: str = "", usuario: Usuario 
                        "apagada_por": quem_apagou.get(m.apagada_por_id, ""),
                        # a foto (ou figurinha) e o áudio dentro da mensagem (24/11/2026)
                        "anexo": m.anexo or "", "anexo_url": f"/conversas/anexo/{m.id}" if m.anexo else "",
+                       "anexo_nome": nomes_anexos.get(m.id_wl, "") if m.anexo == "documento" else "",
                        "pode_apagar": bool(pode_apagar) and not _motivo_para_nao_apagar(m)}
                       for m in mensagens],
         "enviando": [{"texto": p.texto, "quando": p.criado_em.strftime("%d/%m %H:%M"),
-                      "dia": p.criado_em.strftime("%Y-%m-%d"), "hora": p.criado_em.strftime("%H:%M")} for p in pendentes],
+                      "dia": p.criado_em.strftime("%Y-%m-%d"), "hora": p.criado_em.strftime("%H:%M"),
+                      "arquivo": nomes_arquivos.get(p.arquivo_id, "") if p.arquivo_id else ""} for p in pendentes],
         "lead": {"id": lead.id, "empresa": lead.empresa, "status": lead.status, "opt_out": lead.opt_out}
         if lead and pode_ver(usuario, lead) else None,
         # o mesmo contato também conversou por outro número da pessoa: a tela avisa e abre a de lá (24/11/2026)
@@ -435,8 +476,9 @@ def _em_partes(request: Request, dados: bytes, tipo: str, cabecalhos: dict) -> R
 @rotas.get("/conversas/anexo/{mid}")
 def anexo_da_mensagem(mid: int, request: Request, usuario: Usuario = Depends(exige("conversas.ver")),
                       db: Session = Depends(obter_db)):
-    """A foto (ou figurinha) e o áudio da mensagem (24/11/2026): dentro da conversa e, a foto, inteira numa aba nova
-    com um clique. Só nos números cujas conversas a pessoa vê (como a conversa)."""
+    """A foto (ou figurinha), o áudio e o arquivo mandado pela tela (24/11/2026): dentro da conversa e, com um clique,
+    inteiro numa aba nova (o PDF abre; Word, planilha e outros são baixados). Só nos números cujas conversas a pessoa
+    vê (como a conversa)."""
     m = db.execute(select(MensagemWhatsApp).where(MensagemWhatsApp.id == mid)).scalars().first()
     if m is None or not m.anexo or m.conexao not in _numeros(db, usuario):
         return JSONResponse({"erro": "Arquivo não encontrado."}, status_code=404)
@@ -444,10 +486,68 @@ def anexo_da_mensagem(mid: int, request: Request, usuario: Usuario = Depends(exi
                        .options(undefer(AnexoWhatsApp.dados))).scalars().first()
     if anexo is None or not anexo.dados:
         return JSONResponse({"erro": "Arquivo não encontrado."}, status_code=404)
-    nome = f"whatsapp-{mid}.{EXTENSOES_DO_ANEXO.get(anexo.tipo, 'bin')}"
+    nome = anexo.nome or f"whatsapp-{mid}.{EXTENSOES_DO_ANEXO.get(anexo.tipo, 'bin')}"
+    abre = tipo_de_anexo(anexo.tipo) != "documento" or anexo.tipo in ABRE_NO_NAVEGADOR
+    simples = re.sub(r"[^A-Za-z0-9._ -]", "_", nome)  # o nome com acento vai no filename* (RFC 6266)
     return _em_partes(request, anexo.dados, anexo.tipo or "application/octet-stream", {
         "Cache-Control": "private, max-age=86400", "Accept-Ranges": "bytes", "X-Content-Type-Options": "nosniff",
-        "Content-Disposition": f'inline; filename="{nome}"'})
+        "Content-Disposition": f"{'inline' if abre else 'attachment'}; filename=\"{simples}\"; "
+                               f"filename*=UTF-8''{quote(nome)}"})
+
+
+@rotas.post("/conversas/api/enviar-arquivo", dependencies=[Depends(verificar_csrf)])
+async def enviar_arquivo(request: Request, usuario: Usuario = Depends(exige("conversas.enviar")),
+                         db: Session = Depends(obter_db)):
+    """O 📎 da tela (pedido da Maria em 24/11/2026: "dê também a possibilidade de enviar arquivos"): o arquivo vai com o
+    texto como legenda. Foto sai como foto; PDF, Word, planilha, áudio, vídeo e os outros, como documento, com o nome.
+    Até 15 MB e só os tipos de TIPOS_DE_ARQUIVO. As mesmas regras do envio de texto: números que a pessoa vê, SAIR."""
+    form = await request.form()
+    arquivo = form.get("arquivo")
+    if arquivo is None or not hasattr(arquivo, "read"):
+        return JSONResponse({"erro": "Escolha o arquivo."}, status_code=400)
+    nome = _nome_do_arquivo(getattr(arquivo, "filename", "") or "")
+    tipo = TIPOS_DE_ARQUIVO.get(PurePosixPath(nome).suffix.lower())
+    if not tipo:
+        return JSONResponse({"erro": "Esse tipo de arquivo não pode ser enviado. Mande PDF, foto (JPG, PNG), Word, "
+                                     "Excel, PowerPoint, texto, XML, ZIP, áudio ou vídeo MP4."}, status_code=415)
+    dados = await arquivo.read(MAXIMO_ARQUIVO + 1)
+    if not dados:
+        return JSONResponse({"erro": "O arquivo está vazio."}, status_code=400)
+    if len(dados) > MAXIMO_ARQUIVO:
+        return JSONResponse({"erro": "O arquivo passa de 15 MB. Mande um arquivo menor."}, status_code=413)
+    texto = str(form.get("texto") or "").strip()
+    chave = util.com_nono_digito(str(form.get("telefone") or ""))
+    if not chave:
+        return JSONResponse({"erro": "Digite um celular com DDD, por exemplo (81) 99999-0000."}, status_code=400)
+    if not config.WHATSAPP_PONTE:
+        return JSONResponse({"erro": "Neste computador, use a tela Conversas do próprio WhatsApp Leads."}, status_code=400)
+    lead = sdr.lead_pelo_telefone(db, chave)
+    if lead and lead.opt_out:
+        return JSONResponse({"erro": "Este contato pediu para não receber mensagens (opt-out)."}, status_code=409)
+    digitado = str(form.get("nome") or "").strip()
+    contato = digitado[:200] or (lead.responsavel or lead.empresa if lead else "")
+    numero = str(form.get("numero") or "") or _numero_padrao(db, usuario)
+    if numero not in _numeros(db, usuario):
+        return JSONResponse({"erro": "Você ainda não tem número de WhatsApp. Conecte em WhatsApp > Meu WhatsApp "
+                                     "(ou peça ao administrador para compartilhar um número)."}, status_code=403)
+    guardado = ArquivoEnvio(nome=nome, tipo=tipo, dados=dados, tamanho=len(dados), usuario_id=usuario.id,
+                            hash=hashlib.sha256(dados).hexdigest())
+    db.add(guardado)
+    db.flush()
+    try:
+        whatsapp_leads.enviar("55" + chave, contato, texto, db=db, manual=True, usuario_id=usuario.id, conexao=numero,
+                              arquivo_id=guardado.id)
+    except whatsapp_leads.ErroWhatsAppLeads as erro:
+        db.rollback()
+        return JSONResponse({"erro": str(erro)}, status_code=409)
+    if lead:
+        historico(db, lead.id, "whatsapp", f"Arquivo enviado pela tela Conversas: {nome}"
+                  + (f" ({texto[:300]})" if texto else ""), usuario, canal="whatsapp")
+    if digitado and not db.get(ContatoWhatsApp, chave):
+        _salvar_nome(db, chave, digitado, usuario)  # nome digitado na "Nova mensagem" (se for desta AR)
+    db.commit()
+    aviso = "" if conexoes.situacao(numero).get("conectado") else "O celular está desconectado: o arquivo sai quando conectar."
+    return {"ok": True, "telefone": chave, "numero": numero, "aviso": aviso}
 
 
 @rotas.post("/conversas/api/mensagem/{mid}/apagar", dependencies=[Depends(verificar_csrf)])

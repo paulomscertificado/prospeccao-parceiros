@@ -202,6 +202,24 @@ embaixo; com um áudio tocando, a conversa não se redesenha até ele parar. As 
 WhatsApp Leads só baixa as novas). Vídeo, documento e visualização única (como no WhatsApp Web): só o rótulo. Teste: `testes/test_anexos_conversas.py` (e a
 parte 27 do `whatsapp-leads/testes/teste_ponta_a_ponta.py`).
 
+**Enviar arquivo (📎)** (24/11/2026, pedido da Maria: "dê também a possibilidade de enviar arquivos"):
+`POST /conversas/api/enviar-arquivo` (multipart: `arquivo`, `telefone`, `numero`, `texto` = legenda, `nome`; CSRF no
+cabeçalho; `conversas.enviar`, número entre os que a pessoa vê, opt-out e ponte como no envio de texto). Só as extensões
+de `conversas.TIPOS_DE_ARQUIVO` (o tipo vem da extensão, nunca do navegador), até `MAXIMO_ARQUIVO` (15 MB); o nome
+perde a pasta do computador (`_nome_do_arquivo`). O arquivo espera em `arquivos_envio` (fora do backup) e a
+`ponte_whatsapp` ganha `arquivo_id`; a troca manda `arquivo: {id, hash, tipo, nome}` e o computador baixa em
+`GET /api/ponte/arquivo/<id>` (senha da ponte) e confere o sha256. Confirmada a mensagem (`confirmados` com `id_wl`),
+`api._arquivo_enviado` passa o arquivo para `anexos_whatsapp` (com o nome) e apaga de `arquivos_envio`; com erro, só
+apaga. A cópia da mensagem (`_guardar_conversas`) ganha `anexo` = `imagem`/`audio`/`documento`
+(`conversas.tipo_de_anexo`). A conversa mostra o documento com 📄 e o nome (`anexo_nome`); `/conversas/anexo/<id>` abre
+PDF, foto e áudio no navegador e faz baixar o resto (`attachment`, nome em `filename*`). Enquanto sai, a bolha mostra
+📎 e o nome (`enviando[].arquivo`). Lista: a última mensagem como no WhatsApp (📷 Foto, 🎤 Áudio, 📄 nome). Arquivo que
+o WhatsApp Leads não confirmou em 7 dias sai de `arquivos_envio` (`leads_servico.apagar_conversas_antigas`). No WhatsApp
+Leads: `ponte_nuvem._baixar_arquivo` (um arquivo por mensagem em `dados/arquivos`), `mensagens.midia_tipo/midia_nome`;
+foto sai por `enviar_imagem`, o resto por `enviar_documento` (neonize `send_document`, com nome, tipo e legenda) e o
+arquivo sai de lá depois de enviado. Teste: `testes/test_enviar_arquivo.py` (e a parte 28 do
+`whatsapp-leads/testes/teste_ponta_a_ponta.py`).
+
 **Número vermelho do menu Conversas** (23/11/2026, pedido da Maria: "assim como oportunidades tem um contador de
 mensagens coloque também em conversas e api oficial"): `conexoes.mensagens_nao_lidas` = recebidas com `lida` falso nos
 números que a pessoa vê (`conexoes.acessiveis`, a soma das bolinhas da lista), calculado em `web.tela` com a AR de quem

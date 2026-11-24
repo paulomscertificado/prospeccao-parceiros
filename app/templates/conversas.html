@@ -70,6 +70,18 @@
                      min-height: 60px; border-radius: 8px; background: #eef1f5; }
   .bolha .foto:hover img { filter: brightness(.96); }
   .bolha .audio { display: block; width: 280px; max-width: 100%; height: 40px; margin: 2px 0 4px; }
+  /* arquivo mandado pela tela (📎, 24/11/2026): o nome, que abre (PDF) ou baixa (Word, planilha...) */
+  .bolha .documento { display: flex; align-items: center; gap: 8px; margin: 0 -4px 6px; padding: 9px 12px; border-radius: 8px;
+                      background: rgba(13, 59, 102, .06); color: var(--texto); text-decoration: none; max-width: 320px; }
+  .bolha .documento:hover { background: rgba(13, 59, 102, .11); }
+  .bolha .documento span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: .88rem; }
+  .anexar { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; flex-shrink: 0;
+            color: #6b7686; }
+  .anexar:hover { background: #f1f5fa; color: var(--azul); }
+  .anexar svg { width: 21px; height: 21px; }
+  .arquivo-escolhido { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 4px 8px; padding: 7px 10px;
+                       border: 1px solid var(--borda); border-radius: 10px; background: #f8fafc; font-size: .86rem; }
+  .arquivo-escolhido button { border: 0; background: transparent; cursor: pointer; color: #6b7686; font-size: .95rem; }
   .bolha .midia { font-style: italic; color: #4b5a6b; }
   .seguida { margin-top: 1px; }
 
@@ -148,7 +160,15 @@
           <div><label>Celular (com DDD)</label><input type="tel" id="novo-telefone" placeholder="(81) 99999-0000"></div>
           <div><label>Nome (opcional)</label><input type="text" id="novo-nome" placeholder="Como o contato vai aparecer"></div>
         </div>
+        <div id="arquivo-escolhido" class="arquivo-escolhido" hidden>📎 <b id="arquivo-nome"></b>
+          <span class="suave" id="arquivo-tamanho"></span><span class="pequeno suave">· o texto vai como legenda</span>
+          <button type="button" id="tirar-arquivo" title="Não mandar este arquivo" aria-label="Não mandar este arquivo">✕</button></div>
         <form id="form-enviar">
+          <label class="anexar" title="Enviar arquivo (foto, PDF, Word, planilha...)">
+            <input type="file" id="arquivo" hidden aria-label="Enviar arquivo"
+                   accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.xml,.zip,.rar,.mp3,.ogg,.m4a,.mp4">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.4 11.1l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2l-8.6 8.6a1.8 1.8 0 0 1-2.6-2.6l7.9-7.9"/></svg>
+          </label>
           <textarea id="texto" rows="1" placeholder="Escreva uma mensagem" aria-label="Mensagem"></textarea>
           <button class="enviar" id="botao-enviar" title="Enviar (Enter)" aria-label="Enviar">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.4 20.4l17.4-7.5a1 1 0 0 0 0-1.8L3.4 3.6a1 1 0 0 0-1.4 1.2L4.5 12l-2.5 7.2a1 1 0 0 0 1.4 1.2z"/></svg></button>
@@ -204,11 +224,26 @@ function textoMensagem(t) {
 function anexoMensagem(m) {
   const url = escapar(m.anexo_url);
   if (m.anexo === 'audio') return `<audio class="audio" controls preload="none" src="${url}"></audio>`;
+  if (m.anexo === 'documento') {  // o arquivo mandado pela tela (📎): o PDF abre numa aba nova; Word, planilha... baixam
+    return `<a class="documento" href="${url}" target="_blank" rel="noopener" title="Abrir ou baixar o arquivo">📄 `
+         + `<span>${escapar(m.anexo_nome || 'Arquivo')}</span></a>`;
+  }
   return `<a class="foto" href="${url}" target="_blank" rel="noopener" title="Abrir a imagem inteira numa aba nova">`
        + `<img src="${url}" alt="Imagem da conversa" loading="lazy"></a>`;
 }
-// com a foto ou o áudio na tela, sai o rótulo "[imagem]"/"[áudio]" e fica só a legenda
-const legendaDoAnexo = t => escapar((t || '').replace(/^\[(imagem|figurinha|áudio)\]\s*/, ''));
+// com a foto, o áudio ou o arquivo na tela, sai o rótulo ("[imagem]", "[áudio]", "[documento] nome") e fica a legenda
+const legendaDoAnexo = m => escapar(m.anexo === 'documento'
+  ? (m.texto || '').replace(/^\[documento\][^\n]*\n?/, '')
+  : (m.texto || '').replace(/^(🖼️\s*)?\[(imagem|figurinha|áudio|vídeo)\]\s*/u, ''));
+// a última mensagem na lista, como no WhatsApp: "📷 Foto", "🎤 Áudio", "📄 nome do arquivo" (com a legenda, se tiver)
+const ROTULOS_DA_LISTA = { imagem: ['📷', 'Foto'], figurinha: ['🏷️', 'Figurinha'], 'áudio': ['🎤', 'Áudio'],
+                           'vídeo': ['🎬', 'Vídeo'], documento: ['📄', 'Documento'] };
+function previaDaLista(t) {
+  const m = (t || '').match(/^(?:🖼️\s*)?\[(imagem|figurinha|áudio|vídeo|documento)\]\s*([\s\S]*)$/u);
+  if (!m) return (t || '').replace(/\s+/g, ' ');
+  const [icone, nome] = ROTULOS_DA_LISTA[m[1]];
+  return icone + ' ' + (m[2].replace(/\s+/g, ' ').trim() || nome);
+}
 function rotuloDia(dia) {
   const hoje = new Date(); const d = new Date(dia + 'T12:00:00');
   const dif = Math.round((new Date(hoje.toDateString()) - new Date(d.toDateString())) / 86400000);
@@ -251,7 +286,7 @@ async function carregarLista(forcar) {
       <div class="avatar" style="background:${cor(c.telefone)}">${escapar(iniciais(c.nome, c.telefone))}</div>
       <div class="info">
         <div class="linha"><span class="nome">${escapar(c.nome || c.telefone_formatado)}</span><span class="hora">${c.quando}</span></div>
-        <div class="linha"><span class="previa">${c.ultima_direcao === 'saida' && !c.ultima_apagada ? 'Você: ' : ''}${escapar(c.ultima.replace(/\s+/g, ' '))}</span>
+        <div class="linha"><span class="previa">${c.ultima_direcao === 'saida' && !c.ultima_apagada ? 'Você: ' : ''}${escapar(previaDaLista(c.ultima))}</span>
           ${c.nao_lidas ? `<span class="qtd">${c.nao_lidas}</span>` : ''}</div>
         ${d.varios_numeros && !filtroNumero() ? `<div class="pequeno suave">📱 ${escapar(c.numero_nome)}</div>` : ''}
       </div>
@@ -307,7 +342,8 @@ async function carregarConversa(rolar, forcar) {
     const dica = m.erro || (dados ? (m.pode_apagar ? 'Clique para ver os dados da mensagem ou apagar para todos' : 'Clique para ver os dados da mensagem') : '');
     const comAnexo = m.anexo && !m.apagada;  // a foto ou o áudio dentro da mensagem, com a legenda embaixo
     html += `<div class="${classes.join(' ')}"${dados} title="${escapar(dica)}">${comAnexo ? anexoMensagem(m) : ''}`
-          + `<span class="texto">${m.apagada ? APAGADA : (comAnexo ? legendaDoAnexo(m.texto) : textoMensagem(m.texto))}</span>`
+          + `<span class="texto">${m.apagada ? APAGADA : (comAnexo ? legendaDoAnexo(m) : (m.enviando && m.arquivo
+              ? '📎 <b>' + escapar(m.arquivo) + '</b>' + (m.texto ? '<br>' + escapar(m.texto) : '') : textoMensagem(m.texto)))}</span>`
           + `<span class="meta">${m.hora}${situacao ? ' ' + situacao : ''}</span></div>`;
     direcaoAnterior = m.direcao;
   }
@@ -398,17 +434,49 @@ el('nova').addEventListener('click', () => {
   marcarAtiva();
 });
 
+// O 📎 (24/11/2026): o arquivo escolhido vai com o texto como legenda (até 15 MB)
+const MAXIMO_ARQUIVO = 15 * 1024 * 1024;
+function tirarArquivo() {
+  el('arquivo').value = ''; el('arquivo-escolhido').hidden = true;
+  el('texto').placeholder = 'Escreva uma mensagem';
+}
+el('arquivo').addEventListener('change', () => {
+  const arquivo = el('arquivo').files[0];
+  if (!arquivo) return tirarArquivo();
+  if (arquivo.size > MAXIMO_ARQUIVO) { alert('O arquivo passa de 15 MB. Escolha um arquivo menor.'); return tirarArquivo(); }
+  el('arquivo-nome').textContent = arquivo.name;
+  el('arquivo-tamanho').textContent = arquivo.size < 1024 * 1024 ? Math.max(1, Math.round(arquivo.size / 1024)) + ' KB'
+    : (arquivo.size / 1024 / 1024).toFixed(1).replace('.', ',') + ' MB';
+  el('arquivo-escolhido').hidden = false;
+  el('texto').placeholder = 'Legenda (opcional)';
+  el('texto').focus();
+});
+el('tirar-arquivo').addEventListener('click', tirarArquivo);
+
+async function mandarArquivo(dados, arquivo) {
+  const corpo = new FormData();
+  Object.entries(dados).forEach(([chave, valor]) => corpo.append(chave, valor));
+  corpo.append('arquivo', arquivo);
+  const r = await fetch('/conversas/api/enviar-arquivo', { method: 'POST', body: corpo,
+    headers: { 'X-CSRF-Token': document.querySelector('meta[name="csrf"]').content } });
+  let resposta = {};
+  try { resposta = await r.json(); } catch (e) { /* sem corpo */ }
+  if (!r.ok) throw new Error(resposta.erro || 'Não foi possível mandar o arquivo. Recarregue a página.');
+  return resposta;
+}
+
 async function enviar(ev) {
   ev.preventDefault();
   const texto = el('texto').value.trim();
-  if (!texto) return;
+  const arquivo = el('arquivo').files[0];
+  if (!texto && !arquivo) return;
   const dados = modoNovo ? { telefone: el('novo-telefone').value, nome: el('novo-nome').value, texto,
                              numero: filtroNumero() || numeroAtual }
                          : { telefone: atual, texto, numero: numeroAtual };
   el('botao-enviar').disabled = true;
   try {
-    const r = await postarJSON('/conversas/api/enviar', dados);
-    el('texto').value = ''; ajustarAltura();
+    const r = arquivo ? await mandarArquivo(dados, arquivo) : await postarJSON('/conversas/api/enviar', dados);
+    el('texto').value = ''; ajustarAltura(); tirarArquivo();
     if (r.aviso) aviso(r.aviso);
     abrir(r.telefone, r.numero);
   } catch (e) { alert(e.message); }
