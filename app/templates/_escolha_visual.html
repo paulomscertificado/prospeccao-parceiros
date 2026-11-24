@@ -1,49 +1,82 @@
-{# Escolha do visual (HTML do e-mail e imagem do WhatsApp) — o mesmo bloco na Nova campanha (IA SDR) e nas Empresas novas.
-   Usa do contexto: visuais (lista), visual_atual (id), visual_canais ("email,whatsapp"), visual_toques,
-   email_html_liberado (o módulo "E-mail em HTML com a marca" está liberado para a marca) e email_html_atual. #}
-<div class="bloco-visual">
-  {% if email_html_liberado %}
-  <div class="cartoes-escolha" style="margin-bottom:12px">
-    <label class="escolha"><input type="checkbox" name="email_html" {{ 'checked' if email_html_atual is not sameas false }}>
+{# "Como enviar a campanha": texto ou HTML (pedido da Maria em 23/11/2026: "organize melhor a área de criação de
+   campanhas, pois está bem confuso com relação ao HTML ... crie um botão de como ele pode enviar a campanha" e "quando for
+   HTML coloque para ele selecionar o modelo que vai usar naquele envio"). O mesmo bloco na Nova campanha (IA SDR) e nas
+   Empresas novas. Usa do contexto: visuais (os modelos desta área), email_html_liberado (o módulo "E-mail em HTML com a
+   marca" da marca) e envio ({"modo", "modelo", "toques"}: visual.envio_atual, o que vem marcado). O formulário manda
+   envio_html, visual_id e visual_toques (visual.escolha_do_envio). #}
+<div class="bloco-visual" id="como-enviar">
+  {% if visuais or email_html_liberado %}
+  <div class="cartoes-escolha" role="radiogroup" aria-label="Como enviar a campanha">
+    {% for modo, titulo, ajuda in [
+        ('whatsapp_email', '💬✉️ WhatsApp e e-mail com HTML', 'O e-mail vai com o HTML do modelo e o WhatsApp com a imagem dele.'),
+        ('whatsapp', '💬 WhatsApp apenas com HTML', 'O WhatsApp vai com a imagem do modelo. O e-mail vai em texto.'),
+        ('email', '✉️ E-mail apenas com HTML', 'O e-mail vai com o HTML do modelo. O WhatsApp vai em texto.'),
+        ('texto', '📝 Apenas mensagens de texto', 'Sem HTML: o e-mail e o WhatsApp vão só em texto.')] %}
+    <label class="escolha"><input type="radio" name="envio_html" value="{{ modo }}" required {{ 'checked' if envio.modo == modo }}>
       <span class="escolha-corpo"><span class="escolha-marca" aria-hidden="true">✓</span>
-        <b>✉️ E-mail em HTML com a marca</b><span class="pequeno suave">do 2º e-mail em diante, com o logo e a cor da
-          marca (o 1º vai só em texto). <a href="/visuais#marca" target="_blank" rel="noopener">Ver a prévia</a></span></span></label>
+        <b>{{ titulo }}</b><span class="pequeno suave">{{ ajuda }}</span></span></label>
+    {% endfor %}
   </div>
-  {% endif %}
-  {% if visuais %}
-  <div class="campos" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)">
-    <div><label for="visual_id">Sua arte (visual)</label>
-      <select name="visual_id" id="visual_id">
-        <option value="">Nenhuma arte</option>
-        {% for v in visuais %}<option value="{{ v.id }}" {{ 'selected' if visual_atual == v.id }}>{{ v.nome }}{{ '' if (v.html or '').strip() else ' (ainda sem HTML)' }}{{ '' if v.imagem_hash else ' (ainda sem imagem)' }}</option>{% endfor %}
-      </select></div>
-    <div><label>Em quais toques</label>
-      <select name="visual_toques">
-        <option value="seguintes" {{ 'selected' if visual_toques != 'todos' }}>Do 2º toque em diante (recomendado)</option>
-        <option value="todos" {{ 'selected' if visual_toques == 'todos' }}>Em todos os toques</option>
-      </select></div>
+  <div id="modelo-html" style="margin-top:12px" {{ 'hidden' if envio.modo == 'texto' }}>
+    <div class="campos" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)">
+      <div><label for="visual_id">Modelo de HTML deste envio *</label>
+        <select name="visual_id" id="visual_id">
+          <option value="">Escolha o modelo…</option>
+          {% for v in visuais %}<option value="{{ v.id }}" data-previa="/visuais/{{ v.id }}" data-html="{{ '1' if (v.html or '').strip() }}" data-imagem="{{ '1' if v.imagem_hash }}" {{ 'selected' if envio.modelo == v.id|string }}>{{ v.nome }}</option>{% endfor %}
+          {% if email_html_liberado %}<option value="marca" data-previa="/visuais#marca" data-html="1" {{ 'selected' if envio.modelo == 'marca' }}>E-mail com a marca (logo e cor, feito pelo sistema)</option>{% endif %}
+        </select>
+        <a id="previa-modelo" class="pequeno" href="/visuais" target="_blank" rel="noopener" hidden>Ver a prévia do modelo ↗</a></div>
+      <div id="campo-toques"><label for="visual_toques">Em quais toques</label>
+        <select name="visual_toques" id="visual_toques">
+          <option value="seguintes" {{ 'selected' if envio.toques != 'todos' }}>Do 2º toque em diante (recomendado)</option>
+          <option value="todos" {{ 'selected' if envio.toques == 'todos' }}>Em todos os toques</option>
+        </select></div>
+    </div>
+    <div class="aviso aviso-alerta" id="aviso-modelo" style="margin:8px 0 0" hidden></div>
+    <p class="ajuda">O 1º toque vai em texto e, do 2º em diante, vai só o HTML. A imagem no WhatsApp só vai para quem
+      <b>já conversou {{ marca.frase('com') }}</b>; para contato frio sai só o texto (proteção do número).
+      {% if pode('templates.editar') %}<a href="/visuais">Ver e cadastrar modelos</a>.{% endif %}</p>
   </div>
-  <div class="aviso aviso-alerta" id="sem-arte" style="margin:8px 0 0" {{ 'hidden' if visual_atual }}>⚠️ <b>Nenhuma arte escolhida:</b> os e-mails não levam a sua arte (visual).{% if email_html_liberado %} O “E-mail em HTML com a marca” é outro e-mail, mais simples, feito pelo sistema com o logo e a cor da marca.{% endif %} Para mandar a sua arte, escolha-a em “Sua arte (visual)”.</div>
   <script>
-  (function () {  // o aviso some quando a arte é escolhida (pedido da Maria em 23/11/2026: duas campanhas saíram sem a arte)
-    const arte = document.getElementById("visual_id"), aviso = document.getElementById("sem-arte");
-    if (!arte || !aviso) return;
-    const mostrar = () => { aviso.hidden = !!arte.value; };
-    arte.addEventListener("change", mostrar);
-    mostrar();
+  (function () {  // o modelo aparece só com HTML; "E-mail com a marca" serve só para o e-mail (23/11/2026)
+    const bloco = document.getElementById("como-enviar"), modelo = document.getElementById("visual_id");
+    const area = document.getElementById("modelo-html"), toques = document.getElementById("campo-toques");
+    const aviso = document.getElementById("aviso-modelo"), previa = document.getElementById("previa-modelo");
+    const daMarca = modelo.querySelector('option[value="marca"]');
+    function atualizar() {
+      const marcado = bloco.querySelector('input[name="envio_html"]:checked');
+      const modo = marcado ? marcado.value : "texto", comHtml = modo !== "texto";
+      const zap = modo === "whatsapp_email" || modo === "whatsapp", email = modo === "whatsapp_email" || modo === "email";
+      area.hidden = !comHtml;
+      modelo.required = comHtml;
+      if (daMarca) {
+        daMarca.hidden = daMarca.disabled = modo !== "email";
+        if (modelo.value === "marca" && modo !== "email") modelo.value = "";
+      }
+      const op = modelo.selectedOptions[0];
+      toques.hidden = modelo.value === "marca";
+      previa.hidden = !modelo.value;
+      if (op && op.dataset.previa) previa.href = op.dataset.previa;
+      const faltas = [];
+      if (comHtml && modelo.value && modelo.value !== "marca") {
+        const nome = op.textContent.trim();
+        if (zap && !op.dataset.imagem) faltas.push("O modelo “" + nome + "” ainda não tem imagem para o WhatsApp: o WhatsApp vai em texto até você cadastrar a imagem em Campanhas > Visuais.");
+        if (email && !op.dataset.html) faltas.push("O modelo “" + nome + "” ainda não tem HTML: o e-mail vai em texto.");
+      }
+      // o canal da campanha desmarcado (Canais, na mesma tela): o HTML dele não teria por onde sair
+      const canal = nome => document.querySelector('input[name="canais"][value="' + nome + '"], input[name="canal_' + nome + '"]');
+      if (zap && canal("whatsapp") && !canal("whatsapp").checked) faltas.push("O canal WhatsApp da campanha está desmarcado: marque-o para o WhatsApp sair com a imagem.");
+      if (email && canal("email") && !canal("email").checked) faltas.push("O canal E-mail da campanha está desmarcado: marque-o para o e-mail sair com o HTML.");
+      aviso.textContent = faltas.join(" ");
+      aviso.hidden = !faltas.length;
+    }
+    document.addEventListener("change", atualizar);
+    atualizar();
   })();
   </script>
-  <div style="margin-top:6px">
-    <label class="marcar"><input type="checkbox" name="visual_email" {{ 'checked' if 'email' in (visual_canais or 'email') }}> ✉️ E-mail com o HTML do visual</label>
-    <label class="marcar"><input type="checkbox" name="visual_whatsapp" {{ 'checked' if 'whatsapp' in (visual_canais or '') }}> 💬 WhatsApp com a imagem do visual (o texto vai embaixo)</label>
-  </div>
-  <p class="ajuda">A imagem no WhatsApp só vai para quem <b>já conversou {{ marca.frase('com') }}</b>; para contato frio sai só o texto (proteção do número).
-    O 1º contato frio costuma responder melhor só com texto, por isso o padrão é usar o visual do 2º toque em diante:
-    o 1º toque vai em texto e, do 2º em diante, vai só o HTML (com uma arte que é o e-mail inteiro, o texto do toque não vai).
-    <a href="/visuais">Ver e cadastrar visuais</a>.</p>
   {% else %}
-  <p class="ajuda" style="margin:0">{% if email_html_liberado %}Visual próprio (opcional): nenhum cadastrado ainda. Sem ele,
-    vale o e-mail com a marca acima.{% else %}Nenhum visual cadastrado ainda: as mensagens saem só com texto.{% endif %}
-    {% if pode('templates.editar') %}<a href="/visuais">Cadastrar um visual</a> (HTML do e-mail e imagem do WhatsApp).{% endif %}</p>
+  <input type="hidden" name="envio_html" value="texto">
+  <p class="ajuda" style="margin:0">Nenhum modelo de HTML cadastrado ainda: as mensagens saem só com texto.
+    {% if pode('templates.editar') %}<a href="/visuais">Cadastrar um modelo</a> (HTML do e-mail e imagem do WhatsApp).{% endif %}</p>
   {% endif %}
 </div>

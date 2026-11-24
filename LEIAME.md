@@ -156,10 +156,12 @@ visual: o **HTML do e-mail** (cole o código; escreva `{{mensagem}}` onde entra 
 `{{empresa}}`, `{{cidade}}`, `{{vendedor}}` e `{{descadastro}}` se quiser), a **imagem do WhatsApp** (PNG ou JPG, até
 1 MB) e as **imagens que o HTML usa** (cada uma ganha um endereço para colar no HTML). A tela mostra a prévia do e-mail
 e do WhatsApp e manda um e-mail de teste para você.
-- Na **Nova campanha (IA SDR)** e na configuração das **Empresas novas** (passo 5) escolha o visual, os canais (e-mail,
-  WhatsApp) e os toques: **do 2º toque em diante** (recomendado: o 1º contato frio responde melhor só com texto) ou
-  **em todos**. A arte se escolhe no campo **Sua arte (visual)**: com "Nenhuma arte", a tela avisa em amarelo que os
-  e-mails não levam a sua arte. O **E-mail em HTML com a marca** é outro e-mail, mais simples, feito pelo sistema.
+- Na **Nova campanha (IA SDR)** (passo 4) e na configuração das **Empresas novas** (passo 5), **Como enviar a
+  campanha** tem 4 botões: **WhatsApp e e-mail com HTML**, **WhatsApp apenas com HTML**, **E-mail apenas com HTML** e
+  **Apenas mensagens de texto**. Com HTML, escolha o **Modelo de HTML deste envio** (uma das suas artes ou, só para o
+  e-mail, o **E-mail com a marca**, feito pelo sistema com o logo e a cor) e os toques: **do 2º toque em diante**
+  (recomendado: o 1º contato frio responde melhor só com texto) ou **em todos**. A tela avisa se o modelo ainda não tem a
+  imagem do WhatsApp ou o HTML do e-mail. A Nova campanha vem com a escolha da sua última campanha.
 - Empresa sem o nome do responsável: o "Olá, {{nome}}!" da arte vira "Olá!".
 - **Regra do HTML:** o 1º toque vai em texto e, do 2º em diante, vai **só o HTML**. Com uma arte que é o e-mail
   inteiro (sem `{{mensagem}}`, como a "Escritorios contabeis"), o texto do toque não vai: a cópia em texto que segue

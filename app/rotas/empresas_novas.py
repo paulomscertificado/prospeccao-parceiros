@@ -37,6 +37,10 @@ def tela_empresas_novas(request: Request, usuario: Usuario = Depends(exige("camp
         "limite_teste": empresas_novas.LIMITE_TESTE, "quantidades": empresas_novas.QUANTIDADES_BUSCA,
         "limite_frios": ler_config_int(db, "limite_frios_whatsapp", 0),
         "visuais": visual.disponiveis(db, "empresas_novas"),
+        "envio": visual.envio_atual(db, util.para_int(empresas_novas.cfg(db, "novas_visual_id")),
+                                    empresas_novas.cfg(db, "novas_visual_canais"),
+                                    empresas_novas.cfg(db, "novas_visual_toques"),
+                                    empresas_novas.cfg(db, "novas_email_html") != "0"),
         "email_html_liberado": visual.html_da_marca_ligado(db),
         "vagas": vagas.para_tela(db, empresas_novas.dono(db)),  # vagas de WhatsApp do número de quem envia (23/11)
     })
@@ -117,6 +121,12 @@ async def configurar(request: Request, usuario: Usuario = Depends(exige("campanh
     if not canais:
         avisar(request, "Escolha pelo menos um canal (WhatsApp ou e-mail).", "erro")
         return voltar("/empresas-novas")
+    from .. import visual
+
+    escolha = visual.escolha_do_envio(db, form, "empresas_novas") if "envio_html" in form else None
+    if "envio_html" in form and escolha is None:  # "Como enviar as campanhas" com HTML e sem modelo (23/11/2026)
+        avisar(request, "Escolha o modelo de HTML do envio (ou \"Apenas mensagens de texto\").", "erro")
+        return voltar("/empresas-novas#configurar")
     maximo = max(1, min(500, util.para_int(form.get("maximo_dia")) or 60))
     hora = str(form.get("hora", "07:30"))[:5] or "07:30"
     dono_id = util.para_int(form.get("dono_id"))
@@ -128,14 +138,16 @@ async def configurar(request: Request, usuario: Usuario = Depends(exige("campanh
                              ("novas_dono_id", str(dono_id or "")),
                              ("novas_excluir_listas", "1" if form.get("excluir_listas") else "0")]:
         gravar_config(db, chave_cfg, valor)
-    from .. import visual
-
-    vid, canais_visual, toques = visual.escolha_do_formulario(db, form, "empresas_novas")
+    if escolha is not None:  # "Como enviar as campanhas"
+        vid, canais_visual, toques, email_html = escolha
+        gravar_config(db, "novas_email_html", "1" if email_html else "0")
+    else:  # formulário de antes: as caixinhas do visual e do e-mail com a marca
+        vid, canais_visual, toques = visual.escolha_do_formulario(db, form, "empresas_novas")
+        if visual.html_da_marca_ligado(db):  # o botão só aparecia com o módulo liberado para a marca
+            gravar_config(db, "novas_email_html", "1" if form.get("email_html") else "0")
     gravar_config(db, "novas_visual_id", str(vid or ""))
     gravar_config(db, "novas_visual_canais", canais_visual)
     gravar_config(db, "novas_visual_toques", toques)
-    if visual.html_da_marca_ligado(db):  # o botão só aparece com o módulo liberado para a marca
-        gravar_config(db, "novas_email_html", "1" if form.get("email_html") else "0")
     registrar_log(db, usuario, "configurou_empresas_novas", "configuracao", None, request=request)
     db.commit()
     if form.get("ativo") and not empresas_novas.chave_api():

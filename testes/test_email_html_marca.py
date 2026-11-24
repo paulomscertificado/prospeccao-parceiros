@@ -158,7 +158,9 @@ def test_botao_do_email_html_so_com_o_modulo_liberado(cliente, monkeypatch):
         _ligar(db, True)
     try:
         nova = cliente.get("/campanhas/nova").text
-        assert 'name="email_html" checked' in nova and "E-mail em HTML com a marca" in nova and "/visuais#marca" in nova
+        # "Como enviar a campanha" (23/11/2026): a marca é um modelo do "E-mail apenas com HTML"
+        assert 'name="email_html"' not in nova and 'value="marca"' in nova and "E-mail com a marca" in nova
+        assert "/visuais#marca" in nova
         monkeypatch.setattr(campanhas, "gerar_em_segundo_plano", lambda *a, **k: None)
         base = {"csrf": csrf_de(nova), "cidade": "Recife", "estado": "PE", "quantidade": "5", "categorias": ["contabil"],
                 "canais": ["email"], "tom": "consultivo", "objetivo": "Encontrar parceiros"}
@@ -175,7 +177,7 @@ def test_botao_do_email_html_so_com_o_modulo_liberado(cliente, monkeypatch):
 
         # Empresas novas: o botão vem marcado; desmarcado, as campanhas diárias saem em texto
         novas = cliente.get("/empresas-novas").text
-        assert 'name="email_html" checked' in novas
+        assert 'value="marca"' in novas and 'name="email_html"' not in novas
         cliente.post("/empresas-novas/configurar", data={
             "csrf": csrf_de(novas), "ufs": ["PE"], "canal_whatsapp": "on", "maximo_dia": "10", "hora": "07:30"})
         with sessao() as db:

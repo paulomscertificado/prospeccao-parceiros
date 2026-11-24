@@ -575,6 +575,9 @@ def nova_campanha(request: Request, pedido: str = "", base: str = "", usuario: U
     ultima_base = db.execute(select(Campanha.base).where(Campanha.usuario_id == usuario.id, Campanha.tipo == "parceiros")
                              .order_by(Campanha.criado_em.desc()).limit(1)).scalar()
     base = bases_importadas.escolher(db, base or ultima_base or "")
+    # "Como enviar a campanha" vem com a escolha da última campanha da IA SDR da pessoa (23/11/2026)
+    ultima_sdr = db.execute(select(Campanha).where(Campanha.usuario_id == usuario.id, Campanha.tipo == "parceiros")
+                            .order_by(Campanha.criado_em.desc(), Campanha.id.desc()).limit(1)).scalars().first()
     contagem = (bases_importadas.contar(db, base, entendido["estado"], entendido["cidade"])
                 if entendido and entendido.get("cidade") and entendido.get("estado") else {})
     if not contagem:
@@ -589,7 +592,7 @@ def nova_campanha(request: Request, pedido: str = "", base: str = "", usuario: U
         "categorias": db.execute(select(Categoria).where(Categoria.ativa.is_(True)).order_by(Categoria.prioridade)).scalars().all(),
         "cadencias": _cadencias_da_ia(db), "cadencia_sdr": campanhas.cadencia_sdr(db), "ia_ligada": ia.disponivel(),
         "visuais": visual.disponiveis(db, "sdr"),
-        "email_html_liberado": visual.html_da_marca_ligado(db), "email_html_atual": True,
+        "email_html_liberado": visual.html_da_marca_ligado(db), "envio": visual.envio_da_campanha(db, ultima_sdr),
         "whatsapp_sozinho_padrao": ler_config(db, "whatsapp_sozinho_padrao") != "0",
         "vagas": vagas.para_tela(db, usuario),  # as vagas de WhatsApp do número de quem cria (23/11/2026)
     })
@@ -640,9 +643,16 @@ async def criar_campanha(request: Request, usuario: Usuario = Depends(exige("cam
         whatsapp_sozinho=ler_config(db, "whatsapp_sozinho_padrao") != "0",  # regra desde 12/11/2026 (pedido da Maria)
         inicio=util.para_data(form.get("inicio")) or date.today(), status="gerando", personalizar_ia=ia.disponivel(),
     )
-    camp.visual_id, camp.visual_canais, camp.visual_toques = visual.escolha_do_formulario(db, form, "sdr")
-    # o botão só aparece com o módulo liberado para a marca; sem ele, a campanha segue o que a marca tiver depois
-    camp.email_html = bool(form.get("email_html")) if visual.html_da_marca_ligado(db) else True
+    if "envio_html" in form:  # "Como enviar a campanha" (23/11/2026): texto ou HTML, com o modelo deste envio
+        escolha = visual.escolha_do_envio(db, form, "sdr")
+        if escolha is None:
+            avisar(request, "Escolha o modelo de HTML deste envio (ou \"Apenas mensagens de texto\").", "erro")
+            return voltar("/campanhas/nova?pedido=" + util.chave_texto(str(form.get("pedido", "")))[:200])
+        camp.visual_id, camp.visual_canais, camp.visual_toques, camp.email_html = escolha
+    else:  # formulário de antes: as caixinhas do visual e do e-mail com a marca
+        camp.visual_id, camp.visual_canais, camp.visual_toques = visual.escolha_do_formulario(db, form, "sdr")
+        # o botão só aparecia com o módulo liberado para a marca; sem ele, a campanha segue o que a marca tiver depois
+        camp.email_html = bool(form.get("email_html")) if visual.html_da_marca_ligado(db) else True
     db.add(camp)
     db.flush()
     registrar_log(db, usuario, "criou_campanha", "campanha", camp.id,

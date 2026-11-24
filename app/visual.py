@@ -158,6 +158,60 @@ def escolha_do_formulario(db, form, secao: str, prefixo: str = "visual") -> tupl
     return visual.id, canais, toques if toques in TOQUES else "seguintes"
 
 
+# "Como enviar a campanha" (pedido da Maria em 23/11/2026: "crie um botão de como ele pode enviar a campanha"): os 4
+# botões da Nova campanha e das Empresas novas e o que cada um grava (visual_canais)
+ENVIOS = {
+    "whatsapp_email": "WhatsApp e e-mail com HTML",
+    "whatsapp": "WhatsApp apenas com HTML",
+    "email": "E-mail apenas com HTML",
+    "texto": "Apenas mensagens de texto",
+}
+CANAIS_DO_ENVIO = {"whatsapp_email": "email,whatsapp", "whatsapp": "whatsapp", "email": "email", "texto": ""}
+
+
+def envio_atual(db, visual_id: int | None, canais: str, toques: str, email_html: bool | None) -> dict:
+    """O que "Como enviar a campanha" mostra marcado, a partir do que está gravado (na campanha ou na configuração das
+    Empresas novas): {"modo": chave de ENVIOS, "modelo": id da arte ou "marca", "toques": ...}."""
+    toques = toques if toques in TOQUES else "seguintes"
+    arte = db.get(VisualCampanha, visual_id) if visual_id else None
+    marcados = {c for c in (canais or "").split(",") if c in CANAIS}
+    if arte is not None and arte.ativo and marcados:
+        modo = ("whatsapp_email" if marcados == {"email", "whatsapp"} else
+                "whatsapp" if marcados == {"whatsapp"} else "email")
+        return {"modo": modo, "modelo": str(arte.id), "toques": toques}
+    if email_html is not False and html_da_marca_ligado(db):
+        return {"modo": "email", "modelo": "marca", "toques": toques}
+    return {"modo": "texto", "modelo": "", "toques": toques}
+
+
+def envio_da_campanha(db, camp: Campanha | None) -> dict:
+    """envio_atual de uma campanha: a Nova campanha vem com a escolha da última campanha da pessoa (sem nenhuma, o
+    padrão de antes: o e-mail com a marca, se o módulo estiver liberado, senão só texto)."""
+    if camp is None:
+        return envio_atual(db, None, "", "seguintes", True)
+    return envio_atual(db, camp.visual_id, camp.visual_canais, camp.visual_toques, camp.email_html)
+
+
+def escolha_do_envio(db, form, secao: str) -> tuple[int | None, str, str, bool] | None:
+    """(visual_id, visual_canais, visual_toques, email_html) da escolha "Como enviar a campanha": envio_html (chave de
+    ENVIOS) e o modelo em visual_id (id da arte desta área ou "marca", que só serve para o e-mail). None = HTML sem um
+    modelo que sirva (a tela pede para escolher)."""
+    from . import util
+
+    modo = str(form.get("envio_html") or "texto")
+    toques = str(form.get("visual_toques") or "seguintes")
+    toques = toques if toques in TOQUES else "seguintes"
+    if modo not in ENVIOS or modo == "texto":
+        return None, "", toques, False
+    modelo = str(form.get("visual_id") or "")
+    if modelo == "marca":
+        return (None, "", toques, True) if modo == "email" and html_da_marca_ligado(db) else None
+    arte = db.get(VisualCampanha, util.para_int(modelo)) if util.para_int(modelo) else None
+    if arte is None or not arte.ativo or secao not in (arte.usar_em or "").split(","):
+        return None
+    return arte.id, CANAIS_DO_ENVIO[modo], toques, False
+
+
 def no_toque(camp: Campanha | None, indice: int) -> bool:
     """Este toque da cadência usa o visual? (indice 0 = primeiro contato)"""
     if camp is None or not camp.visual_id or not camp.visual_canais:

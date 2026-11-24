@@ -615,8 +615,14 @@ cliente rápido". Antes cada pessoa via só as respostas dos leads dela e tinha 
   (`novas_visual_id/canais/toques` na configuração, copiados para a campanha diária em `empresas_novas.criar_campanha`).
   `Campanha.visual_id`, `visual_canais` ("email,whatsapp") e `visual_toques` ("seguintes" ou "todos");
   `cadencias.aplicar` marca `Tarefa.com_visual` com `visual.no_toque` (índice do passo).
-  O campo chama "Sua arte (visual)" e, com "Nenhuma arte", mostra o aviso amarelo `#sem-arte` (23/11/2026: as campanhas
-  115 e 116 da Maria saíram sem a arte; ela achou que o "E-mail em HTML com a marca" era a arte).
+  "Como enviar a campanha" (23/11/2026, pedido da Maria: "organize melhor a área de criação de campanhas ... crie um
+  botão de como ele pode enviar a campanha"; antes as campanhas 115 e 116 saíram sem a arte porque o "E-mail em HTML
+  com a marca" parecia ser ela): 4 botões `envio_html` (`visual.ENVIOS`: whatsapp_email, whatsapp, email, texto) e,
+  com HTML, o modelo em `visual_id` (id da arte ou "marca", só para o e-mail) + `visual_toques`.
+  `visual.escolha_do_envio` devolve (visual_id, visual_canais, visual_toques, email_html) ou None (HTML sem modelo: a
+  tela avisa); `visual.envio_atual`/`envio_da_campanha` dão o que vem marcado (a Nova campanha repete a última
+  campanha da IA SDR da pessoa; as Empresas novas, a configuração `novas_*`). Formulário sem `envio_html` segue as
+  caixinhas de antes (`escolha_do_formulario` + `email_html`). Testes: `testes/test_como_enviar.py`.
   `visual.montar_html` tira a vírgula antes de um campo vazio ("Olá, {{nome}}!" sem o nome vira "Olá!"; antes "Olá, !").
 - Regra do HTML (23/11/2026, pedido da Maria: "você envia o primeiro toque em texto e no segundo toque o HTML apenas, e
   segue com HTML"): `visual.texto_que_vai` dá a versão em texto do e-mail; com a arte que é o e-mail inteiro
