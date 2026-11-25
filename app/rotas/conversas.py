@@ -21,6 +21,12 @@ anexos_whatsapp); a conversa mostra a foto e toca o áudio dentro da mensagem (/
 Enviar arquivo (24/11/2026, "dê também a possibilidade de enviar arquivos"): o 📎 da tela manda o arquivo
 (/conversas/api/enviar-arquivo, até 15 MB) com o texto como legenda. Ele espera em arquivos_envio até o WhatsApp Leads
 buscar (/api/ponte/arquivo/<id>); confirmada a mensagem, vira o anexo dela (a conversa mostra a foto ou o link).
+
+Apagar conversa (25/11/2026, pedido da Maria: "deletar a conversa com o determinado número"): o botão no topo da
+conversa tira do sistema, para toda a equipe, as mensagens com o contato por aquele número, com as fotos, os áudios e os
+arquivos (/conversas/api/apagar-conversa, permissão conversas.apagar). O WhatsApp Leads apaga a cópia de lá também
+(comando "apagar_conversa"), para a conversa não voltar. No WhatsApp do contato e no celular do número nada muda; o
+contato, o nome escolhido, a ficha do lead e o SAIR continuam, e a mensagem que ainda está saindo fica.
 """
 
 import hashlib
@@ -33,7 +39,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, Response
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.orm import Session, undefer
 
 from .. import autorizacao, config, conexoes, sdr, util
@@ -587,3 +593,42 @@ def situacao_do_apagar(pedido: int, usuario: Usuario = Depends(exige("conversas.
     if c is None or c.acao != "apagar_mensagem" or c.usuario_id != usuario.id:
         return JSONResponse({"erro": "Pedido não encontrado."}, status_code=404)
     return {"situacao": {"feito": "apagada", "erro": "erro"}.get(c.status, "esperando"), "erro": c.erro or ""}
+
+
+@rotas.post("/conversas/api/apagar-conversa", dependencies=[Depends(verificar_csrf)])
+async def apagar_conversa(request: Request, usuario: Usuario = Depends(exige("conversas.apagar")),
+                          db: Session = Depends(obter_db)):
+    """"Apagar conversa" (pedido da Maria em 25/11/2026): as mensagens com o contato pelo número saem do sistema para
+    toda a equipe, com as fotos, os áudios e os arquivos, e o WhatsApp Leads apaga a cópia de lá (comando
+    "apagar_conversa", até a última mensagem que veio de lá: a que chegar depois fica). A mensagem que ainda está saindo
+    (na fila) fica. Só nos números que a pessoa vê. No WhatsApp do contato e no celular do número nada muda."""
+    dados = await request.json()
+    chave = _chave(str(dados.get("telefone", "")))
+    numero = str(dados.get("numero") or "")
+    if not chave or numero not in _numeros(db, usuario):
+        return JSONResponse({"erro": "Conversa não encontrada."}, status_code=404)
+    if not config.WHATSAPP_PONTE:
+        return JSONResponse({"erro": "Neste computador, use a tela Conversas do próprio WhatsApp Leads."}, status_code=400)
+    linhas = db.execute(select(MensagemWhatsApp.id, MensagemWhatsApp.id_wl, MensagemWhatsApp.status)
+                        .where(MensagemWhatsApp.telefone == chave, MensagemWhatsApp.conexao == numero)).all()
+    apagar = [r for r in linhas if r.status != "na_fila"]  # a que ainda está saindo fica (e aparece quando sair)
+    if not apagar:
+        return JSONResponse({"erro": "Esta conversa não tem mensagens para apagar."}, status_code=409)
+    ids_wl = [r.id_wl for r in apagar]
+    db.execute(delete(AnexoWhatsApp).where(AnexoWhatsApp.id_wl.in_(ids_wl)).execution_options(synchronize_session=False))
+    db.execute(delete(MensagemWhatsApp).where(MensagemWhatsApp.id.in_([r.id for r in apagar]))
+               .execution_options(synchronize_session=False))
+    db.add(ComandoWhatsApp(acao="apagar_conversa", usuario_id=usuario.id, dados=json.dumps(
+        {"telefone": "55" + chave if len(chave) in (10, 11) else chave, "conexao": numero, "ate_id": max(ids_wl)})))
+    conexao = db.get(conexoes.ConexaoWhatsApp, numero)
+    nome_numero = conexao.nome if conexao and conexao.nome else numero
+    registrar_log(db, usuario, "apagou_conversa_whatsapp", "conversa_whatsapp", None,
+                  f"Apagar conversa (Conversas): {len(apagar)} mensagens com {chave}, pelo número {nome_numero}",
+                  request, modulo="Conversas")
+    lead = sdr.lead_pelo_telefone(db, chave)
+    if lead:  # a ficha do lead conta por que a conversa sumiu (sem o conteúdo)
+        historico(db, lead.id, "whatsapp", f"Conversa do WhatsApp apagada na tela Conversas ({len(apagar)} mensagens, "
+                                           f"pelo número {nome_numero}).", usuario, canal="whatsapp")
+    _mudou(db)  # as listas abertas (desta e de outras pessoas) tiram a conversa
+    db.commit()
+    return {"ok": True, "apagadas": len(apagar), "ficaram": len(linhas) - len(apagar)}

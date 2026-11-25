@@ -43,6 +43,7 @@
   .chat-topo .sub { font-size: .8rem; color: #6b7686; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .botao-icone { border: 0; background: transparent; color: #6b7686; border-radius: 8px; padding: 6px 8px; cursor: pointer; font: inherit; font-size: .8rem; }
   .botao-icone:hover { background: #f1f5fa; color: var(--azul); }
+  .botao-icone.perigo:hover { background: var(--erro-claro); color: var(--erro); }  /* "Apagar conversa" (25/11/2026) */
   .chat-topo form { display: flex; gap: 6px; align-items: center; flex: 1; }
   .chat-topo form input { max-width: 300px; }
 
@@ -154,6 +155,8 @@
           <button type="button" class="btn btn-pequeno" id="cancelar-nome">Cancelar</button>
         </form>
         <button type="button" class="botao-icone" id="editar-nome" title="Editar o nome do contato">✏️ Editar nome</button>
+        {% if ponte and pode('conversas.apagar') %}<button type="button" class="botao-icone perigo" id="apagar-conversa"
+          title="Apagar esta conversa do sistema (no WhatsApp do contato e no celular do número nada muda)">🗑️ Apagar conversa</button>{% endif %}
       </div>
       <div id="c-optout" class="aviso aviso-erro" style="display:none;margin:0;border-radius:0">Este contato pediu para não receber mensagens (opt-out).</div>
       <div id="c-outros" class="aviso aviso-info" style="display:none;margin:0;border-radius:0"></div>
@@ -505,10 +508,42 @@ document.addEventListener('novidades', e => {
   if (((e.detail || {}).novas || []).some(n => n.tipo === 'conversa')) { carregarLista(); carregarConversa(false); }
 });
 
-function fecharNome() { el('form-nome').style.display = 'none'; el('area-nome').style.display = ''; el('editar-nome').style.display = modoNovo ? 'none' : ''; }
+function fecharNome() {
+  el('form-nome').style.display = 'none'; el('area-nome').style.display = ''; el('editar-nome').style.display = modoNovo ? 'none' : '';
+  if (el('apagar-conversa')) el('apagar-conversa').style.display = modoNovo ? 'none' : '';
+}
 el('editar-nome').addEventListener('click', () => {
   el('area-nome').style.display = 'none'; el('editar-nome').style.display = 'none'; el('form-nome').style.display = 'flex';
+  if (el('apagar-conversa')) el('apagar-conversa').style.display = 'none';
   el('campo-nome').focus(); el('campo-nome').select();
+});
+
+// "Apagar conversa" (25/11/2026, pedido da Maria): as mensagens com o contato por este número saem do sistema para toda
+// a equipe (o WhatsApp Leads apaga a cópia de lá); no WhatsApp do contato e no celular do número nada muda
+function fecharConversa() {
+  atual = ''; assinatura = ''; marcaConversa = ''; mensagensNaTela = [];
+  el('area-conversa').style.display = 'none'; el('sem-conversa').style.display = '';
+  history.replaceState(null, '', '/conversas');
+  marcarAtiva();
+}
+if (el('apagar-conversa')) el('apagar-conversa').addEventListener('click', async () => {
+  if (!atual || modoNovo) return;
+  const botao = el('apagar-conversa');
+  const pelo = Object.keys(NOMES_NUMEROS).length > 1 ? ' pelo ' + (NOMES_NUMEROS[numeroAtual] || numeroAtual) : '';
+  if (!confirm('Apagar a conversa com ' + (el('c-nome').textContent || atual) + pelo + '?\n\n'
+               + 'As mensagens, as fotos, os áudios e os arquivos desta conversa saem do sistema para toda a equipe. '
+               + 'No WhatsApp do contato e no celular do número nada muda. O contato e a ficha do lead continuam.\n\n'
+               + 'Não dá para desfazer.')) return;
+  botao.disabled = true;
+  try {
+    const r = await postarJSON('/conversas/api/apagar-conversa', { telefone: atual, numero: numeroAtual });
+    aviso('Conversa apagada: ' + r.apagadas + (r.apagadas === 1 ? ' mensagem saiu' : ' mensagens saíram') + ' do sistema.'
+          + (r.ficaram ? (r.ficaram === 1 ? ' A mensagem que ainda está saindo continua na conversa.'
+                                          : ' As ' + r.ficaram + ' mensagens que ainda estão saindo continuam na conversa.') : ''));
+    if (r.ficaram) { assinatura = ''; carregarConversa(false, true); } else fecharConversa();
+    carregarLista(true);
+  } catch (e) { alert(e.message); }
+  botao.disabled = false;
 });
 el('cancelar-nome').addEventListener('click', fecharNome);
 el('form-nome').addEventListener('submit', async ev => {

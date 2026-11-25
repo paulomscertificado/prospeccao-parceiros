@@ -272,7 +272,8 @@ MAXIMO_ANEXO = 15 * 1024 * 1024
 async def ponte_anexo(request: Request, id_wl: int):
     """A foto, a figurinha ou o áudio da mensagem `id_wl` do WhatsApp Leads (senha da ponte; corpo = o arquivo, o tipo no
     content-type): fica em anexos_whatsapp e a tela Conversas mostra a foto e toca o áudio dentro da mensagem (pedido
-    da Maria em 24/11/2026). 409 = a mensagem ainda não chegou aqui (o computador manda de novo na próxima troca)."""
+    da Maria em 24/11/2026). 409 = a mensagem ainda não chegou aqui (o computador manda de novo na próxima troca); 410 =
+    ela já veio e não está mais aqui ("Apagar conversa", 25/11/2026): o computador não manda mais."""
     from ..modelos import AnexoWhatsApp
 
     if not _ponte_autorizada(request):
@@ -285,6 +286,8 @@ async def ponte_anexo(request: Request, id_wl: int):
         return JSONResponse({"erro": "arquivo vazio ou grande demais"}, status_code=413)
     with sessao() as db:
         m = db.execute(select(MensagemWhatsApp).where(MensagemWhatsApp.id_wl == id_wl)).scalars().first()
+        if m is None and id_wl <= ler_config_int(db, "wl_conv_ultimo_id", 0):
+            return JSONResponse({"erro": "a mensagem não está mais aqui (conversa apagada)"}, status_code=410)
         if m is None:
             return JSONResponse({"erro": "a mensagem ainda não chegou"}, status_code=409)
         anexo = db.execute(select(AnexoWhatsApp).where(AnexoWhatsApp.id_wl == id_wl)).scalars().first()

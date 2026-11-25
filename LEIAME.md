@@ -71,6 +71,13 @@ no navegador, de qualquer lugar: não precisa do `iniciar.bat`. O passo a passo 
   clique no ✕ ao lado do nome. Na conversa, o arquivo enviado aparece com o 📄 e o nome: clique para abrir (PDF) ou
   baixar (Word, planilha...). Vale também na **+ Nova mensagem** e segue as regras do envio de texto (o número que você
   usa, quem pediu SAIR não recebe).
+  **Apagar conversa** (desde 25/11/2026; administrador e gestor, ou quem tiver a permissão "Apagar conversas inteiras"
+  em Configurações > Papéis e permissões): abra a conversa e clique em **🗑️ Apagar conversa**, no alto (confirme). As
+  mensagens daquele contato **por aquele número**, com as fotos, os áudios e os arquivos, saem do sistema para toda a
+  equipe. **No WhatsApp do contato e no celular do número nada muda.** O contato, o nome que você deu a ele, a ficha do
+  lead e o pedido de SAIR continuam, e a ficha do lead ganha a anotação de que a conversa foi apagada. A mensagem que
+  ainda está saindo continua na conversa, e uma mensagem nova do contato abre a conversa de novo. A conversa do mesmo
+  contato por outro número não muda. **Não dá para desfazer.** A tela **API Oficial** não tem esse botão.
 - **Avisos como no WhatsApp:** com o sistema aberto no navegador (pode estar em outra aba), quando chega mensagem nas
   Conversas, no número oficial (API Oficial) ou uma resposta de campanha:
   - toca um **som**;

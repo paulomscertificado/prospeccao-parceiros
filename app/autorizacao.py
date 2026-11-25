@@ -130,6 +130,9 @@ CATALOGO = [
 
     Permissao("conversas.ver", "Comunicação", "Ver as conversas de WhatsApp", modulo="conversas", padrao="E"),
     Permissao("conversas.enviar", "Comunicação", "Responder pelas Conversas", modulo="conversas", padrao="E"),
+    # "Apagar conversa" (25/11/2026): some do sistema para toda a equipe e não volta; administrador e gestor por padrão
+    Permissao("conversas.apagar", "Comunicação", "Apagar conversas inteiras das Conversas (não dá para desfazer)",
+              modulo="conversas", padrao="G"),
     # Tela API Oficial (21/11/2026): as conversas do número oficial da Meta; a equipe toda acompanha as respostas
     Permissao("oficial.ver", "Comunicação", "Ver as conversas da API oficial do WhatsApp", modulo="api_oficial",
               padrao="E"),

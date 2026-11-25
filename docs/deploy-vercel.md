@@ -192,6 +192,20 @@ também a que o celular do número apagou), sem criar mensagem nova; `conversas_
 com `recibo_em` recente, e `_guardar_conversas` grava `apagada_em` e muda a versão das conversas (as listas abertas se
 atualizam). Recebida apagada = "🚫 Essa mensagem foi apagada pelo contato" (`conversas.APAGADA_PELO_CONTATO`, na
 bolha e na lista).
+**Apagar conversa** (25/11/2026, pedido da Maria: "deletar a conversa com o determinado número"): botão
+`#apagar-conversa` no topo da conversa aberta (só com a ponte ligada e a permissão `conversas.apagar`, nova no catálogo:
+administrador e gestor por padrão). `POST /conversas/api/apagar-conversa` `{"telefone", "numero"}` (CSRF; 404 se o
+número não está entre os que a pessoa vê, `_numeros`; 409 sem mensagem para apagar) apaga de `mensagens_whatsapp` as da
+conversa (telefone + número) que não estão `na_fila` e os `anexos_whatsapp` delas, cria o comando `apagar_conversa`
+`{"telefone": "55...", "conexao", "ate_id"}` (o maior `id_wl` apagado), registra `apagou_conversa_whatsapp` (telefone
+mascarado), anota no histórico do lead (sem o conteúdo) e muda a versão das conversas (as listas abertas tiram a
+conversa). No WhatsApp Leads, `integracao.apagar_conversa` apaga as mensagens do contato (`chave_telefone`, com ou sem o
+9) por aquele número até `ate_id`, menos as `na_fila`, e os arquivos que ainda estavam em `dados/anexos`; o lead de lá
+fica (SAIR, etiquetas, nome). Mensagem que chega depois tem `id_wl` maior e abre a conversa de novo. `/api/ponte/anexo/
+<id_wl>` responde 410 para mensagem que já veio (`id_wl` <= `wl_conv_ultimo_id`) e não está mais aqui, e o WhatsApp
+Leads tem o 410 em `RECUSA_DEFINITIVA` (com 409 ele tentaria para sempre e seguraria as fotos seguintes). Não mudam:
+`contatos_whatsapp`, o lead e o histórico dele, `mensagens` (Envios) e a conversa do contato por outro número. Teste:
+`testes/test_apagar_conversa.py` (e a parte 30 do `whatsapp-leads/testes/teste_ponta_a_ponta.py`).
 A tela API Oficial não tem o botão (não foi pedido; antes de fazer, conferir na Meta se a Cloud API apaga mensagem
 enviada: em 24/11/2026 a documentação só falava do aviso de mensagem apagada pelo cliente). Teste:
 `testes/test_apagar_mensagem.py` (e as partes 26 e 29 do `whatsapp-leads/testes/teste_ponta_a_ponta.py`).

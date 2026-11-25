@@ -269,14 +269,16 @@ def test_em_producao_so_modo_teste_conectado_o_envio_espera(cliente, nuvem, monk
         with pytest.raises(conexoes.SemNumero) as erro:
             conexoes.para_enviar(db, admin)
         assert "MODO TESTE" in str(erro.value) and "ainda não conectou" in str(erro.value)
-        # com um número de verdade conectado, sai por ele normalmente
+        # com um número de verdade conectado, sai por ele normalmente. O id não pode ser "u" + o id de alguém: esse é o
+        # número próprio da pessoa (antes era "u78", e o 78º usuário dos testes ficava com ele; 25/11/2026)
+        de_verdade = "u990078"
         _status_ponte(cliente, {"principal": {"conectado": True, "tipo": "teste", "estado_codigo": "conectado"},
-                                "u78": {"conectado": True, "tipo": "qr", "estado_codigo": "conectado"}})
-        if db.get(ConexaoWhatsApp, "u78") is None:
-            db.add(ConexaoWhatsApp(id="u78", nome="WhatsApp de verdade (produção)", compartilhada_todos=True))
+                                de_verdade: {"conectado": True, "tipo": "qr", "estado_codigo": "conectado"}})
+        if db.get(ConexaoWhatsApp, de_verdade) is None:
+            db.add(ConexaoWhatsApp(id=de_verdade, nome="WhatsApp de verdade (produção)", compartilhada_todos=True))
             db.flush()
-        assert conexoes.para_enviar(db, admin) == "u78"
-        db.delete(db.get(ConexaoWhatsApp, "u78"))
+        assert conexoes.para_enviar(db, admin) == de_verdade
+        db.delete(db.get(ConexaoWhatsApp, de_verdade))
 
 
 def test_regra_cada_usuario_dispara_pelo_proprio_numero(cliente, nuvem):
