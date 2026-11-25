@@ -1,0 +1,61 @@
+{# Quanto cabe por dia na marca (app/capacidade.py; pedido da Maria em 25/11/2026: "quantas empresas novas e quantas
+   campanhas eu consigo fazer no máximo diariamente de forma automática", com uma cadência de 4 toques, "nas marcas que
+   têm e-mail cadastrado"). c = capacidade.da_marca(...); com_nome = mostrar o nome da marca (o Admin Master vê o
+   quadro de cada marca). Na tela Campanhas; o estilo está no estilo.css (.capacidade). #}
+{% macro quadro_capacidade(c, com_nome=False) %}
+<details class="capacidade" id="capacidade-{{ c.ar }}">
+  <summary>
+    <span class="capacidade-icone" aria-hidden="true">📊</span>
+    <span class="capacidade-resumo"><b>Quanto cabe por dia{% if com_nome %} · {{ c.nome }}{% endif %}:</b>
+      {% if c.empresas %}com uma cadência de {{ c.toques }} toques, até <b>{{ c.empresas }} {{ 'empresa nova' if c.empresas == 1 else 'empresas novas' }} por dia</b> ({{ c.por_semana }} por semana), somando todas as campanhas{% if not c.whatsapp %}, só por e-mail{% elif not c.email %}, só por WhatsApp{% endif %}.
+      {% else %}nenhuma empresa nova por enquanto: falta um número de WhatsApp de verdade ou uma conta de e-mail que dispare.{% endif %}</span>
+    <span class="capacidade-abrir pequeno">Ver a conta</span>
+  </summary>
+  <div class="capacidade-corpo">
+    <div class="capacidade-canais">
+      <div class="capacidade-canal">
+        <div class="capacidade-rotulo">WhatsApp</div>
+        <div class="capacidade-numero">{{ c.zap_dia }} <span>por dia</span></div>
+        <p class="pequeno suave">Cada número de verdade manda até {{ c.zap_por_numero }} por dia: {{ c.zap_por_hora }} por hora (um a cada {{ c.zap_intervalo }}), das {{ c.horario }}, fora do almoço.</p>
+        <ul class="capacidade-lista">
+          {% for n in c.numeros %}<li class="{{ 'conta' if n.conta else 'nao-conta' }}"><span class="capacidade-marca" aria-hidden="true">{{ '✓' if n.conta else '✗' }}</span>
+            <b>{{ n.nome }}</b>{% if n.conta %}: {{ n.por_dia }} por dia{% if n.quem %} · disparam por ele: {{ n.quem|join(', ') }}{% endif %}{% else %}: não conta ({{ n.situacao }}){% endif %}</li>
+          {% else %}<li class="nao-conta"><span class="capacidade-marca" aria-hidden="true">✗</span> Nenhum número de WhatsApp cadastrado.</li>{% endfor %}
+        </ul>
+        {% if c.whatsapp %}<p class="capacidade-conta">{{ c.zap_por_numero }} ÷ {{ c.toques }} toques = <b>{{ c.zap_por_numero // c.toques }}</b> {{ 'empresa' if c.zap_por_numero // c.toques == 1 else 'empresas' }} por dia{% if c.numeros_de_verdade > 1 %} em cada número × {{ c.numeros_de_verdade }} números = <b>{{ c.whatsapp }}</b>{% endif %}</p>{% endif %}
+      </div>
+      <div class="capacidade-canal">
+        <div class="capacidade-rotulo">E-mail da marca</div>
+        <div class="capacidade-numero">{{ c.email_dia }} <span>por dia</span></div>
+        <p class="pequeno suave">{{ c.email_por_hora }} por hora (um a cada {{ c.email_intervalo }}), somando todas as contas de e-mail da marca.</p>
+        <ul class="capacidade-lista">
+          {% for conta in c.contas %}{% set dispara = conta.ativa and conta.quem %}<li class="{{ 'conta' if dispara else 'nao-conta' }}"><span class="capacidade-marca" aria-hidden="true">{{ '✓' if dispara else '✗' }}</span>
+            <b>{{ conta.nome }}</b>{% if not conta.ativa %}: pausada{% elif conta.quem %} · disparam por ela: {{ conta.quem|join(', ') }}{% else %}: ninguém dispara por ela{% endif %}</li>{% endfor %}
+        </ul>
+        {% if c.email %}<p class="capacidade-conta">{{ c.email_dia }} ÷ {{ c.toques }} toques = <b>{{ c.email }}</b> {{ 'empresa' if c.email == 1 else 'empresas' }} por dia</p>{% endif %}
+      </div>
+    </div>
+
+    <p class="capacidade-resultado">
+      {% if c.whatsapp and c.email %}Vale o menor dos dois: <b>{{ c.empresas }} {{ 'empresa nova' if c.empresas == 1 else 'empresas novas' }} por dia</b> nas campanhas com WhatsApp e e-mail, {{ c.por_semana }} por semana (o envio automático sai de segunda a sexta).
+      {% elif c.whatsapp %}Sem conta de e-mail que dispare, só o WhatsApp conta: <b>{{ c.empresas }} {{ 'empresa nova' if c.empresas == 1 else 'empresas novas' }} por dia</b>, {{ c.por_semana }} por semana (o envio automático sai de segunda a sexta).
+      {% elif c.email %}Sem número de WhatsApp de verdade, só o e-mail conta: <b>{{ c.empresas }} {{ 'empresa nova' if c.empresas == 1 else 'empresas novas' }} por dia</b>, {{ c.por_semana }} por semana (o envio automático sai de segunda a sexta).
+      {% else %}Por enquanto nenhuma empresa nova cabe: conecte um número de WhatsApp de verdade ou cadastre uma conta de e-mail que dispare.{% endif %}
+    </p>
+
+    <ul class="capacidade-notas">
+      {% if c.empresas and c.outras %}<li><b>Com outras cadências:</b> {% for o in c.outras %}{{ o.toques }} toques, {{ o.empresas }} por dia{{ '; ' if not loop.last else '.' }}{% endfor %}
+        Quanto menos toques, mais empresas novas cabem.</li>{% endif %}
+      <li><b>Quantas campanhas?</b> Não há limite: todas as campanhas da marca dividem estas vagas, e o que conta é a soma das empresas que entram por dia.
+        {% if c.por_campanha and c.empresas %}Cada campanha manda até {{ c.por_campanha }} mensagens por dia (WhatsApp e e-mail somados){% if c.campanhas_minimas > 1 %}: para usar tudo ({{ c.mensagens_dia }} mensagens por dia), deixe pelo menos {{ c.campanhas_minimas }} campanhas em andamento ao mesmo tempo.{% else %}: uma campanha em andamento já dá conta.{% endif %}{% endif %}</li>
+      <li><b>Passou disso?</b> Nada se perde: o que não cabe vai para o próximo dia com vaga, mas os envios começam a atrasar cada vez mais.</li>
+      {% if c.ocupacao.cabem %}<li><b>Agora:</b> {{ c.ocupacao.marcados }} de {{ c.ocupacao.cabem }} vagas de WhatsApp dos próximos {{ c.dias_ocupacao }} dias de envio já estão marcadas ({{ c.ocupacao.pct }}%){% if c.ocupacao_email.cabem %}; no e-mail, {{ c.ocupacao_email.marcados }} de {{ c.ocupacao_email.cabem }} ({{ c.ocupacao_email.pct }}%){% endif %}. Campanha que espera aprovação entra nas vagas quando é aprovada.</li>{% endif %}
+      {% if c.um_numero_a_mais %}<li><b>Mais um número:</b> cada número de WhatsApp de verdade a mais soma {{ c.um_numero_a_mais }} {{ 'empresa nova' if c.um_numero_a_mais == 1 else 'empresas novas' }} por dia, para as campanhas de quem dispara por ele.</li>{% endif %}
+    </ul>
+
+    {% if c.whatsapp_fora %}<p class="aviso aviso-alerta">O WhatsApp Leads não respondeu agora: não dá para saber quais números estão conectados. A conta do WhatsApp volta quando ele responder.</p>{% endif %}
+    {% if c.sem_numero %}<p class="aviso aviso-alerta"><b>Sem número de WhatsApp de verdade:</b> {{ c.sem_numero|join(', ') }}. Os WhatsApps das campanhas {{ 'dessa pessoa' if c.sem_numero|length == 1 else 'dessas pessoas' }} esperam: conecte um número em <a href="/whatsapp">WhatsApp</a> (ou peça um compartilhado).</p>{% endif %}
+    {% if c.sem_conta %}<p class="aviso aviso-alerta"><b>Sem conta de e-mail:</b> {{ c.sem_conta|join(', ') }}. Os e-mails das campanhas {{ 'dessa pessoa' if c.sem_conta|length == 1 else 'dessas pessoas' }} esperam: cadastre a conta em <a href="/email">Contas de e-mail</a> (ou peça uma compartilhada).</p>{% endif %}
+  </div>
+</details>
+{% endmacro %}

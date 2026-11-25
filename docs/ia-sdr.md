@@ -433,6 +433,34 @@ emails!". `app/vagas_email.py` faz o mesmo que `app/vagas.py`, com as regras do 
 Chave da CNPJá: Configurações > Integrações (`/configuracoes/cnpja`, `/configuracoes/cnpja/saldo`); saiu da tela
 Empresas novas, que virou um painel em 4 passos (estados por caixinha, `name="ufs"` repetido).
 
+## Quanto cabe por dia na marca (25/11/2026)
+
+Pedido da Maria: "faça um cálculo de quantas empresas novas e quantas campanhas eu consigo fazer no máximo diariamente
+de forma automática ... use uma cadência de 4 toques" e, com a conta pronta, "faça aparecer isso nas marcas que têm
+e-mail cadastrado no nosso sistema". `app/capacidade.py` faz a conta com as mesmas regras das vagas:
+
+- **WhatsApp:** cada número DE VERDADE da marca (`ConexaoWhatsApp.tenant_id`; conectado e fora do MODO TESTE, que só
+  simula) manda `whatsapp_por_dia` = soma de `vagas.vagas_por_hora` (horário da marca, fora do almoço, 20 min de folga)
+  até `limite_diario_whatsapp` e `limite_frios_whatsapp` (0 = sem limite). Quem dispara por cada número =
+  `conexoes.para_enviar` de cada pessoa ativa da marca (fora o portal; na AR MS também o Admin Master, `ars.PADRAO`); sem
+  número de verdade, a pessoa vai para `sem_numero`. Sem notícia do WhatsApp Leads (`whatsapp_fora`), ninguém é acusado.
+- **E-mail:** `vagas_email.por_dia` (os limites são da marca) se alguém da marca tem conta para disparar
+  (`contas_email.para_enviar`); quem não tem vai para `sem_conta`.
+- **Conta (`empresas_por_dia`):** com N toques (o toque "auto" da IA SDR manda um WhatsApp e um e-mail a quem tem os
+  dois), cabem (vagas do dia do número ÷ N), somando os números, e (e-mail do dia ÷ N); com os dois canais vale o menor.
+  Ex.: MS em 25/11/2026: 1 número de verdade (64/dia, 07:30-20:00) e 80 e-mails → 16 e 20 → **16 empresas novas por
+  dia**, 80 por semana (`DIAS_POR_SEMANA` = 5: o automático só sai de segunda a sexta). `outras` = 2, 3 e 5 toques.
+- **Campanhas:** sem limite de quantas (todas dividem as vagas); `campanhas_minimas` = mensagens do dia com a marca
+  cheia (empresas × N × canais) ÷ `limite_diario_campanha` (60 por campanha, WhatsApp e e-mail somados:
+  `mensagens.enviadas_hoje_campanha`). MS: 128 ÷ 60 → pelo menos 3 em andamento.
+- **Agora:** `vagas.resumo` de cada número de verdade e `vagas_email.resumo` da marca nos próximos 10 dias de envio
+  (marcados de quanto cabe).
+- **Tela:** `templates/_capacidade.html` (`quadro_capacidade`, `<details>` com o resultado no resumo e "Ver a conta") no
+  alto da tela Campanhas (`rotas/sdr.lista_campanhas` -> `capacidade.para_tela`): só para quem tem `campanhas.criar`,
+  só nas marcas com conta de e-mail cadastrada (`contas_da_marca`: a principal só se estiver configurada); quem é de
+  uma marca vê a dela; o Admin Master fora das marcas vê o de cada marca ativa (com o nome), dentro de uma, só o dela.
+- Testes: `testes/test_capacidade.py`.
+
 ## Reserva do lead por usuário (nov/2026)
 
 `app/reservas.py`. Campos em `leads`: `reservado_por_id`, `reservado_em`, `reservado_ate`.

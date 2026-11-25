@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_capacidade.html" import quadro_capacidade %}
 {% block titulo %}Campanhas{% endblock %}
 {% block conteudo %}
 <style>
@@ -49,6 +50,7 @@
   <div class="pedido"><input type="text" name="pedido" placeholder="Ex.: Quero encontrar parceiros entre empresas que atendem pequenas e médias empresas em São Paulo" aria-label="Pedido">
   <button class="btn btn-verde">Criar com a IA</button></div>
 </form>
+{% for c in capacidade %}{{ quadro_capacidade(c, capacidade|length > 1) }}{% endfor %}
 
 <div class="filtro-pilulas">
   {% for chave, nome in filtros.items() %}<a class="pilula {{ 'ativa' if ver == chave }}" href="?ver={{ chave }}{{ '&de=' ~ de if de }}">{{ nome }}</a>{% endfor %}

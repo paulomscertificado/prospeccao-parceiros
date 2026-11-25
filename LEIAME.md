@@ -294,6 +294,21 @@ preço nem comissão e não fecha parceria.
      próxima vaga. Ficam como estão a Renovação (tem prazo), os e-mails de quem ainda não tem conta de e-mail e o
      e-mail atrasado das Empresas novas cuja empresa ainda tem WhatsApp para sair: esse sai logo, sem esperar o
      WhatsApp.
+   **Quanto cabe por dia (desde 25/11/2026):** no alto da tela **Campanhas** aparece quantas empresas novas cabem por
+   dia no envio automático, somando todas as campanhas da marca. Com a cadência padrão de 4 toques, cada empresa recebe
+   4 WhatsApps e 4 e-mails, então cabem por dia as vagas do dia divididas por 4. Exemplo: um número de verdade
+   (64 WhatsApps por dia) e o e-mail da marca (80 por dia) dão 64 ÷ 4 = 16 e 80 ÷ 4 = 20; vale o menor: **16 empresas
+   novas por dia**, 80 por semana. Clique em **Ver a conta** para ver:
+   - os números e as contas de e-mail que contam e quem dispara por cada um (número em modo teste ou desconectado não
+     conta; cada número de verdade a mais soma mais empresas por dia);
+   - a mesma conta com cadências de 2, 3 e 5 toques;
+   - quantas campanhas precisam estar em andamento para usar tudo: não há limite de campanhas, mas cada uma manda até
+     60 mensagens por dia (WhatsApp e e-mail somados);
+   - quanto já está marcado nos próximos 10 dias de envio;
+   - num aviso amarelo, quem ainda não tem número de WhatsApp de verdade ou conta de e-mail (os envios dessas pessoas
+     esperam).
+   O quadro só aparece nas marcas com conta de e-mail cadastrada, para quem cria campanhas. O Admin Master vê o de
+   cada marca.
    Empresa com WhatsApp **e** e-mail recebe os dois em cada toque (nas Empresas novas, só o WhatsApp).
 5. Quando alguém responde com interesse, a automação para e a resposta aparece em **Oportunidades** (🔥), com o
    resumo, para a equipe toda. Quem estiver livre responde o cliente, clica em **Marcar como atendido** e segue com a

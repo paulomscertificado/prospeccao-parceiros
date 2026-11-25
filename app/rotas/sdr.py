@@ -544,9 +544,13 @@ def lista_campanhas(request: Request, ver: str = "todas", de: str = "", usuario:
     donos = autorizacao.filtrar(select(Campanha.usuario_id).distinct(), usuario, "campanhas.ver", Campanha.usuario_id)
     equipe_ = ([] if not autorizacao.escolhe_de_quem(usuario, "campanhas.ver") else
                sorted({uid for (uid,) in db.execute(donos) if uid}, key=lambda i: pessoas.get(i, "")))
+    # quanto cabe por dia na marca: quantas empresas novas as campanhas comportam (pedido da Maria em 25/11/2026)
+    from .. import capacidade
+
     return tela(request, "campanhas.html", {"campanhas": lista, "contagens": contagens, "ver": ver, "de": de,
                                             "filtros": FILTROS_CAMPANHA, "nomes_cat": nomes_cat, "pessoas": pessoas,
-                                            "equipe_campanhas": equipe_})
+                                            "equipe_campanhas": equipe_,
+                                            "capacidade": capacidade.para_tela(db, usuario)})
 
 
 def _cadencias_da_ia(db: Session) -> list[Cadencia]:

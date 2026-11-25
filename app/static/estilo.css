@@ -460,3 +460,34 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--foco); bord
 .vagas-zap .vaga-dia.cheio { border-color: #e9a3a3; background: #fff5f5; }
 .vagas-zap .vaga-dia.cheio b { color: #b42318; }
 .vagas-zap .vagas-nota { margin: 8px 0 0; }
+/* Quanto cabe por dia na marca (templates/_capacidade.html, app/capacidade.py; tela Campanhas) */
+.capacidade { background: var(--cartao); border: 1px solid var(--borda); border-radius: 14px; box-shadow: var(--sombra); margin: 0 0 14px; }
+.capacidade > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 10px; padding: 12px 16px; }
+.capacidade > summary::-webkit-details-marker { display: none; }
+.capacidade[open] > summary { border-bottom: 1px solid var(--borda); }
+.capacidade-icone { font-size: 1.15rem; }
+.capacidade-resumo { flex: 1; min-width: 0; }
+.capacidade-abrir { color: var(--azul); font-weight: 600; white-space: nowrap; }
+.capacidade-abrir::after { content: " ▸"; }
+.capacidade[open] .capacidade-abrir::after { content: " ▾"; }
+.capacidade-corpo { padding: 12px 16px 14px; }
+.capacidade-canais { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.capacidade-canal { border: 1px solid var(--borda); border-radius: 12px; padding: 12px 14px; background: #fbfcfe; }
+.capacidade-canal p { margin: 4px 0; }
+.capacidade-rotulo { color: var(--suave); font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.capacidade-numero { font-size: 1.5rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.capacidade-numero span { font-size: .85rem; font-weight: 500; color: var(--suave); }
+.capacidade-lista { list-style: none; margin: 6px 0; padding: 0; font-size: .85rem; }
+.capacidade-lista li { margin: 3px 0; }
+.capacidade-lista li.nao-conta { color: var(--suave); }
+.capacidade-marca { display: inline-block; width: 1.1em; font-weight: 700; color: var(--verde); }
+.capacidade-lista li.nao-conta .capacidade-marca { color: var(--erro); }
+.capacidade-conta { font-size: .85rem; }
+.capacidade-resultado { margin: 12px 0 0; padding: 10px 14px; border-radius: 10px; background: var(--azul-claro); color: var(--azul); }
+.capacidade-notas { margin: 10px 0 0; padding-left: 18px; font-size: .85rem; }
+.capacidade-notas li { margin: 5px 0; }
+.capacidade .aviso { margin: 10px 0 0; white-space: normal; }
+@media (max-width: 760px) {
+  .capacidade > summary { flex-wrap: wrap; }
+  .capacidade-canais { grid-template-columns: 1fr; }
+}
