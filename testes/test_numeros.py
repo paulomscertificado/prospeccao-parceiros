@@ -232,15 +232,18 @@ def test_numero_em_modo_teste_nunca_e_escolhido_se_houver_um_de_verdade(cliente,
     """Em 11 e 12/11/2026, 14 mensagens de campanha saíram pelo principal em MODO TESTE (o WhatsApp Leads só simula: não
     chegam), havendo um número de verdade conectado. O automático prefere sempre o de verdade; o escolhido para a
     campanha vale, mas a página da campanha avisa."""
+    # o id não pode ser "u" + o id de alguém: esse é o número próprio da pessoa (antes era "u77", e o 77º usuário dos
+    # testes ficava com ele; 25/11/2026)
+    de_verdade = "u990077"
     _status_ponte(cliente, {"principal": {"conectado": True, "tipo": "teste", "estado_codigo": "conectado"},
-                            "u77": {"conectado": True, "tipo": "qr", "estado_codigo": "conectado"}})
+                            de_verdade: {"conectado": True, "tipo": "qr", "estado_codigo": "conectado"}})
     with sessao() as db:
         admin = db.execute(select(Usuario).where(Usuario.perfil == "admin").order_by(Usuario.id)).scalars().first()
-        if db.get(ConexaoWhatsApp, "u77") is None:
-            db.add(ConexaoWhatsApp(id="u77", nome="WhatsApp de verdade (teste)", compartilhada_todos=True))
+        if db.get(ConexaoWhatsApp, de_verdade) is None:
+            db.add(ConexaoWhatsApp(id=de_verdade, nome="WhatsApp de verdade (teste)", compartilhada_todos=True))
         db.flush()
-        assert conexoes.em_modo_teste("principal") and not conexoes.em_modo_teste("u77")
-        assert conexoes.para_enviar(db, admin) == "u77"  # antes: o principal, em modo teste
+        assert conexoes.em_modo_teste("principal") and not conexoes.em_modo_teste(de_verdade)
+        assert conexoes.para_enviar(db, admin) == de_verdade  # antes: o principal, em modo teste
         camp = Campanha(nome="Campanha com número simulado", status="ativa", usuario_id=admin.id, canais="whatsapp",
                         conexao_id="principal", aprovado_em=agora())
         db.add(camp)
@@ -255,7 +258,7 @@ def test_numero_em_modo_teste_nunca_e_escolhido_se_houver_um_de_verdade(cliente,
         admin = db.execute(select(Usuario).where(Usuario.perfil == "admin").order_by(Usuario.id)).scalars().first()
         assert conexoes.para_enviar(db, admin) == "principal"
         db.get(Campanha, cid).status = "cancelada"
-        db.delete(db.get(ConexaoWhatsApp, "u77"))
+        db.delete(db.get(ConexaoWhatsApp, de_verdade))
 
 
 def test_em_producao_so_modo_teste_conectado_o_envio_espera(cliente, nuvem, monkeypatch):

@@ -130,9 +130,11 @@ CATALOGO = [
 
     Permissao("conversas.ver", "Comunicação", "Ver as conversas de WhatsApp", modulo="conversas", padrao="E"),
     Permissao("conversas.enviar", "Comunicação", "Responder pelas Conversas", modulo="conversas", padrao="E"),
-    # "Apagar conversa" (25/11/2026): some do sistema para toda a equipe e não volta; administrador e gestor por padrão
+    # "Apagar conversa" (25/11/2026): some do sistema para toda a equipe e não volta. A equipe toda, cada um nos números
+    # que vê (no mesmo dia, pedido da Maria: "não está aparecendo para as outras marcas", onde quem usa as Conversas é
+    # vendedor ou funcionário; escolheu "Todos"). Antes, só administrador e gestor (_liberar_apagar_conversa)
     Permissao("conversas.apagar", "Comunicação", "Apagar conversas inteiras das Conversas (não dá para desfazer)",
-              modulo="conversas", padrao="G"),
+              modulo="conversas", padrao="E"),
     # Tela API Oficial (21/11/2026): as conversas do número oficial da Meta; a equipe toda acompanha as respostas
     Permissao("oficial.ver", "Comunicação", "Ver as conversas da API oficial do WhatsApp", modulo="api_oficial",
               padrao="E"),
@@ -233,7 +235,25 @@ def preparar(db: Session) -> None:
                 db.add(PermissaoPapel(papel_id=papel.id, permissao=p.codigo, escopo=escopo))
         papel.permissoes_conhecidas = ",".join(sorted(conhecidas | {p.codigo for p in novas}))
     _aplicar_hierarquia(db, existentes)
+    _liberar_apagar_conversa(db, existentes)
     db.flush()
+
+
+def _liberar_apagar_conversa(db: Session, papeis: dict) -> None:
+    """Uma vez só (25/11/2026, pedido da Maria: "não está aparecendo para as outras marcas"; escolheu "Todos"): o
+    "Apagar conversa" nasceu só para administrador e gestor e passa para a equipe toda. Os papéis que já conheciam a
+    permissão sem tê-la ganham agora, com o padrão do perfil base; depois disso, o que o administrador tirar fica tirado."""
+    from .banco import gravar_config, ler_config
+
+    if ler_config(db, "permissoes_apagar_conversa_todos") == "1":
+        return
+    p = POR_CODIGO["conversas.apagar"]
+    for papel in papeis.values():
+        escopo = padrao_do_perfil(papel.base, p)
+        if escopo and db.execute(select(PermissaoPapel.id).where(PermissaoPapel.papel_id == papel.id,
+                                                                  PermissaoPapel.permissao == p.codigo)).first() is None:
+            db.add(PermissaoPapel(papel_id=papel.id, permissao=p.codigo, escopo=escopo))
+    gravar_config(db, "permissoes_apagar_conversa_todos", "1")
 
 
 def _aplicar_hierarquia(db: Session, papeis: dict) -> None:

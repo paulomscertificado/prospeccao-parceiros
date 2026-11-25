@@ -1,20 +1,21 @@
 """Conversas: "Apagar conversa" (25/11/2026, pedido da Maria: "faça a funcionalidade de deletar a conversa com o
 determinado número"). As mensagens com o contato por aquele número saem do sistema para toda a equipe, com as fotos, os
 áudios e os arquivos, e o WhatsApp Leads apaga a cópia de lá (comando "apagar_conversa" da ponte). A mensagem que ainda
-está saindo fica; o contato, a ficha do lead e o nome escolhido continuam. Só quem tem a permissão conversas.apagar
-(administrador e gestor por padrão), nos números que vê."""
+está saindo fica; o contato, a ficha do lead e o nome escolhido continuam. Permissão conversas.apagar: a equipe toda,
+cada um nos números que vê (no mesmo dia, "não está aparecendo para as outras marcas": nasceu só para administrador e
+gestor, e nas outras marcas quem usa as Conversas é vendedor ou funcionário; a Maria escolheu "Todos")."""
 
 import json
 
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
-from app import conexoes
-from app.banco import ler_config, sessao
+from app import autorizacao, conexoes
+from app.banco import gravar_config, ler_config, sessao
 from app.leads_servico import limpar_campos
 from app.main import app
-from app.modelos import (AnexoWhatsApp, ComandoWhatsApp, ContatoWhatsApp, Historico, Lead, LogAuditoria,
-                         MensagemWhatsApp, Usuario)
+from app.modelos import (AnexoWhatsApp, ComandoWhatsApp, ContatoWhatsApp, ExcecaoPermissao, Historico, Lead,
+                         LogAuditoria, MensagemWhatsApp, Papel, PermissaoPapel, Tenant, Usuario)
 from app.seguranca import limite_pedidos, resumir_senha
 from conftest import csrf_de
 
@@ -26,11 +27,11 @@ PONTE = {"x-token": TOKEN}
 JPEG = b"\xff\xd8\xff" + b"foto-da-conversa" * 8
 
 
-def _usuario(email: str, nome: str, perfil: str) -> int:
+def _usuario(email: str, nome: str, perfil: str, empresa: str = "") -> int:
     with sessao() as db:
         u = db.execute(select(Usuario).where(Usuario.email == email)).scalars().first()
         if not u:
-            u = Usuario(nome=nome, email=email, perfil=perfil, senha_hash=resumir_senha(SENHA))
+            u = Usuario(nome=nome, email=email, perfil=perfil, senha_hash=resumir_senha(SENHA), empresa_nome=empresa)
             db.add(u)
             db.flush()
         conexoes.minha(db, u, criar=True)
@@ -63,11 +64,15 @@ def _ids_da_conversa(telefone: str, numero: str) -> set:
                                                                    MensagemWhatsApp.conexao == numero)).scalars())
 
 
-def test_apagar_conversa(cliente, monkeypatch):
+def _ponte_ligada(monkeypatch):
     from app import config
 
     monkeypatch.setattr(config, "WHATSAPP_PONTE", True)
     monkeypatch.setattr(config, "WHATSAPP_PONTE_TOKEN", TOKEN)
+
+
+def test_apagar_conversa(cliente, monkeypatch):
+    _ponte_ligada(monkeypatch)
     gid = _usuario("gil.conversa@teste.com.br", "Gil Conversa", "gestor")
     fid = _usuario("fabio.conversa@teste.com.br", "Fábio Conversa", "funcionario")
     do_gil, do_fabio = f"u{gid}", f"u{fid}"
@@ -76,6 +81,8 @@ def test_apagar_conversa(cliente, monkeypatch):
         db.add(lead)
         limpar_campos(lead)
         db.add(ContatoWhatsApp(telefone=TELEFONE, nome="Dona da Conversa"))
+        # o administrador tirou do Fábio (exceção NEGAR): sem o botão e sem apagar
+        db.add(ExcecaoPermissao(usuario_id=fid, permissao="conversas.apagar", efeito="negar"))
         db.flush()
         lead_id = lead.id
     recebida, enviada, saindo, pelo_fabio, de_outro = _pela_ponte(cliente, [
@@ -93,7 +100,6 @@ def test_apagar_conversa(cliente, monkeypatch):
         assert db.execute(select(AnexoWhatsApp).where(AnexoWhatsApp.id_wl == recebida)).first()
     versao = ler_config_versao()
 
-    # o funcionário vê as conversas, mas não tem o botão nem pode apagar (nem a do próprio número)
     fabio, csrf_fabio = _entrar("fabio.conversa@teste.com.br")
     assert 'id="apagar-conversa"' not in fabio.get("/conversas").text
     r = fabio.post("/conversas/api/apagar-conversa", headers=csrf_fabio, json={"telefone": TELEFONE, "numero": do_fabio})
@@ -143,6 +149,61 @@ def test_apagar_conversa(cliente, monkeypatch):
     # só a que ainda vai sair ficou: não há mais o que apagar
     r = gil.post("/conversas/api/apagar-conversa", headers=csrf_gil, json={"telefone": TELEFONE, "numero": do_gil})
     assert r.status_code == 409 and "não tem mensagens" in r.json()["erro"]
+
+    # sem a exceção, o funcionário apaga como a equipe toda, mas só nos números que vê (o dele, não o do Gil)
+    with sessao() as db:
+        db.execute(delete(ExcecaoPermissao).where(ExcecaoPermissao.usuario_id == fid))
+    assert 'id="apagar-conversa"' in fabio.get("/conversas").text
+    r = fabio.post("/conversas/api/apagar-conversa", headers=csrf_fabio, json={"telefone": OUTRO, "numero": do_gil})
+    assert r.status_code == 404 and _ids_da_conversa(OUTRO, do_gil) == {de_outro}
+    r = fabio.post("/conversas/api/apagar-conversa", headers=csrf_fabio, json={"telefone": TELEFONE, "numero": do_fabio})
+    assert r.status_code == 200 and r.json()["apagadas"] == 1 and _ids_da_conversa(TELEFONE, do_fabio) == set()
+
+
+def test_vendedor_de_outra_marca_tambem_apaga(cliente, monkeypatch):
+    """"Não está aparecendo para as outras marcas" (25/11/2026): no Grupo Certy quem usa as Conversas é vendedor."""
+    _ponte_ligada(monkeypatch)
+    vid = _usuario("vera.conversa@grupocerty.com.br", "Vera Conversa", "vendedor", empresa="Grupo Certy")
+    with sessao() as db:
+        certy = db.execute(select(Tenant.id).where(Tenant.slug == "grupo-certy")).scalar()
+        assert db.get(Usuario, vid).tenant_id == certy  # pessoa do Grupo Certy
+    do_vera = f"u{vid}"
+    (da_vera,) = _pela_ponte(cliente, [{"telefone": "81955509003", "conexao": do_vera, "direcao": "entrada",
+                                        "texto": "Oi, Vera!", "status": "recebida", "origem": ""}])
+    vera, csrf_vera = _entrar("vera.conversa@grupocerty.com.br")
+    assert 'id="apagar-conversa"' in vera.get("/conversas").text
+    r = vera.post("/conversas/api/apagar-conversa", headers=csrf_vera, json={"telefone": "81955509003", "numero": do_vera})
+    assert r.status_code == 200 and r.json()["apagadas"] == 1 and _ids_da_conversa("81955509003", do_vera) == set()
+    assert da_vera
+
+
+def test_os_papeis_que_ja_existiam_ganham_o_apagar_conversa(cliente):
+    """No servidor a permissão nasceu só para administrador e gestor: os papéis que já a conheciam sem tê-la ganham uma
+    vez (autorizacao._liberar_apagar_conversa); depois, o que o administrador tirar fica tirado."""
+    with sessao() as db:
+        ids = {p.codigo: p.id for p in db.execute(select(Papel).where(Papel.codigo.in_(
+            ["funcionario", "vendedor", "parceiro"]))).scalars()}
+
+        def tem(codigo: str):
+            return db.execute(select(PermissaoPapel.escopo).where(PermissaoPapel.papel_id == ids[codigo],
+                                                                 PermissaoPapel.permissao == "conversas.apagar")).scalar()
+
+        def tirar(*codigos: str):
+            db.execute(delete(PermissaoPapel).where(PermissaoPapel.papel_id.in_([ids[c] for c in codigos]),
+                                                    PermissaoPapel.permissao == "conversas.apagar"))
+
+        try:
+            tirar("funcionario", "vendedor")  # como estava no servidor: só administrador e gestor
+            gravar_config(db, "permissoes_apagar_conversa_todos", "")
+            autorizacao.preparar(db)
+            assert (tem("funcionario"), tem("vendedor"), tem("parceiro")) == (autorizacao.TUDO, autorizacao.TUDO, None)
+            assert ler_config(db, "permissoes_apagar_conversa_todos") == "1"
+            tirar("vendedor")  # o administrador tirou do vendedor depois: não volta
+            autorizacao.preparar(db)
+            assert tem("vendedor") is None
+        finally:
+            if tem("vendedor") is None:  # devolve, para os outros testes
+                db.add(PermissaoPapel(papel_id=ids["vendedor"], permissao="conversas.apagar", escopo=autorizacao.TUDO))
 
 
 def ler_config_versao() -> str:

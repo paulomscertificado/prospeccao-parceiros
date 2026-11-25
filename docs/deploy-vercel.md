@@ -194,7 +194,10 @@ atualizam). Recebida apagada = "🚫 Essa mensagem foi apagada pelo contato" (`c
 bolha e na lista).
 **Apagar conversa** (25/11/2026, pedido da Maria: "deletar a conversa com o determinado número"): botão
 `#apagar-conversa` no topo da conversa aberta (só com a ponte ligada e a permissão `conversas.apagar`, nova no catálogo:
-administrador e gestor por padrão). `POST /conversas/api/apagar-conversa` `{"telefone", "numero"}` (CSRF; 404 se o
+a equipe toda, padrão `E`; nasceu só para administrador e gestor e, no mesmo dia, a Maria pediu para todos, "não está
+aparecendo para as outras marcas", onde quem usa as Conversas é vendedor ou funcionário:
+`autorizacao._liberar_apagar_conversa` dá uma vez aos papéis que já existiam, config `permissoes_apagar_conversa_todos`).
+`POST /conversas/api/apagar-conversa` `{"telefone", "numero"}` (CSRF; 404 se o
 número não está entre os que a pessoa vê, `_numeros`; 409 sem mensagem para apagar) apaga de `mensagens_whatsapp` as da
 conversa (telefone + número) que não estão `na_fila` e os `anexos_whatsapp` delas, cria o comando `apagar_conversa`
 `{"telefone": "55...", "conexao", "ate_id"}` (o maior `id_wl` apagado), registra `apagou_conversa_whatsapp` (telefone

@@ -100,7 +100,10 @@ O campo `padrao` de cada permissão reproduz o acesso de antes: `A` = só admini
 `proprios` nas permissões com alcance. `autorizacao.preparar` (chamado por `banco.criar_tabelas`)
 cria os papéis que faltam e, para cada permissão **nova** do catálogo (ainda fora de `permissoes_conhecidas`), dá o
 padrão do perfil base — nunca desfaz o que o administrador escolheu. O catálogo entra na versão do esquema, então a
-nuvem prepara o banco de novo quando uma permissão nova aparece.
+nuvem prepara o banco de novo quando uma permissão nova aparece. Mudar o `padrao` de uma permissão que os papéis já
+conhecem não chega a eles sozinho: precisa de um ajuste de uma vez só, guardado por uma configuração, como
+`_aplicar_hierarquia` (`permissoes_hierarquia`, 17/11/2026) e `_liberar_apagar_conversa`
+(`permissoes_apagar_conversa_todos`, 25/11/2026: "Apagar conversa" de administrador e gestor para a equipe toda).
 
 ## Como proteger uma rota nova
 
