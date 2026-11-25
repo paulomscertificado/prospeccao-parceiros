@@ -15,7 +15,7 @@ from ..banco import agora, ler_config, obter_db
 from ..leads_servico import historico, limpar_campos
 from ..modelos import (Cadencia, Campanha, Categoria, Conhecimento, Lead, Mensagem, Notificacao, Oportunidade, Tarefa,
                        Usuario)
-from ..seguranca import exige, registrar_log, ve_tudo, verificar_csrf
+from ..seguranca import diferencas, exige, registrar_log, ve_tudo, verificar_csrf
 from ..web import avisar, tela, voltar
 from .fila import DIAS_SEMANA
 
@@ -563,6 +563,33 @@ def _cadencias_da_ia(db: Session) -> list[Cadencia]:
     return da_ia or ativas
 
 
+TODAS_AS_CIDADES = "__todas__"  # "Todas as cidades do estado" na Nova campanha: só vale para lista importada
+
+
+def _contexto_da_tela_nova(db: Session, usuario: Usuario, dono: Usuario, base: str, entendido: dict | None,
+                           ultima: Campanha | None, envio_de: Campanha | None) -> dict:
+    """O que a tela da Nova campanha precisa, para criar ou para corrigir uma campanha (`dono` = de quem é a campanha:
+    os números e as vagas de WhatsApp são os dele). `entendido` = o que já vem marcado (cidade, estado, categorias,
+    quantidade); `envio_de` = a campanha de onde vem o "Como enviar a campanha"."""
+    from .. import bases_importadas
+
+    cidade = (entendido or {}).get("cidade") or (ultima.cidade if ultima else "Recife")
+    uf = (entendido or {}).get("estado") or (ultima.estado if ultima else "PE")
+    return {
+        "entendido": entendido, "base": base, "bases": bases_importadas.opcoes(db),
+        "contagem": bases_importadas.contar(db, base, uf, "" if cidade == TODAS_AS_CIDADES else cidade),
+        "numeros_admin": _numeros_para_admin(db, usuario, dono),
+        "ultima_cidade": ultima.cidade if ultima else "", "ultima_uf": ultima.estado if ultima else "",
+        "categorias": db.execute(select(Categoria).where(Categoria.ativa.is_(True)).order_by(Categoria.prioridade)).scalars().all(),
+        "cadencias": _cadencias_da_ia(db), "cadencia_sdr": campanhas.cadencia_sdr(db), "ia_ligada": ia.disponivel(),
+        "visuais": visual.disponiveis(db, "sdr"),
+        "email_html_liberado": visual.html_da_marca_ligado(db), "envio": visual.envio_da_campanha(db, envio_de),
+        "whatsapp_sozinho_padrao": ler_config(db, "whatsapp_sozinho_padrao") != "0",
+        "vagas": vagas.para_tela(db, dono),  # as vagas de WhatsApp do número de quem é a campanha (23/11/2026)
+        "corrigir": None, "cta_marcada": "", "cta_livre": "",
+    }
+
+
 @rotas.get("/campanhas/nova")
 def nova_campanha(request: Request, pedido: str = "", base: str = "", usuario: Usuario = Depends(exige("campanhas.criar")),
                   db: Session = Depends(obter_db)):
@@ -578,23 +605,44 @@ def nova_campanha(request: Request, pedido: str = "", base: str = "", usuario: U
     # "Como enviar a campanha" vem com a escolha da última campanha da IA SDR da pessoa (23/11/2026)
     ultima_sdr = db.execute(select(Campanha).where(Campanha.usuario_id == usuario.id, Campanha.tipo == "parceiros")
                             .order_by(Campanha.criado_em.desc(), Campanha.id.desc()).limit(1)).scalars().first()
-    contagem = (bases_importadas.contar(db, base, entendido["estado"], entendido["cidade"])
-                if entendido and entendido.get("cidade") and entendido.get("estado") else {})
-    if not contagem:
-        cidade = (entendido or {}).get("cidade") or (ultima.cidade if ultima else "Recife")
-        uf = (entendido or {}).get("estado") or (ultima.estado if ultima else "PE")
-        contagem = bases_importadas.contar(db, base, uf, cidade)
     return tela(request, "campanha_nova.html", {
-        "pedido": pedido, "entendido": entendido, "contagem": contagem,
-        "bases": bases_importadas.opcoes(db), "base": base,
-        "numeros_admin": _numeros_para_admin(db, usuario, usuario),
-        "ultima_cidade": ultima.cidade if ultima else "", "ultima_uf": ultima.estado if ultima else "",
-        "categorias": db.execute(select(Categoria).where(Categoria.ativa.is_(True)).order_by(Categoria.prioridade)).scalars().all(),
-        "cadencias": _cadencias_da_ia(db), "cadencia_sdr": campanhas.cadencia_sdr(db), "ia_ligada": ia.disponivel(),
-        "visuais": visual.disponiveis(db, "sdr"),
-        "email_html_liberado": visual.html_da_marca_ligado(db), "envio": visual.envio_da_campanha(db, ultima_sdr),
-        "whatsapp_sozinho_padrao": ler_config(db, "whatsapp_sozinho_padrao") != "0",
-        "vagas": vagas.para_tela(db, usuario),  # as vagas de WhatsApp do número de quem cria (23/11/2026)
+        **_contexto_da_tela_nova(db, usuario, usuario, base, entendido, ultima, ultima_sdr), "pedido": pedido})
+
+
+def _cta_da_tela(cta: str) -> dict:
+    """Que opção da "Pergunta final" vem marcada na tela (e o texto da "Escrever a minha")."""
+    cta = (cta or "").strip()
+    if not cta or cta == config.CTA_VARIAR or cta in config.CTAS:
+        return {"cta_marcada": cta, "cta_livre": ""}
+    return {"cta_marcada": "__minha__", "cta_livre": cta}
+
+
+@rotas.get("/campanhas/{cid:int}/corrigir")
+def corrigir_campanha(request: Request, cid: int, usuario: Usuario = Depends(exige("campanhas.criar")),
+                      db: Session = Depends(obter_db)):
+    """Campanha que não foi montada (cidade sem empresas na base, segmento vazio...): a tela da Nova campanha com tudo
+    o que foi escolhido nela, para trocar o que precisa e montar a MESMA campanha de novo (pedido da Maria em
+    24/11/2026: "sugiro uma opção para editar ou refazer campanha"). Quem salva é o POST de /campanhas/nova."""
+    from .. import bases_importadas
+
+    camp = _campanha(db, cid, usuario, "campanhas.gerenciar")
+    if not campanhas.pode_corrigir(camp):
+        avisar(request, "Só dá para corrigir uma campanha que não conseguiu ser montada.", "alerta")
+        return voltar(f"/campanhas/{cid}")
+    base = bases_importadas.escolher(db, camp.base or "")
+    dono = (db.get(Usuario, camp.usuario_id) if camp.usuario_id else None) or usuario
+    entendido = {"cidade": camp.cidade or (TODAS_AS_CIDADES if bases_importadas.e_lista(base) else ""),
+                 "estado": camp.estado, "quantidade": camp.quantidade,
+                 "categorias": [c for c in (camp.categorias or "").split(",") if c]}
+    hoje_ = date.today()
+    return tela(request, "campanha_nova.html", {
+        **_contexto_da_tela_nova(db, usuario, dono, base, entendido, None, camp), "pedido": camp.pedido or "",
+        **_cta_da_tela(camp.cta),
+        "corrigir": {"id": camp.id, "nome": camp.nome, "erro": camp.erro or camp.etapa, "tom": camp.tom,
+                     "cadencia_id": camp.cadencia_id, "canais": [c for c in (camp.canais or "").split(",") if c],
+                     "inicio": max(camp.inicio or hoje_, hoje_), "conexao_id": camp.conexao_id or "",
+                     "objetivo": camp.objetivo or "Encontrar parceiros",
+                     "dono": dono.nome if dono.id != usuario.id else ""},
     })
 
 
@@ -613,17 +661,27 @@ def contagem_cidade(cidade: str = "", uf: str = "", base: str = "", usuario: Usu
 
 @rotas.post("/campanhas/nova", dependencies=[Depends(verificar_csrf)])
 async def criar_campanha(request: Request, usuario: Usuario = Depends(exige("campanhas.criar")), db: Session = Depends(obter_db)):
+    """Cria a campanha da IA SDR e começa a montá-la. Com `corrigir` (o id de uma campanha que não foi montada), troca
+    as escolhas DELA e monta de novo: "Corrigir e montar de novo" (24/11/2026). A campanha continua de quem era."""
     from .. import bases_importadas
 
     form = await request.form()
+    corrigida = None
+    if util.para_int(form.get("corrigir")):
+        corrigida = _campanha(db, util.para_int(form.get("corrigir")), usuario, "campanhas.gerenciar")
+        if not campanhas.pode_corrigir(corrigida):  # outra aba já mandou montar de novo, por exemplo
+            avisar(request, "Esta campanha não está mais com erro: confira a situação dela aqui.", "alerta")
+            return voltar(f"/campanhas/{corrigida.id}")
+    de_volta = (f"/campanhas/{corrigida.id}/corrigir" if corrigida
+                else "/campanhas/nova?pedido=" + util.chave_texto(str(form.get("pedido", "")))[:200])
     cats = [c for c in form.getlist("categorias") if c]
     cidade, uf = str(form.get("cidade", "")).strip(), str(form.get("estado", "")).strip().upper()
     base = bases_importadas.escolher(db, str(form.get("base") or ""))
-    if cidade == "__todas__":
+    if cidade == TODAS_AS_CIDADES:
         cidade = ""  # "Todas as cidades": só vale para lista importada (a da Receita exige a cidade)
     if not cats or (not cidade and not bases_importadas.e_lista(base)) or uf not in config.UFS:
         avisar(request, "Informe a região (cidade e estado) e pelo menos um segmento.", "erro")
-        return voltar("/campanhas/nova?pedido=" + util.chave_texto(str(form.get("pedido", "")))[:200])
+        return voltar(de_volta)
     canais = [c for c in form.getlist("canais") if c in ("whatsapp", "email", "linkedin")] or ["whatsapp", "email"]
     escolha_cta, cta_livre = str(form.get("cta") or ""), str(form.get("cta_livre") or "").strip()
     cta = cta_livre if escolha_cta in ("", "__minha__") and cta_livre else ("" if escolha_cta == "__minha__" else escolha_cta)
@@ -631,32 +689,45 @@ async def criar_campanha(request: Request, usuario: Usuario = Depends(exige("cam
     if cta and cta != config.CTA_VARIAR and not sdr.texto_seguro(cta):
         avisar(request, "A pergunta final não pode ter valores, porcentagem, desconto, exclusividade, contrato nem "
                         "frase de propaganda. Escreva de outro jeito.", "erro")
-        return voltar("/campanhas/nova?pedido=" + util.chave_texto(str(form.get("pedido", "")))[:200])
-    camp = Campanha(
-        nome=str(form.get("nome") or _nome_automatico(db, cats, cidade or uf)).strip()[:160],
-        pedido=str(form.get("pedido", ""))[:2000], categorias=",".join(cats), cidade=cidade, estado=uf, base=base,
-        quantidade=max(1, min(util.para_int(form.get("quantidade")) or util.para_int(form.get("quantidade_outra")) or 20, 500)), canais=",".join(canais),
-        objetivo=str(form.get("objetivo") or "Encontrar parceiros")[:200],
-        tom=str(form.get("tom")) if str(form.get("tom")) in config.TONS else "consultivo",
-        cta=cta[:200], cadencia_id=util.para_int(form.get("cadencia_id")), usuario_id=usuario.id,
-        conexao_id=_numero_escolhido(db, usuario, form, usuario),
-        whatsapp_sozinho=ler_config(db, "whatsapp_sozinho_padrao") != "0",  # regra desde 12/11/2026 (pedido da Maria)
-        inicio=util.para_data(form.get("inicio")) or date.today(), status="gerando", personalizar_ia=ia.disponivel(),
-    )
+        return voltar(de_volta)
     if "envio_html" in form:  # "Como enviar a campanha" (23/11/2026): texto ou HTML, com o modelo deste envio
         escolha = visual.escolha_do_envio(db, form, "sdr")
         if escolha is None:
             avisar(request, "Escolha o modelo de HTML deste envio (ou \"Apenas mensagens de texto\").", "erro")
-            return voltar("/campanhas/nova?pedido=" + util.chave_texto(str(form.get("pedido", "")))[:200])
-        camp.visual_id, camp.visual_canais, camp.visual_toques, camp.email_html = escolha
-    else:  # formulário de antes: as caixinhas do visual e do e-mail com a marca
-        camp.visual_id, camp.visual_canais, camp.visual_toques = visual.escolha_do_formulario(db, form, "sdr")
-        # o botão só aparecia com o módulo liberado para a marca; sem ele, a campanha segue o que a marca tiver depois
-        camp.email_html = bool(form.get("email_html")) if visual.html_da_marca_ligado(db) else True
-    db.add(camp)
-    db.flush()
-    registrar_log(db, usuario, "criou_campanha", "campanha", camp.id,
-                  f"{camp.nome}: {camp.categorias} {cidade or 'todas as cidades'}/{uf} ({bases_importadas.nome(db, base)})", request)
+            return voltar(de_volta)
+    else:  # formulário de antes: as caixinhas do visual e do e-mail com a marca; o botão do e-mail com a marca só
+        # aparecia com o módulo liberado para a marca (sem ele, a campanha segue o que a marca tiver depois)
+        escolha = (*visual.escolha_do_formulario(db, form, "sdr"),
+                   bool(form.get("email_html")) if visual.html_da_marca_ligado(db) else True)
+    dono = (db.get(Usuario, corrigida.usuario_id) if corrigida and corrigida.usuario_id else None) or usuario
+    valores = {
+        "nome": str(form.get("nome") or _nome_automatico(db, cats, cidade or uf)).strip()[:160],
+        "categorias": ",".join(cats), "cidade": cidade, "estado": uf, "base": base,
+        "quantidade": max(1, min(util.para_int(form.get("quantidade")) or util.para_int(form.get("quantidade_outra")) or 20, 500)),
+        "canais": ",".join(canais), "objetivo": str(form.get("objetivo") or "Encontrar parceiros")[:200],
+        "tom": str(form.get("tom")) if str(form.get("tom")) in config.TONS else "consultivo",
+        "cta": cta[:200], "cadencia_id": util.para_int(form.get("cadencia_id")),
+        "conexao_id": _numero_escolhido(db, usuario, form, dono),  # só um número do dono (regra de 13/11/2026)
+        "inicio": util.para_data(form.get("inicio")) or date.today(), "personalizar_ia": ia.disponivel(),
+    }
+    valores["visual_id"], valores["visual_canais"], valores["visual_toques"], valores["email_html"] = escolha
+    onde = f"{valores['categorias']} {cidade or 'todas as cidades'}/{uf} ({bases_importadas.nome(db, base)})"
+    if corrigida:
+        camp = corrigida
+        antes = {campo: getattr(camp, campo) for campo in valores}
+        for campo, valor in valores.items():
+            setattr(camp, campo, valor)
+        camp.status, camp.erro, camp.etapa, camp.so_fixo = "gerando", "", "", ""
+        registrar_log(db, usuario, "corrigiu_campanha", "campanha", camp.id, f"{camp.nome}: montada de novo com {onde}",
+                      request, mudancas=diferencas(antes, valores))
+        avisar(request, "Campanha corrigida: ela está sendo montada de novo com as novas escolhas.")
+    else:
+        camp = Campanha(pedido=str(form.get("pedido", ""))[:2000], usuario_id=usuario.id, status="gerando",
+                        whatsapp_sozinho=ler_config(db, "whatsapp_sozinho_padrao") != "0",  # regra desde 12/11/2026
+                        **valores)
+        db.add(camp)
+        db.flush()
+        registrar_log(db, usuario, "criou_campanha", "campanha", camp.id, f"{camp.nome}: {onde}", request)
     db.commit()
     campanhas.gerar_em_segundo_plano(camp.id)
     return voltar(f"/campanhas/{camp.id}")
@@ -755,6 +826,9 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(exige("c
         "visual_resumo": visual.resumo_da_campanha(db, camp),
         "pode_whatsapp_sozinho": autorizacao.pode(usuario, "campanhas.whatsapp_sozinho"),
         "pode_gerenciar": pode_gerenciar,
+        # não foi montada: "Corrigir e montar de novo" (24/11/2026)
+        "pode_corrigir": (pode_gerenciar and campanhas.pode_corrigir(camp)
+                          and autorizacao.pode(usuario, "campanhas.criar")),
         "dono": db.get(Usuario, camp.usuario_id) if camp.usuario_id else None,
         "c": camp, "resumo": resumo, "nomes_categorias": nomes,
         "rodando": camp.status == "gerando", "pode_aprovar": pode_gerenciar,

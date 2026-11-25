@@ -474,6 +474,14 @@ def gerar_em_segundo_plano(campanha_id: int) -> None:
     trabalhos.iniciar("campanha", campanha_id)
 
 
+def pode_corrigir(camp: Campanha) -> bool:
+    """A campanha não foi montada (cidade sem empresas na base, segmento vazio...) e dá para trocar as escolhas e
+    montar a MESMA campanha de novo: botão "Corrigir e montar de novo" (pedido da Maria em 24/11/2026: "sugiro uma
+    opção para editar ou refazer campanha"). Só as da IA SDR: as de Empresas novas e de Renovação têm a busca e os
+    avisos próprios."""
+    return camp.status == "erro" and (camp.tipo or "parceiros") == "parceiros"
+
+
 def etapa_personalizar(campanha_id: int, usuario_id: int, estado: dict, prazo: float) -> bool:
     """Troca a mensagem do PRIMEIRO passo de cada lead da campanha por uma mensagem escrita pela IA (em etapas)."""
     with sessao() as db:

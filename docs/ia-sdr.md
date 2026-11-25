@@ -692,6 +692,30 @@ cliente rápido". Antes cada pessoa via só as respostas dos leads dela e tinha 
   nela em qualquer tom (`_usar_modelos_do_segmento(manter={"apresentacao"})`, `tons.PRIMEIRA_COM_CTA`).
 - Testes: `testes/test_tons_cadencias.py`.
 
+## Corrigir e montar de novo (24/11/2026)
+
+Pedido da Maria: a "Campanha 9" parou com "Não encontrei empresas novas de ... em "Campo Verde"/MT na lista
+"contabilidades e adm cond PE & MG"" (a lista só tem PE e MG) e só dava para arquivar ou excluir. "Sugiro uma opção
+para editar ou refazer campanha."
+
+- `campanhas.pode_corrigir(camp)`: status `erro` e tipo `parceiros` (as de Empresas novas e de Renovação têm a busca e
+  os avisos próprios: não têm o botão).
+- Página da campanha: no aviso vermelho do erro, o botão **Corrigir e montar de novo** (`pode_corrigir` no contexto de
+  `ver_campanha`: quem gerencia a campanha e pode criar campanhas); na lista, o atalho **Corrigir**.
+- `GET /campanhas/{id}/corrigir` (`rotas/sdr.corrigir_campanha`, `exige("campanhas.criar")` + `_campanha(...,
+  "campanhas.gerenciar")`): a mesma tela da Nova campanha (`_contexto_da_tela_nova`, também usado por `nova_campanha`)
+  com tudo o que a campanha tinha: base, estado, cidade (`__todas__` = "Todas as cidades" da lista), segmentos,
+  quantidade, tom, cadência, pergunta final (`_cta_da_tela`: a pronta marcada ou "Escrever a minha" com o texto),
+  "Como enviar" (`visual.envio_da_campanha(db, camp)`), nome, canais, início (hoje, se era antes), número (admin) e
+  objetivo. Os números e as vagas de WhatsApp são os do dono da campanha. No topo, o motivo do erro; o botão de salvar
+  vira "Montar a campanha de novo".
+- O POST continua sendo o de `/campanhas/nova`, com o campo `corrigir`: valida tudo antes de mexer, troca as escolhas
+  da MESMA campanha (não cria outra; o dono continua o mesmo, regra dos disparos de 13/11/2026), zera erro/etapa/
+  `so_fixo`, volta a `gerando`, registra `corrigiu_campanha` com o "antes e depois" e chama
+  `gerar_em_segundo_plano` (um trabalho novo, do zero). Campanha que já saiu do erro (clique duplo, outra aba) não é
+  mexida. Erro de validação volta para a tela de correção.
+- Testes: `testes/test_corrigir_campanha.py`.
+
 ## Quem precisa de mim hoje e motivo obrigatório (auditoria P1.7, nov/2026)
 
 - `app/hoje.py`, quadro no topo do Dashboard (`rotas/painel.py`, `templates/dashboard.html`): respostas quentes

@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% from "_vagas_whatsapp.html" import quadro_vagas %}
-{% block titulo %}Nova campanha{% endblock %}
+{% block titulo %}{{ 'Corrigir a campanha' if corrigir else 'Nova campanha' }}{% endblock %}
 {% block conteudo %}
+{# corrigir: a campanha que não foi montada (rotas/sdr.corrigir_campanha), com tudo o que ela tinha marcado #}
 {% set e = entendido or {} %}
 {% set cidade_inicial = e.cidade or ultima_cidade or 'Recife' %}
 {% set uf_inicial = e.estado or ultima_uf or 'PE' %}
@@ -36,12 +37,20 @@
   .opcao-minha input[type=text] { flex: 1; min-width: 220px; }
   .subtitulo-passo:first-of-type { margin-top: 8px; }
 </style>
+{% if corrigir %}
+<div class="cabecalho"><div><h1>Corrigir a campanha</h1>
+  <div class="suave">Tudo o que foi escolhido na campanha "{{ corrigir.nome }}" já está marcado. Troque o que precisar e clique em <b>Montar a campanha de novo</b>.</div></div>
+  <a class="btn" href="/campanhas/{{ corrigir.id }}">Voltar</a></div>
+{% if corrigir.erro %}<div class="aviso aviso-erro"><b>Por que não foi montada:</b> {{ corrigir.erro }}</div>{% endif %}
+{% else %}
 <div class="cabecalho"><div><h1>Nova campanha</h1>
   <div class="suave">Siga os 4 passos. A IA pesquisa as empresas, escreve as mensagens e só envia depois da sua aprovação.</div></div>
   <a class="btn" href="/campanhas">Voltar</a></div>
+{% endif %}
 
 <form method="post" action="/campanhas/nova" id="assistente" class="campanha-nova">
   <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="pedido" value="{{ pedido }}">
+  {% if corrigir %}<input type="hidden" name="corrigir" value="{{ corrigir.id }}">{% endif %}
 
   {# ------------------------------------------------ 1. Onde (vem primeiro: as quantidades dependem da cidade) #}
   <div class="cartao">
@@ -124,7 +133,7 @@
                onfocus="document.getElementById('q-outro').checked = true" aria-label="Quantidade personalizada"></label>
     </div>
     <p class="ajuda">A IA pesquisa o dobro e fica com as melhores.</p>
-    {% if vagas %}{{ quadro_vagas(vagas, "Vagas de WhatsApp no seu número") }}{% endif %}
+    {% if vagas %}{{ quadro_vagas(vagas, "Vagas de WhatsApp no número de " ~ corrigir.dono if corrigir and corrigir.dono else "Vagas de WhatsApp no seu número") }}{% endif %}
   </div>
 
   {# ------------------------------------------------ 4. Como abordar #}
@@ -133,10 +142,11 @@
     <p class="ajuda" style="margin-top:0">Escolha o jeito de falar e o ritmo dos contatos. A campanha só é criada depois que você revisar esta parte.</p>
 
     <h3 class="subtitulo-passo">Tom das mensagens</h3>
+    {% set tom_inicial = corrigir.tom if corrigir and corrigir.tom in config.TONS else 'consultivo' %}
     <div class="cartoes-escolha cartoes-largos" role="radiogroup" aria-label="Tom das mensagens">
       {% for k, nome in config.TONS.items() %}{% set info = config.TONS_INFO.get(k, ('', '')) %}
       <label class="escolha escolha-tom">
-        <input type="radio" name="tom" value="{{ k }}" {{ 'checked' if k == 'consultivo' }} required>
+        <input type="radio" name="tom" value="{{ k }}" {{ 'checked' if k == tom_inicial }} required>
         <span class="escolha-corpo">
           <span class="escolha-marca" aria-hidden="true">✓</span>
           <b>{{ nome }}</b>
@@ -147,11 +157,12 @@
     </div>
 
     <h3 class="subtitulo-passo">Ritmo dos contatos (cadência)</h3>
+    {% set cad_corrigir = corrigir.cadencia_id if corrigir and corrigir.cadencia_id in cadencias|map(attribute='id')|list else none %}
     <div class="cartoes-escolha cartoes-largos" role="radiogroup" aria-label="Cadência">
       {% for c in cadencias %}{% set so_email = c.passos and c.passos|selectattr('canal', 'equalto', 'email')|list|length == c.passos|length %}
       <label class="escolha escolha-cadencia">
         <input type="radio" name="cadencia_id" value="{{ c.id }}" data-so-email="{{ '1' if so_email else '' }}" required
-               {{ 'checked' if (cadencia_sdr and c.id == cadencia_sdr.id) or (not cadencia_sdr and loop.first) }}>
+               {{ 'checked' if c.id == cad_corrigir or (cad_corrigir is none and ((cadencia_sdr and c.id == cadencia_sdr.id) or (not cadencia_sdr and loop.first))) }}>
         <span class="escolha-corpo">
           <span class="escolha-marca" aria-hidden="true">✓</span>
           <b>{{ c.nome.split(' (')[0] }}</b>
@@ -168,20 +179,20 @@
     <h3 class="subtitulo-passo">Pergunta final <span class="pequeno suave">· fecha o 1º contato; pedido pequeno traz mais resposta</span></h3>
     <div class="ctas">
       <div class="ctas-principais">
-        <label class="opcao-cta"><input type="radio" name="cta" value="" checked>
+        <label class="opcao-cta"><input type="radio" name="cta" value="" {{ 'checked' if not cta_marcada }}>
           <span><b>Automática</b> · a mais natural para cada empresa</span></label>
-        <label class="opcao-cta"><input type="radio" name="cta" value="{{ config.CTA_VARIAR }}">
+        <label class="opcao-cta"><input type="radio" name="cta" value="{{ config.CTA_VARIAR }}" {{ 'checked' if cta_marcada == config.CTA_VARIAR }}>
           <span><b>Variar</b> · cada empresa recebe uma pergunta de um tipo diferente (para descobrir qual traz mais resposta)</span></label>
       </div>
       {% for titulo, perguntas in config.CTAS_GRUPOS %}
       <div class="grupo-cta"><div class="grupo-escolha-titulo">{{ titulo }}</div>
         <div class="ctas-opcoes">{% for p in perguntas %}
-          <label class="opcao-cta"><input type="radio" name="cta" value="{{ p }}"><span>“{{ p }}”</span></label>{% endfor %}</div>
+          <label class="opcao-cta"><input type="radio" name="cta" value="{{ p }}" {{ 'checked' if cta_marcada == p }}><span>“{{ p }}”</span></label>{% endfor %}</div>
       </div>{% endfor %}
       <div class="grupo-cta"><div class="grupo-escolha-titulo">Do seu jeito</div>
-        <label class="opcao-cta opcao-minha"><input type="radio" name="cta" value="__minha__" id="cta-minha">
+        <label class="opcao-cta opcao-minha"><input type="radio" name="cta" value="__minha__" id="cta-minha" {{ 'checked' if cta_marcada == '__minha__' }}>
           <span>Escrever a minha:</span>
-          <input type="text" name="cta_livre" maxlength="200" placeholder="Ex.: Vocês atendem empresas que estão abrindo agora?"
+          <input type="text" name="cta_livre" maxlength="200" value="{{ cta_livre }}" placeholder="Ex.: Vocês atendem empresas que estão abrindo agora?"
                  aria-label="Pergunta final escrita por você"></label>
       </div>
     </div>
@@ -192,12 +203,12 @@
     <h3 class="subtitulo-passo">Detalhes</h3>
     <div class="campos" style="margin-top:4px">
       <div class="largo"><label for="nome-campanha">Nome da campanha *</label>
-        <input id="nome-campanha" type="text" name="nome" required placeholder="Ex.: Escritórios contábeis – Belo Horizonte"></div>
+        <input id="nome-campanha" type="text" name="nome" required value="{{ corrigir.nome if corrigir else '' }}" placeholder="Ex.: Escritórios contábeis – Belo Horizonte"></div>
       <div><label>Canais *</label>
-        {% for c in ['whatsapp', 'email'] %}<label class="marcar"><input type="checkbox" name="canais" value="{{ c }}" {{ 'checked' if c == 'whatsapp' }}> {{ CANAIS[c] }}</label>{% endfor %}
+        {% for c in ['whatsapp', 'email'] %}<label class="marcar"><input type="checkbox" name="canais" value="{{ c }}" {{ 'checked' if (c in corrigir.canais if corrigir else c == 'whatsapp') }}> {{ CANAIS[c] }}</label>{% endfor %}
         {% if whatsapp_sozinho_padrao %}<p class="ajuda">Depois da aprovação, os dois saem sozinhos pela fila. WhatsApp: um de cada vez, com alguns minutos entre eles e os limites do número.</p>{% endif %}</div>
-      <div><label>Início *</label><input type="date" name="inicio" required value="{{ hoje.isoformat() }}" min="{{ hoje.isoformat() }}"></div>
-      {% if numeros_admin %}{% set atual = '' %}
+      <div><label>Início *</label><input type="date" name="inicio" required value="{{ (corrigir.inicio if corrigir else hoje).isoformat() }}" min="{{ hoje.isoformat() }}"></div>
+      {% if numeros_admin %}{% set atual = corrigir.conexao_id if corrigir else '' %}
       <div class="largo"><label for="conexao_id">WhatsApp que vai disparar <span class="selo">só admin</span></label>
         <select name="conexao_id" id="conexao_id">
           <option value="">Automático (número do responsável por cada lead)</option>
@@ -205,13 +216,13 @@
         </select>
         <p class="ajuda">Escolha um número para todas as mensagens de WhatsApp desta campanha saírem por ele.</p></div>
       {% endif %}
-      <div class="largo"><label>Objetivo *</label><input type="text" name="objetivo" required value="Encontrar parceiros"></div>
+      <div class="largo"><label>Objetivo *</label><input type="text" name="objetivo" required value="{{ corrigir.objetivo if corrigir else 'Encontrar parceiros' }}"></div>
     </div>
     <label class="marcar" style="margin-top:12px"><input type="checkbox" id="revisei" required>
       <b>Revisei o tom, o ritmo, o nome, os canais e o objetivo desta campanha.</b></label>
   </div>
 
-  <button class="btn btn-verde btn-grande">Pesquisar empresas</button>
+  <button class="btn btn-verde btn-grande">{{ 'Montar a campanha de novo' if corrigir else 'Pesquisar empresas' }}</button>
 </form>
 {% endblock %}
 {% block scripts %}
@@ -324,6 +335,8 @@ document.querySelectorAll('input[name="cadencia_id"]').forEach(r => r.addEventLi
   if (soEmail) { zap.checked = false; mail.checked = true; }
   document.getElementById('aviso-so-email').hidden = !soEmail;
 }));
+// Corrigindo uma campanha que tinha a cadência só de e-mail: o aviso já aparece
+if (document.querySelector('input[name="cadencia_id"][data-so-email="1"]:checked')) document.getElementById('aviso-so-email').hidden = false;
 carregarCidades();
 estado.addEventListener('change', atualizar);
 atualizar();

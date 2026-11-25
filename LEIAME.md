@@ -229,6 +229,11 @@ preço nem comissão e não fecha parceria.
    empresas de software em São Paulo"). Se faltar a região ou o segmento, a tela pergunta.
 2. A IA monta a campanha: acha as empresas, pesquisa o site de cada uma, calcula o potencial, escolhe as melhores e
    escreve uma mensagem **diferente para cada empresa**, nos toques da cadência escolhida (padrão: dia 1, 3, 7 e 12).
+   **Deu erro ao montar?** (por exemplo, a cidade não tem empresas na base ou na lista escolhida.) A campanha mostra o
+   motivo e o botão **Corrigir e montar de novo** (na lista de campanhas, **Corrigir**). A tela abre com tudo o que
+   foi escolhido: troque a cidade, o estado, a base ou os tipos de empresa e clique em **Montar a campanha de novo**.
+   É a mesma campanha, não cria outra (desde 24/11/2026). Dica: no passo 1 a tela mostra quantas empresas a base tem
+   na cidade; uma lista importada só tem as empresas dos estados dela.
 3. Você confere e clica em **APROVAR CAMPANHA** (ou edita/cancela). Nada sai antes disso.
 4. **Aprovou, entrou na fila.** Os e-mails e os WhatsApps saem sozinhos, cada um no seu horário, também para quem
    nunca conversou com a MS (desde 12/11/2026). O WhatsApp sai pelo celular conectado, uma mensagem a cada 8 a 12 minutos
@@ -999,7 +1004,7 @@ permissão, a conta para de enviar na hora.
 | Onde vejo os modelos de cada segmento? | Em **Cadências > Templates de mensagem**, escolha o segmento. São 15 por segmento (8 de WhatsApp e 7 de e-mail); dá para editar. No lead, aparecem os do segmento dele |
 | Dá para pesquisar empresas por CNAE? | Sim. Em **Prospecção**, abra **Pesquisar por CNAE**, marque (ex.: 6319-4/00) ou digite os códigos. Ao lado aparece quantas empresas há na base |
 | Campanhas repetindo as mesmas empresas | Não acontece mais: cada campanha pula as empresas que já estão em outra campanha ativa (ou já contatadas) e busca mais fundo na base. Cancelar uma campanha libera as empresas dela |
-| Campanha com "erro" ao montar | Leia o motivo na campanha. Região sem empresas: confira cidade/bairro e estado (bairro funciona, ex.: "Boa Viagem" / PE). Uma empresa com site quebrado não para mais a campanha: ela segue com os dados da Receita |
+| Campanha com "erro" ao montar | Leia o motivo na campanha e clique em **Corrigir e montar de novo**: a tela abre com tudo o que foi escolhido; troque o que precisar e clique em **Montar a campanha de novo** (é a mesma campanha, não cria outra). Região sem empresas: confira cidade/bairro e estado (bairro funciona, ex.: "Boa Viagem" / PE) e a base (uma lista importada só tem as empresas dos estados dela). Uma empresa com site quebrado não para mais a campanha: ela segue com os dados da Receita |
 | A campanha não manda e-mails sozinha | Configure o SMTP no `.env` e confira em Configurações se "fila envia e-mails sozinha" = 1; o envio só acontece em dias úteis, no horário configurado |
 | "APROVAÇÃO NECESSÁRIA" não some | Clique em APROVAR CAMPANHA (qualquer pessoa da equipe pode aprovar) |
 | Nenhum horário para reunião | Confira o expediente da pessoa em Configurações > Usuários (nos feriados da cidade dela não há horários) |

@@ -90,6 +90,7 @@
       </div>
       <div class="acoes-camp">
         <a class="botao-icone" href="/campanhas/{{ c.id }}">Abrir</a>
+        {% if c.status == 'erro' and (c.tipo or 'parceiros') == 'parceiros' and pode('campanhas.criar') %}<a class="botao-icone" href="/campanhas/{{ c.id }}/corrigir" title="Abre a campanha com tudo o que foi escolhido para trocar o que precisa e montar de novo">Corrigir</a>{% endif %}
         <form class="inline" method="post" action="/campanhas/{{ c.id }}/{{ 'desarquivar' if c.arquivada else 'arquivar' }}">
           <input type="hidden" name="csrf" value="{{ csrf }}"><button class="botao-icone">{{ 'Desarquivar' if c.arquivada else 'Arquivar' }}</button></form>
         <form class="inline" method="post" action="/campanhas/{{ c.id }}/excluir"

@@ -57,7 +57,7 @@
 {% if rodando %}
 <div class="aviso aviso-info"><b>Montando a campanha...</b> {{ c.etapa }} Esta página se atualiza sozinha.</div>
 {% elif c.status == 'erro' %}
-<div class="aviso aviso-erro">{{ c.etapa }} {{ c.erro }}</div>
+<div class="aviso aviso-erro">{{ c.etapa }} {{ c.erro }}{% if pode_corrigir %}<div style="display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;margin-top:10px;white-space:normal"><a class="btn btn-primario" href="/campanhas/{{ c.id }}/corrigir">✏️ Corrigir e montar de novo</a><span class="pequeno" style="color:var(--texto)">Abre esta campanha com tudo o que foi escolhido. Troque a cidade, o estado, a base ou os tipos de empresa e monte de novo.</span></div>{% endif %}</div>
 {% elif c.status == 'aguardando_aprovacao' %}
 <div class="faixa" style="background:#8a5a10"><b>APROVAÇÃO NECESSÁRIA</b> <span>{{ c.etapa }}</span>
   {% if c.tipo == 'renovacao' and pode_aprovar %}<form method="post" action="/campanhas/{{ c.id }}/aprovar" style="display:inline;margin-left:12px" data-confirmar="Aprovar a campanha? Os avisos começam a sair sozinhos, cada um no seu dia e horário."><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar" value="{{ voltar_para }}"><button class="btn btn-verde">APROVAR CAMPANHA</button></form>{% endif %}</div>
