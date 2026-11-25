@@ -63,10 +63,11 @@ def _minutos(hhmm: str, padrao: int) -> int:
     return int(h) * 60 + int(m)
 
 
-def vagas_por_hora(db, minimo: str = "", maximo: str = "") -> dict[int, tuple[int, int, int]]:
+def vagas_por_hora(db, minimo: str = "", maximo: str = "", cabem: int | None = None) -> dict[int, tuple[int, int, int]]:
     """{hora: (vagas, primeiro minuto, último minuto)} no horário de envio da marca das configurações de agora (fora do
     almoço e da folga do fim; `minimo`/`maximo` = janela da campanha, como a da Renovação). Ex.: 07:30-20:00 e 6 por
-    hora: 07h = 3 vagas (07:30-07:59), 08h-11h = 6, 12h = nenhuma, 13h = 3 (13:30-13:59), 14h-18h = 6, 19h = 4."""
+    hora: 07h = 3 vagas (07:30-07:59), 08h-11h = 6, 12h = nenhuma, 13h = 3 (13:30-13:59), 14h-18h = 6, 19h = 4.
+    `cabem`: quantos por hora (padrão: o WhatsApp, por_hora; o e-mail usa o dele, vagas_email.por_hora)."""
     inicio = _minutos(ler_config(db, "horario_envio_inicio"), 8 * 60 + 30)
     fim = _minutos(ler_config(db, "horario_envio_fim"), 18 * 60)
     if minimo:
@@ -74,7 +75,7 @@ def vagas_por_hora(db, minimo: str = "", maximo: str = "") -> dict[int, tuple[in
     if maximo:
         fim = min(fim, _minutos(maximo, fim))
     fim -= FOLGA_FIM
-    cabem = por_hora(db)
+    cabem = por_hora(db) if cabem is None else cabem
     horas: dict[int, tuple[int, int, int]] = {}
     for hora in range(inicio // 60, fim // 60 + 1):
         minutos = [m for m in range(max(inicio, hora * 60), min(fim, hora * 60 + 59) + 1)

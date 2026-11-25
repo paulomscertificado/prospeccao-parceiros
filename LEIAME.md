@@ -278,6 +278,22 @@ preço nem comissão e não fecha parceria.
    - na fila, **cada número tem a sua vez**: o intervalo de 8 a 12 minutos vale para o mesmo número, e números
      diferentes mandam ao mesmo tempo. Quando a fila aperta, a conversa que já começou (o toque seguinte) sai antes do
      primeiro toque de uma empresa nova.
+   **Vagas de e-mail (desde 25/11/2026):** o mesmo para os e-mails. A fila manda um e-mail por vez, a cada 3 a 4
+   minutos: cabem uns **17 por hora** e, pelo limite de Configurações > Geral > E-mail, **80 por dia**. Esses limites
+   são da **marca**: as campanhas de todas as contas de e-mail da marca dividem as vagas (todas usam o mesmo domínio e
+   dividem a mesma reputação). Só de segunda a sexta, no horário de envio, fora do almoço e dos feriados de quem envia.
+   - ao lado do quadro de WhatsApp aparece o quadro **Vagas de e-mail**, com a conta por onde os seus e-mails saem e
+     quantas vagas livres há hoje e nos próximos dias. Hoje já descontando os e-mails que saíram (o limite é do dia).
+     Sem conta de e-mail, o quadro avisa: os e-mails esperam até você cadastrar a sua em **Contas de e-mail** (ou
+     alguém compartilhar uma com você);
+   - ao **aprovar**, cada e-mail fica no horário marcado se a hora e o dia ainda têm vaga; se não, vai para a hora mais
+     vazia ou para o próximo dia com vaga. Ele nunca passa na frente do WhatsApp do mesmo toque, e dois e-mails para a
+     mesma empresa ficam a pelo menos 20 horas um do outro. O aviso da aprovação diz de que dia a que dia saem os
+     primeiros e-mails;
+   - **de hora em hora**, o e-mail que ficou de um dia anterior e o que está numa hora ou num dia já lotado vão para a
+     próxima vaga. Ficam como estão a Renovação (tem prazo), os e-mails de quem ainda não tem conta de e-mail e o
+     e-mail atrasado das Empresas novas cuja empresa ainda tem WhatsApp para sair: esse sai logo, sem esperar o
+     WhatsApp.
    Empresa com WhatsApp **e** e-mail recebe os dois em cada toque (nas Empresas novas, só o WhatsApp).
 5. Quando alguém responde com interesse, a automação para e a resposta aparece em **Oportunidades** (🔥), com o
    resumo, para a equipe toda. Quem estiver livre responde o cliente, clica em **Marcar como atendido** e segue com a

@@ -447,3 +447,16 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--foco); bord
                 padding: 10px 14px; background: var(--cartao); border: 1px solid var(--borda); border-radius: var(--raio);
                 box-shadow: 0 6px 20px rgba(16, 24, 40, .12); }
 @media (max-width: 720px) { .config-campos { grid-template-columns: 1fr; } }
+
+/* ---------- Vagas de WhatsApp (23/11/2026) e de e-mail (25/11/2026): templates/_vagas_whatsapp.html e _vagas_email.html ---------- */
+.vagas-lado-a-lado { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 0 14px; align-items: start; }
+.vagas-zap { border: 1px solid var(--borda); border-radius: 12px; padding: 12px 14px; margin: 12px 0 4px; background: #fbfcfe; }
+.vagas-zap .vagas-topo { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.vagas-zap .vagas-dias { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.vagas-zap .vaga-dia { flex: 1 1 92px; max-width: 140px; border: 1px solid var(--borda); border-radius: 10px; padding: 6px 10px; background: #fff; }
+.vagas-zap .vaga-dia .vaga-titulo { display: block; font-size: .78rem; color: #6b7686; text-transform: capitalize; }
+.vagas-zap .vaga-dia b { font-size: 1.25rem; }
+.vagas-zap .vaga-dia.apertado { border-color: #e7c27a; background: #fffaf0; }
+.vagas-zap .vaga-dia.cheio { border-color: #e9a3a3; background: #fff5f5; }
+.vagas-zap .vaga-dia.cheio b { color: #b42318; }
+.vagas-zap .vagas-nota { margin: 8px 0 0; }

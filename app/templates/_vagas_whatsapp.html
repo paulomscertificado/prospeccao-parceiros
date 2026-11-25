@@ -1,19 +1,7 @@
 {# Vagas de WhatsApp do número (app/vagas.py; pedido da Maria em 23/11/2026: campanhas não podem acumular no número).
    v = vagas.para_tela(...) ou vagas.da_campanha(...). Usado na Nova campanha, no Buscar agora das Empresas novas e
-   na aprovação da campanha. #}
+   na aprovação da campanha, ao lado das vagas de e-mail (_vagas_email.html). O estilo está no estilo.css. #}
 {% macro quadro_vagas(v, titulo="Vagas de WhatsApp no número", explicar=True) %}
-<style>
-  .vagas-zap { border: 1px solid var(--borda); border-radius: 12px; padding: 12px 14px; margin: 12px 0 4px; background: #fbfcfe; }
-  .vagas-zap .vagas-topo { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
-  .vagas-zap .vagas-dias { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-  .vagas-zap .vaga-dia { flex: 1 1 92px; max-width: 140px; border: 1px solid var(--borda); border-radius: 10px; padding: 6px 10px; background: #fff; }
-  .vagas-zap .vaga-dia .vaga-titulo { display: block; font-size: .78rem; color: #6b7686; text-transform: capitalize; }
-  .vagas-zap .vaga-dia b { font-size: 1.25rem; }
-  .vagas-zap .vaga-dia.apertado { border-color: #e7c27a; background: #fffaf0; }
-  .vagas-zap .vaga-dia.cheio { border-color: #e9a3a3; background: #fff5f5; }
-  .vagas-zap .vaga-dia.cheio b { color: #b42318; }
-  .vagas-zap .vagas-nota { margin: 8px 0 0; }
-</style>
 <div class="vagas-zap" id="vagas-whatsapp">
   <div class="vagas-topo"><b>{{ titulo }}{% if v.nome %}: {{ v.nome }}{% endif %}</b>
     <span class="pequeno suave">cabem {{ v.por_hora }} por hora, {{ v.por_dia }} num dia inteiro (um a cada {{ v.intervalo }})</span></div>

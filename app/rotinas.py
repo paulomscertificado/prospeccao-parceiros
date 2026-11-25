@@ -379,6 +379,10 @@ def _rotina_hora() -> None:
 
     with sessao() as db:  # WhatsApp que ficou de um dia anterior ou numa hora lotada vai para a próxima vaga do número
         vagas.replanejar(db)  # (pedido da Maria em 23/11/2026: nada acumulando nem atrasado na fila)
+    from . import vagas_email
+
+    with sessao() as db:  # o mesmo com os e-mails, nas vagas de e-mail da marca (pedido da Maria em 25/11/2026); depois
+        vagas_email.replanejar(db)  # do WhatsApp: o e-mail atrasado que sai sem esperar vê onde o WhatsApp ficou
     from . import assertiva
 
     with sessao() as db:  # LGPD: o resultado das consultas da Assertiva fica só 30 dias

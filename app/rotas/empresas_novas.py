@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .. import autorizacao, empresas_novas, util, vagas
+from .. import autorizacao, empresas_novas, util, vagas, vagas_email
 from ..banco import gravar_config, ler_config_int, obter_db
 from ..modelos import Tarefa, Usuario
 from ..seguranca import exige, registrar_log, verificar_csrf
@@ -43,6 +43,7 @@ def tela_empresas_novas(request: Request, usuario: Usuario = Depends(exige("camp
                                     empresas_novas.cfg(db, "novas_email_html") != "0"),
         "email_html_liberado": visual.html_da_marca_ligado(db),
         "vagas": vagas.para_tela(db, empresas_novas.dono(db)),  # vagas de WhatsApp do número de quem envia (23/11)
+        "vagas_email": vagas_email.para_tela(db, empresas_novas.dono(db)),  # e as de e-mail da marca (25/11/2026)
     })
 
 

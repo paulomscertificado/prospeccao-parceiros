@@ -554,8 +554,9 @@ def resumo_aprovacao(db, camp: Campanha) -> dict:
 
 def aprovar(db, camp: Campanha, usuario: Usuario, vagas_usadas: dict | None = None) -> int:
     """Rascunhos viram tarefas de verdade (datas a partir de hoje). Os WhatsApps entram nas vagas do número (app/vagas.py,
-    pedido da Maria em 23/11/2026): o que não cabe no dia marcado vai para o próximo dia com vaga, sem acumular com as
-    outras campanhas; `vagas_usadas` recebe o resumo (vagas.planejar) para a mensagem da tela."""
+    pedido da Maria em 23/11/2026) e depois os e-mails nas vagas de e-mail da marca (app/vagas_email.py, 25/11/2026): o
+    que não cabe no dia marcado vai para o próximo dia com vaga, sem acumular com as outras campanhas; `vagas_usadas`
+    recebe o resumo (vagas.planejar; o do e-mail em "email") para a mensagem da tela."""
     rascunhos = db.execute(select(Tarefa).where(Tarefa.campanha_id == camp.id, Tarefa.status == "rascunho")).scalars().all()
     for t in [t for t in rascunhos if t.canal not in ("email", "whatsapp")]:
         t.status = "cancelada"  # campanhas antigas com ligação: a campanha só manda e-mail e WhatsApp
@@ -579,13 +580,15 @@ def aprovar(db, camp: Campanha, usuario: Usuario, vagas_usadas: dict | None = No
             while atraso and t.data in sem_envio:  # empurrada para frente: nunca para um feriado de quem envia
                 t.data = util.proximo_dia_util(t.data + timedelta(days=1))
         _sem_horario_no_passado(db, rascunhos, minimo, maximo, sem_envio)
-        if camp.tipo != "renovacao" and not camp.envio_oficial:  # Renovação: datas pelo vencimento (tem prazo)
-            from . import vagas
+        if camp.tipo != "renovacao":  # Renovação: datas pelo vencimento (tem prazo)
+            from . import vagas, vagas_email
 
             anterior = db.info.get("ar_config")
-            usar_config_da_ar(db, camp.tenant_id)  # o horário e o ritmo da marca da campanha
+            usar_config_da_ar(db, camp.tenant_id)  # o horário, o ritmo e os limites da marca da campanha
             try:
-                feito = vagas.planejar(db, rascunhos, minimo=minimo, maximo=maximo)
+                feito = {} if camp.envio_oficial else vagas.planejar(db, rascunhos, minimo=minimo, maximo=maximo)
+                # depois do WhatsApp: o e-mail nunca vai para antes de onde ficou (continua depois do WhatsApp do toque)
+                feito["email"] = vagas_email.planejar(db, rascunhos, minimo=minimo, maximo=maximo)
             finally:
                 usar_config_da_ar(db, anterior)
             if vagas_usadas is not None:

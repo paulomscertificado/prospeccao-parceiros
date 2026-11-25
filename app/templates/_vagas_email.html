@@ -1,0 +1,21 @@
+{# Vagas de e-mail da marca (app/vagas_email.py; pedido da Maria em 25/11/2026: "a mesma coisa para os emails", como as
+   vagas de WhatsApp do número de _vagas_whatsapp.html). v = vagas_email.para_tela(...) ou vagas_email.da_campanha(...).
+   Usado na Nova campanha, no Buscar agora das Empresas novas e na aprovação, ao lado das vagas de WhatsApp. O estilo é
+   o mesmo (.vagas-zap, no estilo.css). #}
+{% macro quadro_vagas_email(v, titulo="Vagas de e-mail", explicar=True) %}
+<div class="vagas-zap vagas-email" id="vagas-email">
+  <div class="vagas-topo"><b>{{ titulo }}{% if v.nome %}: {{ v.nome }}{% endif %}</b>
+    <span class="pequeno suave">cabem {{ v.por_hora }} por hora, {{ v.por_dia }} num dia inteiro (um a cada {{ v.intervalo }})</span></div>
+  {% if not v.nome and not v.outra_marca %}<p class="pequeno vagas-nota"><b>Ainda sem conta de e-mail.</b> Cadastre a sua em Contas de e-mail (ou peça uma compartilhada): sem conta, o e-mail espera.</p>{% endif %}
+  <div class="vagas-dias">{% for d in v.dias %}
+    <div class="vaga-dia {{ 'cheio' if d.livres == 0 else ('apertado' if d.livres * 4 < d.cabem else '') }}" title="{{ d.marcados }} já marcados de {{ d.cabem }} que cabem">
+      <span class="vaga-titulo">{{ d.titulo }}</span><b>{{ d.livres }}</b> <span class="pequeno suave">livres de {{ d.cabem }}</span></div>{% endfor %}
+  </div>
+  {% if v.empresas is defined %}
+  <p class="pequeno vagas-nota">Esta campanha: <b>{{ v.empresas }}</b> {{ 'empresa' if v.empresas == 1 else 'empresas' }} com e-mail ({{ v.emails }} {{ 'e-mail' if v.emails == 1 else 'e-mails' }} somando os toques).
+    {% if v.empresas and v.primeiros %}Com as vagas livres, os primeiros e-mails saem {% if v.primeiros.de.dia == v.primeiros.ate.dia %}<b>{{ v.primeiros.de.titulo }}</b>{% else %}entre <b>{{ v.primeiros.de.titulo }}</b> e <b>{{ v.primeiros.ate.titulo }}</b>{% endif %}.
+    {% elif v.empresas %}Os primeiros e-mails passam das vagas das próximas semanas: o que não couber vai para os dias seguintes com vaga.{% endif %}</p>
+  {% endif %}
+  {% if explicar %}<p class="pequeno suave vagas-nota">Os limites de e-mail (por hora e por dia) são da marca: as campanhas de todas as contas de e-mail dela dividem estas vagas. Ao aprovar, cada e-mail entra numa vaga: o que não cabe vai para a hora mais vazia ou para o próximo dia com vaga, sempre depois do WhatsApp do mesmo toque e com pelo menos 20 horas entre dois e-mails para a mesma empresa.</p>{% endif %}
+</div>
+{% endmacro %}

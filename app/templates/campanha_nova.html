@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_vagas_whatsapp.html" import quadro_vagas %}
+{% from "_vagas_email.html" import quadro_vagas_email %}
 {% block titulo %}{{ 'Corrigir a campanha' if corrigir else 'Nova campanha' }}{% endblock %}
 {% block conteudo %}
 {# corrigir: a campanha que não foi montada (rotas/sdr.corrigir_campanha), com tudo o que ela tinha marcado #}
@@ -133,7 +134,10 @@
                onfocus="document.getElementById('q-outro').checked = true" aria-label="Quantidade personalizada"></label>
     </div>
     <p class="ajuda">A IA pesquisa o dobro e fica com as melhores.</p>
-    {% if vagas %}{{ quadro_vagas(vagas, "Vagas de WhatsApp no número de " ~ corrigir.dono if corrigir and corrigir.dono else "Vagas de WhatsApp no seu número") }}{% endif %}
+    {% if vagas or vagas_email %}<div class="vagas-lado-a-lado">
+      {% if vagas %}{{ quadro_vagas(vagas, "Vagas de WhatsApp no número de " ~ corrigir.dono if corrigir and corrigir.dono else "Vagas de WhatsApp no seu número") }}{% endif %}
+      {% if vagas_email %}{{ quadro_vagas_email(vagas_email, "Vagas de e-mail na conta de " ~ corrigir.dono if corrigir and corrigir.dono else "Vagas de e-mail na sua conta") }}{% endif %}
+    </div>{% endif %}
   </div>
 
   {# ------------------------------------------------ 4. Como abordar #}

@@ -391,6 +391,45 @@ marcado e, com mais de 2 dias de atraso, o toque parava esperando o clique.
   Buscar agora das Empresas novas (`para_tela(db, empresas_novas.dono(db))`) e na aprovação
   (`vagas.da_campanha(db, camp)`: vagas do número da campanha + empresas/WhatsApps dos rascunhos e `quando_cabem`).
 - Testes: `testes/test_vagas.py`.
+
+## Vagas de e-mail da marca (25/11/2026)
+
+Pedido da Maria, sobre o quadro de vagas de WhatsApp: "gostei muito disso aqui e agora desenvolva a mesma coisa para os
+emails!". `app/vagas_email.py` faz o mesmo que `app/vagas.py`, com as regras do e-mail:
+
+- **De quem são as vagas:** da MARCA (`chave_da_marca(tenant_id)`), não de cada conta. Os limites de e-mail
+  (`limite_hora_email`, `limite_diario_email`) já valiam para a marca inteira, somando as contas dela (mesmo domínio,
+  mesma reputação; `contas_email`, `mensagens._contar_saida`), e a fila manda um e-mail por vez para a plataforma toda.
+  O quadro mostra a conta por onde saem os e-mails da pessoa (`Contas.da_pessoa` = `contas_email.para_enviar`: a
+  própria ou uma compartilhada; a principal só para o dono). Conta de outra marca não aparece (`outra_marca`: as
+  Empresas novas são da plataforma e quem envia pode ser de outra marca; `testes/test_marca_ar.py` pegou o endereço do
+  e-mail principal na tela do Grupo Certy).
+- **Quanto cabe:** `por_hora` = min(ritmo da fila, `limite_hora_email`); ritmo = 3600 / (média de
+  `campanhas.INTERVALO_AUTOMATICO_SEG` + 30 s de espera do relógio) = 17; `vagas_por_hora` = as horas do WhatsApp
+  (`vagas.vagas_por_hora(..., cabem=)`: horário da marca, fora do almoço, 20 min de folga) com 17 por hora; `por_dia` =
+  min(`limite_diario_email`, soma das horas) = 80. Só de segunda a sexta (`mensagens.dentro_do_horario`), fora dos
+  feriados de quem envia. Hoje: só o que falta do dia e do limite (os que já saíram hoje contam, `enviados_hoje`) e os
+  atrasados ocupam hoje (a fila manda primeiro). `texto_do_intervalo` = "3 a 4 minutos".
+- **`ocupacao`:** e-mails pendentes das campanhas ativas e aprovadas por (marca, dia, hora), só de quem recebe
+  (`_recebe`: e-mail preenchido e não marcado como inexistente, sem SAIR/pausa/resposta/perda) e com conta para sair
+  (sem conta, `contas_email.SemConta`: espera e não ocupa vaga). A Renovação ocupa (gasta o limite), mas não muda de dia.
+- **`planejar(db, tarefas, desde, ordem, minimo, maximo)`:** só os e-mails; chamado em `campanhas.aprovar` DEPOIS de
+  `vagas.planejar` (com as configurações da AR da campanha; também em `envio_oficial`, que só mexe no WhatsApp). Por
+  (campanha, lead), e-mail a e-mail: fica onde está se a hora e o dia têm vaga (`_Agenda.fica_onde_esta`; até 4 min
+  depois da folga do fim, que o horário natural usa); senão a hora mais vazia do primeiro dia com vaga
+  (`primeira_vaga`). Nunca vai para antes de onde estava (continua depois do WhatsApp do toque), fica a pelo menos
+  `horas_minimas_automatico(db, "email")` (20 h) do e-mail anterior da empresa e com o espaço da cadência. Devolve
+  `movidos`, `de`, `ate`, `empresas` (em `vagas_usadas["email"]`; a rota diz "Primeiro e-mail de cada empresa...").
+- **De hora em hora** (`rotinas._rotina_hora` -> `vagas_email.replanejar`, depois do WhatsApp): e-mails atrasados e os
+  de uma hora ou dia já lotado da marca (amanhã em diante) vão para as próximas vagas; quem já começou a conversa fica
+  com as vagas. Fora: Renovação, marca com `enviar_email_automatico` desligado (o atraso é o clique), e-mail sem conta,
+  hoje (a fila está mandando) e o atrasado de `TIPOS_WHATSAPP_PRIMEIRO` cuja empresa ainda tem WhatsApp da campanha por
+  sair (`_ainda_tem_whatsapp`): ele fica atrasado e sai sem esperar o WhatsApp (regra de 17/11/2026).
+- **Telas:** `templates/_vagas_email.html` (`quadro_vagas_email`) ao lado do de WhatsApp (`.vagas-lado-a-lado`; o
+  estilo dos dois quadros foi para o `estilo.css`) na Nova campanha (`vagas_email.para_tela(db, dono)`), no Buscar agora
+  das Empresas novas e na aprovação (`vagas_email.da_campanha`: vagas da marca da campanha + empresas/e-mails dos
+  rascunhos e `vagas.quando_cabem`).
+- Testes: `testes/test_vagas_email.py`.
 Chave da CNPJá: Configurações > Integrações (`/configuracoes/cnpja`, `/configuracoes/cnpja/saldo`); saiu da tela
 Empresas novas, que virou um painel em 4 passos (estados por caixinha, `name="ufs"` repetido).
 

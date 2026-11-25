@@ -10,7 +10,8 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from .. import agenda_horarios, autorizacao, campanhas, config, hoje as fila_hoje, ia, metricas, sdr, util, vagas, visual
+from .. import (agenda_horarios, autorizacao, campanhas, config, hoje as fila_hoje, ia, metricas, sdr, util, vagas,
+               vagas_email, visual)
 from ..banco import agora, ler_config, obter_db
 from ..leads_servico import historico, limpar_campos
 from ..modelos import (Cadencia, Campanha, Categoria, Conhecimento, Lead, Mensagem, Notificacao, Oportunidade, Tarefa,
@@ -586,6 +587,7 @@ def _contexto_da_tela_nova(db: Session, usuario: Usuario, dono: Usuario, base: s
         "email_html_liberado": visual.html_da_marca_ligado(db), "envio": visual.envio_da_campanha(db, envio_de),
         "whatsapp_sozinho_padrao": ler_config(db, "whatsapp_sozinho_padrao") != "0",
         "vagas": vagas.para_tela(db, dono),  # as vagas de WhatsApp do número de quem é a campanha (23/11/2026)
+        "vagas_email": vagas_email.para_tela(db, dono),  # e as de e-mail da marca, com a conta dele (25/11/2026)
         "corrigir": None, "cta_marcada": "", "cta_livre": "",
     }
 
@@ -838,6 +840,8 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(exige("c
         "nome_da_area": area[1] if area else "IA SDR",
         # aprovação: as vagas de WhatsApp do número e quanto a campanha pede (23/11/2026)
         "vagas": vagas.da_campanha(db, camp) if camp.status == "aguardando_aprovacao" else None,
+        # e as vagas de e-mail da marca, com a conta de quem é a campanha (25/11/2026)
+        "vagas_email": vagas_email.da_campanha(db, camp) if camp.status == "aguardando_aprovacao" else None,
     })
 
 
@@ -865,17 +869,29 @@ def html_do_toque(cid: int, tid: int, usuario: Usuario = Depends(exige("campanha
 
 
 def _texto_das_vagas(nas_vagas: dict) -> str:
-    """O que a aprovação fez com as vagas do número (campanhas.aprovar -> vagas.planejar), para o aviso da tela."""
-    if not nas_vagas.get("de"):
-        return ""
-    de, ate = nas_vagas["de"], nas_vagas["ate"]
-    periodo = f"no dia {de:%d/%m}" if de == ate else f"de {de:%d/%m} a {ate:%d/%m}"
-    texto = f" Primeiro WhatsApp de cada empresa {periodo}, dentro das vagas do número"
-    movidos = nas_vagas.get("movidos") or 0
-    if movidos:
-        texto += (f" ({movidos} {'WhatsApp foi' if movidos == 1 else 'WhatsApps foram'} para o próximo dia com vaga, "
-                  "para não acumular com as outras campanhas)")
-    return texto + "."
+    """O que a aprovação fez com as vagas do número (campanhas.aprovar -> vagas.planejar) e com as vagas de e-mail da
+    marca (vagas_email.planejar, em "email"), para o aviso da tela."""
+    texto = ""
+    if nas_vagas.get("de"):
+        de, ate = nas_vagas["de"], nas_vagas["ate"]
+        periodo = f"no dia {de:%d/%m}" if de == ate else f"de {de:%d/%m} a {ate:%d/%m}"
+        texto = f" Primeiro WhatsApp de cada empresa {periodo}, dentro das vagas do número"
+        movidos = nas_vagas.get("movidos") or 0
+        if movidos:
+            texto += (f" ({movidos} {'WhatsApp foi' if movidos == 1 else 'WhatsApps foram'} para o próximo dia com "
+                      "vaga, para não acumular com as outras campanhas)")
+        texto += "."
+    email = nas_vagas.get("email") or {}
+    if email.get("de"):
+        de, ate = email["de"], email["ate"]
+        periodo = f"no dia {de:%d/%m}" if de == ate else f"de {de:%d/%m} a {ate:%d/%m}"
+        texto += f" Primeiro e-mail de cada empresa {periodo}, dentro das vagas de e-mail"
+        movidos = email.get("movidos") or 0
+        if movidos:
+            texto += (f" ({movidos} {'e-mail foi' if movidos == 1 else 'e-mails foram'} para o próximo dia com vaga, "
+                      "para não passar do limite de e-mails)")
+        texto += "."
+    return texto
 
 
 @rotas.post("/campanhas/{cid:int}/{acao}", dependencies=[Depends(verificar_csrf)])

@@ -34,7 +34,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
   {% if marca.fonte_url %}<link rel="stylesheet" href="{{ marca.fonte_url }}">{% endif %}
-  <link rel="stylesheet" href="/static/estilo.css?v=16">
+  <link rel="stylesheet" href="/static/estilo.css?v=17">
   {# white label, Fase 5: cores e fonte da marca da AR (app/marca.py, tema; só #RRGGBB e fontes da lista) #}
   {% if marca.css %}<style>:root { {{ marca.css|safe }} }</style>{% endif %}
   {% if marca.logo_url and not marca.logo_largo %}<link rel="icon" href="{{ marca.logo_url }}">{% endif %}{# largo vira um risquinho na aba #}

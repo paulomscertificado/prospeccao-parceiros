@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_vagas_whatsapp.html" import quadro_vagas %}
+{% from "_vagas_email.html" import quadro_vagas_email %}
 {% block titulo %}{{ c.nome }}{% endblock %}
 {% block conteudo %}
 <div class="cabecalho">
@@ -184,7 +185,10 @@
     <p>Canais permitidos: {{ c.canais.replace(',', ', ') }} (a IA usa a ordem de prioridade de Configurações).</p>
     <p>Cadência: {{ c.cadencia.nome if c.cadencia else 'IA SDR' }}. Cada toque tem um ângulo diferente; depois do último sem resposta o lead vira "Sem resposta".</p>
     <p class="pequeno suave">Limites: por contato, por dia, por hora, por campanha e por domínio (Configurações).</p>
-    {% if vagas %}{{ quadro_vagas(vagas) }}{% endif %}
+    {% if vagas or vagas_email %}<div class="vagas-lado-a-lado">
+      {% if vagas %}{{ quadro_vagas(vagas) }}{% endif %}
+      {% if vagas_email %}{{ quadro_vagas_email(vagas_email, "Vagas de e-mail na conta") }}{% endif %}
+    </div>{% endif %}
     {% if c.status == 'aguardando_aprovacao' and pode_aprovar %}
     <div class="grupo-btn">
       <form method="post" action="/campanhas/{{ c.id }}/aprovar" data-confirmar="Aprovar e iniciar a campanha?"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-verde">APROVAR CAMPANHA</button></form>
