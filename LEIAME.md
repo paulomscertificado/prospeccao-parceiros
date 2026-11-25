@@ -800,6 +800,12 @@ Como ligar (o administrador da AR; o Admin Master, dentro da AR):
    mensagem de teste em texto simples, de graça. O modelo de exemplo "hello_world" da Meta não serve: ele só sai dos
    números de teste dela.
 
+**Foto do perfil do número oficial:** o número oficial não abre no celular, então a foto muda pelo sistema. Em
+**Configurações > WhatsApp > API oficial da Meta**, no quadro **Foto do perfil no WhatsApp**, escolha a imagem (JPG ou
+PNG, até 5 MB) e clique em **Trocar a foto**. O sistema usa o quadrado do meio da imagem e o WhatsApp mostra a foto num
+círculo: deixe o logo no centro, longe dos cantos. A foto que está valendo aparece ao lado do botão; para os clientes,
+a nova aparece em alguns minutos.
+
 Quem responder ao número oficial: a resposta aparece no lead (para os próximos toques e avisa a equipe) e quem
 mandar SAIR deixa de receber mensagens. Por enquanto, responda pelo app WhatsApp Business do celular.
 

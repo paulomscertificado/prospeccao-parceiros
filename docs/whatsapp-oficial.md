@@ -77,9 +77,22 @@ começou a montar o portfólio pela conta de Carol (passo a passo abaixo); nada 
   (`whatsapp_cloud.registro_do_numero`; se a Meta recusar, o teste não cai) e guarda `ativado` (`numero_ativado`:
   `CLOUD_API`) e `status_numero`. Sem ativar: a tela avisa ("Achado na Meta, mas ainda não ativado") e a Renovação não
   liga o envio pela API (`falta_para_renovacao`). Testes: `testes/test_whatsapp_oficial.py`.
+- **Foto do perfil** (25/11/2026, pedido da Maria: o logo da MS com "Canal oficial" no número da API): o número não
+  abre em celular nenhum e o Gerenciador do WhatsApp só abre para a dona do portfólio na Meta, então a foto muda pela
+  tela. Quadro "Foto do perfil no WhatsApp" (`#foto`, dentro da API oficial) → `POST /whatsapp/oficial/foto` →
+  `whatsapp_oficial.trocar_foto`: `preparar_foto` (Pillow; o quadrado do meio, no máximo 640 x 640, JPEG; transparente
+  vira branco; recusa o que não é imagem, menor que 192 x 192, maior que 5 MB ou que 40 megapixels, antes de falar com
+  a Meta), o envio em partes pelo app do token (`app_do_token` + `whatsapp_cloud.subir_arquivo`, o mesmo da imagem de
+  exemplo dos modelos) e `POST /{phone_number_id}/whatsapp_business_profile` com o `profile_picture_handle`
+  (`trocar_foto_do_perfil`). A tela mostra a foto que está na Meta: `GET /whatsapp/oficial/foto` →
+  `whatsapp_oficial.foto_atual` (`whatsapp_cloud.perfil` dá o `profile_picture_url`; `baixar_foto_do_perfil` baixa
+  SEM o token, só de `whatsapp.net`/`fbcdn.net`/`fbsbx.com`, sem guardar cópia; 404 = sem foto). Registro de
+  atividades: `trocou_foto_whatsapp_oficial` e `foto_whatsapp_oficial_recusada`. Testes:
+  `testes/test_foto_perfil_oficial.py`.
 - **Cliente da Meta**: `integracoes/whatsapp_cloud.py` — `consultar_numero` (campos `display_phone_number`,
   `verified_name`, `quality_rating`, `whatsapp_business_manager_messaging_limit`, `name_status`),
-  `registro_do_numero`, `registrar_numero`, `enviar_modelo`,
+  `registro_do_numero`, `registrar_numero`, `perfil`, `subir_arquivo`, `trocar_foto_do_perfil`,
+  `baixar_foto_do_perfil`, `enviar_modelo`,
   `enviar_texto_por`, `numeros_do_webhook`, `ler_webhook` (com o `phone_number_id` de cada item), `assinatura_confere`.
   Versão da API: `WHATSAPP_API_VERSAO` (padrão `v27.0`). Telefone de destino: 55 + DDD + celular com o 9
   (`util.com_nono_digito`). A forma antiga (variáveis `WHATSAPP_TOKEN`/`WHATSAPP_PHONE_NUMBER_ID`, botão "Enviar pela

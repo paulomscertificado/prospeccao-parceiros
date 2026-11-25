@@ -11,6 +11,7 @@ das mensagens.
 Etapa 2 (16/11/2026, pedido da Maria): os modelos do aviso de vencimento (pedir a aprovação e acompanhar) e os avisos
 da Renovação pelo número oficial (Campanha.envio_oficial): fila própria, a arte do site no cabeçalho e os botões
 Quero renovar / Já renovei / Parar avisos. As outras campanhas continuam pelo WhatsApp Leads (QR code).
+Foto do perfil (25/11/2026, pedido da Maria): trocar_foto e foto_atual (a tela mostra a foto que está na Meta).
 """
 
 import json
@@ -267,6 +268,74 @@ def ativar_numero(db, conta: ContaWhatsAppOficial, senha: str, repeticao: str | 
                                    "como conectado: clique em Testar conexão daqui a pouco.")
         conta.situacao = json.dumps(resultado, ensure_ascii=False)
     return resultado
+
+
+# ---------------------------------------------------------------- foto do perfil do número (25/11/2026)
+# Pedido da Maria: o logo da MS com "Canal oficial" na foto do número oficial. O número não abre em celular nenhum
+# (está ligado direto na API), então a foto muda por aqui: Configurações > WhatsApp > API oficial > Foto do perfil.
+FOTO_LADO = 640                # a foto vai quadrada, com 640 x 640 (o WhatsApp mostra num círculo)
+FOTO_MINIMO = 192              # a Meta não aceita foto menor que 192 x 192
+FOTO_MAXIMO_ARQUIVO = 5_000_000  # 5 MB, o limite da Meta para imagem
+FOTO_MAXIMO_PIXELS = 40_000_000  # imagem maior que isso (40 megapixels) nem é aberta
+
+
+def preparar_foto(conteudo: bytes) -> bytes:
+    """A imagem escolhida vira a foto do perfil: o quadrado do meio, no máximo 640 x 640, em JPEG (o formato que a Meta
+    aceita sem surpresa). Fundo transparente fica branco; foto de celular deitada fica de pé."""
+    import io
+
+    from PIL import Image, ImageOps
+
+    if not conteudo:
+        raise whatsapp_cloud.ErroWhatsApp("Escolha a imagem da foto (JPG ou PNG).")
+    if len(conteudo) > FOTO_MAXIMO_ARQUIVO:
+        raise whatsapp_cloud.ErroWhatsApp("A imagem passou de 5 MB: diminua o tamanho (ou salve em JPG) e tente de novo.")
+    try:
+        with Image.open(io.BytesIO(conteudo)) as original:
+            largura, altura = original.size
+            if largura * altura > FOTO_MAXIMO_PIXELS:
+                raise whatsapp_cloud.ErroWhatsApp("A imagem é grande demais: use uma de até 4000 x 4000 pixels.")
+            if min(largura, altura) < FOTO_MINIMO:
+                raise whatsapp_cloud.ErroWhatsApp(
+                    f"A imagem é pequena demais ({largura} x {altura}): use uma de pelo menos {FOTO_MINIMO} x "
+                    f"{FOTO_MINIMO} pixels (o ideal é {FOTO_LADO} x {FOTO_LADO} ou maior).")
+            imagem = ImageOps.exif_transpose(original)
+            lado = min(imagem.size)
+            esquerda, topo = (imagem.width - lado) // 2, (imagem.height - lado) // 2
+            imagem = imagem.crop((esquerda, topo, esquerda + lado, topo + lado))
+            if imagem.mode != "RGB":
+                com_transparencia = imagem.convert("RGBA")
+                imagem = Image.new("RGB", com_transparencia.size, (255, 255, 255))
+                imagem.paste(com_transparencia, mask=com_transparencia.getchannel("A"))
+            if lado > FOTO_LADO:
+                imagem = imagem.resize((FOTO_LADO, FOTO_LADO), Image.Resampling.LANCZOS)
+            saida = io.BytesIO()
+            imagem.save(saida, "JPEG", quality=92, optimize=True)
+    except whatsapp_cloud.ErroWhatsApp:
+        raise
+    except (OSError, ValueError, Image.DecompressionBombError):  # não é imagem, arquivo cortado, formato estranho
+        raise whatsapp_cloud.ErroWhatsApp("O arquivo não é uma imagem que dê para usar: escolha um JPG ou PNG.") from None
+    return saida.getvalue()
+
+
+def trocar_foto(conta: ContaWhatsAppOficial, conteudo: bytes) -> bytes:
+    """Troca a foto do perfil do número oficial na Meta: prepara a imagem (preparar_foto), sobe pelo app do token
+    (envio em partes, como a imagem de exemplo dos modelos) e põe no perfil do número. Devolve a foto enviada."""
+    foto = preparar_foto(conteudo)
+    chave = token(conta)
+    app_id = whatsapp_cloud.app_do_token(chave)
+    if not app_id:
+        raise whatsapp_cloud.ErroWhatsApp("Não consegui descobrir o app da Meta pelo token (ele é preciso para subir a "
+                                          "foto): confira o token e clique em Salvar e testar.")
+    codigo = whatsapp_cloud.subir_arquivo(app_id, chave, foto, "image/jpeg", "foto-do-perfil.jpg", "foto do perfil")
+    whatsapp_cloud.trocar_foto_do_perfil(conta.phone_number_id, chave, codigo)
+    return foto
+
+
+def foto_atual(conta: ContaWhatsAppOficial) -> tuple[bytes, str]:
+    """A foto que está no perfil do número agora, buscada na Meta (para a tela mostrar). (b"", "") = sem foto."""
+    endereco = str(whatsapp_cloud.perfil(conta.phone_number_id, token(conta)).get("profile_picture_url") or "")
+    return whatsapp_cloud.baixar_foto_do_perfil(endereco) if endereco else (b"", "")
 
 
 # ---------------------------------------------------------------- conversas do número oficial (tela API Oficial)

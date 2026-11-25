@@ -136,6 +136,21 @@
   </form>
   {% if s.ativado %}<p class="pequeno suave" style="margin-top:4px">Este número já está ativado. Só ative de novo se a Meta pedir
     (por exemplo, depois de aprovar um nome de exibição novo).</p>{% endif %}
+  <h3 style="margin:18px 0 6px" id="foto">Foto do perfil no WhatsApp</h3>
+  <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+    <div class="foto-perfil-oficial" style="width:88px;height:88px;border-radius:50%;overflow:hidden;background:#e9eef3;flex:none;display:flex;align-items:center;justify-content:center">
+      <img src="/whatsapp/oficial/foto" alt="Foto atual do perfil do número oficial" width="88" height="88" style="object-fit:cover" onerror="this.remove();document.getElementById('sem-foto-oficial').hidden=false">
+      <span id="sem-foto-oficial" class="pequeno suave" style="text-align:center;padding:6px" hidden>Sem foto</span>
+    </div>
+    <form method="post" action="/whatsapp/oficial/foto" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div><label class="pequeno" for="arquivo-foto-oficial">Nova foto (JPG ou PNG, até 5 MB)</label><input id="arquivo-foto-oficial" type="file" name="arquivo" accept="image/jpeg,image/png,image/webp" required></div>
+      <button class="btn btn-verde">Trocar a foto</button>
+    </form>
+  </div>
+  <p class="pequeno suave" style="margin-top:6px">A foto que os clientes veem no número oficial. O sistema usa o quadrado do meio
+    da imagem (até 640 x 640) e o WhatsApp mostra num círculo: deixe o logo no centro, longe dos cantos. A foto nova
+    aparece para os clientes em alguns minutos.</p>
   <h3 style="margin:18px 0 6px">Webhook: respostas, SAIR e situação das mensagens</h3>
   <p class="pequeno" style="margin:0 0 8px">No Meta for Developers &gt; seu app &gt; WhatsApp &gt; Configuração, em <b>Webhook</b>, cole:</p>
   <div class="campos">

@@ -9,8 +9,8 @@ computador e de 10 em 10 s no resto do tempo (economia do banco da nuvem, 17/11/
 
 import json
 
-from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -203,6 +203,52 @@ async def ativar_numero_oficial(request: Request, usuario: Usuario = Depends(exi
     if r.get("avisos"):
         avisar(request, " ".join(r["avisos"]), "alerta")
     return voltar("/whatsapp#ativar")
+
+
+@rotas.post("/whatsapp/oficial/foto", dependencies=[Depends(verificar_csrf)])
+async def trocar_foto_oficial(request: Request, arquivo: UploadFile = File(...),
+                              usuario: Usuario = Depends(exige("whatsapp.gerenciar_todos")),
+                              db: Session = Depends(obter_db)):
+    """Troca a foto do perfil do número oficial na Meta (pedido da Maria em 25/11/2026). O número não abre em celular
+    nenhum, então a foto só muda por aqui (ou pelo Gerenciador do WhatsApp, da dona do portfólio na Meta)."""
+    conta, motivo = _conta_oficial_da_tela(request, usuario, db)
+    if motivo:
+        avisar(request, motivo, "erro")
+        return voltar("/whatsapp#foto")
+    conteudo = await arquivo.read(whatsapp_oficial.FOTO_MAXIMO_ARQUIVO + 1)
+    nome = (arquivo.filename or "imagem")[:80]
+    try:
+        whatsapp_oficial.trocar_foto(conta, conteudo)
+    except whatsapp_cloud.ErroWhatsApp as erro:
+        if erro.codigo:  # chegou à Meta: o motivo fica no registro (para conferir depois)
+            registrar_log(db, usuario, "foto_whatsapp_oficial_recusada", "whatsapp_oficial", conta.id,
+                          f"foto do perfil do número {conta.phone_number_id} ({nome}): {erro}", request,
+                          modulo="WhatsApp")
+            db.commit()
+        avisar(request, f"A foto não foi trocada: {erro}", "erro")
+        return voltar("/whatsapp#foto")
+    registrar_log(db, usuario, "trocou_foto_whatsapp_oficial", "whatsapp_oficial", conta.id,
+                  f"foto do perfil do número {conta.phone_number_id} ({nome})", request, modulo="WhatsApp")
+    db.commit()
+    avisar(request, "Foto do perfil trocada na Meta. Os clientes passam a ver a foto nova em alguns minutos (no "
+                    "celular de quem já conversou com o número, às vezes demora um pouco mais).")
+    return voltar("/whatsapp#foto")
+
+
+@rotas.get("/whatsapp/oficial/foto")
+def foto_oficial(request: Request, usuario: Usuario = Depends(exige("whatsapp.gerenciar_todos")),
+                 db: Session = Depends(obter_db)):
+    """A foto que está agora no perfil do número oficial, buscada na Meta (a tela mostra ao lado do botão)."""
+    conta, motivo = _conta_oficial_da_tela(request, usuario, db)
+    foto, tipo = b"", ""
+    if not motivo:
+        try:
+            foto, tipo = whatsapp_oficial.foto_atual(conta)
+        except whatsapp_cloud.ErroWhatsApp:
+            pass
+    if not foto:
+        return Response(status_code=404, headers={"Cache-Control": "no-store"})
+    return Response(foto, media_type=tipo, headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
 
 
 @rotas.post("/whatsapp/oficial/teste", dependencies=[Depends(verificar_csrf)])

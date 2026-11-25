@@ -8,7 +8,8 @@ Duas formas de usar:
 - por AR (app/whatsapp_oficial.py, tela Configurações > WhatsApp > "API oficial da Meta"): as funções com
   `phone_number_id` e `token` explícitos (consultar_numero, registro_do_numero e registrar_numero, enviar_modelo, enviar_texto_por, subir_midia) e as dos
   modelos, com o ID da conta do WhatsApp Business (criar_modelo, modelos_da_conta; a imagem de exemplo do modelo
-  sobe pelo app do token: app_do_token + subir_exemplo);
+  sobe pelo app do token: app_do_token + subir_exemplo); a foto do perfil do número (perfil, subir_arquivo +
+  trocar_foto_do_perfil, baixar_foto_do_perfil);
 - a antiga, por variável (WHATSAPP_TOKEN e WHATSAPP_PHONE_NUMBER_ID): configurado(), enviar_template(),
   enviar_texto() — botão "Enviar pela API" da ficha do lead.
 """
@@ -276,26 +277,72 @@ def app_do_token(token: str, versao: str | None = None) -> str:
 
 def subir_exemplo(app_id: str, token: str, conteudo: bytes, tipo: str = "image/png", nome: str = "exemplo.png",
                   versao: str | None = None) -> str:
-    """Sobe a imagem de exemplo de um modelo com imagem no cabeçalho (envio em partes da Meta, "Resumable Upload")
-    e devolve o código dela (header_handle) para o pedido de aprovação."""
+    """Sobe a imagem de exemplo de um modelo com imagem no cabeçalho e devolve o código dela (header_handle) para o
+    pedido de aprovação."""
+    return subir_arquivo(app_id, token, conteudo, tipo, nome, "imagem de exemplo", versao)
+
+
+def subir_arquivo(app_id: str, token: str, conteudo: bytes, tipo: str, nome: str, o_que: str = "imagem de exemplo",
+                  versao: str | None = None) -> str:
+    """Sobe um arquivo pelo envio em partes da Meta ("Resumable Upload", pelo app do token) e devolve o código dele
+    (handle): a imagem de exemplo de um modelo novo e a foto do perfil do número. `o_que` aparece nos erros."""
     sessao_envio = _pedir("POST", f"{app_id}/uploads", token, versao,
                           params={"file_name": nome, "file_length": len(conteudo), "file_type": tipo})
     if not sessao_envio.get("id"):
-        raise ErroWhatsApp("A Meta não abriu o envio da imagem de exemplo.")
+        raise ErroWhatsApp(f"A Meta não abriu o envio da {o_que}.")
     try:
         r = httpx.request("POST", _url(str(sessao_envio["id"]), versao), content=conteudo, timeout=60,
                           headers={"Authorization": f"OAuth {token}", "file_offset": "0"})
     except httpx.HTTPError:
         raise ErroWhatsApp("Sem conexão com a API do WhatsApp. Confira a internet.") from None
     if r.status_code >= 400:
-        raise ErroWhatsApp(f"A Meta recusou a imagem de exemplo: {_erro_da_meta(r)}")
+        raise ErroWhatsApp(f"A Meta recusou a {o_que}: {_erro_da_meta(r)}", _codigo_do_erro(r))
     try:
         codigo = r.json().get("h", "")
     except ValueError:
         codigo = ""
     if not codigo:
-        raise ErroWhatsApp("A Meta não devolveu o código da imagem de exemplo.")
+        raise ErroWhatsApp(f"A Meta não devolveu o código da {o_que}.")
     return codigo
+
+
+# ---------------------------------------------------------------- perfil do número (o que os clientes veem)
+# Foto do perfil pela API (25/11/2026, pedido da Maria): o número oficial está ligado direto na API, sem celular, e a
+# foto só muda por aqui (ou pelo Gerenciador do WhatsApp, que só a dona do portfólio da Meta abre).
+CAMPOS_DO_PERFIL = "about,description,profile_picture_url,websites,email,address,vertical"
+SERVIDORES_DA_FOTO = ("whatsapp.net", "fbcdn.net", "fbsbx.com")  # onde a Meta guarda a foto do perfil (sem token)
+
+
+def perfil(phone_number_id: str, token: str, versao: str | None = None) -> dict:
+    """O perfil do número no WhatsApp: recado, descrição, endereço da foto, sites, e-mail, endereço e ramo."""
+    dados = _pedir("GET", f"{phone_number_id}/whatsapp_business_profile", token, versao,
+                   params={"fields": CAMPOS_DO_PERFIL})
+    lista = dados.get("data") if isinstance(dados, dict) else None
+    return lista[0] if isinstance(lista, list) and lista and isinstance(lista[0], dict) else {}
+
+
+def trocar_foto_do_perfil(phone_number_id: str, token: str, codigo_da_foto: str, versao: str | None = None) -> bool:
+    """Põe no perfil do número a foto já enviada pelo envio em partes (`codigo_da_foto` = o handle de subir_arquivo)."""
+    dados = _pedir("POST", f"{phone_number_id}/whatsapp_business_profile", token, versao,
+                   json={"messaging_product": "whatsapp", "profile_picture_handle": codigo_da_foto})
+    return bool(dados.get("success", True)) if isinstance(dados, dict) else True
+
+
+def baixar_foto_do_perfil(url: str, maximo: int = MAXIMO_DA_MIDIA) -> tuple[bytes, str]:
+    """Baixa a foto do perfil pelo endereço que a Meta deu (público, por isso SEM o token). Devolve (bytes, tipo)."""
+    from urllib.parse import urlsplit
+
+    servidor = (urlsplit(url).hostname or "").lower()
+    if not url.startswith("https://") or not any(servidor == s or servidor.endswith("." + s) for s in SERVIDORES_DA_FOTO):
+        raise ErroWhatsApp("A Meta não devolveu um endereço válido para a foto do perfil.")
+    try:
+        r = httpx.request("GET", url, timeout=20, follow_redirects=False)
+    except httpx.HTTPError:
+        raise ErroWhatsApp("Sem conexão com a Meta para baixar a foto do perfil.") from None
+    tipo = str(r.headers.get("content-type") or "").split(";")[0].strip().lower()
+    if r.status_code != 200 or not tipo.startswith("image/") or len(r.content) > maximo:
+        raise ErroWhatsApp(f"A Meta não entregou a foto do perfil (situação {r.status_code}).")
+    return r.content, tipo
 
 
 def criar_modelo(waba_id: str, token: str, nome: str, idioma: str, categoria: str, componentes: list[dict],
