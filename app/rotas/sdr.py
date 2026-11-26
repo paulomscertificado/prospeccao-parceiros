@@ -511,6 +511,14 @@ def _campanha(db: Session, cid: int, usuario: Usuario, permissao: str = "campanh
 AREAS_DAS_CAMPANHAS = {"renovacao": ("/renovacao", "Renovação"), "empresas_novas": ("/empresas-novas", "Empresas novas")}
 
 
+def _sem_as_da_renovacao(consulta, usuario: Usuario):
+    """As campanhas de Renovação ficam na tela Renovação (pedido da Maria em 13/11/2026: "preciso dela como
+    renovação"); quem não abre aquela tela (sem a permissão "Ver a Renovação") vê na lista as que alcança."""
+    if autorizacao.pode(usuario, "renovacao.ver"):
+        return consulta.where(Campanha.tipo != "renovacao")
+    return consulta
+
+
 @rotas.get("/campanhas")
 def lista_campanhas(request: Request, ver: str = "todas", de: str = "", usuario: Usuario = Depends(exige("campanhas.ver")),
                     db: Session = Depends(obter_db)):
@@ -523,11 +531,7 @@ def lista_campanhas(request: Request, ver: str = "todas", de: str = "", usuario:
             consulta = consulta.where(Campanha.usuario_id == usuario.id)
         elif util.para_int(de):
             consulta = consulta.where(Campanha.usuario_id == util.para_int(de))
-    consulta = consulta.where(Campanha.arquivada.is_(ver == "arquivadas"))
-    # as campanhas de Renovação ficam na tela Renovação (pedido da Maria em 13/11/2026: "preciso dela como renovação");
-    # quem não abre aquela tela (sem a permissão "Ver a Renovação") vê aqui as que alcança
-    if autorizacao.pode(usuario, "renovacao.ver"):
-        consulta = consulta.where(Campanha.tipo != "renovacao")
+    consulta = _sem_as_da_renovacao(consulta.where(Campanha.arquivada.is_(ver == "arquivadas")), usuario)
     if ver == "aprovacao":
         consulta = consulta.where(Campanha.status == "aguardando_aprovacao")
     elif ver == "ativas":
@@ -544,12 +548,20 @@ def lista_campanhas(request: Request, ver: str = "todas", de: str = "", usuario:
     donos = autorizacao.filtrar(select(Campanha.usuario_id).distinct(), usuario, "campanhas.ver", Campanha.usuario_id)
     equipe_ = ([] if not autorizacao.escolhe_de_quem(usuario, "campanhas.ver") else
                sorted({uid for (uid,) in db.execute(donos) if uid}, key=lambda i: pessoas.get(i, "")))
+    # lista vazia de quem vê as campanhas de outras pessoas: o aviso diz quantas a equipe tem e leva a elas ("Todas" +
+    # "Toda a equipe"). Pedido da Maria em 26/11/2026: o usuário novo do Jefferson abriu em "Só as minhas", ainda sem
+    # campanhas, e achou que não via as da equipe. Contadas pelo id (o filtro da marca vale para colunas da Campanha)
+    da_equipe = 0
+    if not lista and equipe_ and not (ver == "todas" and de == "todos"):
+        da_equipe = len(db.execute(_sem_as_da_renovacao(autorizacao.filtrar(
+            select(Campanha.id).where(Campanha.arquivada.is_(False)), usuario, "campanhas.ver", Campanha.usuario_id),
+            usuario)).all())
     # quanto cabe por dia na marca: quantas empresas novas as campanhas comportam (pedido da Maria em 25/11/2026)
     from .. import capacidade
 
     return tela(request, "campanhas.html", {"campanhas": lista, "contagens": contagens, "ver": ver, "de": de,
                                             "filtros": FILTROS_CAMPANHA, "nomes_cat": nomes_cat, "pessoas": pessoas,
-                                            "equipe_campanhas": equipe_,
+                                            "equipe_campanhas": equipe_, "da_equipe": da_equipe,
                                             "capacidade": capacidade.para_tela(db, usuario)})
 
 

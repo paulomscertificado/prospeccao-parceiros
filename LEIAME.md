@@ -887,7 +887,9 @@ Empresas novas (busca paga na CNPJá), que continuam em **IA SDR · Configurar a
 **Quem está acima vê o que é de quem está abaixo** (pedido de 17/11/2026): Administrador > Gestor > Funcionário >
 Vendedor. Colegas do mesmo nível não veem o que é um do outro, e quem está abaixo não vê o que é de quem está acima.
 Nas telas com o filtro "de quem" (Campanhas, Minha fila, Leads, Pipeline, Agenda e Dashboard), quem está acima escolhe
-uma das pessoas abaixo ou "todos". As **Oportunidades** continuam abertas para a equipe toda (16/11/2026). As telas
+uma das pessoas abaixo ou "todos". Essas telas abrem com o que é da própria pessoa ("Só as minhas"); na lista de
+**Campanhas**, quando não aparece nenhuma (por exemplo, um usuário novo, que ainda não criou campanha), a tela diz quantas
+campanhas a equipe tem e mostra o botão **Ver as campanhas da equipe** (26/11/2026). As **Oportunidades** continuam abertas para a equipe toda (16/11/2026). As telas
 **Renovação** e **Empresas novas** (planilha da certificadora e busca paga na CNPJá) são só de quem as configura
 (administrador e gestor).
 
@@ -1065,6 +1067,7 @@ permissão, a conta para de enviar na hora.
 | E-mails caindo no spam | Configurações > E-mail mostra o que falta no DNS (DKIM e DMARC); comece com poucos e-mails por dia |
 | Ver se o e-mail/WhatsApp já foi para o lead | Menu **Envios**, em abas: **Enviados** (tudo o que saiu, separado por dia, com a situação: na fila, enviada, não saiu, respondeu; e os testes da campanha, marcados com 🧪, que vão só para quem testou) e **Próximos envios** (o que ainda vai sair, com o motivo: a hora mostrada é a programada; "atrasado" + "Aguardando seu clique" quer dizer que ainda não saiu). Filtros por período, situação, canal, campanha e nome da empresa; o número **Aguardando seu clique** no topo mostra o que precisa de um clique hoje. Na campanha: **Andamento por empresa**. Na ficha do lead: **Envios para este lead** |
 | Arquivar ou excluir uma campanha | Na lista de campanhas (ou dentro da campanha): **Arquivar** tira da lista (veja em "Arquivadas"); **Excluir** apaga a campanha e cancela o que estava programado. As empresas continuam em Leads. Cada pessoa vê e mexe só nas próprias campanhas (administrador e gestor veem todas) |
+| Não vejo as campanhas da equipe | A lista abre em **Só as minhas**. Clique em **Todas** e escolha **Toda a equipe** no seletor à direita (ou clique em **Ver as campanhas da equipe**, que aparece quando a lista está vazia). As arquivadas ficam em **Arquivadas**, e as da Renovação, na tela **Renovação**. Cada usuário vê só as campanhas da própria marca, e o vendedor só as dele |
 | Onde envio os WhatsApps da campanha? | Dentro da campanha aprovada, em **WhatsApp de hoje**: um botão por mensagem, sai pelo seu número |
 | Como testo uma campanha antes de aprovar? | Na campanha, cartão **Testar antes de aprovar**: escolha a campanha e o canal (WhatsApp ou e-mail); as mensagens chegam no SEU e-mail/WhatsApp com "[TESTE]". Nenhum lead recebe nada e não conta nos limites |
 | Testei e o e-mail chegou só em texto. O HTML não funciona? | Funciona: o **1º e-mail** sai só em texto (com a arte "do 2º toque em diante" e com o e-mail com a marca). No teste, escolha **Todos os 4 toques**: o 1º chega em texto e os outros com a arte. A tela do teste avisa isso. Se a campanha foi criada com o **Visual** em "Só texto (sem visual)", nenhum e-mail leva a arte (só o e-mail com a marca, se estiver ligado) |

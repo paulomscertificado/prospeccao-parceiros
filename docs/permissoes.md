@@ -84,7 +84,13 @@ alcança os registros da própria pessoa e os de quem tem nível menor, na mesma
 `autorizacao._aplicar_hierarquia` trocou uma vez só (config `permissoes_hierarquia`) os papéis Gestor e Funcionário
 do sistema que ainda estavam no padrão antigo (`tudo` e `proprios`); o que o administrador tinha mudado à mão ficou.
 Os filtros "de quem" das telas (Campanhas, Minha fila, Leads, Pipeline, Agenda, Dashboard) aparecem para quem alcança
-outras pessoas (`autorizacao.escolhe_de_quem`) e listam só elas (`autorizacao.pessoas_visiveis`).
+outras pessoas (`autorizacao.escolhe_de_quem`) e listam só elas (`autorizacao.pessoas_visiveis`). Elas abrem no
+que é da própria pessoa ("Só as minhas"). Lista de Campanhas vazia para quem alcança outras pessoas: o aviso diz quantas
+campanhas a equipe tem (não arquivadas, sem as da Renovação para quem abre a tela Renovação, `_sem_as_da_renovacao`) e
+leva a elas pelo botão "Ver as campanhas da equipe" (`?ver=todas&de=todos`; `rotas/sdr.lista_campanhas`, `da_equipe`).
+Pedido da Maria em 26/11/2026: o usuário novo do Jefferson (Grupo Certy) abriu em "Só as minhas", ainda sem campanhas,
+trocou a pessoa com a aba "Arquivadas" aberta e achou que não via as da equipe. Teste:
+`test_hierarquia.test_lista_vazia_leva_as_campanhas_da_equipe`.
 
 **Renovação e Empresas novas** valem para a AR toda (planilha da certificadora, busca paga na CNPJá). As Empresas
 novas (tela, textos, "Buscar agora") exigem `campanhas.configurar`. A **Renovação tem grupo próprio** desde

@@ -3,6 +3,8 @@ vê e cuida do que é dele e de quem está abaixo (não do que é do administrad
 e mexe só no dele, o vendedor fica com o dele. Renovação e Empresas novas (planilha, busca paga na CNPJá) só para
 quem configura; as campanhas delas seguem a hierarquia."""
 
+import re
+
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
@@ -145,3 +147,30 @@ def test_hierarquia_aplicada_uma_vez_sem_desfazer_o_que_o_admin_mudou(cliente):
         assert linha("gestor", "leads.ver").escopo == "tudo"
         linha("gestor", "leads.ver").escopo = "abaixo"  # volta ao padrão para os outros testes
         linha("gestor", "relatorios.ver").escopo = "abaixo"
+
+
+def test_lista_vazia_leva_as_campanhas_da_equipe(cliente):
+    """Pedido da Maria (26/11/2026): o usuário novo do Jefferson abriu Campanhas em "Só as minhas", ainda sem campanhas,
+    e achou que não via as da equipe. Lista vazia de quem vê as de outras pessoas: o aviso diz quantas a equipe tem e
+    leva a elas ("Todas" + "Toda a equipe"); quem só vê as próprias continua com o aviso de sempre."""
+    c = _cenario()
+    with sessao() as db:
+        for chave, perfil in (("gesnovo", "gestor"), ("vennovo", "vendedor")):
+            if not db.execute(select(Usuario).where(Usuario.email == _email(chave))).scalars().first():
+                db.add(Usuario(nome=f"Novo {chave}", email=_email(chave), perfil=perfil,
+                               senha_hash=resumir_senha(SENHA)))
+    ges = _entrar("gesnovo")
+    pagina = ges.get("/campanhas").text  # abre em "Só as minhas": ele ainda não tem nenhuma
+    assert "Você ainda não tem campanhas." in pagina and 'href="?ver=todas&amp;de=todos"' in pagina
+    total = int(re.search(r"A equipe tem (\d+) campanha", pagina).group(1))
+    equipe = ges.get("/campanhas?ver=todas&de=todos").text
+    assert "Campanha Hier vena." in equipe and "Ver as campanhas da equipe" not in equipe
+    assert equipe.count('class="camp"') == total > 0  # o número do aviso é o que aparece em Todas + Toda a equipe
+
+    pagina = ges.get(f"/campanhas?ver=arquivadas&de={c['vena']}").text  # como o Jefferson: pessoa escolhida em Arquivadas
+    assert "Vena Hierarquia não tem campanhas arquivadas." in pagina and "Ver as campanhas da equipe" in pagina
+    pagina = ges.get("/campanhas?ver=arquivadas&de=todos").text
+    assert "A equipe não tem campanhas arquivadas." in pagina and f"As {total} campanhas da equipe estão em" in pagina
+
+    pagina = _entrar("vennovo").get("/campanhas").text  # o vendedor só vê as próprias: o aviso de sempre
+    assert "Nenhuma campanha aqui." in pagina and "Ver as campanhas da equipe" not in pagina

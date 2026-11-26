@@ -35,6 +35,8 @@
   .botao-icone:hover { color: var(--azul); border-color: #b9c7d6; }
   .botao-icone.perigo:hover { color: var(--erro); border-color: #f2c4bf; }
   .vazio-campanhas { text-align: center; padding: 40px 16px; background: #fff; border: 1px dashed #cdd8e4; border-radius: 14px; color: #6b7686; }
+  .vazio-campanhas p { margin: 0 0 8px; }
+  .vazio-campanhas .btn { margin-top: 6px; }
   @media (max-width: 760px) {
     .camp { grid-template-columns: 1fr; }
     .camp .lado { align-items: stretch; min-width: 0; }
@@ -102,7 +104,15 @@
     </div>
   </div>
   {% else %}
-  <div class="vazio-campanhas">{% if ver == 'arquivadas' %}Nenhuma campanha arquivada.{% else %}Nenhuma campanha aqui. Escreva o que procura na caixa acima ou clique em <b>+ Criar campanha</b>.{% endif %}</div>
+  {% set SITUACAO = {'aprovacao': 'aguardando aprovação', 'ativas': 'em andamento', 'erro': 'com erro', 'arquivadas': 'arquivadas'} %}
+  <div class="vazio-campanhas">{% if da_equipe %}
+    {# lista vazia de quem vê as campanhas de outras pessoas: quantas a equipe tem e o caminho até elas (26/11/2026) #}
+    {% set quem = 'Você' if de == 'minhas' else ('A equipe' if de == 'todos' else pessoas.get(de|int, 'Esta pessoa')) %}
+    <p><b>{{ quem }} {{ 'ainda ' if ver == 'todas' }}não tem campanhas{{ ' ' ~ SITUACAO[ver] if ver in SITUACAO }}.</b></p>
+    <p>{% if de == 'todos' %}{% if da_equipe == 1 %}A campanha da equipe está em <b>Todas</b>.{% else %}As {{ da_equipe }} campanhas da equipe estão em <b>Todas</b>.{% endif %}
+       {% else %}A equipe tem {{ da_equipe }} campanha{{ 's' if da_equipe != 1 }}: escolha <b>Toda a equipe</b> no seletor à direita ou clique no botão.{% endif %}</p>
+    <a class="btn btn-primario" href="?ver=todas&amp;de=todos">Ver as campanhas da equipe</a>
+  {% elif ver == 'arquivadas' %}Nenhuma campanha arquivada.{% else %}Nenhuma campanha aqui. Escreva o que procura na caixa acima ou clique em <b>+ Criar campanha</b>.{% endif %}</div>
   {% endfor %}
 </div>
 {% endblock %}
