@@ -1004,6 +1004,9 @@ class Certificado(DaAR, Base):
                                                     index=True)  # campanha de renovação que avisou (ou vai avisar)
     fora_motivo: Mapped[str] = mapped_column(String(160), default="")  # não entra em campanha (ex.: pediu SAIR)
     importado_em: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # colunas Ponto e Unidade da planilha (26/11/2026): o ponto de atendimento pode ficar fora dos avisos (quadro 4)
+    ponto: Mapped[str] = mapped_column(String(120), default="")
+    unidade: Mapped[str] = mapped_column(String(160), default="")
 
     parceiro: Mapped["Parceiro | None"] = relationship()
     cliente: Mapped["Cliente | None"] = relationship()

@@ -14,6 +14,15 @@ base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renova
    (LGPD: não precisa). Cada linha vira um `Certificado` com `origem="planilha"` (chave = `protocolo`; sem protocolo,
    documento + tipo + vencimento). Importar de novo atualiza os campos e não mexe na situação. Número na célula do
    Excel perde o zero da frente: `_documento` devolve (CPF com 11, CNPJ com 14).
+   **Ponto e Unidade** (26/11/2026): as colunas Ponto e Unidade do relatório vão para `Certificado.ponto`/`unidade`.
+   Na planilha da MS de 26/11, 173 dos 746 certificados eram do ponto GILBERTO CONTABIL, cujos clientes não devem
+   receber os avisos (pedido da Maria). No quadro 4, **Pontos de atendimento que não recebem avisos**
+   (`renov_pontos_fora`, por marca, `normalizar_pontos`). Vale o nome do ponto ou o da unidade, sem diferença de
+   acento e maiúscula (`no_ponto_fora`). Esses certificados ficam na lista ("Ponto fora dos avisos", em
+   `situacao_na_tela`), mas `a_avisar` os tira de tudo que monta campanha ("Montar campanha", "todos da planilha" e a
+   campanha automática). `contatos_para_campanha` conta os que ficaram de fora ("de ponto de atendimento fora dos
+   avisos"). Certificado importado antes disso fica sem ponto até a planilha ser importada de novo. Testes:
+   `testes/test_renovacao_pontos.py`.
 2. **Contato** (`dados_do_registro`): WhatsApp = primeiro celular (11 dígitos com o 9) entre o telefone da pessoa e o
    da empresa; e-mail = o da pessoa, senão o da empresa. Só da planilha (pedido da Maria): nada é buscado em outro
    lugar.
