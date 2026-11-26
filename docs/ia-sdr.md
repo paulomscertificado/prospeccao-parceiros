@@ -822,6 +822,20 @@ para editar ou refazer campanha."
   problema, lembrete a cada 12 h, "✅ Resolvido" quando some. Vai para `alertas_emails` ou os administradores, e
   também para o sino. Tela: Configurações > Integrações > "Avisos de problema por e-mail" (com e-mail de teste,
   `POST /configuracoes/alertas/teste`). Testes: `testes/test_alertas.py`.
+- **API de licenças do Assinador MS (26/11/2026).** O Assinador MS virou produto com conta e licença, conferidas pela
+  API `assinador-ms/api_licencas` (serviço `assinador-licencas`, 127.0.0.1:8040, no MESMO servidor). A cada 5 minutos
+  `alertas.verificar` chama `conferir_licencas`: `GET config.LICENCAS_READY_URL` (padrão na nuvem
+  `http://127.0.0.1:8040/api/v1/ready`; vazio fora dela e nos testes = não confere), espera até 10 s. No ar = 200 com
+  `{"status": "ready"}`; 503 (banco das licenças fora), sem resposta, demora ou outra resposta = falha, contada em
+  `alertas_licencas` (`{"seguidas", "erro", "desde"}`; só grava quando há falha ou quando zera). Com 2 seguidas
+  (`LICENCAS_SEGUIDAS`, ~10 min: reiniciar ou publicar a API não avisa) `problemas_agora` abre a chave `licencas`
+  ("Assinador MS: o servidor de licenças não responde"), que segue o caminho de sempre: 1 e-mail, lembrete em 12 h e
+  "✅ Resolvido" na 1ª conferência no ar. Vai só para a MS (`ar` = AR MS: Admin Master, ou a lista `alertas_emails`, e
+  os administradores da AR MS), nunca para outra AR. Registro no journal da Prospecção: "Assinador MS: API de
+  licenças no ar" a cada conferência e um aviso (WARNING) a cada falha. Testes: `testes/test_alertas.py` (API falsa:
+  caiu, avisou só a MS, não repetiu, lembrou, voltou; uma falha só não avisa; sem endereço não pergunta nada).
+  O quadro "Problemas abertos agora" da tela mostra a quem é de uma AR só os da plataforma e os da AR dele
+  (`alertas.ativos(db, ar)`), como os e-mails.
 
 ## Empresas novas: WhatsApp sai sozinho depois da aprovação (nov/2026)
 

@@ -9,7 +9,9 @@ A cada 5 minutos (rotinas.rodada) o sistema confere:
 - e-mails da fila falhando (5 ou mais na última hora);
 - número com os contatos frios pausados por pedidos de SAIR (mensagens.limite_de_frios);
 - o agendador que ficou mais de 30 minutos sem rodar (aviso quando ele volta);
-- a cópia de segurança (backup) feita no computador da plataforma parada há mais de 3 dias e meio.
+- a cópia de segurança (backup) feita no computador da plataforma parada há mais de 3 dias e meio;
+- a API de licenças do Assinador MS (assinador-ms/api_licencas, no mesmo servidor) sem responder em 2 conferências
+  seguidas (desde 26/11/2026; o aviso vai só para a MS: Admin Master e administradores da AR MS).
 
 Cada problema vira UM e-mail para os administradores (ou para a lista em Configurações), um lembrete a cada 12 horas
 enquanto durar e um e-mail de "resolvido" quando volta ao normal. Também aparece no sino do sistema.
@@ -18,16 +20,20 @@ Só roda na nuvem (no computador local o sistema é uma cópia de testes)."""
 import logging
 from datetime import datetime, timedelta
 
+import httpx
 from sqlalchemy import func, select, text
 
-from . import config, relogio
+from . import ars, config, relogio
 from .banco import agora, gravar_config, ler_config, ler_config_int, ler_config_json, sessao
-from .modelos import Mensagem, Notificacao, Usuario
+from .modelos import Mensagem, Notificacao, Tenant, Usuario
 
 log = logging.getLogger(__name__)
 
 ESTADO = "alertas_estado"        # {chave: {"titulo", "texto", "link", "desde", "avisado_em"}}
 FALHAS = "alertas_falhas"        # {rotina: {"seguidas", "erro", "desde"}}
+LICENCAS = "alertas_licencas"    # {"seguidas", "erro", "desde"}: conferências seguidas da API de licenças sem resposta
+LICENCAS_SEGUIDAS = 2            # 2 conferências seguidas (~10 min): reiniciar ou publicar a API não vira aviso
+TEMPO_LICENCAS = 10              # segundos esperando o /ready responder
 ULTIMA_RODADA = "alertas_ultima_rodada"
 REPETIR = timedelta(hours=12)    # lembrete enquanto o problema durar
 ESPERA_PONTE = timedelta(minutes=15)
@@ -93,6 +99,56 @@ def tamanho_do_banco_mb(db) -> float | None:
     if db.get_bind().dialect.name != "postgresql":
         return None
     return (db.execute(text("select pg_database_size(current_database())")).scalar() or 0) / 1024 / 1024
+
+
+# ---------------------------------------------------------------- API de licenças do Assinador MS (26/11/2026)
+
+def _ar_ms(db) -> int | None:
+    """A AR MS, dona do Assinador MS: o aviso da API de licenças vai para o Admin Master e os administradores dela."""
+    return db.execute(select(Tenant.id).where(Tenant.slug == ars.AR_MS)).scalar()
+
+
+def _erro_da_api_de_licencas(url: str) -> str:
+    """Pergunta ao /ready da API. '' = no ar (200 com {"status": "ready"}); senão, o que deu errado, em poucas palavras."""
+    try:
+        r = httpx.get(url, timeout=TEMPO_LICENCAS)
+    except httpx.TimeoutException:
+        return f"não respondeu em {TEMPO_LICENCAS} segundos"
+    except httpx.ConnectError:
+        return "o serviço não atende: parece parado"
+    except httpx.HTTPError as erro:
+        return f"falha na conexão ({type(erro).__name__})"
+    if r.status_code == 503:
+        return "o serviço está ligado, mas o banco de dados das licenças não responde (erro 503)"
+    if r.status_code != 200:
+        return f"respondeu com o erro {r.status_code}"
+    try:
+        dados = r.json()
+    except ValueError:
+        dados = None
+    return "" if isinstance(dados, dict) and dados.get("status") == "ready" else "respondeu algo inesperado"
+
+
+def conferir_licencas(db) -> bool | None:
+    """Confere a API de licenças do Assinador MS (no MESMO servidor, config.LICENCAS_READY_URL) e conta as conferências
+    seguidas sem resposta em LICENCAS; com LICENCAS_SEGUIDAS, problemas_agora abre o aviso. Chamado por verificar (a
+    cada 5 minutos). Devolve se está no ar (None = não confere: fora do servidor ou endereço vazio)."""
+    url = config.LICENCAS_READY_URL
+    if not url:
+        return None
+    erro = _erro_da_api_de_licencas(url)
+    antes = ler_config_json(db, LICENCAS, {}) or {}
+    if not erro:
+        log.info("Assinador MS: API de licenças no ar")
+        if antes:  # só grava quando havia falha (nada de gravar no banco a cada 5 minutos)
+            log.info("Assinador MS: API de licenças voltou depois de %s conferência(s) sem resposta",
+                     antes.get("seguidas", 0))
+            gravar_config(db, LICENCAS, {})
+        return True
+    seguidas = int(antes.get("seguidas", 0) or 0) + 1
+    gravar_config(db, LICENCAS, {"seguidas": seguidas, "erro": erro, "desde": antes.get("desde") or agora().isoformat()})
+    log.warning("Assinador MS: API de licenças sem resposta (%s conferência(s) seguida(s)): %s", seguidas, erro)
+    return False
 
 
 def problemas_agora(db) -> dict[str, dict]:
@@ -185,6 +241,19 @@ def problemas_agora(db) -> dict[str, dict]:
                       "computador ligado depois do meio-dia ou dar dois cliques em fazer_backup.bat."),
             "link": "/configuracoes?aba=integracoes", "desde": feito.isoformat()}
 
+    licencas = ler_config_json(db, LICENCAS, {}) or {}
+    if int(licencas.get("seguidas", 0) or 0) >= LICENCAS_SEGUIDAS:  # contadas por conferir_licencas (2 seguidas)
+        comeco = _ler_data(licencas.get("desde"))
+        achados["licencas"] = {
+            "titulo": "Assinador MS: o servidor de licenças não responde",
+            "texto": (f"Desde {comeco:%d/%m às %H:%M} " if comeco else "Há alguns minutos ")
+            + f"o servidor de licenças do Assinador MS não responde ({licencas.get('erro') or 'sem resposta'}). "
+            "Os clientes que já entraram no programa continuam assinando por até 72 horas com a licença guardada no "
+            "computador, mas ninguém consegue entrar na conta (nem num computador novo) e as licenças não são renovadas "
+            "enquanto ele não voltar.\n\nO que fazer: avisar quem cuida do sistema para conferir o serviço "
+            "assinador-licencas no servidor (passo a passo em assinador-ms/docs/licencas/operacao.md).",
+            "link": "/configuracoes?aba=integracoes#avisos", "desde": licencas.get("desde", ""), "ar": _ar_ms(db)}
+
     desde = agora_ - timedelta(hours=1)
     falhas, total = db.execute(select(
         func.count(Mensagem.id).filter(Mensagem.status == "falhou"), func.count(Mensagem.id)).where(
@@ -239,6 +308,10 @@ def verificar(db=None) -> dict:
     agora_ = agora()
     estado: dict = ler_config_json(db, ESTADO, {}) or {}
     feito = {"novos": 0, "lembretes": 0, "resolvidos": 0}
+    try:
+        conferir_licencas(db)  # conta as falhas seguidas da API de licenças do Assinador MS (lidas em problemas_agora)
+    except Exception:  # noqa: BLE001 - não pode impedir os outros avisos
+        log.exception("Não consegui conferir a API de licenças do Assinador MS")
     atuais = problemas_agora(db)
     for chave, p in atuais.items():
         anterior = estado.get(chave) or {}
@@ -270,10 +343,12 @@ def verificar(db=None) -> dict:
     return feito
 
 
-def ativos(db) -> list[dict]:
-    """Os problemas avisados que ainda estão abertos (para a tela de Configurações)."""
+def ativos(db, ar: int | None = None) -> list[dict]:
+    """Os problemas avisados que ainda estão abertos (para a tela de Configurações). Com `ar` (quem vê é de uma AR): os
+    da plataforma e os dessa AR; o de outra AR (número dela, API de licenças do Assinador MS) fica de fora, como o e-mail."""
     estado = ler_config_json(db, ESTADO, {}) or {}
-    return [{"chave": c, **v} for c, v in sorted(estado.items(), key=lambda kv: kv[1].get("desde", ""))]
+    return [{"chave": c, **v} for c, v in sorted(estado.items(), key=lambda kv: kv[1].get("desde", ""))
+            if ar is None or v.get("ar") in (None, ar)]
 
 
 # ---------------------------------------------------------------- Chamado pelas rotinas

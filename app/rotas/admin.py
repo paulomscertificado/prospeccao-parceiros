@@ -229,7 +229,7 @@ def configuracoes(request: Request, aba: str = "geral", usuario: Usuario = Depen
         "receita_oculta": bases_importadas.receita_oculta(db),
         "tem_chave_cnpja": bool(_chave_cnpja()) if aba == "integracoes" else False,
         "assertiva": assertiva_painel,
-        "painel_avisos": {"ativos": alertas.ativos(db), "para": alertas.destinatarios(db), "ligado": alertas.ligado(),
+        "painel_avisos": {"ativos": alertas.ativos(db, ar_tela), "para": alertas.destinatarios(db), "ligado": alertas.ligado(),
                    "email_ok": email_smtp.configurado(), "banco_mb": alertas.tamanho_do_banco_mb(db),
                    "banco_limite": int(float(ler_config(db, "limite_banco_mb") or 0) or 0),
                    "backup": ler_config_json(db, "backup_ultimo", {}) or {}, "relogio": relogio.resumo(db)}

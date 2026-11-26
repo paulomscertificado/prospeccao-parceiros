@@ -177,6 +177,9 @@ a ordem de sempre). A regra da Maria continua igual para a plataforma toda: um e
 e pausa de contatos frios vão para o Admin Master (ou a lista `alertas_emails`) e para os administradores da AR dona do
 número; computador do WhatsApp parado vai para todos os administradores (afeta todas as ARs); banco, backup, rotina,
 relógio e e-mails da fila vão para a plataforma (Admin Master ou a lista). O "resolvido" segue o mesmo caminho.
+API de licenças do Assinador MS parada (26/11/2026, `alertas.conferir_licencas`) é da AR MS: Admin Master (ou a lista)
+e os administradores da AR MS, nunca as outras ARs. No quadro "Problemas abertos agora" (Configurações > Integrações)
+quem é de uma AR vê só os da plataforma e os da AR dele (`alertas.ativos(db, ar)`).
 
 **Testes:** `testes/test_fila_justa.py` (ordem da vez; limite de uma AR contando só os envios dela; o portão: AR MS no
 limite e o e-mail do Grupo Certy sai na mesma rodada; quem recebe cada aviso).

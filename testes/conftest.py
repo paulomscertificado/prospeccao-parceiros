@@ -18,6 +18,7 @@ os.environ["LISTA_EXCLUSAO_CNPJA"] = "0"                       # nunca fala com 
 os.environ["ESPACAR_ENVIOS"] = "0"                             # a regra de 3-4 min tem teste próprio
 os.environ["EXIGIR_2FA"] = "0"                                 # os testes do 2FA ligam só neles
 os.environ["WHATSAPP_LEADS_TOKEN"] = ""                       # nunca fala com o WhatsApp Leads de verdade
+os.environ["LICENCAS_READY_URL"] = ""                          # nunca confere a API de licenças de verdade (test_alertas simula)
 os.environ["WHATSAPP_LEADS_PASTA"] = str(Path(PASTA_TESTE, "sem-whatsapp-leads"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 

@@ -78,6 +78,10 @@ elif DATABASE_URL.startswith("postgresql://"):
 CRON_SECRET = os.environ.get("CRON_SECRET", "")
 # Avisos por e-mail quando algo para (app/alertas.py): sempre na nuvem; no computador, só com ALERTAS_LIGADOS=1
 ALERTAS_LIGADOS = os.environ.get("ALERTAS_LIGADOS", "0") == "1"
+# API de licenças do Assinador MS (assinador-ms/api_licencas), no MESMO servidor: os avisos conferem o /ready dela a cada
+# 5 minutos (alertas.conferir_licencas). Vazio = não confere (o padrão fora do servidor; os testes simulam a resposta).
+LICENCAS_READY_URL = os.environ.get("LICENCAS_READY_URL",
+                                    "http://127.0.0.1:8040/api/v1/ready" if NA_NUVEM else "").strip()
 # Segundos que cada chamada do agendador pode trabalhar (a Vercel corta em maxDuration do vercel.json).
 SEGUNDOS_POR_RODADA = int(os.environ.get("SEGUNDOS_POR_RODADA", "240"))
 
