@@ -213,12 +213,18 @@ base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renova
     e `_sem_horario_no_passado` na aprovação). Avisos já marcados num feriado (a piloto, montada antes; ou feriado novo
     salvo na tela): `remarcar_feriados(db, aplicar=True)` leva cada um ao dia útil mais perto (antes, se der) com 2 dias
     dos vizinhos, até o vencimento e com vaga no teto de WhatsApps; sem vaga de WhatsApp, só o e-mail; sem dia, cancela.
-    O e-mail vai de novo para ~2 h depois do WhatsApp. A tela chama ao salvar um feriado novo.
+    O e-mail vai de novo para ~2 h depois do WhatsApp, no mesmo dia. A tela chama ao salvar um feriado novo.
     Desde 18/11/2026 valem também os feriados do estado e da cidade de quem é a campanha (`dias_sem_envio(db, pessoa)`,
     `app/feriados.py`, Configurações > Feriados): na montagem (`criar_campanha` → `datas_da_campanha(pessoa=)`), na
     aprovação (`reajustar_na_aprovacao`) e em `remarcar_feriados` (cada campanha com os feriados do dono dela).
-    `emails_no_prazo(db, camp)` (na montagem e na aprovação): o e-mail que ficaria para depois do vencimento
-    (WhatsApp numa sexta à tarde, vence no sábado) sai no mesmo dia e horário do WhatsApp.
+    **E-mail no dia do WhatsApp** (pedido da Maria em 26/11/2026; antes, desde 13/11, só o e-mail que passaria do
+    vencimento voltava): `emails_no_dia_do_whatsapp(db, camp)` (no fim da montagem e na aprovação, com o horário e os
+    feriados da marca da campanha) põe o e-mail de cada aviso no dia do WhatsApp do mesmo aviso, umas 2 h depois dele
+    ou, se isso passar do horário, logo depois dele (`cadencias.depois_de(..., mesmo_dia=True)`: 3 a 8 minutos depois,
+    no máximo 5 minutos antes do fim do horário; a fila de e-mail espera o WhatsApp do aviso sair). Antes, o e-mail do
+    WhatsApp do fim da tarde ia para o dia útil seguinte: na campanha 127 do Grupo Certy (avisos até as 17:30), o do
+    último aviso caía no dia do vencimento. `reajustar_na_aprovacao` e `remarcar_feriados` usam a mesma regra. Teste:
+    `test_email_do_aviso_sai_no_dia_do_whatsapp`. As Empresas novas continuam com o dia útil seguinte.
     **Aprovar na tela** (pedido da Maria em 13/11/2026): a tela Renovação mostra no topo a campanha
     `aguardando_aprovacao` com o botão (e a lista de campanhas também); o formulário manda `voltar=/renovacao` e
     `rotas/sdr.acao_campanha` volta para lá (só endereços de `AREAS_DAS_CAMPANHAS`). A página da campanha de renovação

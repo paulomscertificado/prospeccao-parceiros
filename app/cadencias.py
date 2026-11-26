@@ -81,23 +81,30 @@ INTERVALO_DEPOIS_DO_WHATSAPP = 120  # minutos: Empresas novas, o e-mail do toque
 
 def depois_de(db: Session, dia: date, hora: str, minutos: int = INTERVALO_DEPOIS_DO_WHATSAPP,
               pular_fds: bool | None = None, minimo: str = "", maximo: str = "",
-              feriados: frozenset = frozenset()) -> tuple[date, str]:
+              feriados: frozenset = frozenset(), mesmo_dia: bool = False) -> tuple[date, str]:
     """Dia e horário natural pelo menos `minutos` depois de dia/hora: no mesmo dia, se couber no horário de envio
     (fora do almoço); senão no próximo dia de envio. Empresas novas (pedido da Maria em 12/11/2026): o e-mail de cada
-    toque fica para depois do WhatsApp do mesmo toque, que tem prioridade."""
+    toque fica para depois do WhatsApp do mesmo toque, que tem prioridade.
+    mesmo_dia=True (avisos da Renovação, pedido da Maria em 26/11/2026): nunca o dia seguinte; se os `minutos` passarem
+    do horário de envio, fica logo depois de dia/hora (no máximo 5 minutos antes do fim do horário)."""
     from .banco import agora
 
     fim = _minutos(ler_config(db, "horario_envio_fim") or "18:00", 18 * 60)
     if maximo:
         fim = min(fim, _minutos(maximo, fim))
     fim -= 20
-    minuto = _minutos(hora or "09:00", 9 * 60) + minutos + random.randint(0, 40)
+    base = _minutos(hora or "09:00", 9 * 60)
+    minuto = base + minutos + random.randint(0, 40)
     if 12 * 60 <= minuto < 13 * 60 + 30:
         minuto = 13 * 60 + 30 + random.randint(1, 25)  # nada no horário de almoço
     if minuto % 5 == 0:
         minuto += random.randint(1, 4)  # nada de 14:30, 15:15...
     if minuto > fim + 4:
-        return dia_e_hora_futuros(db, dia + timedelta(days=1), pular_fds, minimo, maximo, feriados)  # próximo dia
+        if not mesmo_dia:
+            return dia_e_hora_futuros(db, dia + timedelta(days=1), pular_fds, minimo, maximo, feriados)  # próximo dia
+        # o e-mail do aviso não vai para o dia útil seguinte (no último aviso, às vezes o do vencimento): sai logo depois
+        # do WhatsApp; a fila de e-mail espera o WhatsApp do aviso sair (campanhas.TIPOS_WHATSAPP_PRIMEIRO)
+        minuto = max(base, min(base + random.randint(3, 8), fim + 15))
     hhmm = f"{minuto // 60:02d}:{minuto % 60:02d}"
     if f"{dia:%Y-%m-%d} {hhmm}" <= agora().strftime("%Y-%m-%d %H:%M"):
         return dia_e_hora_futuros(db, dia, pular_fds, minimo, maximo, feriados)  # o WhatsApp já passou: fica para já

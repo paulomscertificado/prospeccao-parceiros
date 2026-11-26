@@ -623,8 +623,10 @@ renovação novo antes, para entrarem os clientes de janeiro).
   seguintes que ainda cabem (nunca em dias seguidos). Aviso que atrasou (número desconectado, fila parada) também sai com o texto dos dias que faltam no
   dia em que sai, e os avisos repetidos são cancelados sozinhos. Aviso que cairia no sábado ou no domingo vem para a sexta antes;
   quem vence no fim de semana tem o último aviso na sexta (se preciso, o aviso anterior vem um dia antes para caber).
-- **WhatsApp primeiro, e-mail depois:** igual às Empresas novas (o e-mail de cada aviso sai umas 2 horas depois do
-  WhatsApp). Quem não tem celular na planilha recebe só por e-mail. Sem WhatsApp e sem e-mail na planilha, não recebe
+- **WhatsApp primeiro, e-mail depois:** o e-mail de cada aviso sai **no mesmo dia** do WhatsApp, umas 2 horas depois
+  dele. Quando o WhatsApp está marcado no fim da tarde e as 2 horas passariam do horário dos avisos, o e-mail sai logo
+  depois do WhatsApp, nunca no dia seguinte (desde 26/11/2026; antes ele ia para o dia útil seguinte e, no último aviso,
+  às vezes caía no dia do vencimento). Quem não tem celular na planilha recebe só por e-mail. Sem WhatsApp e sem e-mail na planilha, não recebe
   aviso (aparece no filtro **Sem WhatsApp e e-mail**): o contato vem só da planilha.
 - **Teto por dia (quando ligado):** com o teto de contatos frios ligado em Configurações > Geral (era 20; desligado
   desde 17/11/2026, e aí os avisos ficam nos dias certos e saem no ritmo de 15 por hora), a campanha espalha os avisos: no máximo 20 WhatsApps de renovação por dia, quem vence antes recebe antes, todo mundo recebe o

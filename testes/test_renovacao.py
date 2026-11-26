@@ -60,14 +60,6 @@ def _montar(cid):
         pass
 
 
-def _proximo_dia_de_envio(dia, sem_envio):
-    """O dia útil seguinte (sem sábado, domingo e os feriados da Renovação)."""
-    dia += timedelta(days=1)
-    while dia.weekday() >= 5 or dia in sem_envio:
-        dia += timedelta(days=1)
-    return dia
-
-
 class _SemLinha:  # a montagem roda aqui, não numa linha de execução paralela (evita corrida no teste)
     def __init__(self, *a, **k):
         pass
@@ -234,17 +226,12 @@ def test_campanha_agrupa_por_contato_e_marca_os_avisos(cliente, monkeypatch):
         aviso = zaps[0].mensagem
         assert aviso.startswith("Olá, Maria! Tudo bem?") and "Estes certificados digitais vencem em breve" in aviso
         assert "PADARIA GRUPO LTDA (e-CNPJ A1)" in aviso and "Seu certificado (e-CPF A1)" in aviso and "SAIR" in aviso
-        for zap in zaps:  # o e-mail de cada aviso fica para umas 2 h depois do WhatsApp do mesmo aviso
+        for zap in zaps:  # o e-mail de cada aviso sai no dia do WhatsApp do mesmo aviso, depois dele: umas 2 h depois
+            # ou, com o WhatsApp no fim da tarde, logo depois dele (renovacao.emails_no_dia_do_whatsapp, 26/11/2026;
+            # test_email_do_aviso_sai_no_dia_do_whatsapp)
             mail = [t for t in dela if t.canal == "email" and t.angulo == zap.angulo]
-            assert mail and mail[0].data <= venc
-            if (mail[0].data, mail[0].hora) == (zap.data, zap.hora):
-                # ... menos quando isso passaria do vencimento: WhatsApp à tarde no último dia útil antes de um
-                # vencimento no fim de semana ou num feriado (o horário é sorteado; rodando numa terça, o contato A
-                # vence num sábado). Aí o e-mail sai junto com o WhatsApp e a fila de e-mail espera o WhatsApp sair
-                # (renovacao.emails_no_prazo; test_email_do_aviso_nao_passa_do_vencimento)
-                assert _proximo_dia_de_envio(zap.data, sem_envio) > venc
-            else:
-                assert (mail[0].data, mail[0].hora) > (zap.data, zap.hora)
+            assert mail and mail[0].data == zap.data <= venc
+            assert mail[0].hora > zap.hora
         primeiro = db.execute(select(Certificado).where(Certificado.protocolo == "8000001")).scalars().one()
         assert {t.certificado_id for t in dela} == {primeiro.id}  # o primeiro a vencer define as datas
         b = next(l for l in leads.values() if l.chave_whatsapp == "81987650002")
@@ -1218,7 +1205,7 @@ def test_tela_salva_os_outros_feriados(cliente, csrf):
 def test_email_do_aviso_nao_passa_do_vencimento(cliente):
     """Pedido da Maria (13/11/2026): "os de sábados e domingos avisar na sexta". O e-mail fica para umas 2 horas depois
     do WhatsApp; numa sexta à tarde isso caía na segunda, depois do vencimento no sábado, e o e-mail era cancelado. Agora
-    ele sai no mesmo dia do WhatsApp (a fila de e-mail espera o WhatsApp sair)."""
+    ele sai no mesmo dia do WhatsApp, logo depois dele (a fila de e-mail espera o WhatsApp sair)."""
     sexta = date.today() + timedelta(days=(4 - date.today().weekday()) % 7 + 7)
     with sessao() as db:
         _limpar(db)
@@ -1241,9 +1228,62 @@ def test_email_do_aviso_nao_passa_do_vencimento(cliente):
                        angulo="renov_ultimo", mensagem="Olá! Último aviso.")
         db.add_all([zap, email])
         db.flush()
-        assert renovacao.emails_no_prazo(db, camp) == 1
-        assert (email.data, email.hora) == (sexta, "16:41")
-        assert renovacao.emails_no_prazo(db, camp) == 0
+        assert renovacao.emails_no_dia_do_whatsapp(db, camp) == 1
+        assert email.data == sexta and "16:41" < email.hora <= "16:49"  # 2 h depois passaria do horário
+        assert renovacao.emails_no_dia_do_whatsapp(db, camp) == 0
+        db.rollback()
+
+
+def test_email_do_aviso_sai_no_dia_do_whatsapp(cliente):
+    """Pedido da Maria (26/11/2026), campanha 127 do Grupo Certy (avisos até as 17:30): o WhatsApp marcado no fim da
+    tarde (17:02) jogava o e-mail do aviso para o dia útil seguinte, e o do último aviso caía no dia do vencimento. O
+    e-mail fica no dia do WhatsApp: umas 2 h depois, se couber no horário; senão logo depois dele. As campanhas montadas
+    antes (como a 127) ficam certas na aprovação."""
+    from app import cadencias
+    from app.modelos import ConfiguracaoAR
+
+    quinta = date.today() + timedelta(days=(3 - date.today().weekday()) % 7 + 7)  # a quinta da outra semana
+    with sessao() as db:
+        _limpar(db)
+        ms = _na_marca_da_tela(db)
+        db.add(ConfiguracaoAR(tenant_id=ms, chave="renov_hora_fim", valor="17:30"))
+        db.flush()
+        db.info.pop("config_ar", None)  # os valores da marca ficam guardados na sessão
+        # a regra do horário: sem mesmo_dia (Empresas novas), o dia seguinte; com ele, logo depois do WhatsApp
+        assert cadencias.depois_de(db, quinta, "17:02", maximo="17:30")[0] > quinta
+        dia, hora = cadencias.depois_de(db, quinta, "17:02", maximo="17:30", mesmo_dia=True)
+        assert dia == quinta and "17:05" <= hora <= "17:10"
+        dia, hora = cadencias.depois_de(db, quinta, "10:23", maximo="17:30", mesmo_dia=True)
+        assert dia == quinta and hora >= "12:23"  # cabe: umas 2 h depois, como antes
+
+        admin = _admin(db)
+        camp = Campanha(nome="Renovação e-mail no dia do WhatsApp", tipo="renovacao", status="aguardando_aprovacao",
+                        usuario_id=admin.id, canais="whatsapp,email", tenant_id=ms)
+        lead = Lead(empresa="CLIENTE NO DIA LTDA", whatsapp="(81) 98777-0002", email="nodia@nodia-teste.com.br",
+                    status="Abordagem criada", vendedor_id=admin.id, origem=renovacao.ORIGEM_LEAD)
+        db.add_all([camp, lead])
+        db.flush()
+        cert = Certificado(origem="planilha", protocolo="9500002", cliente_nome=lead.empresa, status="Ativo",
+                           data_vencimento=quinta + timedelta(days=5), campanha_id=camp.id, lead_id=lead.id)
+        db.add(cert)
+        db.flush()
+
+        def aviso(canal, dia, hora, angulo):
+            t = Tarefa(tipo="prospeccao", lead_id=lead.id, campanha_id=camp.id, certificado_id=cert.id, canal=canal,
+                       data=dia, hora=hora, status="rascunho", angulo=angulo, mensagem="Olá! Aviso de vencimento.")
+            db.add(t)
+            return t
+
+        # montada antes da correção, como a 127: o e-mail do WhatsApp das 17:02 no dia útil seguinte; o do último aviso
+        # (na segunda, vence na terça) já no dia do WhatsApp
+        aviso("whatsapp", quinta, "17:02", "renov_aviso")
+        email_tarde = aviso("email", quinta + timedelta(days=1), "14:32", "renov_aviso")
+        aviso("whatsapp", quinta + timedelta(days=4), "10:23", "renov_ultimo")
+        email_manha = aviso("email", quinta + timedelta(days=4), "13:33", "renov_ultimo")
+        db.flush()
+        campanhas.aprovar(db, camp, admin)
+        assert email_tarde.status == "pendente" and email_tarde.data == quinta and "17:02" < email_tarde.hora <= "17:10"
+        assert (email_manha.data, email_manha.hora) == (quinta + timedelta(days=4), "13:33")  # já estava no dia: fica
         db.rollback()
 
 

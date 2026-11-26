@@ -1504,9 +1504,10 @@ def reajustar_na_aprovacao(db, camp: Campanha, rascunhos: list[Tarefa]) -> list[
                 _textos_de_primeiro(db, t, dono)
             if t.data != nova:
                 zap = zaps.get(t.angulo) if t.canal == "email" else None
-                if zap is not None:
+                if zap is not None:  # o e-mail no dia do WhatsApp do aviso (26/11/2026)
                     t.data, t.hora = cadencias.depois_de(db, zap.data, zap.hora or "09:00", pular_fds=pular_fds,
-                                                         minimo=minimo, maximo=maximo, feriados=sem_envio)
+                                                         minimo=minimo, maximo=maximo, feriados=sem_envio,
+                                                         mesmo_dia=True)
                 else:
                     t.data = nova
             continuam.append(t)
@@ -1659,29 +1660,31 @@ def encerrar_toques(db, hoje: date | None = None) -> int:
     return len(tarefas)
 
 
-def emails_no_prazo(db, camp: Campanha) -> int:
-    """O e-mail de cada aviso sai umas 2 horas depois do WhatsApp; numa sexta à tarde isso caía na segunda, depois de um
-    vencimento no fim de semana, e o aviso por e-mail acabava cancelado (pedido da Maria em 13/11/2026: "os de sábados e
-    domingos avisar na sexta"). O e-mail que passaria do vencimento sai no mesmo dia e horário do WhatsApp (a fila de
-    e-mail espera o WhatsApp da empresa sair). Devolve quantos mudaram."""
+def emails_no_dia_do_whatsapp(db, camp: Campanha) -> int:
+    """O e-mail de cada aviso sai no MESMO dia do WhatsApp do aviso: umas 2 horas depois dele, se couber no horário de
+    envio da marca; senão, logo depois dele (cadencias.depois_de com mesmo_dia; a fila de e-mail espera o WhatsApp do
+    aviso sair). Pedido da Maria em 26/11/2026: na campanha do Grupo Certy, o WhatsApp do fim da tarde jogava o e-mail
+    para o dia útil seguinte, e o do último aviso caía no dia do vencimento. Antes (13/11/2026, "os de sábados e domingos
+    avisar na sexta") só o e-mail que passaria do vencimento voltava para o dia do WhatsApp. Roda no fim da montagem e
+    na aprovação, com o horário e os feriados da marca da campanha. Devolve quantos mudaram."""
+    from . import cadencias
+    from .banco import config_da_ar
+
     tarefas = db.execute(select(Tarefa).where(Tarefa.campanha_id == camp.id, Tarefa.tipo == "prospeccao",
                                               Tarefa.status.in_(("rascunho", "pendente")))).scalars().all()
-    ids = {t.certificado_id for t in tarefas if t.certificado_id}
-    if not ids:
-        return 0
-    vencimentos = dict(db.execute(select(Certificado.id, Certificado.data_vencimento)
-                                  .where(Certificado.id.in_(ids))).all())
     zaps = {(t.lead_id, t.certificado_id, t.angulo): t for t in tarefas if t.canal == "whatsapp"}
-    mudou = 0
-    for t in tarefas:
-        venc = vencimentos.get(t.certificado_id)
-        if t.canal != "email" or venc is None or t.data <= venc:
-            continue
-        zap = zaps.get((t.lead_id, t.certificado_id, t.angulo))
-        if zap is not None and zap.data <= venc:
-            t.data, t.hora = zap.data, zap.hora
-            mudou += 1
-    return mudou
+    fora_do_dia = [(t, zaps[(t.lead_id, t.certificado_id, t.angulo)]) for t in tarefas if t.canal == "email"
+                   and (t.lead_id, t.certificado_id, t.angulo) in zaps
+                   and t.data != zaps[(t.lead_id, t.certificado_id, t.angulo)].data]
+    if not fora_do_dia:
+        return 0
+    dono = db.get(Usuario, camp.usuario_id) if camp.usuario_id else None
+    with config_da_ar(db, camp.tenant_id):
+        minimo, maximo, sem_envio = hora_inicio(db), hora_fim(db), dias_sem_envio(db, dono)
+        for t, zap in fora_do_dia:
+            t.data, t.hora = cadencias.depois_de(db, zap.data, zap.hora or "09:00", pular_fds=True, minimo=minimo,
+                                                 maximo=maximo, feriados=sem_envio, mesmo_dia=True)
+    return len(fora_do_dia)
 
 
 def _dia_que_cabe(dia: date, vencimento: date, antes: date | None, depois: date | None, inicio: date,
@@ -1814,8 +1817,9 @@ def _remarcar_feriados_da_marca(db, hoje: date | None, aplicar: bool, ar: int | 
             return (max(datas) if lado < 0 else min(datas)) if datas else None
 
         def email_depois(i: int, depois: date | None) -> None:
-            """O e-mail do aviso: umas 2 horas depois do WhatsApp; se não couber antes do próximo aviso (ou do
-            vencimento), no mesmo dia (a fila de e-mail espera o WhatsApp da empresa sair)."""
+            """O e-mail do aviso: no dia do WhatsApp, umas 2 horas depois dele ou, se isso passar do horário, logo
+            depois dele (26/11/2026); se ainda assim não couber antes do próximo aviso (ou do vencimento), junto com o
+            WhatsApp (a fila de e-mail espera o WhatsApp da empresa sair)."""
             zap_i, email_i = avisos[i].get("whatsapp"), avisos[i].get("email")
             if (zap_i is None or email_i is None or email_i.status not in abertos
                     or novas.get(zap_i.id, ()) is None or novas.get(email_i.id, ()) is None):
@@ -1823,7 +1827,7 @@ def _remarcar_feriados_da_marca(db, hoje: date | None, aplicar: bool, ar: int | 
             if zap_i.id not in novas and email_i.data not in sem_envio:
                 return  # nada mudou
             d, h = cadencias.depois_de(db, dia_de(zap_i), hora_de(zap_i), pular_fds=True, minimo=minimo,
-                                       maximo=maximo, feriados=sem_envio)
+                                       maximo=maximo, feriados=sem_envio, mesmo_dia=True)
             if d > venc or (depois is not None and d >= depois):
                 d, h = dia_de(zap_i), hora_de(zap_i)
             novas[email_i.id] = (d, h)

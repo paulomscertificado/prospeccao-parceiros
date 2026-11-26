@@ -392,7 +392,7 @@ def _montar(campanha_id: int, escolhidos: list[int], textos: dict[int, dict], so
             if ondas:  # certificado do mesmo contato vencendo bem depois: os próprios avisos, na mesma campanha
                 r["tarefas"] += renovacao.montar_ondas(db, camp, cad, usuario, ondas)
             db.flush()
-            renovacao.emails_no_prazo(db, camp)  # e-mail nunca depois do vencimento (sexta à tarde, vence no sábado)
+            renovacao.emails_no_dia_do_whatsapp(db, camp)  # o e-mail do aviso no dia do WhatsApp dele (26/11/2026)
         camp.etapa = (f"Pronta: {r['leads']} {'contatos' if camp.tipo == 'renovacao' else 'empresas'}, "
                       f"{r['tarefas']} mensagens"
                       + (f" ({len(r['pulados'])} puladas)" if r["pulados"] else "") + ".")
@@ -601,7 +601,9 @@ def aprovar(db, camp: Campanha, usuario: Usuario, vagas_usadas: dict | None = No
             from . import renovacao
 
             db.flush()
-            renovacao.emails_no_prazo(db, camp)  # aprovada depois: o e-mail também não passa do vencimento
+            # o e-mail do aviso no dia do WhatsApp dele, também nas campanhas montadas antes de 26/11/2026 (o e-mail
+            # do WhatsApp do fim da tarde ia para o dia útil seguinte) e nas aprovadas depois do dia da montagem
+            renovacao.emails_no_dia_do_whatsapp(db, camp)
     camp.status = "ativa"
     camp.aprovado_por_id = usuario.id if usuario else None
     camp.aprovado_em = agora()
