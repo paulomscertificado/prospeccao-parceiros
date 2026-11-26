@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta
 import pytest
 from sqlalchemy import select
 
-from app import banco, cadencias, campanhas
+from app import banco, cadencias, campanhas, feriados, vagas, vagas_email
 from app.banco import gravar_config, sessao
 from app.modelos import Campanha, Lead, Tarefa, Usuario
 
@@ -21,8 +21,23 @@ def _devolve_config():
 
 
 def _relogio(monkeypatch, quando: datetime):
-    monkeypatch.setattr(banco, "agora", lambda: quando)
-    monkeypatch.setattr(campanhas, "agora", lambda: quando)
+    """Para o relógio em `quando`. As vagas de WhatsApp e de e-mail (app/vagas.py, app/vagas_email.py) guardam a própria
+    cópia de banco.agora: sem trocar a delas, a aprovação usava a hora de verdade (e o teste falhava do fim da tarde
+    em diante)."""
+    for modulo in (banco, campanhas, vagas, vagas_email):
+        monkeypatch.setattr(modulo, "agora", lambda: quando)
+
+
+def _hoje_de_envio(db, pessoa) -> date:
+    """O primeiro dia, de hoje em diante, que é dia de envio de `pessoa` (segunda a sexta, fora dos feriados dela) e
+    cujo depois de amanhã também é. A fila de e-mail não manda no fim de semana nem no feriado, e as vagas de e-mail
+    levam o e-mail marcado num desses dias para o próximo dia de envio (com `hoje + 2` no sábado, o teste falhava toda
+    quinta e sexta). Nunca antes de hoje: a aprovação conta o atraso da campanha pelo dia de verdade."""
+    sem_envio = feriados.dias_sem_envio(db, pessoa)
+    dia = date.today()
+    while any(d.weekday() >= 5 or d in sem_envio for d in (dia, dia + timedelta(days=2))):
+        dia += timedelta(days=1)
+    return dia
 
 
 def test_hoje_so_horario_que_ainda_nao_passou(cliente, monkeypatch):
@@ -50,11 +65,11 @@ def test_depois_do_expediente_vai_para_o_proximo_dia(cliente, monkeypatch):
 
 
 def test_aprovar_tarde_reagenda_o_que_ja_passou(cliente, monkeypatch):
-    hoje = date.today()
-    _relogio(monkeypatch, datetime.combine(hoje, datetime.min.time()).replace(hour=16, minute=0))
     with sessao() as db:
         gravar_config(db, "pular_fim_de_semana", "0")
         admin = db.execute(select(Usuario).where(Usuario.perfil == "admin")).scalars().first()
+        hoje = _hoje_de_envio(db, admin)  # os feriados que valem são os de quem é a campanha
+        _relogio(monkeypatch, datetime.combine(hoje, datetime.min.time()).replace(hour=16, minute=0))
         lead = Lead(empresa="Horario Teste Ltda", email="contato@horarioteste-x.com.br", status="Abordagem criada")
         db.add(lead)
         camp = Campanha(nome="Aprovada à tarde", status="aguardando_aprovacao", usuario_id=admin.id, canais="email")
