@@ -560,6 +560,9 @@ muda nas outras. A campanha automática do dia, por enquanto, roda só para a MS
    duplicar.
 3. No quadro **3. Montar campanha agora**, escolha quantos contatos (10 a 100; vão os que vencem primeiro) e clique
    em **Montar campanha**. Em alguns minutos a campanha fica **aguardando aprovação**.
+   Para levar **todos os clientes da planilha** de uma vez (ex.: a planilha de janeiro e fevereiro), clique em
+   **Montar com todos da planilha (N)**: entram todos que ainda não estão em campanha, de qualquer mês, cada um com os
+   avisos marcados desde já e contados do próprio vencimento. Também espera a aprovação.
 4. A campanha que espera aprovação aparece no **topo da tela Renovação**, com o botão verde **APROVAR CAMPANHA**
    (também no quadro **Campanhas de renovação** e na página da campanha). Para conferir as mensagens antes, clique em
    **Ver os avisos**. Depois de aprovar, você volta para a tela Renovação.

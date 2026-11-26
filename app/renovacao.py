@@ -1146,6 +1146,11 @@ def ondas(contato: Contato, dias_da_janela: int) -> list[Contato]:
     return lista
 
 
+# "Montar com todos da planilha" (pedido da Maria em 26/11/2026): todos os certificados ativos fora de campanha, de
+# qualquer mês, cada contato com os avisos contados do próprio vencimento (como a campanha do piloto, até 31/12)
+ATE_TODOS = date(2100, 1, 1)
+
+
 def criar_campanha(db, usuario: Usuario, quantidade: int | None = None, ate: date | None = None,
                    nome: str = "") -> Campanha | None:
     """Campanha de renovação com os contatos que vencem primeiro (no máximo `quantidade`; sem ela, o máximo por dia

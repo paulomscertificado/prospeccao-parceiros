@@ -82,7 +82,10 @@ def tela_renovacao(request: Request, ver: str = "avisar", q: str = "", usuario: 
     todos = db.execute(select(Certificado).where(Certificado.origem == renovacao.ORIGEM)).scalars().all()
     abertos = [c for c in todos if c.status == "Ativo" and c.data_vencimento >= hoje]
     contatos, fora = renovacao.contatos_para_campanha(db, hoje)
+    todos_da_planilha, _ = renovacao.contatos_para_campanha(db, hoje, ate=renovacao.ATE_TODOS)
     kpis = {
+        "todos_contatos": len(todos_da_planilha),  # "Montar com todos da planilha" (pedido da Maria em 26/11/2026)
+        "todos_ate": max((c.vencimento for c in todos_da_planilha), default=None),
         "base": len(abertos),
         "em_30": sum(1 for c in abertos if c.data_vencimento <= hoje + timedelta(days=janela)),
         "prontos_contatos": len(contatos), "prontos_certificados": sum(len(c.certificados) for c in contatos),
@@ -175,6 +178,18 @@ async def montar(request: Request, usuario: Usuario = Depends(exige("renovacao.g
                  db: Session = Depends(obter_db)):
     form = await request.form()
     _na_ar_da_renovacao(db, request, usuario)
+    if form.get("todos"):  # todos os clientes da planilha fora de campanha (pedido da Maria em 26/11/2026)
+        camp = renovacao.criar_campanha(db, renovacao.dono(db) or usuario, None, ate=renovacao.ATE_TODOS)
+        if camp is None:
+            avisar(request, "Nenhum cliente da planilha para avisar: todos já estão em campanha, renovados ou sem "
+                            "WhatsApp e e-mail (importe a planilha mais recente).", "erro")
+            return voltar("/renovacao")
+        registrar_log(db, usuario, "montou_campanha_renovacao", "campanha", camp.id,
+                      f"{camp.quantidade} contatos (todos da planilha)", request)
+        db.commit()
+        avisar(request, f"A campanha está sendo montada com todos os {camp.quantidade} contatos da planilha, cada um com "
+                        "os avisos marcados antes do próprio vencimento, e vai pedir aprovação (leva alguns minutos).")
+        return voltar(f"/campanhas/{camp.id}")
     quantidade = util.para_int(form.get("quantidade"))
     if quantidade not in renovacao.QUANTIDADES:
         quantidade = renovacao.QUANTIDADES[0]

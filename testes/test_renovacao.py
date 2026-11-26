@@ -1539,3 +1539,49 @@ def test_aviso_no_dia_certo_nao_muda_e_enviar_agora_volta_se_falhar(cliente, mon
         assert tentativas and "Último aviso:" in tentativas[0]  # tentou com o texto da etapa
         assert erro and atrasado.angulo == "renov_aviso" and atrasado.mensagem == original
         db.rollback()
+
+
+
+def test_montar_com_todos_da_planilha(cliente, csrf, monkeypatch):
+    """Pedido da Maria (26/11/2026): "crie uma opção para criar a campanha para todos os leads da planilha". Quem vence
+    daqui a 1 ou 2 meses (fora dos dias do 1º aviso) entra numa campanha só, cada um com os avisos contados do próprio
+    vencimento; a campanha espera a aprovação."""
+    from app import trabalhos
+
+    monkeypatch.setattr(trabalhos.threading, "Thread", _SemLinha)
+    linhas = [
+        _linha(45, "9700001", "e-CNPJ A1 12 meses", "TODOS JANEIRO LTDA", "19131243000197", "JOANA TODOS",
+               "12345678901", "joana@todos-teste.com.br", "81987650001"),
+        _linha(75, "9700002", "e-CPF A1 12 meses", "", "", "PEDRO FEVEREIRO", "98765432100",
+               "pedro@todos-teste.com.br", "81987650002"),
+    ]
+    with sessao() as db:
+        _limpar(db)
+        renovacao.importar(db, renovacao.ler_planilha("r.xlsx", _planilha(linhas))[0], _admin(db))
+        db.commit()
+    pagina = cliente.get("/renovacao").text
+    assert "Montar com todos da planilha (2)" in pagina and 'name="todos"' in pagina
+    r = cliente.post("/renovacao/montar", data={"csrf": csrf, "quantidade": "10"})
+    assert "Nenhum cliente para avisar agora" in r.text  # o "Montar campanha" só leva quem vence nos próximos dias
+    r = cliente.post("/renovacao/montar", data={"csrf": csrf, "quantidade": "10", "todos": "1"})
+    assert "todos os 2 contatos da planilha" in r.text
+    with sessao() as db:
+        camp = db.execute(select(Campanha).where(Campanha.tipo == "renovacao")
+                          .order_by(Campanha.id.desc())).scalars().first()
+        cid = camp.id
+        assert camp.quantidade == 2
+    _montar(cid)
+    with sessao() as db:
+        camp = db.get(Campanha, cid)
+        assert camp.status == "aguardando_aprovacao", camp.erro
+        for protocolo in ("9700001", "9700002"):
+            cert = db.execute(select(Certificado).where(Certificado.protocolo == protocolo)).scalars().one()
+            avisos = db.execute(select(Tarefa).where(Tarefa.campanha_id == cid, Tarefa.lead_id == cert.lead_id,
+                                                     Tarefa.canal == "whatsapp")).scalars().all()
+            assert cert.campanha_id == cid and len(avisos) >= 2
+            primeiro = min(t.data for t in avisos)
+            assert primeiro >= cert.data_vencimento - timedelta(days=renovacao.janela(db) + 6)  # no tempo certo
+            assert max(t.data for t in avisos) < cert.data_vencimento
+    assert "Montar com todos da planilha (0)" in cliente.get("/renovacao").text  # já estão em campanha
+    with sessao() as db:
+        _limpar(db)
