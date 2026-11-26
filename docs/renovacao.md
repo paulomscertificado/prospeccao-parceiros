@@ -134,7 +134,13 @@ base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renova
    lia por tarefa; `remarcar_feriados` roda marca por marca; Disparar, Minha fila e o planejamento da campanha usam a
    marca dela (`banco.config_da_ar`); importar e os textos gravam na marca da tela. A campanha automática do dia
    continua só da AR MS (`rodada_diaria`). A tela das outras marcas diz que tudo ali é delas. Testes:
-   `testes/test_renovacao_por_marca.py`. O teste do quadro 1 sai com a marca da
+   `testes/test_renovacao_por_marca.py`. **Montagem e aprovação com a marca da campanha** (26/11/2026, o Grupo Certy
+   escolheu avisos 25, 15, 5 e 1 dia antes, e a plataforma tem os 12, 6, 3 e 1 do piloto da MS): a montagem roda em
+   segundo plano, sem a marca da tela, e lia a plataforma. Os textos dos avisos (`etapa_preparar`) e o horário e os
+   feriados da 2ª onda (`montar_ondas`, em `campanhas._montar`) agora vêm da marca da campanha (`usar_config_da_ar`
+   com `camp.tenant_id`). A aprovação dias depois (`reajustar_na_aprovacao`, em `campanhas.aprovar` com
+   `config_da_ar`) conta as datas com os dias da marca, mesmo aprovada pelo Admin Master fora das marcas.
+   Testes: `testes/test_renovacao_montagem_da_marca.py`. O teste do quadro 1 sai com a marca da
    AR da tela (`textos_do_contato(ar=)`: o Admin Master dentro do Grupo Certy recebia "da MS"). Testes:
    `testes/test_renovacao_dono_por_ar.py`. `arte_do_toque` e o teste (`enviar_teste(ar=)`, o cliente fictício usa a AR
    da tela) mandam `"url"` junto; o WhatsApp Leads confere de novo (`arte_aviso.endereco_da_arte`) e guarda uma cópia

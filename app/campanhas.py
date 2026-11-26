@@ -17,8 +17,8 @@ from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import aliased
 
 from . import base_receita, bases_importadas, cadencias, config, contas_email, email_validacao, reservas, ia, mensagens, prospeccao, sdr, trabalhos, util
-from .banco import (agora, algum_valor, gravar_config, ler_config, ler_config_int, ler_config_json, sessao,
-                    usar_config_da_ar)
+from .banco import (agora, algum_valor, config_da_ar, gravar_config, ler_config, ler_config_int, ler_config_json,
+                    sessao, usar_config_da_ar)
 from .leads_servico import criar_lead, historico, limpar_campos, mudar_status, preencher, registrar_contato
 from .modelos import Cadencia, Campanha, Categoria, Lead, Tarefa, Usuario
 from .modelos import NOME_CADENCIA_SDR
@@ -362,6 +362,8 @@ def _montar(campanha_id: int, escolhidos: list[int], textos: dict[int, dict], so
             datas: dict | None = None, ondas: dict | None = None) -> None:
     with sessao() as db:
         camp = db.get(Campanha, campanha_id)
+        if camp.tipo == "renovacao":  # em segundo plano não há a marca da tela: a Renovação da marca da campanha (o
+            usar_config_da_ar(db, camp.tenant_id)  # horário e os feriados da 2ª onda saíam da plataforma; 26/11/2026)
         usuario = db.get(Usuario, camp.usuario_id)
         cad = db.get(Cadencia, camp.cadencia_id) if camp.cadencia_id else cadencia_sdr(db)
         leads = [l for l in (db.get(Lead, i) for i in escolhidos) if l]
@@ -565,8 +567,10 @@ def aprovar(db, camp: Campanha, usuario: Usuario, vagas_usadas: dict | None = No
         from . import renovacao
 
         # aprovada depois do dia em que foi montada: as datas são contadas de novo do vencimento (empurrar tudo para
-        # frente, como nas outras, jogaria avisos para depois do vencimento)
-        rascunhos = renovacao.reajustar_na_aprovacao(db, camp, rascunhos)
+        # frente, como nas outras, jogaria avisos para depois do vencimento), com os dias, o horário e os feriados da
+        # marca da campanha, seja quem aprova (o Admin Master fora das marcas usava os da plataforma; 26/11/2026)
+        with config_da_ar(db, camp.tenant_id):
+            rascunhos = renovacao.reajustar_na_aprovacao(db, camp, rascunhos)
     if rascunhos:
         primeiro = min(t.data for t in rascunhos)
         atraso = 0 if camp.tipo == "renovacao" else max(0, (date.today() - primeiro).days)

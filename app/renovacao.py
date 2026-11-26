@@ -35,7 +35,7 @@ from datetime import date, datetime, timedelta
 from sqlalchemy import func, or_, select
 
 from . import util
-from .banco import agora, gravar_config, ler_config, sessao
+from .banco import agora, gravar_config, ler_config, sessao, usar_config_da_ar
 from .modelos import Campanha, Certificado, Lead, Tarefa, Usuario
 
 ORIGEM = "planilha"                   # Certificado.origem dos que vieram do Relatório de renovação
@@ -1301,6 +1301,9 @@ def etapa_preparar(campanha_id: int, estado: dict, prazo: float) -> bool:
         lote = grupos[estado["feitos"]:estado["feitos"] + 10]
         with sessao() as db:
             camp = db.get(Campanha, campanha_id)
+            # em segundo plano não há a marca da tela: os textos, os dias, o horário e os feriados são os da Renovação
+            # da marca da campanha (26/11/2026: os avisos do Grupo Certy saíam com os textos da plataforma)
+            usar_config_da_ar(db, camp.tenant_id)
             usuario = db.get(Usuario, camp.usuario_id)
             pular_fds = True  # Renovação: só de segunda a sexta
             for grupo in lote:
