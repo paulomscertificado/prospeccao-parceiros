@@ -113,6 +113,14 @@ Detalhes em [ia-sdr.md](ia-sdr.md).
   como HMAC (`totp_recuperacao`). "Lembrar este computador" = cookie assinado `ms_aparelho` por 30 dias, invalidado
   por `versao_2fa`. Sessões sem a marca `2fa` de quem precisa voltam para o login. O admin zera em Configurações >
   Usuários (`/configuracoes/usuarios/{id}/zerar-2fa`); `redefinir_senha.py` também zera.
+- `redefinir_senha.py` (o `redefinir_senha.bat`; 26/11/2026): a opção 1, "sistema na internet", entra no servidor
+  (`ssh -t` com `BatchMode=yes`, o acesso do `servidor/pc/baixar_copias.py`: `SERVIDOR_IP` de `dados/agendador.txt` +
+  chave `~/.ssh/ms_servidor`) e roda `servidor/redefinir_senha.sh`, que chama o mesmo programa como o usuário
+  `prospeccao` com `--aqui --configuracoes /etc/prospeccao/ambiente` (as configurações do site, lidas pelo
+  python-dotenv sem trocar `$NOME`; sem o arquivo ou sem `DATABASE_URL` ele para, em vez de abrir um banco vazio).
+  No servidor prepara o banco como o site (`preparar_banco_na_nuvem`). `--conferir` só abre o banco (`SELECT 1`).
+  Antes, a opção 1 usava o `dados/supabase.txt`: o banco antigo, de antes da mudança para o servidor (17/11/2026), e
+  a senha do sistema no ar não mudava. Testes: `testes/test_redefinir_senha.py`.
 - Sessão: cookie assinado, `SameSite=Lax`, `Secure` em produção, expira após 120 min sem uso.
 - CSRF: token por sessão em todo formulário e no cabeçalho `X-CSRF-Token` das chamadas JSON.
 - Rate limiting: 5 senhas erradas/15 min por IP+e-mail; 240 alterações/min por IP; 120 webhooks/min.

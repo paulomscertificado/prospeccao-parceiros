@@ -283,10 +283,9 @@ def test_redefinir_senha_bat_deixa_a_senha_provisoria(cliente, monkeypatch):
     uid = _criar_direto(email, "SenhaAntiga123", perfil="gestor", ar="grupo-certy")
     with sessao() as db:
         dois_fatores.ativar(db.get(Usuario, uid), dois_fatores.novo_segredo(), dois_fatores.passo_atual())
-    monkeypatch.setattr(redefinir_senha, "escolher_banco", lambda: None)  # nunca o banco da internet
     monkeypatch.setattr("builtins.input", lambda *_: str(uid))
     monkeypatch.setattr("getpass.getpass", lambda *_: PROVISORIA)
-    assert redefinir_senha.main() == 0
+    assert redefinir_senha.main(["--aqui"]) == 0  # o banco dos testes; o servidor tem os testes dele (test_redefinir_senha)
     with sessao() as db:
         u = db.get(Usuario, uid)
         assert u.senha_provisoria is True and not u.totp_ativo and senha_confere(PROVISORIA, u.senha_hash)

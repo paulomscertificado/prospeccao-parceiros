@@ -49,7 +49,9 @@ Configurações > **Usuários** (só administrador):
 - Perfil **Parceiro**: escolha também o parceiro (escritório) ligado ao login. Ele verá só o portal.
 - Desativar: desmarque "Ativo" e salve (a pessoa sai na hora).
 - Esqueceu a senha e não há outro admin: `redefinir_senha.bat` (a senha nova também é provisória: troca no próximo
-  login).
+  login). A opção 1 ("sistema na internet") entra no servidor com o acesso das cópias de segurança (`SERVIDOR_IP` em
+  `dados/agendador.txt` e a chave `~/.ssh/ms_servidor`) e roda lá o `servidor/redefinir_senha.sh`; a 2 muda o banco
+  deste computador.
 
 ## 8. Como importar leads
 

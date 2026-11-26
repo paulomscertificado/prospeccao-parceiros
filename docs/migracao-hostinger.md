@@ -14,6 +14,7 @@ Tudo que roda está em `servidor/` (testes em `testes/test_servidor_hostinger.py
 | `instalar_sistema.sh <endereço>` | servidor (root) | Instala/atualiza Prospecção e WhatsApp Leads, serviços, Caddy (cadeado). Não liga o relógio nem o WhatsApp Leads pela 1ª vez |
 | `migrar_banco.sh <arquivo>` | servidor (root) | Copia o Supabase inteiro (pg_dump/pg_restore, só lê o Supabase) e confere as linhas tabela por tabela (`conferir_contagens.py`). Recusa se o servidor já for o sistema em uso |
 | `modo_ensaio.sh ligar/desligar` | servidor (root) | Bloqueia a saída de e-mail (SMTP/IMAP) enquanto o oficial ainda é a Vercel |
+| `redefinir_senha.sh [--conferir]` | servidor (root, com terminal) | Senha nova (provisória) para um usuário do sistema no ar: o `redefinir_senha.py` como o usuário `prospeccao`, com as configurações do site. É o que a opção 1 do `redefinir_senha.bat` roda por `ssh -t` (26/11/2026). `--conferir` só abre o banco |
 | `prospeccao*.service/.timer`, `whatsapp-leads-copia.*`, `Caddyfile.modelo` | servidor | Site (uvicorn em 127.0.0.1:8001, `api.index:app`), relógio a cada minuto (`/api/cron`), cópias diárias 06:10 e 06:30 |
 | `pc/preparar_migracao.py <endereço>` | computador da MS | Monta as configurações em `dados/migracao/` (tem senhas; só mostra nomes) |
 | `pc/enviar_codigo.sh <IP>` | computador da MS (Git Bash) | Manda o código dos dois sistemas (sem dados). Também é o jeito de publicar depois da virada |

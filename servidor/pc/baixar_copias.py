@@ -43,7 +43,10 @@ def opcoes() -> list[str]:
 
 
 def ip_do_servidor() -> str:
+    """SERVIDOR_IP de dados/agendador.txt ("" sem ele). O redefinir_senha.py também entra no servidor por aqui."""
     arquivo = RAIZ / "dados" / "agendador.txt"
+    if not arquivo.is_file():
+        return ""
     for linha in arquivo.read_text(encoding="utf-8-sig").splitlines():
         if linha.startswith("SERVIDOR_IP="):
             return linha.split("=", 1)[1].strip()

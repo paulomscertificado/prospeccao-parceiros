@@ -1015,6 +1015,19 @@ sua linha em Configurações > Usuários: no próximo login você lê um QR code
 acesso: `redefinir_senha.bat` (escolha "sistema na internet") cria uma senha nova e desliga o código do celular. Essa
 senha também é provisória: depois de entrar, o sistema pede para trocar por uma senha sua.
 
+Como usar o `redefinir_senha.bat` (no computador da MS que baixa as cópias de segurança do sistema; ele usa o mesmo
+acesso ao servidor):
+1. Dois cliques em `redefinir_senha.bat`, na pasta `prospeccao-parceiros`.
+2. Em "Onde?", aperte **Enter** (1 = sistema na internet). O programa entra no servidor do sistema e as perguntas
+   seguintes vêm de lá.
+3. Digite o número da pessoa na lista e a senha nova duas vezes (a senha não aparece enquanto você digita).
+4. Na mensagem "Pronto!", a senha já vale no sistema. Passe a senha à pessoa por um canal seguro.
+
+Se aparecer "Este computador não tem o acesso ao servidor do sistema", use o computador da MS que baixa as cópias de
+segurança ou peça ajuda ao suporte. A opção 2 muda só a cópia do sistema que fica neste computador, não o sistema na
+internet. (Até 26/11/2026 a opção 1 mudava o banco antigo, de antes da mudança para o servidor, e a senha do sistema
+na internet continuava a mesma.)
+
 **Regra da MS: cada usuário tem o seu disparo** (pedido da Maria em 13/11/2026). Os disparos de uma pessoa nunca
 saem pelo WhatsApp ou pelo e-mail de outra pessoa: o **e-mail** sai só pelo do cadastro dela (**Contas de e-mail**); o
 **WhatsApp**, pelo número dela ou por um que outra pessoa **compartilhou** com ela. Ser administrador não muda isso.
@@ -1062,7 +1075,9 @@ permissão, a conta para de enviar na hora.
 |---|---|
 | "O Python não foi encontrado" | Instale o Python marcando "Add Python to PATH" e rode `instalar.bat` de novo |
 | "O sistema ainda não foi instalado" | Rode `instalar.bat` |
-| Esqueci a senha | Outro administrador cria uma senha nova em Configurações > Usuários, ou rode `redefinir_senha.bat`. A senha nova é provisória: depois de entrar, o sistema pede para trocar por uma senha sua |
+| Esqueci a senha | Outro administrador cria uma senha nova em Configurações > Usuários, ou rode `redefinir_senha.bat` no computador da MS e aperte Enter em "Onde?" (sistema na internet). A senha nova é provisória: depois de entrar, o sistema pede para trocar por uma senha sua |
+| "Este computador não tem o acesso ao servidor do sistema" (`redefinir_senha.bat`) | Rode no computador da MS que baixa as cópias de segurança do sistema (ele tem o acesso ao servidor), ou peça ajuda ao suporte. Nada foi mudado |
+| "Não consegui entrar no servidor" (`redefinir_senha.bat`) | Confira a internet do computador e rode de novo. Nada foi mudado |
 | "Troque a sua senha" logo depois de entrar | Você entrou com a senha que recebeu do administrador (provisória). Crie uma senha só sua: mínimo 8 caracteres, com letras e números, diferente da que recebeu. Até trocar, nenhuma outra tela abre. Para sair sem trocar, clique em "Sair e trocar depois" |
 | "Código errado" no login | O código muda a cada 30 segundos: digite o que o app mostra agora. Se sempre der errado, acerte a hora automática do celular |
 | Perdi o celular do código | Use um código de recuperação ou peça ao administrador para clicar em "zerar" em Configurações > Usuários |
