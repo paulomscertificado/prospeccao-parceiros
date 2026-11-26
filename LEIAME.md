@@ -615,7 +615,12 @@ renovação novo antes, para entrarem os clientes de janeiro).
   e o sistema só sabe quem renovou se alguém marcar **Renovado** na lista).
 - **Uma mensagem por contato:** se o mesmo WhatsApp aparece em vários certificados (ex.: um grupo de empresas com o
   mesmo telefone), ele recebe **uma** mensagem em cada aviso, com a lista dos certificados (até 5; com mais, um
-  resumo: "57 certificados digitais que você acompanha vencem entre..."). Nunca uma mensagem por certificado.
+  resumo: "57 certificados digitais que você acompanha vencem entre..."). Nunca uma mensagem por certificado. Por isso
+  o quadro 3 mostra os **certificados** e os **contatos** (ex.: 746 certificados de 593 contatos).
+- **Todos os certificados da planilha entram, de CPF e de CNPJ** (desde 26/11/2026): também o cliente que alguém da
+  equipe está atendendo, que já respondeu, que está como Perdido ou que já recebe os avisos de outro certificado (por
+  exemplo, na campanha piloto). Só fica de fora quem pediu para não receber mensagens (**SAIR**) e quem não tem
+  WhatsApp nem e-mail na planilha. O quadro 3 diz quantos ficam de fora e por quê.
 - **Datas:** 30, 15, 5 e 1 dia antes do vencimento. Quem entra mais tarde começa pelo aviso que combina com os
   **dias que faltam** (ex.: com 12, 6, 3 e 1 dia, quem vence amanhã recebe só o **Último aviso**, nunca o 1º; faltando
   2 ou 3 dias, o **Faltam poucos dias**). Esse primeiro aviso se apresenta como o 1º ("Olá, Paula! Aqui é Thamires,

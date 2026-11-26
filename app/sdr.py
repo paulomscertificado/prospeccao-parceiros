@@ -848,6 +848,22 @@ def automacao_ativa(lead: Lead) -> bool:
     return not (lead.automacao_pausada or lead.opt_out or lead.anonimizado or lead.perdido or lead.etapa >= 2)
 
 
+def recebe_automatico(lead: Lead | None, tarefa: Tarefa | None = None) -> bool:
+    """O lead recebe a mensagem automática deste toque? Aviso de renovação (pedido da Maria em 26/11/2026: "se eu mandei
+    746, é para você criar campanha para os 746 certificados, tanto de CPF quanto de CNPJ"): todo cliente da planilha,
+    menos quem pediu SAIR (ou foi anonimizado), mesmo atendido por alguém da equipe, que já respondeu ou marcado como
+    Perdido. Quem responde, é assumido ou é encerrado tem os avisos pendentes cancelados na hora
+    (leads_servico.cancelar_tarefas_de_prospeccao): o aviso que ainda existe é de um certificado que ninguém tratou.
+    Os outros toques: automacao_ativa."""
+    if lead is None:
+        return False
+    from .renovacao import ANGULOS as AVISOS_DE_RENOVACAO
+
+    if tarefa is not None and tarefa.campanha_id and tarefa.angulo in AVISOS_DE_RENOVACAO:
+        return not (lead.opt_out or lead.anonimizado)
+    return automacao_ativa(lead)
+
+
 # ---------------------------------------------------------------- WhatsApp conectado (WhatsApp Leads)
 
 class EnvioRecusado(Exception):

@@ -84,10 +84,11 @@ def test_quadro_3_diz_quando_entra_o_proximo_e_conta_so_a_marca(cliente):
         assert r.status_code == 200 and "2 certificados novos" in r.text.replace("<b>", "").replace("</b>", "")
         pagina = " ".join(c.get("/renovacao").text.split())
         assert "1 contato pronto agora" in pagina  # B: o que vence em 5 dias
-        assert "Montar com todos da planilha (2)" in pagina  # A: os dois da planilha
+        assert "Montar com todos da planilha (2 certificados)" in pagina  # A: os dois da planilha
         # o Admin Master fora das marcas monta na marca principal: os clientes do Grupo Certy não contam lá
         master = " ".join(cliente.get("/renovacao").text.split())
-        assert "Ninguém fora de campanha vence nos próximos" in master and "Montar com todos da planilha (0)" in master
+        assert ("Ninguém fora de campanha vence nos próximos" in master
+                and "Montar com todos da planilha (0 certificados)" in master)
         with sessao() as db:  # o que vence em 5 dias já entrou numa campanha: B fica sem ninguém
             from app.modelos import Certificado
 

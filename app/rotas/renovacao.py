@@ -93,10 +93,14 @@ def tela_renovacao(request: Request, ver: str = "avisar", q: str = "", usuario: 
     # "Montar com todos da planilha" (pedido da Maria em 26/11/2026): a última planilha importada da marca em que a
     # campanha vai ser montada (o Admin Master fora das marcas: a MS), com o período certo (do 1º ao último vencimento)
     desde = renovacao.inicio_da_ultima_planilha(db)
-    todos_da_planilha, _ = renovacao.contatos_para_campanha(db, hoje, ate=renovacao.ATE_TODOS, ar=ar_monta, desde=desde)
+    todos_da_planilha, fora_todos = renovacao.contatos_para_campanha(db, hoje, ate=renovacao.ATE_TODOS, ar=ar_monta,
+                                                                     desde=desde)
     vencimentos = [c.data_vencimento for contato in todos_da_planilha for c in contato.certificados]
     kpis = {
-        "todos_contatos": len(todos_da_planilha), "todos_de": min(vencimentos, default=None),
+        # contatos e certificados (pedido da Maria em 26/11/2026: "se eu mandei 746, é para você criar campanha para os
+        # 746 certificados"; quem tem vários certificados no mesmo WhatsApp recebe uma mensagem só, com a lista)
+        "todos_contatos": len(todos_da_planilha), "todos_certificados": len(vencimentos), "todos_fora": fora_todos,
+        "todos_de": min(vencimentos, default=None),
         "todos_ate": max(vencimentos, default=None), "todos_planilha": desde.strftime("%d/%m/%Y %H:%M") if desde else "",
         "base": len(abertos),
         "em_30": sum(1 for c in abertos if c.data_vencimento <= hoje + timedelta(days=janela)),
@@ -205,8 +209,9 @@ async def montar(request: Request, usuario: Usuario = Depends(exige("renovacao.g
         registrar_log(db, usuario, "montou_campanha_renovacao", "campanha", camp.id,
                       f"{camp.quantidade} contatos (todos da planilha)", request)
         db.commit()
-        avisar(request, f"A campanha está sendo montada com todos os {camp.quantidade} contatos da planilha, cada um com "
-                        "os avisos marcados antes do próprio vencimento, e vai pedir aprovação (leva alguns minutos).")
+        avisar(request, f"A campanha está sendo montada com todos os certificados da planilha, de {camp.quantidade} "
+                        "contatos (quem tem mais de um certificado recebe uma mensagem só, com a lista), cada um com os "
+                        "avisos marcados antes do próprio vencimento, e vai pedir aprovação (leva alguns minutos).")
         return voltar(f"/campanhas/{camp.id}")
     quantidade = util.para_int(form.get("quantidade"))
     if quantidade not in renovacao.QUANTIDADES:

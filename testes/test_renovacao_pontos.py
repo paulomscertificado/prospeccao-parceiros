@@ -60,7 +60,7 @@ def test_ponto_fora_dos_avisos_nao_entra_nas_campanhas(cliente):
                 assert len(todos) == 1
         pagina = " ".join(cliente.get("/renovacao?ver=proximos").text.split())  # o Admin Master: a marca principal
         assert "Ponto fora dos avisos (GILBERTO CONTABIL)" in pagina
-        assert "Montar com todos da planilha (1)" in pagina
+        assert "Montar com todos da planilha (1 certificado)" in pagina
         assert "2 certificados (de ponto de atendimento fora dos avisos)" in pagina
         assert "GILBERTO CONTABIL (2 certificados)" in pagina  # o quadro 4 mostra os pontos das planilhas
         with sessao() as db:  # importar de novo guarda o ponto também em quem já estava (planilha antiga, sem ele)

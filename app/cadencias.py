@@ -133,20 +133,25 @@ def aplicar(db: Session, cadencia: Cadencia, leads: list[Lead], usuario: Usuario
     inicio = inicio or date.today()
     pular_fds = ler_config(db, "pular_fim_de_semana") == "1"
     resultado = {"leads": 0, "tarefas": 0, "pulados": []}
+    # Aviso de renovação (pedido da Maria em 26/11/2026: "se eu mandei 746, é para você criar campanha para os 746
+    # certificados, tanto de CPF quanto de CNPJ"): só quem pediu SAIR fica de fora. O cliente atendido por alguém da
+    # equipe, que já respondeu, marcado como Perdido ou que já recebe os avisos de outro certificado (ex.: na campanha
+    # piloto) recebe também os do certificado novo (na hora do envio: sdr.recebe_automatico)
+    aviso_de_renovacao = campanha is not None and campanha.tipo == "renovacao"
     for lead in leads:
         if lead.opt_out or lead.anonimizado:
             resultado["pulados"].append(f"{lead.empresa}: pediu para não ser contatado")
             continue
-        if lead.perdido or lead.etapa >= 2:
+        if not aviso_de_renovacao and (lead.perdido or lead.etapa >= 2):
             resultado["pulados"].append(f"{lead.empresa}: já respondeu ou foi encerrado ({lead.status})")
             continue
-        if lead.automacao_pausada:
+        if not aviso_de_renovacao and lead.automacao_pausada:
             resultado["pulados"].append(f"{lead.empresa}: atendimento assumido por uma pessoa")
             continue
-        em_andamento = db.execute(select(Tarefa.id).where(
+        em_andamento = None if (permitir_em_andamento or aviso_de_renovacao) else db.execute(select(Tarefa.id).where(
             Tarefa.lead_id == lead.id, Tarefa.tipo == "prospeccao",
             Tarefa.status.in_(["pendente", "rascunho"])).limit(1)).first()
-        if em_andamento and not permitir_em_andamento:  # (Renovação: 2ª onda de avisos do mesmo contato)
+        if em_andamento:  # (Renovação: 2ª onda de avisos do mesmo contato e avisos de outro certificado)
             resultado["pulados"].append(f"{lead.empresa}: já está em uma cadência")
             continue
         responsavel = db.get(Usuario, lead.vendedor_id) if lead.vendedor_id else usuario

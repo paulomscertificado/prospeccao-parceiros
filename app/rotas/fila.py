@@ -111,7 +111,7 @@ def situacao_e_previsao(t: Tarefa, hoje: date, no_horario: bool, conversaram: se
     "coloque o horário exato que vai sair o disparo"); previsto_zap = {(campanha, lead): [(marcado, previsto)]} dos
     WhatsApps, para o e-mail das Empresas novas que espera o WhatsApp da empresa."""
     lead = t.lead
-    if not lead or not sdr.automacao_ativa(lead):
+    if not sdr.recebe_automatico(lead, t):
         return "parado", "Automação parada para este lead (respondeu, opt-out ou está com alguém)", None
     if t.canal == "email" and not lead.email:
         return "sem_email", "Sem e-mail cadastrado", None

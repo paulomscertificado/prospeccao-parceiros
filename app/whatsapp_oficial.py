@@ -915,8 +915,8 @@ def processar_fila(db, maximo: int = POR_RODADA) -> dict:
         camp = db.get(Campanha, t.campanha_id)
         if camp is not None and camp.tipo == renovacao.TIPO_CAMPANHA and renovacao.fora_do_horario(db):
             continue
-        if not sdr.automacao_ativa(t.lead) or not (t.mensagem or "").strip():
-            continue  # o cliente respondeu, saiu ou está com alguém da equipe
+        if not sdr.recebe_automatico(t.lead, t) or not (t.mensagem or "").strip():
+            continue  # o cliente pediu SAIR (aviso de renovação: só isso para, 26/11/2026) ou o aviso está sem texto
         from . import feriados
 
         if feriados.adiar_se_feriado(db, t):

@@ -33,8 +33,17 @@ base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renova
    campanha vai ser montada (`ar_de_quem_monta`); pedido da Maria em 26/11/2026, ou `rodada_diaria`):
    certificados `Ativo`, sem campanha, sem `fora_motivo`, vencendo de amanhã até 30 dias (`a_avisar`), **agrupados por
    contato** (`agrupar`: chave = WhatsApp, senão e-mail). Na planilha de 12/11/2026 um número aparece em 57
-   certificados: um aviso por certificado seria spam. Ficam de fora (`motivo_de_fora`, as mesmas regras de
-   `cadencias.aplicar`): SAIR (grava `fora_motivo`), pessoa atendendo, já respondeu, já em outra sequência. O trabalho
+   certificados: um aviso por certificado seria spam. Fica de fora (`motivo_de_fora`, as mesmas regras de
+   `cadencias.aplicar`) só quem pediu SAIR ou foi anonimizado (grava `fora_motivo`). Desde 26/11/2026 (pedido da Maria:
+   "se eu mandei 746, é para você criar campanha para os 746 certificados, tanto de CPF quanto de CNPJ") o cliente
+   atendido por alguém da equipe, que já respondeu, marcado como Perdido ou que já recebe os avisos de outro
+   certificado (ex.: na piloto) também recebe os avisos dos certificados novos: na planilha de jan-mar/2027 da MS eram
+   30 contatos (57 certificados), todos com outro certificado na piloto. `cadencias.aplicar` não pula esses leads na
+   campanha de renovação, e na hora do envio vale `sdr.recebe_automatico(lead, tarefa)` (aviso de renovação: só SAIR
+   para; os outros toques: `automacao_ativa`) nas filas do WhatsApp, da API oficial e do e-mail, no Disparar e na Minha
+   fila. Quem responde, é assumido ou é encerrado tem os avisos pendentes cancelados na hora
+   (`leads_servico.cancelar_tarefas_de_prospeccao`). A tela (quadro 3, opção A) mostra certificados, contatos e quem
+   fica de fora. Teste: `test_todos_da_planilha_leva_todos_os_certificados_menos_quem_pediu_sair`. O trabalho
    em etapas (`campanhas.etapa_gerar`, fase `"renovacao"` → `etapa_preparar`) cria ou reaproveita o lead do contato
    (origem `"Renovação (planilha)"`; lead que já existe com o mesmo WhatsApp é reaproveitado, para as respostas não
    embaralharem), prende os certificados (`campanha_id`, `lead_id`) e calcula datas e textos.

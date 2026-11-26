@@ -955,7 +955,7 @@ def processar_fila(db, maximo: int = 25) -> dict:
             feito["bloqueados"] += 1
             continue
         lead = t.lead
-        if not lead or not sdr.automacao_ativa(lead) or not lead.email:
+        if not sdr.recebe_automatico(lead, t) or not lead.email:  # aviso de renovação: menos SAIR, sempre (26/11/2026)
             t.status, t.concluida_em, t.resultado = "cancelada", agora(), "Automação parada para este lead"
             continue
         bloqueio = mensagens.bloqueio_de_envio(db, lead, "email", t.campanha_id)
@@ -1136,7 +1136,7 @@ def para_disparar(db, camp: Campanha) -> dict[str, list[Tarefa]]:
     vistos: dict[str, set] = {"whatsapp": set(), "email": set()}
     for t in tarefas:
         lead = t.lead
-        if not lead or not sdr.automacao_ativa(lead):
+        if not sdr.recebe_automatico(lead, t):
             continue
         for canal in ("whatsapp", "email"):
             contato = lead.whatsapp if canal == "whatsapp" else lead.email  # WhatsApp em branco: não sai
@@ -1206,7 +1206,7 @@ def enviar_toque_agora(db, t: Tarefa, usuario: Usuario, canal: str = "") -> str:
 
 def _enviar_toque(db, t: Tarefa, usuario: Usuario) -> str:
     lead = t.lead
-    if not lead or not sdr.automacao_ativa(lead):
+    if not sdr.recebe_automatico(lead, t):
         return "A automação está parada para este lead (respondeu, opt-out ou está com alguém)."
     if not _texto_do_canal(t, t.canal)[1]:
         return "Este toque está sem mensagem."
@@ -1705,8 +1705,8 @@ def processar_fila_whatsapp(db, maximo: int = 3) -> dict:
         if not (lead.whatsapp or "").strip():
             continue  # campo WhatsApp em branco: a mensagem espera alguém cadastrar o número
         automatica = toque_sai_sozinho(t, automaticas, hoje)
-        if not sdr.automacao_ativa(lead) or not (t.mensagem or "").strip():
-            continue  # lead respondeu, saiu ou está com um humano
+        if not sdr.recebe_automatico(lead, t) or not (t.mensagem or "").strip():
+            continue  # lead respondeu, saiu ou está com um humano (aviso de renovação: só quem pediu SAIR para)
         if not automatica and not whatsapp_liberado(db, lead):
             continue  # contato frio de campanha de parceiros: fica na Agenda para o clique
         numero = _numero_do_envio(db, t, numeros)
