@@ -1,5 +1,6 @@
-"""Baixa do servidor (Hostinger) as cópias de segurança dos últimos dias, da Prospecção e do WhatsApp Leads, guarda
-neste computador e manda para o Google Drive, como era antes da migração. Assim sempre existe uma cópia FORA do servidor.
+"""Baixa do servidor (Hostinger) as cópias de segurança dos últimos dias, da Prospecção, do WhatsApp Leads e do banco
+de licenças do Assinador MS (desde 26/11/2026), guarda neste computador e manda para o Google Drive, como era antes da
+migração. Assim sempre existe uma cópia FORA do servidor.
 
 As cópias são feitas no servidor todo dia às 06:10 e 06:30 (criptografadas, com a senha de dados/senha_backup.txt).
 Chamado 1 vez por dia pelo chamar_cron.ps1 (versão do servidor). Uso manual, na pasta prospeccao-parceiros:
@@ -17,10 +18,13 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(RAIZ))
 WL_DADOS = RAIZ.parent / "whatsapp-leads" / "dados"
+LICENCAS_LOCAL = RAIZ.parent / "assinador-ms" / "dados" / "copias-licencas"
 CHAVE = Path.home() / ".ssh" / "ms_servidor"
 SISTEMAS = (  # (pasta no servidor, prefixo dos arquivos, pasta neste computador)
     ("/opt/prospeccao/dados/backups", "nuvem_", RAIZ / "dados" / "backups"),
     ("/opt/whatsapp-leads/dados/backups", "whatsapp_", WL_DADOS / "backups"),
+    # API de licenças do Assinador MS (cópia a cada 6 h, mesma senha e mesmo formato; assinador-ms/api_licencas)
+    ("/var/backups/assinador-licencas", "licencas_", LICENCAS_LOCAL),
 )
 FICAM = 14
 
@@ -74,7 +78,9 @@ def main() -> int:
     if not ip:
         print("Falta SERVIDOR_IP em dados/agendador.txt. Nada foi feito.")
         return 1
-    fora = {"nuvem_": pasta_fora_do_pc(), "whatsapp_": pasta_do_drive_whatsapp()}
+    prospeccao_fora = pasta_fora_do_pc()
+    fora = {"nuvem_": prospeccao_fora, "whatsapp_": pasta_do_drive_whatsapp(),
+            "licencas_": prospeccao_fora.parent / "Assinador Licencas" if prospeccao_fora else None}
     baixadas, erros = [], []
     for remota, prefixo, local in SISTEMAS:
         r = subprocess.run([programa("ssh"), *opcoes(), f"root@{ip}", f"ls -1t {remota}/{prefixo}*.cripto 2>/dev/null | head -3"],
