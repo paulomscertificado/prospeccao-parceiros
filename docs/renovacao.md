@@ -18,8 +18,10 @@ base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renova
    da empresa; e-mail = o da pessoa, senão o da empresa. Só da planilha (pedido da Maria): nada é buscado em outro
    lugar.
 3. **Campanha** (`criar_campanha`, "Montar campanha agora" com 10/20/30/40/50/100 contatos, "Montar com todos da
-   planilha" = `criar_campanha(ate=ATE_TODOS)` com todos os ativos fora de campanha de qualquer mês, pedido da Maria em
-   26/11/2026, ou `rodada_diaria`):
+   planilha" = `criar_campanha(ate=ATE_TODOS, desde=inicio_da_ultima_planilha(db))`: os ativos fora de campanha da
+   ÚLTIMA planilha importada da marca (`importar` grava `renov_ultima_importacao_em`, por marca; `a_avisar(desde=)`
+   filtra `importado_em`), de qualquer mês; a tela mostra o período (1º e último vencimento) e conta na marca em que a
+   campanha vai ser montada (`ar_de_quem_monta`); pedido da Maria em 26/11/2026, ou `rodada_diaria`):
    certificados `Ativo`, sem campanha, sem `fora_motivo`, vencendo de amanhã até 30 dias (`a_avisar`), **agrupados por
    contato** (`agrupar`: chave = WhatsApp, senão e-mail). Na planilha de 12/11/2026 um número aparece em 57
    certificados: um aviso por certificado seria spam. Ficam de fora (`motivo_de_fora`, as mesmas regras de

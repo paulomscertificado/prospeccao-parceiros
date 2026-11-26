@@ -7,7 +7,7 @@ import json
 from collections import Counter
 from datetime import date, datetime, time, timedelta
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 
 from app import campanhas, renovacao, sdr
 from app.banco import agora, gravar_config, sessao
@@ -1555,12 +1555,21 @@ def test_montar_com_todos_da_planilha(cliente, csrf, monkeypatch):
         _linha(75, "9700002", "e-CPF A1 12 meses", "", "", "PEDRO FEVEREIRO", "98765432100",
                "pedro@todos-teste.com.br", "81987650002"),
     ]
+    antiga = [_linha(50, "9700009", "e-CPF A1 12 meses", "", "", "SOBRA ANTIGA", "11122233344",
+                     "sobra@todos-teste.com.br", "81987650009")]
     with sessao() as db:
         _limpar(db)
+        renovacao.importar(db, renovacao.ler_planilha("antiga.xlsx", _planilha(antiga))[0], _admin(db))
+        db.commit()
+    with sessao() as db:  # a planilha nova (a de janeiro e fevereiro, no caso da Maria): só ela entra no "todos"
+        db.execute(update(Certificado).where(Certificado.protocolo == "9700009")
+                   .values(importado_em=agora() - timedelta(hours=2)))
         renovacao.importar(db, renovacao.ler_planilha("r.xlsx", _planilha(linhas))[0], _admin(db))
         db.commit()
     pagina = cliente.get("/renovacao").text
     assert "Montar com todos da planilha (2)" in pagina and 'name="todos"' in pagina
+    de, ate = date.today() + timedelta(days=45), date.today() + timedelta(days=75)
+    assert f"{de:%d/%m/%Y}</b> a <b>{ate:%d/%m/%Y}" in pagina  # o período certo: do 1º ao último vencimento
     r = cliente.post("/renovacao/montar", data={"csrf": csrf, "quantidade": "10"})
     assert "Nenhum cliente para avisar agora" in r.text  # o "Montar campanha" só leva quem vence nos próximos dias
     r = cliente.post("/renovacao/montar", data={"csrf": csrf, "quantidade": "10", "todos": "1"})
@@ -1583,5 +1592,7 @@ def test_montar_com_todos_da_planilha(cliente, csrf, monkeypatch):
             assert primeiro >= cert.data_vencimento - timedelta(days=renovacao.janela(db) + 6)  # no tempo certo
             assert max(t.data for t in avisos) < cert.data_vencimento
     assert "Montar com todos da planilha (0)" in cliente.get("/renovacao").text  # já estão em campanha
+    with sessao() as db:  # a sobra da planilha antiga não entrou (fica para a campanha automática do dia)
+        assert db.execute(select(Certificado).where(Certificado.protocolo == "9700009")).scalars().one().campanha_id is None
     with sessao() as db:
         _limpar(db)

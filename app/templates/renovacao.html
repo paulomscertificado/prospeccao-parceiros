@@ -100,10 +100,11 @@
       <div class="quantas-empresas">{% for q in quantidades %}<label class="chip"><input type="radio" name="quantidade" value="{{ q }}" {{ 'checked' if loop.first }}> {{ q }}</label>{% endfor %}</div></div>
     <div class="grupo-btn"><button class="btn btn-primario" {{ 'disabled' if not kpis.prontos_contatos }}>Montar campanha</button>
       <button class="btn" name="todos" value="1" {{ 'disabled' if not kpis.todos_contatos }}
-        data-confirmar="Montar uma campanha com todos os {{ kpis.todos_contatos }} contatos da planilha que ainda não estão em campanha{{ ' (vencem até ' ~ kpis.todos_ate.strftime('%d/%m/%Y') ~ ')' if kpis.todos_ate }}? Cada um recebe os avisos antes do próprio vencimento. A campanha também espera a aprovação.">Montar com todos da planilha ({{ kpis.todos_contatos }})</button></div>
-    <p class="ajuda" style="margin:0 0 6px"><b>Todos da planilha:</b> uma campanha só com todos os contatos que ainda não
-      estão em campanha{{ ', que vencem até ' ~ kpis.todos_ate.strftime('%d/%m/%Y') if kpis.todos_ate }}, cada um com os
-      avisos ({{ quando }}) marcados desde já, contados do próprio vencimento.</p>
+        data-confirmar="Montar uma campanha com os {{ kpis.todos_contatos }} contatos da última planilha importada que ainda não estão em campanha{{ ' (vencem de ' ~ kpis.todos_de.strftime('%d/%m/%Y') ~ ' a ' ~ kpis.todos_ate.strftime('%d/%m/%Y') ~ ')' if kpis.todos_ate }}? Cada um recebe os avisos antes do próprio vencimento. A campanha também espera a aprovação.">Montar com todos da planilha ({{ kpis.todos_contatos }})</button></div>
+    <p class="ajuda" style="margin:0 0 6px"><b>Todos da planilha:</b> uma campanha só com os contatos da última planilha
+      importada{{ ' (' ~ kpis.todos_planilha ~ ')' if kpis.todos_planilha }} que ainda não estão em campanha{% if kpis.todos_ate %},
+      que vencem de <b>{{ kpis.todos_de.strftime('%d/%m/%Y') }}</b> a <b>{{ kpis.todos_ate.strftime('%d/%m/%Y') }}</b>{% endif %},
+      cada um com os avisos ({{ quando }}) marcados desde já, contados do próprio vencimento.</p>
     <p class="ajuda" style="margin-bottom:0">Entra quem vence nos próximos {{ janela }} dias e ainda não está em campanha. Cada contato
       (mesmo WhatsApp) recebe <b>uma</b> mensagem por aviso, com a lista dos certificados dele. A campanha só sai depois
       que alguém aprovar.{% if limite_frios %} O WhatsApp segue o ritmo seguro do número (no máximo {{ limite_frios }} contatos

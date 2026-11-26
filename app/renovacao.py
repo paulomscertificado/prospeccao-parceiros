@@ -73,6 +73,7 @@ PADRAO = {
     "renov_ultima_rodada": "",        # dia em que a campanha automática rodou (AAAA-MM-DD)
     "renov_ultimo_resultado": "",
     "renov_ultima_importacao": "",
+    "renov_ultima_importacao_em": "",  # quando começou a última importação (AAAA-MM-DDTHH:MM:SS): "todos da planilha"
     "renov_arte": "1",                # a arte do aviso (a do site) vai junto no WhatsApp e no e-mail
     "renov_conexao": "",              # número de WhatsApp dos disparos ("" = automático, sempre um número de verdade)
     "renov_envio_oficial": "0",       # WhatsApp dos avisos pela API oficial da Meta (etapa 2, whatsapp_oficial.py)
@@ -632,6 +633,7 @@ def importar(db, registros: list[dict], usuario: Usuario | None, arquivo: str = 
     """Grava os certificados da planilha. Importar de novo atualiza (pelo protocolo), sem duplicar; a situação
     (renovado, em campanha...) de quem já estava fica como está."""
     hoje = date.today()
+    inicio = agora().replace(microsecond=0)  # os certificados desta planilha ficam com importado_em daqui em diante
     indice = {_chave_do_certificado(c): c for c in db.execute(
         select(Certificado).where(Certificado.origem == ORIGEM)).scalars()}
     resumo = {"linhas": len(registros), "novos": 0, "atualizados": 0, "iguais": 0, "repetidos": 0, "vencidos": 0,
@@ -672,7 +674,17 @@ def importar(db, registros: list[dict], usuario: Usuario | None, arquivo: str = 
              + (f", {resumo['vencidos']} já vencidos (não recebem aviso)" if resumo["vencidos"] else "")
              + (f" (por {usuario.nome})" if usuario else "") + ".")
     gravar_config(db, "renov_ultima_importacao", texto)
+    gravar_config(db, "renov_ultima_importacao_em", inicio.isoformat())
     return resumo
+
+
+def inicio_da_ultima_planilha(db) -> datetime | None:
+    """Quando começou a última importação da marca (None: importada antes de 26/11/2026, quando isso passou a ser
+    guardado). "Montar com todos da planilha" leva só os certificados dela (pedido da Maria em 26/11/2026)."""
+    try:
+        return datetime.fromisoformat(cfg(db, "renov_ultima_importacao_em"))
+    except ValueError:
+        return None
 
 
 # ---------------------------------------------------------------- Contatos (certificados agrupados)
@@ -725,7 +737,8 @@ def agrupar(certificados) -> tuple[list[Contato], list[Certificado]]:
     return sorted((Contato(k, v) for k, v in grupos.items()), key=lambda c: (c.vencimento, c.chave)), sem_contato
 
 
-def a_avisar(db, hoje: date | None = None, ate: date | None = None, ar: int | None = None) -> list[Certificado]:
+def a_avisar(db, hoje: date | None = None, ate: date | None = None, ar: int | None = None,
+             desde: datetime | None = None) -> list[Certificado]:
     """Certificados que podem entrar numa campanha: da planilha, ativos, fora de campanha e vencendo até o dia do 1º
     aviso (ex.: 30 ou 12 dias) ou até `ate` (campanha do piloto: até 31/12), de amanhã em diante (o que vence hoje já
     não dá tempo de avisar). `ar`: só os dessa AR (a rodada diária roda sem tela e enxerga todas as ARs: sem o filtro,
@@ -738,6 +751,8 @@ def a_avisar(db, hoje: date | None = None, ate: date | None = None, ar: int | No
         Certificado.data_vencimento <= ate)
     if ar:
         consulta = consulta.where(Certificado.tenant_id == ar)
+    if desde is not None:  # só os da planilha importada a partir daí (a última: "todos da planilha")
+        consulta = consulta.where(Certificado.importado_em >= desde)
     return db.execute(consulta).scalars().all()
 
 
@@ -807,11 +822,12 @@ def motivo_de_fora(db, lead: Lead) -> str:
 
 
 def contatos_para_campanha(db, hoje: date | None = None, marcar_saida: bool = False,
-                           ate: date | None = None, ar: int | None = None) -> tuple[list[Contato], dict]:
+                           ate: date | None = None, ar: int | None = None,
+                           desde: datetime | None = None) -> tuple[list[Contato], dict]:
     """Contatos que podem entrar numa campanha agora (do que vence primeiro ao último) e quantos certificados ficam de
     fora por motivo. marcar_saida=True grava nos certificados de quem pediu SAIR (vale até alguém reabrir). `ar`: só os
     certificados e os leads dessa AR (ver a_avisar)."""
-    contatos, sem_contato = agrupar(a_avisar(db, hoje, ate, ar))
+    contatos, sem_contato = agrupar(a_avisar(db, hoje, ate, ar, desde))
     fora: dict[str, int] = {}
     if sem_contato:
         fora["sem WhatsApp e sem e-mail na planilha"] = len(sem_contato)
@@ -1152,7 +1168,7 @@ ATE_TODOS = date(2100, 1, 1)
 
 
 def criar_campanha(db, usuario: Usuario, quantidade: int | None = None, ate: date | None = None,
-                   nome: str = "") -> Campanha | None:
+                   nome: str = "", desde: datetime | None = None) -> Campanha | None:
     """Campanha de renovação com os contatos que vencem primeiro (no máximo `quantidade`; sem ela, o máximo por dia
     da configuração). `ate`: todos os que vencem até essa data, com os avisos marcados desde já (campanha do piloto de
     13/11/2026, até 31/12); o contato com certificados vencendo em datas distantes recebe uma "onda" de avisos para
@@ -1162,7 +1178,7 @@ def criar_campanha(db, usuario: Usuario, quantidade: int | None = None, ate: dat
 
     hoje = date.today()
     ar = ar_de_quem_monta(db, usuario)
-    contatos, _ = contatos_para_campanha(db, hoje, marcar_saida=True, ate=ate, ar=ar)
+    contatos, _ = contatos_para_campanha(db, hoje, marcar_saida=True, ate=ate, ar=ar, desde=desde)
     limite = quantidade or (None if ate else util.para_int(cfg(db, "renov_maximo_dia")) or 40)
     escolhidos = contatos[:limite] if limite else contatos
     if not escolhidos:

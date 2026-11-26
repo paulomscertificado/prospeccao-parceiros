@@ -94,7 +94,7 @@ CHAVES_DA_AR = frozenset({
     # a tela guarda (última importação e rodada). Antes, salvar o quadro 4 numa marca mudava o das outras
     "renov_ativo", "renov_hora", "renov_maximo_dia", "renov_canais", "renov_arte", "renov_email_html", "renov_dias",
     "renov_hora_inicio", "renov_hora_fim", "renov_feriados", "renov_ativo_desde", "renov_mensagens",
-    "renov_ultima_rodada", "renov_ultimo_resultado", "renov_ultima_importacao",
+    "renov_ultima_rodada", "renov_ultimo_resultado", "renov_ultima_importacao", "renov_ultima_importacao_em",
     # módulos (autorizacao.MODULOS): cada AR tem os seus, mas só o Admin Master liga e desliga (Fase 3). Todo módulo
     # novo entra aqui E em CHAVES_SO_MASTER (testes/test_modulos_por_ar.py confere): fora daqui, o Painel master
     # gravava na plataforma e ligar/desligar em uma AR valia para todas (a Assertiva, até 19/11/2026)
