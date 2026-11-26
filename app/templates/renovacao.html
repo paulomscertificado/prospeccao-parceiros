@@ -101,15 +101,18 @@
       use a opção <b>A</b>.</p>{% endif %}
     <div class="opcao-montar" id="montar-todos">
       <b>A. Todos da última planilha</b>
-      {% if kpis.todos_contatos %}<p class="ajuda" style="margin:4px 0 8px">{{ kpis.todos_contatos }}
-        {{ 'contato' if kpis.todos_contatos == 1 else 'contatos' }} da planilha importada{{ ' em ' ~ kpis.todos_planilha if kpis.todos_planilha }}
-        que ainda não {{ 'está' if kpis.todos_contatos == 1 else 'estão' }} em campanha, com vencimento de
-        <b>{{ kpis.todos_de.strftime('%d/%m/%Y') }}</b> a <b>{{ kpis.todos_ate.strftime('%d/%m/%Y') }}</b>. Cada um recebe os
-        avisos ({{ quando }}) contados do próprio vencimento, marcados desde já.</p>
+      {% if kpis.todos_contatos %}<p class="ajuda" style="margin:4px 0 8px"><b>{{ kpis.todos_certificados }}
+        {{ 'certificado' if kpis.todos_certificados == 1 else 'certificados' }}</b> da planilha importada{{ ' em ' ~ kpis.todos_planilha if kpis.todos_planilha }}
+        que ainda não {{ 'está' if kpis.todos_certificados == 1 else 'estão' }} em campanha, com vencimento de
+        <b>{{ kpis.todos_de.strftime('%d/%m/%Y') }}</b> a <b>{{ kpis.todos_ate.strftime('%d/%m/%Y') }}</b>, de
+        <b>{{ kpis.todos_contatos }} {{ 'contato' if kpis.todos_contatos == 1 else 'contatos' }}</b>: quem tem mais de um
+        certificado no mesmo WhatsApp recebe uma mensagem só, com a lista de todos (CPF e CNPJ). Cada um recebe os avisos
+        ({{ quando }}) contados do próprio vencimento, marcados desde já.{% if kpis.todos_fora %} Ficam de fora:
+        {% for motivo, n in kpis.todos_fora.items() %}{{ n }} {{ 'certificado' if n == 1 else 'certificados' }} ({{ motivo }}){{ '; ' if not loop.last else '.' }}{% endfor %}{% endif %}</p>
       {% else %}<p class="ajuda" style="margin:4px 0 8px">Ninguém da última planilha está fora de campanha (ou ninguém tem
         WhatsApp nem e-mail). Quando sair o relatório novo, importe no quadro 2.</p>{% endif %}
       <button class="btn btn-primario" name="todos" value="1" {{ 'disabled' if not kpis.todos_contatos }}
-        data-confirmar="Montar uma campanha com os {{ kpis.todos_contatos }} contatos da última planilha importada que ainda não estão em campanha{{ ' (vencem de ' ~ kpis.todos_de.strftime('%d/%m/%Y') ~ ' a ' ~ kpis.todos_ate.strftime('%d/%m/%Y') ~ ')' if kpis.todos_ate }}? Cada um recebe os avisos antes do próprio vencimento. A campanha também espera a aprovação.">Montar com todos da planilha ({{ kpis.todos_contatos }})</button>
+        data-confirmar="Montar uma campanha com os {{ kpis.todos_certificados }} certificados ({{ kpis.todos_contatos }} contatos) da última planilha importada que ainda não estão em campanha{{ ' (vencem de ' ~ kpis.todos_de.strftime('%d/%m/%Y') ~ ' a ' ~ kpis.todos_ate.strftime('%d/%m/%Y') ~ ')' if kpis.todos_ate }}? Cada um recebe os avisos antes do próprio vencimento. A campanha também espera a aprovação.">Montar com todos da planilha ({{ kpis.todos_certificados }} {{ 'certificado' if kpis.todos_certificados == 1 else 'certificados' }})</button>
     </div>
     <div class="opcao-montar" id="montar-proximos">
       <b>B. Só quem vence nos próximos {{ janela }} dias</b>

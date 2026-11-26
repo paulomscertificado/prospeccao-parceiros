@@ -1607,13 +1607,13 @@ def test_montar_com_todos_da_planilha(cliente, csrf, monkeypatch):
         renovacao.importar(db, renovacao.ler_planilha("r.xlsx", _planilha(linhas))[0], _admin(db))
         db.commit()
     pagina = cliente.get("/renovacao").text
-    assert "Montar com todos da planilha (2)" in pagina and 'name="todos"' in pagina
+    assert "Montar com todos da planilha (2 certificados)" in pagina and 'name="todos"' in pagina
     de, ate = date.today() + timedelta(days=45), date.today() + timedelta(days=75)
     assert f"{de:%d/%m/%Y}</b> a <b>{ate:%d/%m/%Y}" in pagina  # o período certo: do 1º ao último vencimento
     r = cliente.post("/renovacao/montar", data={"csrf": csrf, "quantidade": "10"})
     assert "Nenhum cliente para avisar agora" in r.text  # o "Montar campanha" só leva quem vence nos próximos dias
     r = cliente.post("/renovacao/montar", data={"csrf": csrf, "quantidade": "10", "todos": "1"})
-    assert "todos os 2 contatos da planilha" in r.text
+    assert "todos os certificados da planilha, de 2 contatos" in r.text
     with sessao() as db:
         camp = db.execute(select(Campanha).where(Campanha.tipo == "renovacao")
                           .order_by(Campanha.id.desc())).scalars().first()
@@ -1631,8 +1631,91 @@ def test_montar_com_todos_da_planilha(cliente, csrf, monkeypatch):
             primeiro = min(t.data for t in avisos)
             assert primeiro >= cert.data_vencimento - timedelta(days=renovacao.janela(db) + 6)  # no tempo certo
             assert max(t.data for t in avisos) < cert.data_vencimento
-    assert "Montar com todos da planilha (0)" in cliente.get("/renovacao").text  # já estão em campanha
+    assert "Montar com todos da planilha (0 certificados)" in cliente.get("/renovacao").text  # já estão em campanha
     with sessao() as db:  # a sobra da planilha antiga não entrou (fica para a campanha automática do dia)
         assert db.execute(select(Certificado).where(Certificado.protocolo == "9700009")).scalars().one().campanha_id is None
+    with sessao() as db:
+        _limpar(db)
+
+
+def test_todos_da_planilha_leva_todos_os_certificados_menos_quem_pediu_sair(cliente, csrf, monkeypatch):
+    """Pedido da Maria (26/11/2026): "se eu mandei 746, é para você criar campanha para os 746 certificados, tanto de CPF
+    quanto de CNPJ". Na planilha de jan-mar/2027 da MS, 30 contatos (57 certificados) ficavam de fora porque tinham
+    outro certificado na campanha piloto: já recebiam os avisos dela, alguém da equipe atendia ou estavam como Perdido.
+    Agora só quem pediu SAIR fica de fora, e o CPF e o CNPJ no mesmo WhatsApp vão numa mensagem só."""
+    from app import trabalhos
+    from app.leads_servico import criar_lead
+
+    monkeypatch.setattr(trabalhos.threading, "Thread", _SemLinha)
+    linhas = [
+        _linha(40, "9710001", "e-CNPJ A1 12 meses", "ATENDIDA TESTE LTDA", "19131243000197", "ANA ATENDIDA",
+               "12345678901", "atendida@todos2-teste.com.br", "81987660001"),
+        _linha(45, "9710002", "e-CPF A1 12 meses", "", "", "PAULO PERDIDO", "98765432100",
+               "perdido@todos2-teste.com.br", "81987660002"),
+        _linha(50, "9710003", "e-CNPJ A1 12 meses", "PILOTO TESTE LTDA", "11222333000181", "RITA PILOTO",
+               "11122233344", "piloto@todos2-teste.com.br", "81987660003"),
+        _linha(55, "9710004", "e-CPF A1 12 meses", "", "", "SAULO SAIR", "22233344455",
+               "sair@todos2-teste.com.br", "81987660004"),
+        _linha(60, "9710005", "e-CPF A1 12 meses", "", "", "NINA NOVA", "33344455566",
+               "nova@todos2-teste.com.br", "81987660005"),
+        _linha(64, "9710006", "e-CNPJ A1 12 meses", "NOVA COMERCIO TESTE LTDA", "11444777000161", "NINA NOVA",
+               "33344455566", "nova@todos2-teste.com.br", "81987660005"),
+    ]
+    with sessao() as db:
+        _limpar(db)
+        admin = _admin(db)
+
+        def lead_de(nome, zap, **campos):
+            lead, _ = criar_lead(db, {"empresa": nome, "whatsapp": zap}, admin, origem=renovacao.ORIGEM_LEAD,
+                                 checar_duplicado=False)
+            for campo, valor in campos.items():
+                setattr(lead, campo, valor)
+            return lead
+
+        # como na planilha da MS: cada um com outro certificado na piloto
+        lead_de("ANA ATENDIDA", "(81) 98766-0001", automacao_pausada=True, status="Humano assumiu")
+        lead_de("PAULO PERDIDO", "(81) 98766-0002", status="Perdido", motivo_perda="Sem resposta")
+        piloto = lead_de("RITA PILOTO", "(81) 98766-0003")
+        lead_de("SAULO SAIR", "(81) 98766-0004", opt_out=True, status="Perdido", motivo_perda="Opt-out")
+        outra = Campanha(nome="Piloto do teste", tipo="renovacao", status="ativa", usuario_id=admin.id,
+                         canais="whatsapp")
+        db.add(outra)
+        db.flush()
+        db.add(Tarefa(tipo="prospeccao", lead_id=piloto.id, campanha_id=outra.id, canal="whatsapp",
+                      data=date.today() + timedelta(days=5), hora="10:17", status="pendente", angulo="renov_aviso",
+                      mensagem="Olá! Aviso do outro certificado."))
+        renovacao.importar(db, renovacao.ler_planilha("todos2.xlsx", _planilha(linhas))[0], admin)
+        db.commit()
+    pagina = " ".join(cliente.get("/renovacao").text.split())
+    assert "Montar com todos da planilha (5 certificados)" in pagina  # as 6 linhas, menos o SAIR
+    assert "de <b>4 contatos</b>" in pagina  # o CPF e o CNPJ da Nina no mesmo WhatsApp: uma mensagem só
+    assert "Ficam de fora: 1 certificado (pediu para não receber mensagens (SAIR))." in pagina
+    r = cliente.post("/renovacao/montar", data={"csrf": csrf, "quantidade": "10", "todos": "1"})
+    assert "todos os certificados da planilha, de 4 contatos" in r.text
+    with sessao() as db:
+        cid = db.execute(select(Campanha.id).where(Campanha.tipo == "renovacao", Campanha.id != outra.id)
+                         .order_by(Campanha.id.desc())).scalars().first()
+    _montar(cid)
+    with sessao() as db:
+        camp = db.get(Campanha, cid)
+        assert camp.status == "aguardando_aprovacao", camp.erro
+        certs = {c.protocolo: c for c in db.execute(select(Certificado).where(
+            Certificado.protocolo.in_([f"971000{i}" for i in range(1, 7)]))).scalars()}
+        assert {p for p, c in certs.items() if c.campanha_id == cid} == {"9710001", "9710002", "9710003", "9710005",
+                                                                          "9710006"}
+        assert certs["9710004"].campanha_id is None  # pediu SAIR: nunca
+        avisos = {}
+        for protocolo in ("9710001", "9710002", "9710003", "9710005"):
+            lead = db.get(Lead, certs[protocolo].lead_id)
+            avisos[protocolo] = db.execute(select(Tarefa).where(Tarefa.campanha_id == cid, Tarefa.lead_id == lead.id,
+                                                                Tarefa.canal == "whatsapp")).scalars().all()
+            assert avisos[protocolo], protocolo
+            assert all(sdr.recebe_automatico(lead, t) for t in avisos[protocolo])  # na hora do envio também sai
+        nina = avisos["9710005"][0].mensagem
+        assert "NOVA COMERCIO TESTE LTDA (e-CNPJ A1)" in nina and "e-CPF A1" in nina  # os dois numa mensagem
+        atendida = db.get(Lead, certs["9710001"].lead_id)
+        assert not sdr.recebe_automatico(atendida, Tarefa(campanha_id=cid, angulo="apresentacao"))  # outros toques: não
+        sair = db.execute(select(Lead).where(Lead.empresa == "SAULO SAIR")).scalars().first()
+        assert not sdr.recebe_automatico(sair, avisos["9710001"][0])  # SAIR: nem o aviso de renovação
     with sessao() as db:
         _limpar(db)

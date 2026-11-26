@@ -842,18 +842,15 @@ def _leads_dos_contatos(db, contatos: list[Contato], ar: int | None = None) -> d
 
 
 def motivo_de_fora(db, lead: Lead) -> str:
-    """Por que o contato não entra numa campanha agora (as mesmas regras de cadencias.aplicar). "" = pode."""
-    from .sdr import com_humano
-
+    """Por que o contato não entra numa campanha de renovação agora (as mesmas regras de cadencias.aplicar). "" = pode.
+    Desde 26/11/2026 (pedido da Maria: "se eu mandei 746, é para você criar campanha para os 746 certificados, tanto de
+    CPF quanto de CNPJ") só quem pediu SAIR (ou foi anonimizado) fica de fora. O cliente atendido por alguém da equipe,
+    que já respondeu, marcado como Perdido ou que já recebe os avisos de outro certificado (ex.: na campanha piloto)
+    também recebe os avisos dos certificados novos: na planilha de jan-mar/2027 da MS eram 30 contatos (57
+    certificados), todos com outro certificado na piloto. Quem responde, é assumido ou é encerrado tem os avisos
+    pendentes cancelados na hora (leads_servico.cancelar_tarefas_de_prospeccao)."""
     if lead.opt_out or lead.anonimizado:
         return "pediu para não receber mensagens (SAIR)"
-    if lead.automacao_pausada or com_humano(lead):
-        return "uma pessoa da equipe está atendendo"
-    if lead.perdido or lead.etapa >= 2:
-        return f"já respondeu ({lead.status}): a equipe cuida"
-    if db.execute(select(Tarefa.id).where(Tarefa.lead_id == lead.id, Tarefa.tipo == "prospeccao",
-                                          Tarefa.status.in_(["pendente", "rascunho"])).limit(1)).first():
-        return "já está recebendo outra sequência de mensagens"
     return ""
 
 
