@@ -299,6 +299,7 @@ CONFIG_PADRAO = {
         "renovações, mantendo o escritório como parceiro."
     ),
     "plataforma_nome": "Prospecção de Parceiros",  # nome neutro da tela de entrada (só o Admin Master muda)
+    "plataforma_suporte": "",  # contato do suporte na tela de entrada e na trava de senha errada (só o Admin Master)
     "limite_diario_whatsapp": "40",
     "limite_diario_email": "80",
     "horas_entre_contatos": "20",

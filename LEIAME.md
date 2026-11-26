@@ -1031,7 +1031,7 @@ permissão, a conta para de enviar na hora.
 | Esqueci a senha | Outro administrador cria uma senha nova em Configurações > Usuários, ou rode `redefinir_senha.bat` |
 | "Código errado" no login | O código muda a cada 30 segundos: digite o que o app mostra agora. Se sempre der errado, acerte a hora automática do celular |
 | Perdi o celular do código | Use um código de recuperação ou peça ao administrador para clicar em "zerar" em Configurações > Usuários |
-| "Muitas tentativas erradas" | Espere 15 minutos e tente de novo |
+| "Entrada travada por segurança" | Depois de 5 tentativas erradas seguidas (senha ou código do celular), a entrada fica travada por 15 minutos; a mensagem diz a partir de que horas tentar de novo. A cada erro a tela avisa quantas tentativas restam. Se a pessoa não lembrar a senha, o administrador cria uma nova (Configurações > Usuários; a de um administrador, só o Admin Master). O contato do suporte que aparece na mensagem fica em Configurações > Marca (Admin Master, fora das empresas) |
 | "O formulário expirou" | Recarregue a página (F5) e repita |
 | Lead da base sem responsável | A Receita não tem sócio-administrador pessoa física para essa empresa: preencha à mão |
 | A busca acha poucos escritórios | Importe a **base da Receita Federal** (Configurações > Integrações) |

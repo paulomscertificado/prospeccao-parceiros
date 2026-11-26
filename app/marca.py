@@ -302,12 +302,14 @@ def da_plataforma(db=None) -> dict:
     guardada = _guardadas.get("plataforma")
     if guardada and guardada[0] > time.monotonic():
         return guardada[1]
-    nome = PLATAFORMA
+    nome, suporte = PLATAFORMA, ""
     if db is not None:
         from .banco import ler_config
 
         nome = (ler_config(db, "plataforma_nome") or "").strip() or PLATAFORMA
-    m = _com_frase({"ar": None, "slug": "", "e_ms": False, "plataforma": True, "nome": nome, "curto": "sua empresa",
+        suporte = (ler_config(db, "plataforma_suporte") or "").strip()
+    m = _com_frase({"ar": None, "slug": "", "e_ms": False, "plataforma": True, "nome": nome, "suporte": suporte,
+                    "curto": "sua empresa",
                     "artigo": "a", "site": "", "descricao": "", "dominio_email": "", "cor": "", "cor_detalhe": "",
                     "cor_fundo": "", "fonte": "", "titulo": nome, "logo_url": "", "logo_largo": False, "css": "",
                     "fonte_url": "", "uf": "", "cidade": ""})

@@ -8,16 +8,16 @@ import secrets
 import threading
 import time
 from collections import defaultdict, deque
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from cryptography.fernet import Fernet, InvalidToken
 from fastapi import Depends, Request
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from . import config
 from .banco import agora, obter_db
-from .modelos import LogAuditoria, Usuario
+from .modelos import LogAuditoria, TentativaErrada, Usuario
 
 ITERACOES = 310_000
 
@@ -101,13 +101,46 @@ class Limitador:
             self._eventos.pop(chave, None)
 
 
-limite_login = Limitador(maximo=5, janela_seg=15 * 60)      # 5 senhas erradas a cada 15 min
 limite_pedidos = Limitador(maximo=240, janela_seg=60)       # pedidos de alteração por minuto, por IP
 limite_api = Limitador(maximo=120, janela_seg=60)           # webhooks e API
 # white label (plano de segurança): além do IP, por pessoa e por AR (escritórios inteiros podem sair pelo mesmo IP)
 limite_pessoa = Limitador(maximo=240, janela_seg=60)        # pedidos de alteração por minuto, por pessoa
 limite_ar = Limitador(maximo=1200, janela_seg=60)           # pedidos de alteração por minuto, por AR
 PRAZO_ENTRADA_SEG = 2 * 60 * 60  # o Admin Master fica dentro de uma AR por até 2 horas (depois entra de novo)
+
+# ---------------------------------------------------------------- trava da entrada (senha e código do celular)
+# 5 erros em 15 minutos travam a entrada por 15 minutos: com o mesmo e-mail no mesmo IP (senha) ou da mesma pessoa
+# (código do celular). Contados no banco (tabela tentativas_erradas), iguais em todos os processos do servidor: na
+# memória, cada um dos 2 processos contava os seus e eram até 10 erros (caso da Thamires em 26/11/2026; ela e a Maria
+# não sabiam da trava, e a tela agora avisa quantas tentativas restam e até que horas fica travada).
+TENTATIVAS_ERRADAS = 5
+MINUTOS_DA_TRAVA = 15
+
+
+def _resumo_da_tentativa(chave: str) -> str:
+    return hashlib.sha256(chave.encode()).hexdigest()
+
+
+def trava_de_entrada(db: Session, chave: str) -> tuple[int, datetime | None]:
+    """(tentativas que ainda restam, até quando a entrada fica travada; None = não está travada)."""
+    horas = db.execute(select(TentativaErrada.criado_em).where(
+        TentativaErrada.chave == _resumo_da_tentativa(chave),
+        TentativaErrada.criado_em > agora() - timedelta(minutes=MINUTOS_DA_TRAVA))
+        .order_by(TentativaErrada.criado_em.desc()).limit(TENTATIVAS_ERRADAS)).scalars().all()
+    if len(horas) >= TENTATIVAS_ERRADAS:  # destrava quando a mais antiga das 5 últimas fizer 15 minutos
+        return 0, horas[-1] + timedelta(minutes=MINUTOS_DA_TRAVA)
+    return TENTATIVAS_ERRADAS - len(horas), None
+
+
+def registrar_tentativa_errada(db: Session, chave: str) -> None:
+    """Conta um erro (quem chama faz o commit). As de mais de 1 dia saem daqui."""
+    db.add(TentativaErrada(chave=_resumo_da_tentativa(chave)))
+    db.execute(delete(TentativaErrada).where(TentativaErrada.criado_em < agora() - timedelta(days=1)))
+
+
+def zerar_tentativas(db: Session, chave: str) -> None:
+    """Acertou: os erros de antes não contam mais (quem chama faz o commit)."""
+    db.execute(delete(TentativaErrada).where(TentativaErrada.chave == _resumo_da_tentativa(chave)))
 
 
 def ip_de(request: Request) -> str:

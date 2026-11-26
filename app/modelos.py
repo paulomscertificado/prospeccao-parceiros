@@ -1049,6 +1049,16 @@ class Conhecimento(DaAR, Base):
     ativa: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
+class TentativaErrada(Base):
+    """Uma tentativa errada de entrar (senha, ou o código do celular), para a trava de 15 minutos (seguranca.py). Fica
+    no banco para valer igual em todos os processos do servidor: na memória de cada um, com 2 processos, eram até 10
+    erros antes de travar (26/11/2026). Só o resumo (SHA-256) de "IP|e-mail" ou "2fa|pessoa": sem e-mail nem IP."""
+    __tablename__ = "tentativas_erradas"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    chave: Mapped[str] = mapped_column(String(64), index=True)
+    criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora, index=True)
+
+
 class LogAuditoria(DaAR, Base):
     __tablename__ = "logs"
     id: Mapped[int] = mapped_column(primary_key=True)

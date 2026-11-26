@@ -16,7 +16,10 @@
     <div class="campo"><label>E-mail</label><input type="email" name="email" value="{{ email or '' }}" required autofocus autocomplete="username"></div>
     <div class="campo"><label>Senha</label><input type="password" name="senha" required autocomplete="current-password"></div>
     <button class="btn btn-primario" style="width:100%;justify-content:center">Entrar</button>
-    <p class="ajuda" style="margin-top:12px">Esqueceu a senha? Peça ao administrador para criar uma nova em Configurações &gt; Usuários.</p>
+    <p class="ajuda" style="margin-top:12px">Esqueceu a senha? Peça ao administrador da sua empresa para criar uma nova
+      em Configurações &gt; Usuários{% if suporte %} ou fale com o suporte da plataforma: <b>{{ suporte }}</b>{% endif %}.</p>
+    <p class="ajuda">Por segurança, depois de {{ tentativas or 5 }} tentativas erradas seguidas a entrada fica travada por
+      {{ minutos_trava or 15 }} minutos.</p>
   </form>
 </div></div>
 {% endblock %}

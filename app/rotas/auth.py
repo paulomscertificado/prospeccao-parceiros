@@ -1,5 +1,7 @@
 """Login (senha + código do celular para admin/gestor), primeiro acesso, sair e troca de senha."""
 
+import math
+import re
 import secrets
 import time
 
@@ -8,10 +10,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import config, dois_fatores
-from ..banco import obter_db
+from ..banco import agora, ler_config, obter_db
 from ..modelos import Usuario
-from ..seguranca import (entrar, existe_usuario, ip_de, limite_login, marcar_login, problema_na_senha,
-                         registrar_log, resumir_senha, senha_confere, usuario_logado, verificar_csrf)
+from ..seguranca import (MINUTOS_DA_TRAVA, TENTATIVAS_ERRADAS, entrar, existe_usuario, ip_de, marcar_login,
+                         problema_na_senha, registrar_log, registrar_tentativa_errada, resumir_senha, senha_confere,
+                         trava_de_entrada, usuario_logado, verificar_csrf, zerar_tentativas)
 from ..util import email_valido
 from ..web import avisar, tela, voltar
 
@@ -50,27 +53,73 @@ def _concluir_login(request: Request, db: Session, usuario: Usuario, destino: st
     return voltar(destino or _inicio(usuario))
 
 
+# ---------------------------------------------------------------- trava da entrada (seguranca.trava_de_entrada)
+# Pedido da Maria em 26/11/2026: a Thamires errou a senha, a entrada travou e nem ela nem a Maria sabiam da trava. A
+# tela agora avisa quantas tentativas restam e, travada, até que horas, o que fazer e o contato do suporte.
+TRAVA_DA_SENHA = f"foram {TENTATIVAS_ERRADAS} tentativas com e-mail ou senha errados"
+TRAVA_DO_CODIGO = f"foram {TENTATIVAS_ERRADAS} códigos errados"
+DEPOIS_DO_CODIGO = ", entrando de novo com e-mail e senha,"
+
+
+def contato_do_suporte(db: Session) -> str:
+    """O contato do suporte da plataforma (Configurações > Marca, do Admin Master fora das ARs); "" = sem contato."""
+    return re.sub(r"\s+", " ", ler_config(db, "plataforma_suporte") or "").strip()
+
+
+def _fale_com_o_suporte(db: Session) -> str:
+    contato = contato_do_suporte(db)
+    return f"fale com o suporte da plataforma: {contato}" if contato else "fale com o suporte da plataforma"
+
+
+def ainda_restam(restam: int) -> str:
+    """O aviso depois de um erro, antes da trava."""
+    if restam == 1:
+        return (f"Atenção: resta só 1 tentativa. Se errar de novo, a entrada fica travada por {MINUTOS_DA_TRAVA} "
+                "minutos, por segurança.")
+    return (f"Você ainda tem {restam} tentativas. Depois de {TENTATIVAS_ERRADAS} erros seguidos, a entrada fica "
+            f"travada por {MINUTOS_DA_TRAVA} minutos, por segurança.")
+
+
+def mensagem_da_trava(db: Session, ate, motivo: str, depois: str = "") -> str:
+    """A entrada travou: o motivo, a partir de que horas tentar de novo e com quem falar."""
+    minutos = max(1, math.ceil((ate - agora()).total_seconds() / 60))
+    return (f"Entrada travada por segurança: {motivo}. Tente de novo a partir das {ate:%H:%M} (daqui a {minutos} "
+            f"{'minuto' if minutos == 1 else 'minutos'}){depois} ou {_fale_com_o_suporte(db)}.")
+
+
+def _tela_de_entrada(request: Request, db: Session, contexto: dict | None = None, status_code: int = 200):
+    return tela(request, "login.html", {"suporte": contato_do_suporte(db), "tentativas": TENTATIVAS_ERRADAS,
+                                        "minutos_trava": MINUTOS_DA_TRAVA, **(contexto or {})}, status_code=status_code)
+
+
 @rotas.get("/login")
 def login_tela(request: Request, db: Session = Depends(obter_db)):
     if not existe_usuario(db):
         return voltar("/primeiro-acesso")
-    return tela(request, "login.html")
+    return _tela_de_entrada(request, db)
 
 
 @rotas.post("/login", dependencies=[Depends(verificar_csrf)])
 def login(request: Request, email: str = Form(...), senha: str = Form(...), db: Session = Depends(obter_db)):
     chave = f"{ip_de(request)}|{email.strip().lower()}"
-    if limite_login.bloqueado(chave):
-        return tela(request, "login.html", {"erro": "Muitas tentativas erradas. Espere 15 minutos e tente de novo.",
-                                            "email": email}, status_code=429)
+    _, travada_ate = trava_de_entrada(db, chave)
+    if travada_ate:  # travada vale também para a senha certa: é a proteção contra quem tenta adivinhar
+        return _tela_de_entrada(request, db, {"erro": mensagem_da_trava(db, travada_ate, TRAVA_DA_SENHA),
+                                              "email": email}, status_code=429)
     usuario = db.execute(select(Usuario).where(Usuario.email == email.strip().lower())).scalars().first()
     if not usuario or not usuario.ativo or not senha_confere(senha, usuario.senha_hash):
-        limite_login.registrar(chave)
+        registrar_tentativa_errada(db, chave)
         registrar_log(db, None, "login_falhou", "usuario", None, f"e-mail: {email.strip().lower()}", request)
         db.commit()
-        return tela(request, "login.html", {"erro": "E-mail ou senha incorretos.", "email": email}, status_code=401)
-    limite_login.zerar(chave)
+        restam, travada_ate = trava_de_entrada(db, chave)
+        if travada_ate:
+            return _tela_de_entrada(request, db, {"erro": mensagem_da_trava(db, travada_ate, TRAVA_DA_SENHA),
+                                                  "email": email}, status_code=429)
+        return _tela_de_entrada(request, db, {"erro": "E-mail ou senha incorretos. " + ainda_restam(restam),
+                                              "email": email}, status_code=401)
+    zerar_tentativas(db, chave)
     if dois_fatores.precisa(usuario) and not (usuario.totp_ativo and dois_fatores.aparelho_confiavel(request, usuario)):
+        db.commit()
         _aguardar_codigo(request, usuario)
         return voltar("/login/codigo" if usuario.totp_ativo else "/login/ativar-codigo")
     return _concluir_login(request, db, usuario)
@@ -103,16 +152,20 @@ def ativar_codigo(request: Request, codigo: str = Form(""), db: Session = Depend
     if usuario is None or not segredo:
         return _sem_pendente(request)
     chave = f"2fa|{usuario.id}"
-    if limite_login.bloqueado(chave):
-        avisar(request, "Muitas tentativas erradas. Espere 15 minutos e tente de novo.", "erro")
+    _, travada_ate = trava_de_entrada(db, chave)
+    if travada_ate:
+        avisar(request, mensagem_da_trava(db, travada_ate, TRAVA_DO_CODIGO, DEPOIS_DO_CODIGO), "erro")
         return voltar("/login/ativar-codigo")
     passo = dois_fatores.conferir(segredo, codigo)
     if passo is None:
-        limite_login.registrar(chave)
-        avisar(request, "Código errado. Confira se leu o QR code desta tela e digite os 6 números que o app mostra "
-                        "agora (eles mudam a cada 30 segundos).", "erro")
+        registrar_tentativa_errada(db, chave)
+        db.commit()
+        restam, travada_ate = trava_de_entrada(db, chave)
+        avisar(request, mensagem_da_trava(db, travada_ate, TRAVA_DO_CODIGO, DEPOIS_DO_CODIGO) if travada_ate else
+               "Código errado. Confira se leu o QR code desta tela e digite os 6 números que o app mostra agora (eles "
+               "mudam a cada 30 segundos). " + ainda_restam(restam), "erro")
         return voltar("/login/ativar-codigo")
-    limite_login.zerar(chave)
+    zerar_tentativas(db, chave)
     codigos = dois_fatores.ativar(usuario, segredo, passo)
     registrar_log(db, usuario, "ativou_2fa", "usuario", usuario.id, request=request)
     entrar(request, usuario)
@@ -137,9 +190,10 @@ def codigo_login(request: Request, codigo: str = Form(""), lembrar: str = Form("
     if usuario is None or not usuario.totp_ativo:
         return _sem_pendente(request)
     chave = f"2fa|{usuario.id}"
-    if limite_login.bloqueado(chave):
-        return tela(request, "dois_fatores_codigo.html", {"pessoa": usuario, "erro": "Muitas tentativas erradas. "
-                    "Espere 15 minutos e tente de novo."}, status_code=429)
+    _, travada_ate = trava_de_entrada(db, chave)
+    if travada_ate:
+        return tela(request, "dois_fatores_codigo.html", {"pessoa": usuario, "erro": mensagem_da_trava(
+            db, travada_ate, TRAVA_DO_CODIGO, DEPOIS_DO_CODIGO)}, status_code=429)
     recuperacao = False
     passo = dois_fatores.conferir(dois_fatores.segredo_de(usuario), codigo, usuario.totp_ultimo_passo)
     if passo is not None:
@@ -147,12 +201,16 @@ def codigo_login(request: Request, codigo: str = Form(""), lembrar: str = Form("
     elif dois_fatores.usar_codigo_de_recuperacao(usuario, codigo):
         recuperacao = True
     else:
-        limite_login.registrar(chave)
+        registrar_tentativa_errada(db, chave)
         registrar_log(db, usuario, "codigo_2fa_errado", "usuario", usuario.id, request=request)
         db.commit()
+        restam, travada_ate = trava_de_entrada(db, chave)
+        if travada_ate:
+            return tela(request, "dois_fatores_codigo.html", {"pessoa": usuario, "erro": mensagem_da_trava(
+                db, travada_ate, TRAVA_DO_CODIGO, DEPOIS_DO_CODIGO)}, status_code=429)
         return tela(request, "dois_fatores_codigo.html", {"pessoa": usuario, "erro": "Código errado ou já usado. "
-                    "Digite os 6 números que o app mostra agora."}, status_code=401)
-    limite_login.zerar(chave)
+                    "Digite os 6 números que o app mostra agora. " + ainda_restam(restam)}, status_code=401)
+    zerar_tentativas(db, chave)
     if recuperacao:
         registrar_log(db, usuario, "usou_codigo_recuperacao", "usuario", usuario.id,
                       f"restam {dois_fatores.codigos_restantes(usuario)}", request)

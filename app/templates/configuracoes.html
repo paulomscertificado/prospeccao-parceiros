@@ -44,11 +44,16 @@
 {% if m.plataforma %}
 <form class="cartao" method="post" action="/configuracoes/marca" style="max-width:640px">
   <input type="hidden" name="csrf" value="{{ csrf }}">
-  <h2>Nome da plataforma</h2>
+  <h2>Nome e suporte da plataforma</h2>
   <p class="suave">Aparece na tela de entrada e para o Admin Master fora das empresas. É neutro: nenhuma empresa vê o
     nome de outra.</p>
   <div class="campo"><label for="p-nome">Nome</label>
     <input id="p-nome" type="text" name="plataforma_nome" maxlength="60" value="{{ m.nome }}"></div>
+  <div class="campo"><label for="p-suporte">Contato do suporte</label>
+    <input id="p-suporte" type="text" name="plataforma_suporte" maxlength="120" value="{{ m.suporte or '' }}"
+           placeholder="Ex.: WhatsApp (81) 99999-0000 ou o e-mail do suporte">
+    <p class="ajuda">Aparece na tela de entrada e na mensagem de quando a entrada fica travada por senha errada (5 erros
+      seguidos travam por 15 minutos). Em branco, a mensagem diz só "fale com o suporte da plataforma".</p></div>
   <button class="btn btn-primario">Salvar</button>
   <p class="ajuda">A marca de cada empresa (nome, logo, cores e fonte) muda dentro dela: no
     <a href="/master">Painel master</a>, clique em "Entrar na AR" e depois em Configurações &gt; Marca.</p>

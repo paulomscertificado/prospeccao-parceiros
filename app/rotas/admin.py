@@ -258,13 +258,18 @@ async def salvar_marca(request: Request, usuario: Usuario = Depends(exige("confi
         if not autorizacao.e_master(usuario):
             return _so_da_plataforma(request, destino)
         nome = re.sub(r"\s+", " ", str(form.get("plataforma_nome") or "")).strip()[:60]
-        antes = {"plataforma_nome": ler_config(db, "plataforma_nome")}
-        gravar_config(db, "plataforma_nome", nome or marca.PLATAFORMA)
+        # contato do suporte: na tela de entrada e na mensagem da trava de senha errada (26/11/2026, pedido da Maria)
+        suporte = re.sub(r"\s+", " ", str(form.get("plataforma_suporte") or "")).strip()[:120]
+        antes = {"plataforma_nome": ler_config(db, "plataforma_nome"),
+                 "plataforma_suporte": ler_config(db, "plataforma_suporte")}
+        depois = {"plataforma_nome": nome or marca.PLATAFORMA, "plataforma_suporte": suporte}
+        for chave, valor in depois.items():
+            gravar_config(db, chave, valor)
         registrar_log(db, usuario, "salvou_nome_da_plataforma", "configuracao", None, nome, request,
-                      mudancas=diferencas(antes, {"plataforma_nome": nome or marca.PLATAFORMA}))
+                      mudancas=diferencas(antes, depois))
         db.commit()
         marca.esquecer()
-        avisar(request, "Nome da plataforma salvo.")
+        avisar(request, "Nome e suporte da plataforma salvos.")
         return voltar(destino)
     arquivo = form.get("logo")
     novo_logo = await arquivo.read() if arquivo is not None and getattr(arquivo, "filename", "") else None

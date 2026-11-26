@@ -13,8 +13,17 @@
 | Tarefas automáticas | Laço `asyncio` a cada hora (vencimentos) + threads para buscas longas | Sem Redis/Celery no MVP |
 
 Pensado para a escala da MS (milhares de leads, dezenas de usuários). Para dezenas de milhares de leads
-ativos ou vários servidores: mover buscas e enriquecimento para uma fila (RQ/Celery) e o limitador de
-tentativas para Redis.
+ativos ou vários servidores: mover buscas e enriquecimento para uma fila (RQ/Celery) e os limitadores de
+pedidos para Redis.
+
+**Trava da entrada** (26/11/2026, pedido da Maria: a Thamires errou a senha, a entrada travou e ninguém sabia da
+trava): 5 erros em 15 minutos (senha: mesmo IP + e-mail; código do celular: mesma pessoa) travam a entrada por
+15 minutos (`seguranca.trava_de_entrada`, `registrar_tentativa_errada`, `zerar_tentativas`). Os erros ficam no
+banco (tabela `tentativas_erradas`, só o SHA-256 da chave, sem e-mail nem IP; as de mais de 1 dia saem), iguais nos
+2 processos do servidor: o limitador antigo ficava na memória de cada processo e eram até 10 erros. A tela avisa
+quantas tentativas restam e, travada, a partir de que horas tentar de novo e o contato do suporte da plataforma
+(`plataforma_suporte`, Configurações > Marca do Admin Master fora das ARs; `rotas/auth.mensagem_da_trava`). Testes:
+`testes/test_trava_de_entrada.py`.
 
 ## Fluxo principal
 
