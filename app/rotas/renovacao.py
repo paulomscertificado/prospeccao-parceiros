@@ -70,7 +70,7 @@ def _endereco_da_lista(ver: str, busca: str = "") -> str:
 
 
 @rotas.get("/renovacao")
-def tela_renovacao(request: Request, ver: str = "avisar", q: str = "", usuario: Usuario = Depends(exige("campanhas.configurar")),
+def tela_renovacao(request: Request, ver: str = "avisar", q: str = "", usuario: Usuario = Depends(exige("renovacao.ver")),
                    db: Session = Depends(obter_db)):
     _na_ar_da_renovacao(db, request, usuario)
     hoje = date.today()
@@ -134,7 +134,7 @@ def tela_renovacao(request: Request, ver: str = "avisar", q: str = "", usuario: 
 
 
 @rotas.post("/renovacao/importar", dependencies=[Depends(verificar_csrf)])
-async def importar(request: Request, arquivo: UploadFile = File(...), usuario: Usuario = Depends(exige("campanhas.configurar")),
+async def importar(request: Request, arquivo: UploadFile = File(...), usuario: Usuario = Depends(exige("renovacao.gerenciar")),
                    db: Session = Depends(obter_db)):
     conteudo = await arquivo.read()
     if not conteudo:
@@ -171,7 +171,7 @@ async def importar(request: Request, arquivo: UploadFile = File(...), usuario: U
 
 
 @rotas.post("/renovacao/montar", dependencies=[Depends(verificar_csrf)])
-async def montar(request: Request, usuario: Usuario = Depends(exige("campanhas.configurar")),
+async def montar(request: Request, usuario: Usuario = Depends(exige("renovacao.gerenciar")),
                  db: Session = Depends(obter_db)):
     form = await request.form()
     _na_ar_da_renovacao(db, request, usuario)
@@ -224,7 +224,7 @@ def _api_oficial(db, request: Request, usuario: Usuario) -> dict:
 
 
 @rotas.post("/renovacao/configurar", dependencies=[Depends(verificar_csrf)])
-async def configurar(request: Request, usuario: Usuario = Depends(exige("campanhas.configurar")),
+async def configurar(request: Request, usuario: Usuario = Depends(exige("renovacao.gerenciar")),
                      db: Session = Depends(obter_db)):
     form = await request.form()
     _na_ar_da_renovacao(db, request, usuario)
@@ -375,7 +375,7 @@ async def configurar(request: Request, usuario: Usuario = Depends(exige("campanh
 
 
 @rotas.post("/renovacao/mensagens", dependencies=[Depends(verificar_csrf)])
-async def salvar_mensagens(request: Request, usuario: Usuario = Depends(exige("campanhas.configurar")),
+async def salvar_mensagens(request: Request, usuario: Usuario = Depends(exige("renovacao.gerenciar")),
                            db: Session = Depends(obter_db)):
     from .. import sdr
 
@@ -403,7 +403,7 @@ async def salvar_mensagens(request: Request, usuario: Usuario = Depends(exige("c
 
 
 @rotas.post("/renovacao/restaurar-mensagens", dependencies=[Depends(verificar_csrf)])
-def restaurar_mensagens(request: Request, usuario: Usuario = Depends(exige("campanhas.configurar")),
+def restaurar_mensagens(request: Request, usuario: Usuario = Depends(exige("renovacao.gerenciar")),
                         db: Session = Depends(obter_db)):
     _na_ar_da_renovacao(db, request, usuario)
     gravar_config(db, "renov_mensagens", "")
@@ -414,7 +414,7 @@ def restaurar_mensagens(request: Request, usuario: Usuario = Depends(exige("camp
 
 
 @rotas.post("/renovacao/testar", dependencies=[Depends(verificar_csrf)])
-async def testar(request: Request, usuario: Usuario = Depends(exige("campanhas.configurar")),
+async def testar(request: Request, usuario: Usuario = Depends(exige("renovacao.gerenciar")),
                  db: Session = Depends(obter_db)):
     """Área de teste (como a da IA SDR): os avisos chegam no WhatsApp ou no e-mail de quem testa, com "[TESTE]"."""
     form = await request.form()
@@ -468,7 +468,7 @@ async def testar(request: Request, usuario: Usuario = Depends(exige("campanhas.c
 
 
 @rotas.post("/renovacao/certificado/{cid:int}/situacao", dependencies=[Depends(verificar_csrf)])
-async def mudar_situacao(request: Request, cid: int, usuario: Usuario = Depends(exige("campanhas.configurar")),
+async def mudar_situacao(request: Request, cid: int, usuario: Usuario = Depends(exige("renovacao.gerenciar")),
                          db: Session = Depends(obter_db)):
     form = await request.form()
     cert = db.get(Certificado, cid)

@@ -870,6 +870,11 @@ calendário até 24 horas depois do toque do cliente.
 | Vendedor | Só os próprios leads, campanhas, tarefas e vendas |
 | Parceiro | Só o portal: própria carteira, indicações, vendas e comissão |
 
+**Liberar a Renovação para outra pessoa** (por exemplo, uma vendedora): Configurações > **Exceções por pessoa** >
+escolha a pessoa > Permissão **Renovação · Ver a Renovação** (só ver) e, se ela também for importar a planilha e
+montar os avisos, **Renovação · Mexer na Renovação** > Regra PERMITIR > Salvar exceção. A Renovação não dá as
+Empresas novas (busca paga na CNPJá), que continuam em **IA SDR · Configurar as Empresas novas**.
+
 **Quem está acima vê o que é de quem está abaixo** (pedido de 17/11/2026): Administrador > Gestor > Funcionário >
 Vendedor. Colegas do mesmo nível não veem o que é um do outro, e quem está abaixo não vê o que é de quem está acima.
 Nas telas com o filtro "de quem" (Campanhas, Minha fila, Leads, Pipeline, Agenda e Dashboard), quem está acima escolhe

@@ -84,11 +84,20 @@ CATALOGO = [
               padrao="A"),
     Permissao("campanhas.whatsapp_sozinho", "IA SDR",
               "Ligar o WhatsApp automático da campanha (contato frio sai sem clique)", modulo="campanhas", padrao="A"),
-    # Renovação e Empresas novas valem para a AR toda (planilha da certificadora, busca paga na CNPJá): só quem
-    # configura abre essas telas (17/11/2026); as campanhas delas seguem a hierarquia, como as outras
+    # Empresas novas valem para a AR toda (busca paga na CNPJá): só quem configura abre a tela (17/11/2026); as
+    # campanhas dela seguem a hierarquia, como as outras. A Renovação tem grupo próprio (abaixo) desde 26/11/2026.
     Permissao("campanhas.configurar", "IA SDR",
-              "Configurar a Renovação e as Empresas novas (planilha, textos, avisos e busca paga na CNPJá)",
+              "Configurar as Empresas novas (busca paga na CNPJá, textos e avisos)",
               modulo="campanhas", padrao="G"),
+
+    # Renovação com grupo próprio (26/11/2026, pedido da Maria: "o módulo de renovação não está aparecendo" nas
+    # Exceções por pessoa). Antes vinha dentro de campanhas.configurar, junto com as Empresas novas, e dar a Renovação
+    # a alguém dava também a busca paga na CNPJá. Quem já podia continua podendo (_separar_renovacao).
+    Permissao("renovacao.ver", "Renovação", "Ver a Renovação (certificados que vão vencer, avisos e campanhas)",
+              modulo="campanhas", padrao="G"),
+    Permissao("renovacao.gerenciar", "Renovação",
+              "Mexer na Renovação: importar a planilha, montar os avisos, testar, mudar textos e configurações e "
+              "cancelar avisos de um cliente", modulo="campanhas", padrao="G"),
     Permissao("fila.ver", "IA SDR", "Ver a fila de mensagens", True, padrao="E"),
     Permissao("fila.enviar", "IA SDR", "Enviar e editar mensagens da fila", True, padrao="E"),
     Permissao("envios.ver", "IA SDR", "Ver os envios", True, padrao="E"),
@@ -236,7 +245,47 @@ def preparar(db: Session) -> None:
         papel.permissoes_conhecidas = ",".join(sorted(conhecidas | {p.codigo for p in novas}))
     _aplicar_hierarquia(db, existentes)
     _liberar_apagar_conversa(db, existentes)
+    _separar_renovacao(db, existentes)
     db.flush()
+
+
+RENOVACAO = ("renovacao.ver", "renovacao.gerenciar")
+
+
+def _separar_renovacao(db: Session, papeis: dict) -> None:
+    """Uma vez só (26/11/2026, pedido da Maria: a Renovação não aparecia nas Exceções por pessoa): a Renovação sai de
+    campanhas.configurar e ganha as permissões dela. Ninguém ganha nem perde acesso: cada papel fica com as duas novas
+    se tinha campanhas.configurar (com o mesmo alcance) e sem elas se não tinha; cada exceção de campanhas.configurar
+    (PERMITIR ou NEGAR) vira as mesmas exceções nas duas novas. Depois disso, o que o administrador mudar fica."""
+    from .banco import gravar_config, ler_config
+
+    if ler_config(db, "permissoes_renovacao_separada") == "1":
+        return
+    for papel in papeis.values():
+        linhas = {r.permissao: r for r in db.execute(select(PermissaoPapel).where(
+            PermissaoPapel.papel_id == papel.id,
+            PermissaoPapel.permissao.in_(("campanhas.configurar",) + RENOVACAO))).scalars()}
+        base = linhas.get("campanhas.configurar")
+        for codigo in RENOVACAO:
+            atual = linhas.get(codigo)
+            if base is None and atual is not None:
+                db.delete(atual)
+            elif base is not None and atual is None:
+                db.add(PermissaoPapel(papel_id=papel.id, permissao=codigo, escopo=base.escopo))
+            elif base is not None:
+                atual.escopo = base.escopo
+    excecoes = db.execute(select(ExcecaoPermissao).where(ExcecaoPermissao.permissao == "campanhas.configurar")
+                          .execution_options(sem_filtro_de_ar=True)).scalars().all()
+    for e in excecoes:
+        for codigo in RENOVACAO:
+            ja_tem = db.execute(select(ExcecaoPermissao.id).where(
+                ExcecaoPermissao.usuario_id == e.usuario_id, ExcecaoPermissao.permissao == codigo)
+                .execution_options(sem_filtro_de_ar=True)).first()
+            if ja_tem is None:
+                db.add(ExcecaoPermissao(usuario_id=e.usuario_id, permissao=codigo, efeito=e.efeito, escopo=e.escopo,
+                                        ate=e.ate, motivo=e.motivo, criado_por_id=e.criado_por_id,
+                                        tenant_id=e.tenant_id))
+    gravar_config(db, "permissoes_renovacao_separada", "1")
 
 
 def _liberar_apagar_conversa(db: Session, papeis: dict) -> None:

@@ -223,5 +223,9 @@ Configurações (`renov_*`): `renov_ativo`, `renov_hora`, `renov_maximo_dia`, `r
 
 ## Permissões
 
-Mesmas das Empresas novas: ver `campanhas.ver`; importar, montar, configurar, mensagens e situação do certificado
-`campanhas.gerenciar`.
+Grupo **Renovação** nas permissões (desde 26/11/2026, pedido da Maria: ele não aparecia nas Exceções por pessoa):
+`renovacao.ver` abre a tela Renovação (e o item do menu); `renovacao.gerenciar` importa a planilha, monta, testa,
+muda textos e configurações e a situação de cada certificado. Administrador e gestor por padrão; para liberar a outra
+pessoa: Configurações > Exceções por pessoa > PERMITIR. Antes vinha dentro de `campanhas.configurar`, que ficou só
+com as Empresas novas. As campanhas de renovação seguem a hierarquia de `campanhas.ver`/`campanhas.gerenciar` (o
+APROVAR) e quem não abre a tela Renovação as vê na lista de Campanhas.

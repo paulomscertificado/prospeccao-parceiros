@@ -86,9 +86,15 @@ do sistema que ainda estavam no padrão antigo (`tudo` e `proprios`); o que o ad
 Os filtros "de quem" das telas (Campanhas, Minha fila, Leads, Pipeline, Agenda, Dashboard) aparecem para quem alcança
 outras pessoas (`autorizacao.escolhe_de_quem`) e listam só elas (`autorizacao.pessoas_visiveis`).
 
-**Renovação e Empresas novas** valem para a AR toda (planilha da certificadora, busca paga na CNPJá): as telas, a
-configuração, os textos, a planilha, o "Montar", o teste, o "Buscar agora" e a situação dos certificados exigem
-`campanhas.configurar` (administrador e gestor). As campanhas dessas telas seguem a hierarquia (`campanhas.ver`) e o
+**Renovação e Empresas novas** valem para a AR toda (planilha da certificadora, busca paga na CNPJá). As Empresas
+novas (tela, textos, "Buscar agora") exigem `campanhas.configurar`. A **Renovação tem grupo próprio** desde
+26/11/2026 (pedido da Maria: "o módulo de renovação não está aparecendo" nas Exceções por pessoa; antes vinha
+dentro de `campanhas.configurar`, e dar a Renovação a alguém dava também a busca paga): `renovacao.ver` abre a tela
+e `renovacao.gerenciar` mexe nela (planilha, "Montar", teste, textos, configurações e a situação dos
+certificados). As três são de administrador e gestor por padrão. A separação (`autorizacao._separar_renovacao`, uma
+vez só, config `permissoes_renovacao_separada`) deu as duas novas a cada papel que tinha `campanhas.configurar`, com
+o mesmo alcance, tirou dos que não tinham e copiou as exceções: ninguém ganhou nem perdeu acesso. Teste:
+`testes/test_renovacao_permissoes.py`. As campanhas dessas telas seguem a hierarquia (`campanhas.ver`) e o
 APROVAR só aparece para quem pode aprovar aquela campanha. Quem não configura vê as campanhas de renovação que alcança na
 lista de Campanhas. Teste: `testes/test_hierarquia.py`.
 

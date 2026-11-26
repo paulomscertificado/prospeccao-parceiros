@@ -525,8 +525,8 @@ def lista_campanhas(request: Request, ver: str = "todas", de: str = "", usuario:
             consulta = consulta.where(Campanha.usuario_id == util.para_int(de))
     consulta = consulta.where(Campanha.arquivada.is_(ver == "arquivadas"))
     # as campanhas de Renovação ficam na tela Renovação (pedido da Maria em 13/11/2026: "preciso dela como renovação");
-    # quem não abre aquela tela (não configura a Renovação) vê aqui as que alcança
-    if autorizacao.pode(usuario, "campanhas.configurar"):
+    # quem não abre aquela tela (sem a permissão "Ver a Renovação") vê aqui as que alcança
+    if autorizacao.pode(usuario, "renovacao.ver"):
         consulta = consulta.where(Campanha.tipo != "renovacao")
     if ver == "aprovacao":
         consulta = consulta.where(Campanha.status == "aguardando_aprovacao")
@@ -809,9 +809,10 @@ def ver_campanha(request: Request, cid: int, usuario: Usuario = Depends(exige("c
     marca_ligada = visual.html_da_marca_ligado(db)
     from .. import bases_importadas
 
-    # Renovação e Empresas novas têm área própria (só para quem as configura): o menu marca a área e o "Voltar" leva
-    # para lá; para os outros, a lista de Campanhas
-    area = AREAS_DAS_CAMPANHAS.get(camp.tipo) if autorizacao.pode(usuario, "campanhas.configurar") else None
+    # Renovação e Empresas novas têm área própria (só para quem abre aquela tela): o menu marca a área e o "Voltar"
+    # leva para lá; para os outros, a lista de Campanhas
+    abre_a_area = {"renovacao": "renovacao.ver", "empresas_novas": "campanhas.configurar"}.get(camp.tipo)
+    area = AREAS_DAS_CAMPANHAS.get(camp.tipo) if abre_a_area and autorizacao.pode(usuario, abre_a_area) else None
     pode_gerenciar = autorizacao.pode(usuario, "campanhas.gerenciar", camp)
     resumo = campanhas.resumo_aprovacao(db, camp)
     return tela(request, "campanha.html", {
