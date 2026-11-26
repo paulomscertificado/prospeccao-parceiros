@@ -162,7 +162,14 @@ base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renova
    melhor essa área de criar as campanhas de renovação"; o Grupo Certy tinha ligado a campanha automática às 08:45, e
    ela não roda lá): `renovacao.automatica_na_ar(db, ar)` diz se a `rodada_diaria` roda para a marca (hoje só a AR
    principal, `marca.ar_padrao`). Nas outras, o quadro 4 não mostra o liga/desliga, o horário, o "Começar em" nem o
-   máximo, e salvar grava `renov_ativo` = 0 sem mexer em `renov_hora`/`renov_ativo_desde`/`renov_maximo_dia`. O quadro
+   máximo, e salvar grava `renov_ativo` = 0 sem mexer em `renov_hora`/`renov_ativo_desde`/`renov_maximo_dia`.
+   **Quadro 4 em blocos** (26/11/2026, pedido da Maria: "melhore essa área de configuração pois está muito confuso"):
+   título "4. Como os avisos saem", resumo **Como está hoje** (dias, horário, canais, quem assina, campanha do dia, só
+   com o que está salvo) e os blocos `#quando` (dias, horário, outros feriados), `#por-onde` (canais, quem assina, API
+   oficial, número QR: com o oficial ligado, "de reserva"), `#junto` (arte, e-mail com a marca, endereço da arte num
+   `<details>` para o master), `#quero-renovar` (calendário; só para quem escolhe o número), `#quem-nao-recebe`
+   (pontos de atendimento) e `#automatica` (campanha do dia, ou o aviso de que ela ainda não roda na marca). Os nomes
+   dos campos do formulário não mudaram (`/renovacao/configurar`). O quadro
    3 separa **A. Todos da última planilha** (`ATE_TODOS` + `inicio_da_ultima_planilha`) e **B. Só quem vence nos
    próximos N dias**, cada um com o seu botão e a sua contagem, na marca em que a campanha vai ser montada
    (`ar_de_quem_monta`: o Admin Master fora das marcas via os prontos de todas). Sem ninguém em B, a tela diz quando

@@ -44,7 +44,7 @@ def test_marca_sem_automatica_nao_mostra_o_liga_desliga_e_salvar_desliga(cliente
     pagina = c.get("/renovacao").text
     assert 'name="ativo"' not in pagina and 'name="hora"' not in pagina and 'name="ativo_desde"' not in pagina
     assert 'name="maximo_dia"' not in pagina
-    assert "A campanha automática do dia ainda não" in pagina and "Quem envia, por qual número e quando" in pagina
+    assert "A campanha automática do dia ainda não" in pagina and "4. Como os avisos saem" in pagina
     assert "A. Todos da última planilha" in pagina and "B. Só quem vence nos próximos" in pagina
     r = c.post("/renovacao/configurar", data=_formulario(csrf_de(pagina)))
     assert r.status_code == 200 and "Configuração salva." in r.text and "campanha automática roda" not in r.text
@@ -56,7 +56,7 @@ def test_marca_sem_automatica_nao_mostra_o_liga_desliga_e_salvar_desliga(cliente
 
 def test_marca_principal_continua_com_a_campanha_automatica(cliente, csrf):
     pagina = cliente.get("/renovacao").text  # o Admin Master fora das marcas: a Renovação da marca principal
-    assert 'name="ativo"' in pagina and 'name="hora"' in pagina and "Campanha automática, quem envia" in pagina
+    assert 'name="ativo"' in pagina and 'name="hora"' in pagina and "Campanha automática do dia" in pagina
     assert "A campanha automática do dia ainda não" not in pagina
     r = cliente.post("/renovacao/configurar", data=_formulario(csrf, ativo="on", hora="07:30", maximo_dia="35"))
     assert "A campanha automática roda todo dia às 07:30" in r.text or "escolha quem é o dono" in r.text

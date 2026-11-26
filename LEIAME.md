@@ -574,17 +574,22 @@ de importar).
    (também no quadro **Campanhas de renovação** e na página da campanha). Para conferir as mensagens antes, clique em
    **Ver os avisos**. Depois de aprovar, você volta para a tela Renovação.
    Depois de aprovada, tudo sai sozinho. As campanhas de renovação não aparecem na lista da IA SDR.
-5. No quadro **4**, escolha o **dono** (ele assina e os e-mails saem pela conta dele) e o **Número de WhatsApp dos
-   disparos** (só o administrador escolhe; fica gravado em cada campanha e dá para trocar na página da campanha).
+5. No quadro **4. Como os avisos saem** (desde 26/11/2026 em blocos: um resumo **Como está hoje** no alto e os blocos
+   **Quando os avisos saem**, **Por onde saem e quem assina**, **O que vai junto**, **Quando o cliente toca em "Quero
+   renovar"**, **Quem não recebe avisos** e **Campanha automática do dia**), escolha em **Por onde saem e quem assina**
+   **quem assina os avisos** (ele assina e os e-mails saem pela conta dele) e o **número de WhatsApp (QR code)** (só o
+   administrador escolhe; fica gravado em cada campanha e dá para trocar na página da campanha; com o número oficial
+   ligado, o QR fica só de reserva).
    **Número em "MODO TESTE" só simula o envio: a mensagem não chega.** No automático, o sistema usa o número de quem
    assina e nunca um em modo teste quando há um de verdade conectado. Na MS, se quiser, ligue a **campanha
    automática**: todo dia, no horário escolhido, o sistema monta a campanha com quem chegou a 30 dias do vencimento
    (ela também espera a aprovação). Clique em **Salvar configuração**.
 
-**Dias, horário e início (quadro 4):** em **Avisar quantos dias antes de vencer** você escreve os 4 dias dos avisos
-(padrão 30, 15, 5, 1; no piloto de 13/11/2026: **12, 6, 3, 1**). **Avisos a partir das** e **até as** limitam o
-horário (hoje: das 10:00 às 18:00). **Começar em** é o dia em que a campanha automática começa a montar sozinha (no
-piloto: 01/01/2027). Valem para as campanhas montadas depois de salvar.
+**Dias, horário e início (quadro 4, bloco "Quando os avisos saem"):** em **Dias antes do vencimento (os 4 avisos)**
+você escreve os 4 dias dos avisos (padrão 30, 15, 5, 1; no piloto de 13/11/2026: **12, 6, 3, 1**); embaixo aparece o
+nome de cada aviso com os dias. **Das** e **até as** limitam o horário (hoje: das 10:00 às 18:00). **Começar em** (bloco
+"Campanha automática do dia") é o dia em que a campanha automática começa a montar sozinha (no piloto: 01/01/2027).
+Valem para as campanhas montadas depois de salvar.
 
 **Só em dia comercial:** os avisos da Renovação só saem **de segunda a sexta, das 10:00 às 18:00** (o horário do quadro
 4). Fora disso eles esperam e saem no próximo horário permitido; o WhatsApp para às 17:50, para chegar ao cliente antes
@@ -597,9 +602,9 @@ e Corpus Christi). Os da cidade ou do estado você escreve em **Outros feriados*
 já marcados para ele mudam de dia sozinhos (se não couber em outro dia antes do vencimento, aquele aviso é cancelado).
 
 **Pontos de atendimento sem avisos:** a planilha traz o **Ponto** de cada certificado (ex.: MATRIZ, CEASA, GILBERTO
-CONTABIL). Para um ponto cujos clientes não devem receber os avisos, escreva o nome dele no quadro 4, em **Pontos de
-atendimento que não recebem avisos** (separados por vírgula; embaixo do campo aparecem os pontos que vieram nas
-planilhas), e clique em **Salvar configuração**. Os clientes desse ponto continuam na lista de certificados, com a
+CONTABIL). Para um ponto cujos clientes não devem receber os avisos, escreva o nome dele no quadro 4, bloco **Quem não
+recebe avisos**, em **Pontos de atendimento sem avisos** (separados por vírgula; embaixo do campo aparecem os pontos
+que vieram nas planilhas), e clique em **Salvar configuração**. Os clientes desse ponto continuam na lista de certificados, com a
 situação "Ponto fora dos avisos", mas não entram em nenhuma campanha, nem no "Montar com todos da planilha". Na MS, o
 ponto **GILBERTO CONTABIL** está fora dos avisos desde 26/11/2026.
 
