@@ -380,6 +380,9 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--foco); bord
 .campo-quantas { font-size: .82rem; font-weight: 600; color: #344054; }
 .quantas-empresas { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
 .quantas-empresas .chip { padding: 6px 12px; font-size: .9rem; }
+/* Renovação, quadro 3: as duas formas de montar a campanha, cada uma com o seu botão */
+.opcao-montar { border: 1px solid var(--borda); border-radius: 8px; padding: 10px 12px; margin: 10px 0; }
+.opcao-montar .campo-quantas { margin-bottom: 8px; }
 .escolha-corpo .pequeno { font-weight: 400; }
 
 /* ---------- Configurações: menu das seções à esquerda (_configuracoes.html) ---------- */

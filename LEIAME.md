@@ -551,20 +551,24 @@ certificadora.
 
 **Cada marca tem a sua Renovação** (desde 24/11/2026): a planilha, os clientes, as campanhas e todas as configurações
 (dono, número, dias dos avisos, horários, feriados, canais, arte e textos) são só da marca. O que uma marca muda não
-muda nas outras. A campanha automática do dia, por enquanto, roda só para a MS.
+muda nas outras. A campanha automática do dia, por enquanto, roda só para a MS: nas outras marcas o quadro 4 nem mostra
+o botão dela, e as campanhas são montadas no quadro 3 (de preferência com **Montar com todos da planilha**, logo depois
+de importar).
 
 **Passo a passo:**
 1. **Teste primeiro** (quadro **1. Testar os avisos**, ver abaixo): mande os avisos para o seu WhatsApp e confira.
 2. Exporte o **Relatório de renovação** (Excel) no sistema da certificadora. Em **Renovação**, no quadro
    **2. Importar a planilha de renovação**, escolha o arquivo e clique em **Importar planilha**. Pode importar de novo sempre que sair um relatório novo: quem já estava é atualizado, sem
    duplicar.
-3. No quadro **3. Montar campanha agora**, escolha quantos contatos (10 a 100; vão os que vencem primeiro) e clique
-   em **Montar campanha**. Em alguns minutos a campanha fica **aguardando aprovação**.
-   Para levar **todos os clientes da planilha** de uma vez (ex.: a planilha de janeiro e fevereiro), importe a
-   planilha e clique em **Montar com todos da planilha (N)**: entram todos os clientes da **última planilha importada**
-   que ainda não estão em campanha (a tela mostra de que dia a que dia eles vencem), cada um com os avisos marcados
-   desde já e contados do próprio vencimento. Sobras de planilhas antigas ficam para a campanha automática do dia.
-   Também espera a aprovação.
+3. No quadro **3. Montar campanha agora** há duas opções, cada uma com o seu botão:
+   - **A. Todos da última planilha** (ex.: a planilha de janeiro e fevereiro): importe a planilha e clique em **Montar
+     com todos da planilha (N)**. Entram todos os clientes da **última planilha importada** que ainda não estão em
+     campanha (a tela mostra de que dia a que dia eles vencem), cada um com os avisos marcados desde já e contados do
+     próprio vencimento. Sobras de planilhas antigas ficam para a campanha automática do dia (na MS) ou para a opção B.
+   - **B. Só quem vence nos próximos dias** (os dias do 1º aviso, no quadro 4): escolha quantos contatos (10 a 100; vão
+     os que vencem primeiro) e clique em **Montar campanha**. Se ninguém estiver nesse prazo, o botão fica apagado e a
+     tela diz em que dia entra o próximo cliente.
+   Em alguns minutos a campanha fica **aguardando aprovação**.
 4. A campanha que espera aprovação aparece no **topo da tela Renovação**, com o botão verde **APROVAR CAMPANHA**
    (também no quadro **Campanhas de renovação** e na página da campanha). Para conferir as mensagens antes, clique em
    **Ver os avisos**. Depois de aprovar, você volta para a tela Renovação.
@@ -572,9 +576,9 @@ muda nas outras. A campanha automática do dia, por enquanto, roda só para a MS
 5. No quadro **4**, escolha o **dono** (ele assina e os e-mails saem pela conta dele) e o **Número de WhatsApp dos
    disparos** (só o administrador escolhe; fica gravado em cada campanha e dá para trocar na página da campanha).
    **Número em "MODO TESTE" só simula o envio: a mensagem não chega.** No automático, o sistema usa o número de quem
-   assina e nunca um em modo teste quando há um de verdade conectado. Se quiser, ligue a **campanha automática**:
-   todo dia, no horário escolhido, o sistema monta a campanha com quem chegou a 30 dias do vencimento (ela também
-   espera a aprovação). Clique em **Salvar configuração**.
+   assina e nunca um em modo teste quando há um de verdade conectado. Na MS, se quiser, ligue a **campanha
+   automática**: todo dia, no horário escolhido, o sistema monta a campanha com quem chegou a 30 dias do vencimento
+   (ela também espera a aprovação). Clique em **Salvar configuração**.
 
 **Dias, horário e início (quadro 4):** em **Avisar quantos dias antes de vencer** você escreve os 4 dias dos avisos
 (padrão 30, 15, 5, 1; no piloto de 13/11/2026: **12, 6, 3, 1**). **Avisos a partir das** e **até as** limitam o

@@ -1920,6 +1920,15 @@ def mudar_situacao(db, cert: Certificado, situacao: str, usuario: Usuario | None
     return cancelados
 
 
+def automatica_na_ar(db, ar: int | None) -> bool:
+    """A campanha automática do dia (rodada_diaria) roda para esta AR? Por enquanto só para a AR principal (a de
+    marca.ar_padrao). Nas outras a tela não mostra o liga/desliga nem o horário (26/11/2026: o Grupo Certy ligou às
+    08:45 achando que ia rodar) e as campanhas são montadas no quadro 3."""
+    from . import marca
+
+    return ar is not None and ar == marca.ar_padrao(db)
+
+
 def rodada_diaria() -> str:
     """Chamado pelo relógio (a cada 15 min): uma vez por dia, depois do horário configurado, monta a campanha do dia
     com quem entrou nos 30 dias antes do vencimento. Devolve o que aconteceu ("" = nada a fazer)."""

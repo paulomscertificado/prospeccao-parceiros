@@ -72,7 +72,7 @@ def _endereco_da_lista(ver: str, busca: str = "") -> str:
 @rotas.get("/renovacao")
 def tela_renovacao(request: Request, ver: str = "avisar", q: str = "", usuario: Usuario = Depends(exige("renovacao.ver")),
                    db: Session = Depends(obter_db)):
-    _na_ar_da_renovacao(db, request, usuario)
+    ar = _na_ar_da_renovacao(db, request, usuario)
     hoje = date.today()
     ver = ver if ver in FILTROS else "avisar"
     busca = q.strip()[:80]
@@ -81,12 +81,18 @@ def tela_renovacao(request: Request, ver: str = "avisar", q: str = "", usuario: 
     filtros = {**FILTROS, "avisar": f"Vencem em {janela} dias"}
     todos = db.execute(select(Certificado).where(Certificado.origem == renovacao.ORIGEM)).scalars().all()
     abertos = [c for c in todos if c.status == "Ativo" and c.data_vencimento >= hoje]
-    contatos, fora = renovacao.contatos_para_campanha(db, hoje)
+    # o quadro 3 conta só a marca em que a campanha vai ser montada (o Admin Master fora das marcas: a MS), como o
+    # "Montar campanha" faz: antes contava as outras marcas e o botão ficava ligado sem ninguém para levar
+    ar_monta = renovacao.ar_de_quem_monta(db, renovacao.dono(db) or usuario)
+    contatos, fora = renovacao.contatos_para_campanha(db, hoje, ar=ar_monta)
+    # ninguém nos próximos dias: quando entra o próximo (pedido da Maria em 26/11/2026: "ajuste melhor essa área")
+    depois = [c for c in renovacao.a_avisar(db, hoje, renovacao.ATE_TODOS, ar_monta)
+              if c.data_vencimento > hoje + timedelta(days=janela) and renovacao.chave_do_contato(c)]
+    proximo = min((c.data_vencimento for c in depois), default=None)
     # "Montar com todos da planilha" (pedido da Maria em 26/11/2026): a última planilha importada da marca em que a
     # campanha vai ser montada (o Admin Master fora das marcas: a MS), com o período certo (do 1º ao último vencimento)
     desde = renovacao.inicio_da_ultima_planilha(db)
-    todos_da_planilha, _ = renovacao.contatos_para_campanha(
-        db, hoje, ate=renovacao.ATE_TODOS, ar=renovacao.ar_de_quem_monta(db, renovacao.dono(db) or usuario), desde=desde)
+    todos_da_planilha, _ = renovacao.contatos_para_campanha(db, hoje, ate=renovacao.ATE_TODOS, ar=ar_monta, desde=desde)
     vencimentos = [c.data_vencimento for contato in todos_da_planilha for c in contato.certificados]
     kpis = {
         "todos_contatos": len(todos_da_planilha), "todos_de": min(vencimentos, default=None),
@@ -94,6 +100,8 @@ def tela_renovacao(request: Request, ver: str = "avisar", q: str = "", usuario: 
         "base": len(abertos),
         "em_30": sum(1 for c in abertos if c.data_vencimento <= hoje + timedelta(days=janela)),
         "prontos_contatos": len(contatos), "prontos_certificados": sum(len(c.certificados) for c in contatos),
+        "depois_certificados": len(depois), "proximo_vence": proximo,
+        "proximo_entra": proximo - timedelta(days=janela) if proximo else None,
         "em_campanha": sum(1 for c in abertos if c.campanha_id),
         "sem_contato": sum(1 for c in abertos if not renovacao.chave_do_contato(c)),
         "renovados": sum(1 for c in todos if c.status == "Renovado"),
@@ -120,6 +128,7 @@ def tela_renovacao(request: Request, ver: str = "avisar", q: str = "", usuario: 
     return tela(request, "renovacao.html", {
         "cfg": {c: renovacao.cfg(db, c) for c in renovacao.PADRAO}, "mensagens": renovacao.mensagens(db),
         "angulos": renovacao.nomes_dos_avisos(dias), "dias_aviso": dias, "janela": janela,
+        "automatica": renovacao.automatica_na_ar(db, ar),  # a campanha automática do dia roda para esta marca?
         "quantidades": renovacao.QUANTIDADES,
         "kpis": kpis, "fora": fora, "filtros": filtros, "ver": ver, "busca": busca, "lista": lista[:LIMITE_LISTA],
         "total_lista": len(lista), "por_contato": por_contato, "hoje": hoje, "campanhas": campanhas,
@@ -248,7 +257,11 @@ def _api_oficial(db, request: Request, usuario: Usuario) -> dict:
 async def configurar(request: Request, usuario: Usuario = Depends(exige("renovacao.gerenciar")),
                      db: Session = Depends(obter_db)):
     form = await request.form()
-    _na_ar_da_renovacao(db, request, usuario)
+    ar = _na_ar_da_renovacao(db, request, usuario)
+    # a campanha automática do dia só roda na marca principal (renovacao.automatica_na_ar): nas outras a tela não mostra
+    # o liga/desliga, e salvar deixa desligada (o Grupo Certy ligou às 08:45 em 26/11/2026 achando que ia rodar)
+    automatica = renovacao.automatica_na_ar(db, ar)
+    ligada = automatica and bool(form.get("ativo"))
     canais = ",".join(c for c in ("whatsapp", "email") if form.get(f"canal_{c}"))
     if not canais:
         avisar(request, "Escolha pelo menos um canal (WhatsApp ou e-mail).", "erro")
@@ -306,11 +319,15 @@ async def configurar(request: Request, usuario: Usuario = Depends(exige("renovac
             return voltar("/renovacao#configurar")
         mudou_feriados = ", ".join(validos) != renovacao.cfg(db, "renov_feriados")
         gravar_config(db, "renov_feriados", ", ".join(validos))
-    desde = util.para_data(form.get("ativo_desde"))
     gravar_config(db, "renov_hora_inicio", hora_inicio)
     gravar_config(db, "renov_hora_fim", hora_fim)
-    gravar_config(db, "renov_ativo_desde", desde.isoformat() if desde else "")
-    hora = str(form.get("hora", "07:45"))[:5] or "07:45"
+    desde, hora = None, ""
+    if automatica:  # o horário, o início e o máximo da campanha automática (nas outras marcas ficam como estão)
+        desde = util.para_data(form.get("ativo_desde"))
+        hora = str(form.get("hora", "07:45"))[:5] or "07:45"
+        gravar_config(db, "renov_ativo_desde", desde.isoformat() if desde else "")
+        gravar_config(db, "renov_maximo_dia", str(maximo))
+        gravar_config(db, "renov_hora", hora)
     dono_id = util.para_int(form.get("dono_id"))
     if dono_id and not db.get(Usuario, dono_id):
         dono_id = None
@@ -371,9 +388,8 @@ async def configurar(request: Request, usuario: Usuario = Depends(exige("renovac
         if email_html != (renovacao.cfg(db, "renov_email_html") != "0"):
             gravar_config(db, "renov_email_html", "1" if email_html else "0")
             renovacao.aplicar_email_html(db, email_html)  # também nas campanhas em andamento
-    for chave, valor in [("renov_ativo", "1" if form.get("ativo") else "0"), ("renov_canais", canais),
-                         ("renov_arte", "1" if form.get("arte") else "0"),
-                         ("renov_maximo_dia", str(maximo)), ("renov_hora", hora), ("renov_dono_id", str(dono_id or ""))]:
+    for chave, valor in [("renov_ativo", "1" if ligada else "0"), ("renov_canais", canais),
+                         ("renov_arte", "1" if form.get("arte") else "0"), ("renov_dono_id", str(dono_id or ""))]:
         gravar_config(db, chave, valor)
     registrar_log(db, usuario, "configurou_renovacao", "configuracao", None, request=request)
     db.commit()
@@ -385,13 +401,13 @@ async def configurar(request: Request, usuario: Usuario = Depends(exige("renovac
             remarcados = (f" {r['remarcados']} aviso(s) que caíam em feriado mudaram de dia"
                           + (f" e {r['cancelados']} não couberam em outro dia antes do vencimento" if r["cancelados"] else "")
                           + ".")
-    if form.get("ativo") and not dono_id:
+    if ligada and not dono_id:
         avisar(request, "Configuração salva, mas escolha quem é o dono das campanhas de renovação." + remarcados
                + aviso_da_arte, "erro")
     else:
         avisar(request, "Configuração salva." + (
             f" A campanha automática roda todo dia às {hora}" + (f", a partir de {desde:%d/%m/%Y}" if desde else "") + "."
-            if form.get("ativo") else "") + remarcados + aviso_da_arte)
+            if ligada else "") + remarcados + aviso_da_arte)
     return voltar("/renovacao#configurar")
 
 

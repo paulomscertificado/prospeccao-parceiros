@@ -140,7 +140,16 @@ base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renova
    feriados da 2ª onda (`montar_ondas`, em `campanhas._montar`) agora vêm da marca da campanha (`usar_config_da_ar`
    com `camp.tenant_id`). A aprovação dias depois (`reajustar_na_aprovacao`, em `campanhas.aprovar` com
    `config_da_ar`) conta as datas com os dias da marca, mesmo aprovada pelo Admin Master fora das marcas.
-   Testes: `testes/test_renovacao_montagem_da_marca.py`. O teste do quadro 1 sai com a marca da
+   Testes: `testes/test_renovacao_montagem_da_marca.py`. **Área de montar** (26/11/2026, pedido da Maria: "ajuste
+   melhor essa área de criar as campanhas de renovação"; o Grupo Certy tinha ligado a campanha automática às 08:45, e
+   ela não roda lá): `renovacao.automatica_na_ar(db, ar)` diz se a `rodada_diaria` roda para a marca (hoje só a AR
+   principal, `marca.ar_padrao`). Nas outras, o quadro 4 não mostra o liga/desliga, o horário, o "Começar em" nem o
+   máximo, e salvar grava `renov_ativo` = 0 sem mexer em `renov_hora`/`renov_ativo_desde`/`renov_maximo_dia`. O quadro
+   3 separa **A. Todos da última planilha** (`ATE_TODOS` + `inicio_da_ultima_planilha`) e **B. Só quem vence nos
+   próximos N dias**, cada um com o seu botão e a sua contagem, na marca em que a campanha vai ser montada
+   (`ar_de_quem_monta`: o Admin Master fora das marcas via os prontos de todas). Sem ninguém em B, a tela diz quando
+   entra o próximo (`proximo_entra` = vencimento − dias do 1º aviso). Testes: `testes/test_renovacao_tela_montar.py`.
+   O teste do quadro 1 sai com a marca da
    AR da tela (`textos_do_contato(ar=)`: o Admin Master dentro do Grupo Certy recebia "da MS"). Testes:
    `testes/test_renovacao_dono_por_ar.py`. `arte_do_toque` e o teste (`enviar_teste(ar=)`, o cliente fictício usa a AR
    da tela) mandam `"url"` junto; o WhatsApp Leads confere de novo (`arte_aviso.endereco_da_arte`) e guarda uma cópia
