@@ -171,6 +171,8 @@
     O que cada papel pode fazer: <a href="/permissoes?aba=papeis">Papéis e permissões</a>.{% endif %}</p>
   <p class="pequeno suave" style="margin:0">🔐 Administrador e gestor entram com a senha e o código de 6 números de um app no
     celular (verificação em 2 etapas). Se a pessoa perder o celular, abra "Editar" na linha dela e clique em "Zerar o código do celular".</p>
+  <p class="pequeno suave" style="margin:4px 0 0">🔑 A senha que você cria para alguém (pessoa nova ou senha nova em "Editar") é
+    provisória: no primeiro login, o sistema pede para a pessoa trocar por uma senha só dela.</p>
 </div>
 {% for g in grupos_usuarios %}{% set chave = g.ar if g.ar else 'plataforma' %}
 <section class="cartao grupo-usuarios">
@@ -198,7 +200,8 @@
       <div><label>Senha inicial</label><input type="password" name="senha" required autocomplete="new-password"></div>
     </div>
     <button class="btn btn-primario">Criar</button> <button type="button" class="btn" data-abrir="nova-{{ chave }}">Cancelar</button>
-    <p class="ajuda">Envie a senha para a pessoa por um canal seguro. No primeiro acesso, administrador e gestor configuram o código do celular.</p>
+    <p class="ajuda">Envie a senha para a pessoa por um canal seguro. No primeiro acesso, ela troca essa senha por uma só dela
+      (e administrador e gestor configuram o código do celular).</p>
   </form>{% endif %}
   <div class="tabela-rolagem"><table class="lista-usuarios">
     <tr><th>Pessoa</th><th>Papel</th><th>Equipe</th><th>Situação</th><th></th></tr>
@@ -208,6 +211,7 @@
       <td>{{ u.papel.nome if u.papel else PERFIS.get(u.perfil, u.perfil) }}</td>
       <td>{{ (g.equipes|selectattr('id', 'equalto', u.equipe_id)|map(attribute='nome')|first) or '—' }}</td>
       <td>{% if u.ativo %}<span class="selo selo-ok">ativo</span>{% else %}<span class="selo">inativo</span>{% endif %}{% if u.totp_ativo %} <span title="código do celular ativo">🔐</span>{% endif %}
+        {% if u.senha_provisoria %}<span class="selo selo-alerta" title="A pessoa ainda está com a senha que recebeu: no próximo login, o sistema pede para ela trocar">troca a senha no login</span>{% endif %}
         <div class="pequeno suave">{{ 'último acesso ' ~ (u.ultimo_login|datahora) if u.ultimo_login else 'nunca entrou' }}</div></td>
       <td class="nowrap">{% if pode('usuarios.gerenciar') %}<button type="button" class="btn btn-pequeno" data-abrir="editar-{{ u.id }}">Editar</button>{% endif %}</td>
     </tr>
@@ -225,7 +229,7 @@
           <div><label>Minutos por reunião</label><input type="number" name="duracao_reuniao" value="{{ u.duracao_reuniao }}"></div>
           <div><label>Cidade onde trabalha (feriados)</label><input type="text" name="cidade" maxlength="120" value="{{ u.cidade or '' }}" placeholder="Recife"></div>
           <div><label>UF</label><select name="uf"><option value="">—</option>{% for sigla in ufs %}<option value="{{ sigla }}" {{ 'selected' if u.uf == sigla }}>{{ sigla }}</option>{% endfor %}</select></div>
-          <div><label>Nova senha</label><input type="password" name="senha" placeholder="(manter a atual)" autocomplete="new-password"></div>
+          <div><label>Nova senha{% if u.id != usuario.id %} (provisória: a pessoa troca no próximo login){% endif %}</label><input type="password" name="senha" placeholder="(manter a atual)" autocomplete="new-password"></div>
         </div>
         <label class="marcar"><input type="checkbox" name="ativo" {{ 'checked' if u.ativo }}> Acesso ativo</label>
         {% if not sou_master and u.id != usuario.id and (u.master or u.perfil == 'admin') %}<p class="pequeno suave">Administradores só o admin master altera.</p>{% endif %}

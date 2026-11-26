@@ -450,6 +450,10 @@ class Usuario(DaAR, Base):
     master: Mapped[bool] = mapped_column(Boolean, default=False)
     parceiro_id: Mapped[int | None] = mapped_column(ForeignKey("parceiros.id"), nullable=True)
     versao_sessao: Mapped[int] = mapped_column(Integer, default=1)  # muda ao trocar a senha: derruba sessões antigas
+    # Senha provisória (pedido da Maria em 26/11/2026): a senha foi escolhida por outra pessoa (o administrador em
+    # Configurações > Usuários ou o redefinir_senha.bat). No próximo login a pessoa só abre a tela "Troque a sua senha"
+    # (seguranca.usuario_logado → /trocar-senha) até escolher uma senha dela. Quem já usava o sistema ficou com False.
+    senha_provisoria: Mapped[bool] = mapped_column(Boolean, default=False)
     # Agenda para reuniões marcadas pela IA SDR (ex.: "seg-sex 09:00-12:00,14:00-18:00")
     expediente: Mapped[str] = mapped_column(String(120), default="seg-sex 09:00-12:00,14:00-18:00")
     duracao_reuniao: Mapped[int] = mapped_column(Integer, default=30)

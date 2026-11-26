@@ -54,7 +54,7 @@ Definido em `app/modelos.py` e `app/base_receita.py`.
 | Tabela | Para quê | Campos principais |
 |---|---|---|
 | `contas_email` | E-mail de envio de cada pessoa e o principal da MS (`app/contas_email.py`) | dono_id, endereco, senha_cripto, ler_respostas, ativa, compartilhada_todos/com |
-| `usuarios` | Login e perfis | email (único), senha_hash, perfil (tipo base: admin/gestor/funcionario/vendedor/parceiro), papel_id (papel criado na tela; vazio = papel do sistema do perfil), equipe_id, parceiro_id, versao_sessao, totp_* e versao_2fa (2 etapas) |
+| `usuarios` | Login e perfis | email (único), senha_hash, perfil (tipo base: admin/gestor/funcionario/vendedor/parceiro), papel_id (papel criado na tela; vazio = papel do sistema do perfil), equipe_id, parceiro_id, versao_sessao, senha_provisoria (troca no próximo login), totp_* e versao_2fa (2 etapas) |
 | `papeis` / `permissoes_papel` | Papéis e o que cada um pode (`docs/permissoes.md`) | codigo, nome, base, sistema, permissoes_conhecidas · papel_id, permissao (`recurso.acao`), escopo (tudo/equipe/proprios) |
 | `excecoes_permissao` | PERMITIR/NEGAR por usuário | usuario_id, permissao, efeito, escopo, ate, motivo, criado_por_id |
 | `equipes` | Equipes (unidades) para o alcance "só a equipe" | nome |
@@ -93,6 +93,19 @@ Detalhes em [ia-sdr.md](ia-sdr.md).
 ## Segurança
 
 - Senhas: PBKDF2-SHA256 com sal; troca de senha derruba as outras sessões (`versao_sessao`).
+- Senha provisória (26/11/2026, pedido da Maria: "toda vez que ele entrar no sistema pela primeira vez, mande ele
+  trocar a senha"): a senha que o administrador escolhe para outra pessoa (pessoa nova ou "Nova senha" em
+  Configurações > Usuários, `rotas/admin.salvar_usuario`; a própria senha trocada ali não conta) e a do
+  `redefinir_senha.py` deixam `Usuario.senha_provisoria` ligado. Com ele, `seguranca.usuario_logado` levanta
+  `PrecisaTrocarSenha` em TODA rota (antes de conferir a permissão) e `main._precisa_trocar_senha` manda para
+  `/trocar-senha` (303; JSON 403 em `/api/` e nas chamadas com `X-CSRF-Token`). A tela usa o porteiro
+  `usuario_para_trocar_senha` (as mesmas conferências da sessão, sem o menu e sem ligar a AR) e vem depois da senha e
+  do código do celular (`_depois_de_entrar`: também o "Já guardei, continuar" dos códigos de recuperação). A troca
+  segue `problema_na_senha`, recusa a senha recebida, sobe `versao_sessao` (outros navegadores saem), mantém este
+  dentro (`entrar`) e grava `trocou_senha_provisoria` no registro (na AR da pessoa); o login com a senha provisória
+  fica no registro com "com a senha provisória". Na publicação, a coluna nasce desligada para todos e
+  `banco.marcar_senhas_provisorias` (uma vez, quando a coluna nasce) liga só para quem nunca entrou (`ultimo_login`
+  vazio), menos o Admin Master. Testes: `testes/test_troca_de_senha.py`.
 - Verificação em 2 etapas (`app/dois_fatores.py`, `config.EXIGIR_2FA`): obrigatória para admin e gestor (e para quem
   já ligou). Depois da senha, a sessão só guarda `pendente_2fa` por 10 minutos; o acesso abre em `/login/codigo`
   (ou `/login/ativar-codigo` na 1ª vez, com QR code). TOTP de 6 dígitos, 30 s, tolera ±30 s; código já usado não

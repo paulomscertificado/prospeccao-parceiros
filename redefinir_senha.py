@@ -1,5 +1,6 @@
 """Cria uma senha nova para um usuário (quando ninguém consegue entrar) e desliga o código do celular dele
-(verificação em 2 etapas), que é configurado de novo no próximo login.
+(verificação em 2 etapas), que é configurado de novo no próximo login. A senha nova é provisória: no próximo login,
+depois do código do celular, a pessoa troca por uma senha só dela (pedido da Maria em 26/11/2026).
 
 Uso: python redefinir_senha.py   (ou dois cliques em redefinir_senha.bat)
 Se existir dados/supabase.txt, pergunta se é no sistema da internet ou no deste computador.
@@ -34,7 +35,7 @@ def main():
     from app import dois_fatores
     from app.banco import criar_tabelas, sessao
     from app.modelos import Usuario
-    from app.seguranca import problema_na_senha, resumir_senha
+    from app.seguranca import problema_na_senha, registrar_log, resumir_senha
 
     criar_tabelas()
     with sessao() as db:
@@ -58,11 +59,15 @@ def main():
             print("As senhas não são iguais.")
             return 1
         usuario.senha_hash = resumir_senha(senha)
+        usuario.senha_provisoria = True  # no próximo login a pessoa troca por uma senha só dela
         dois_fatores.zerar(usuario)  # também derruba as sessões abertas
         usuario.ativo = True
+        registrar_log(db, None, "redefiniu_senha", "usuario", usuario.id,
+                      f"{usuario.email} pelo redefinir_senha; senha provisória: troca no próximo login")
         print(f"Pronto! Senha de {usuario.nome} trocada e código do celular desligado.")
         if usuario.perfil in dois_fatores.PERFIS_OBRIGADOS:
             print("No próximo login, o sistema mostra um QR code para ler de novo com o app do celular.")
+        print("Depois de entrar, o sistema pede para a pessoa trocar esta senha por uma senha só dela.")
     return 0
 
 

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block titulo %}Troque a sua senha{% endblock %}
+{% block publico %}
+{# Troca obrigatória da senha provisória (rotas/auth.py, pedido da Maria em 26/11/2026). Tela sem menu, como a de
+   entrada: até trocar, nenhuma outra tela do sistema abre. #}
+<div class="login"><div class="conteiner">
+  <div class="capa">
+    <div class="marca"><span class="logo-texto">{{ marca.titulo }}</span></div>
+    <span class="etiqueta">Segurança</span>
+    <h1>Troque a sua senha.</h1>
+    <p>Você entrou com a senha que recebeu do administrador. Para continuar, crie agora uma senha só sua, que ninguém
+      mais saiba.</p>
+  </div>
+  <form class="cartao" method="post" action="/trocar-senha">
+    {% for tipo, texto in avisos %}<div class="aviso aviso-{{ tipo }}">{{ texto }}</div>{% endfor %}
+    {% if erro %}<div class="aviso aviso-erro">{{ erro }}</div>{% endif %}
+    <p style="margin-top:0">Olá, <b>{{ pessoa.nome|primeiro_nome }}</b>! Este é o seu primeiro acesso com essa senha.</p>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="campo"><label>Sua conta</label><input type="email" value="{{ pessoa.email }}" readonly autocomplete="username"></div>
+    <div class="campo"><label>Senha nova (mínimo 8 caracteres, com letras e números)</label>
+      <input type="password" name="nova" required minlength="8" autofocus autocomplete="new-password"></div>
+    <div class="campo"><label>Repita a senha nova</label>
+      <input type="password" name="nova2" required minlength="8" autocomplete="new-password"></div>
+    <button class="btn btn-primario" style="width:100%;justify-content:center">Trocar a senha e entrar</button>
+    <p class="ajuda" style="margin-top:12px">A senha nova precisa ser diferente da que você recebeu. Não conte a ninguém,
+      nem ao administrador: se esquecer, ele cria outra para você.</p>
+    <p class="ajuda"><a href="/sair">Sair e trocar depois</a></p>
+  </form>
+</div></div>
+{% endblock %}

@@ -893,6 +893,14 @@ uma das pessoas abaixo ou "todos". As **Oportunidades** continuam abertas para a
 
 Crie usuários em **Configurações > Usuários** (o perfil padrão é Funcionário MS).
 
+**Troca de senha no primeiro login** (pedido da Maria em 26/11/2026): a senha que o administrador cria para alguém
+(**+ Nova pessoa**, ou **Nova senha** em **Editar**) é **provisória**. Logo depois de entrar com ela (e do código do
+celular, para administrador e gestor), a pessoa vê a tela **Troque a sua senha** e só abre o sistema depois de criar
+uma senha só dela: mínimo 8 caracteres, com letras e números, e diferente da que recebeu. Vale para todos os papéis
+(também o parceiro do portal) e todas as marcas, e também para a senha criada pelo `redefinir_senha.bat`. Na lista de
+Usuários, quem ainda não trocou aparece com o selo **troca a senha no login**. Quem já usava o sistema não precisa
+trocar; quem tinha sido cadastrado e ainda não tinha entrado troca no primeiro login.
+
 **Admin master:** quem criou o sistema (na MS, o **Paulo Marinho**) aparece com o selo **admin master**. Só ele cria ou
 promove administradores e dá permissões de administração. O cadastro, a senha e o código do celular dele só ele muda; os
 dos outros administradores, só ele também. Ninguém muda o próprio papel, a própria equipe nem as próprias permissões.
@@ -993,7 +1001,8 @@ celular.
 
 **Perdeu ou trocou de celular?** Use um código de recuperação, ou peça ao administrador para clicar em **zerar** na
 sua linha em Configurações > Usuários: no próximo login você lê um QR code novo. Se o próprio administrador ficar sem
-acesso: `redefinir_senha.bat` (escolha "sistema na internet") cria uma senha nova e desliga o código do celular.
+acesso: `redefinir_senha.bat` (escolha "sistema na internet") cria uma senha nova e desliga o código do celular. Essa
+senha também é provisória: depois de entrar, o sistema pede para trocar por uma senha sua.
 
 **Regra da MS: cada usuário tem o seu disparo** (pedido da Maria em 13/11/2026). Os disparos de uma pessoa nunca
 saem pelo WhatsApp ou pelo e-mail de outra pessoa: o **e-mail** sai só pelo do cadastro dela (**Contas de e-mail**); o
@@ -1042,7 +1051,8 @@ permissão, a conta para de enviar na hora.
 |---|---|
 | "O Python não foi encontrado" | Instale o Python marcando "Add Python to PATH" e rode `instalar.bat` de novo |
 | "O sistema ainda não foi instalado" | Rode `instalar.bat` |
-| Esqueci a senha | Outro administrador cria uma senha nova em Configurações > Usuários, ou rode `redefinir_senha.bat` |
+| Esqueci a senha | Outro administrador cria uma senha nova em Configurações > Usuários, ou rode `redefinir_senha.bat`. A senha nova é provisória: depois de entrar, o sistema pede para trocar por uma senha sua |
+| "Troque a sua senha" logo depois de entrar | Você entrou com a senha que recebeu do administrador (provisória). Crie uma senha só sua: mínimo 8 caracteres, com letras e números, diferente da que recebeu. Até trocar, nenhuma outra tela abre. Para sair sem trocar, clique em "Sair e trocar depois" |
 | "Código errado" no login | O código muda a cada 30 segundos: digite o que o app mostra agora. Se sempre der errado, acerte a hora automática do celular |
 | Perdi o celular do código | Use um código de recuperação ou peça ao administrador para clicar em "zerar" em Configurações > Usuários |
 | "Entrada travada por segurança" | Depois de 5 tentativas erradas seguidas (senha ou código do celular), a entrada fica travada por 15 minutos; a mensagem diz a partir de que horas tentar de novo. A cada erro a tela avisa quantas tentativas restam. Se a pessoa não lembrar a senha, o administrador cria uma nova (Configurações > Usuários; a de um administrador, só o Admin Master). O contato do suporte que aparece na mensagem fica em Configurações > Marca (Admin Master, fora das empresas) |

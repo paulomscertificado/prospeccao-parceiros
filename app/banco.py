@@ -281,7 +281,19 @@ def migrar_colunas() -> list[str]:
                 con.execute(text(f'ALTER TABLE {tabela.name} ADD COLUMN {se_nao_existe}"{coluna.name}" {tipo}'
                                  f'{_valor_padrao_sql(coluna)}'))
                 adicionadas.append(f"{tabela.name}.{coluna.name}")
+        if "usuarios.senha_provisoria" in adicionadas:  # uma vez só, quando a coluna nasce
+            marcar_senhas_provisorias(con)
     return adicionadas
+
+
+def marcar_senhas_provisorias(con) -> int:
+    """Troca de senha no primeiro login (26/11/2026): quem foi cadastrado e ainda não entrou está com a senha que o
+    administrador escolheu, então troca no primeiro login. Quem já usa o sistema não é obrigado, nem o Admin Master
+    (escolheu a própria senha no /primeiro-acesso)."""
+    from sqlalchemy import text
+
+    return con.execute(text("UPDATE usuarios SET senha_provisoria = :sim WHERE ultimo_login IS NULL AND master = :nao"),
+                       {"sim": True, "nao": False}).rowcount or 0
 
 
 def migrar_status(db: Session) -> int:

@@ -11,7 +11,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from . import arquivo_env, config
 from .banco import criar_tabelas, preparar_banco_na_nuvem, sessao
-from .seguranca import PrecisaLogin, SemPermissao
+from .seguranca import PrecisaLogin, PrecisaTrocarSenha, SemPermissao
 from .web import PASTA, avisar, tela
 
 log = logging.getLogger(__name__)
@@ -84,6 +84,14 @@ async def _precisa_login(request: Request, erro: PrecisaLogin):
     if str(erro):
         avisar(request, str(erro), "alerta")
     return RedirectResponse("/login", status_code=303)
+
+
+@app.exception_handler(PrecisaTrocarSenha)
+async def _precisa_trocar_senha(request: Request, erro: PrecisaTrocarSenha):
+    """Senha provisória (a que o administrador escolheu): qualquer tela leva para "Troque a sua senha" (26/11/2026)."""
+    if request.url.path.startswith("/api/") or request.headers.get("x-csrf-token"):
+        return JSONResponse({"erro": "Troque a sua senha antes de continuar: recarregue a página."}, status_code=403)
+    return RedirectResponse("/trocar-senha", status_code=303)
 
 
 @app.exception_handler(SemPermissao)

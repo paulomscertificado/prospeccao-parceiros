@@ -1,6 +1,8 @@
 # Rotas e API
 
 Todas as rotas exigem login (exceto `/login`, `/primeiro-acesso`, `/api/saude` e os webhooks).
+Quem entrou com a senha provisória (criada pelo administrador) só abre `GET/POST /trocar-senha` ("Troque a sua senha",
+campos `nova` e `nova2`): as outras rotas levam para lá (303; 403 em JSON nas chamadas com `X-CSRF-Token`).
 Todo `POST` exige o token CSRF (campo `csrf` no formulário ou cabeçalho `X-CSRF-Token`).
 Perfis: A = administrador, G = gestor, V = vendedor, P = parceiro (acesso **padrão**). Desde as permissões em camadas
 cada rota confere uma permissão `recurso.acao` (ex.: `leads.editar`), que o administrador pode mudar por papel ou por

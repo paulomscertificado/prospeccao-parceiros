@@ -149,7 +149,8 @@ def test_toda_rota_da_equipe_confere_permissao():
                 juntar(sub)
 
         juntar(rota.dependant)
-        if not nomes & {"_checar", "usuario_logado"}:
+        # usuario_para_trocar_senha: o porteiro da tela "Troque a sua senha" (só quem entrou com a senha provisória)
+        if not nomes & {"_checar", "usuario_logado", "usuario_para_trocar_senha"}:
             sem_porteiro.append(caminho)
     assert conferidas > 150  # as 178 rotas menos as abertas
     assert sem_porteiro == []

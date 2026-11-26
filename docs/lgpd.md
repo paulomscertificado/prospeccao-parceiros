@@ -13,7 +13,7 @@ de dados (DPO) da MS.
 | Direito de exclusão | "Excluir dados (LGPD)" anonimiza o lead e guarda só as chaves mínimas para **não contatar de novo** |
 | Retenção | Leads encerrados/opt-out sem movimento há N dias (padrão 365) são anonimizados (Configurações > LGPD) |
 | Controle de acesso | Papéis com permissões por ação e alcance (tudo/equipe/próprios), exceções por pessoa com registro, módulos; vendedor vê só os próprios dados; parceiro só a própria carteira (`docs/permissoes.md`) |
-| Segurança | Senha com hash PBKDF2, verificação em 2 etapas para administrador e gestor, chave Pix criptografada, sessão com expiração, CSRF, limite de tentativas, consultas parametrizadas (sem SQL injection), cabeçalhos de segurança, HTTPS em produção |
+| Segurança | Senha com hash PBKDF2, troca obrigatória da senha recebida do administrador no primeiro login, verificação em 2 etapas para administrador e gestor, chave Pix criptografada, sessão com expiração, CSRF, limite de tentativas, consultas parametrizadas (sem SQL injection), cabeçalhos de segurança, HTTPS em produção |
 | Anti-spam | Sem disparo em massa; limite diário por canal; intervalo mínimo por lead; WhatsApp oficial só com templates aprovados |
 
 Dados de demonstração são fictícios (domínio `.example`, DDD inexistente) e podem ser apagados em um clique.

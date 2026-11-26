@@ -161,6 +161,10 @@ class SemPermissao(Exception):
     pass
 
 
+class PrecisaTrocarSenha(Exception):
+    """A pessoa entrou com uma senha provisória (a que o administrador escolheu): até trocar, só abre /trocar-senha."""
+
+
 def token_csrf(request: Request) -> str:
     token = request.session.get("csrf")
     if not token:
@@ -202,7 +206,9 @@ def entrar(request: Request, usuario: Usuario):
     })
 
 
-def usuario_logado(request: Request, db: Session = Depends(obter_db)) -> Usuario:
+def _pessoa_da_sessao(request: Request, db: Session) -> Usuario:
+    """Quem está nesta sessão, conferido: sessão ociosa, senha trocada em outro lugar, código do celular e AR suspensa
+    (PrecisaLogin se algo falhar). Não confere a senha provisória: isso é com usuario_logado."""
     usuario_id = request.session.get("usuario_id")
     if not usuario_id:
         raise PrecisaLogin()
@@ -228,6 +234,14 @@ def usuario_logado(request: Request, db: Session = Depends(obter_db)) -> Usuario
             request.session.clear()
             raise PrecisaLogin("O acesso da sua AR está suspenso. Fale com o administrador da plataforma.")
     request.session["ultimo_uso"] = int(time.time())
+    return usuario
+
+
+def usuario_logado(request: Request, db: Session = Depends(obter_db)) -> Usuario:
+    """O porteiro de todas as telas (direto ou por autorizacao.exige)."""
+    usuario = _pessoa_da_sessao(request, db)
+    if usuario.senha_provisoria:  # entrou com a senha que recebeu: nenhuma tela abre antes da troca (26/11/2026)
+        raise PrecisaTrocarSenha()
     request.state.usuario = usuario
     if usuario.master and request.session.get("ar_entrada"):
         _prazo_da_entrada(request, db, usuario)
@@ -236,6 +250,12 @@ def usuario_logado(request: Request, db: Session = Depends(obter_db)) -> Usuario
     # white label: daqui em diante esta tela só enxerga a AR da pessoa (Admin Master: a AR em que entrou, ou todas)
     ligar(db, usuario, request.session.get("ar_entrada") if usuario.master else None)
     return usuario
+
+
+def usuario_para_trocar_senha(request: Request, db: Session = Depends(obter_db)) -> Usuario:
+    """O porteiro da tela "Troque a sua senha" (/trocar-senha): quem entrou (senha e, para quem precisa, o código do
+    celular) e ainda está com a senha provisória. A tela não mostra o menu nem liga a AR: só troca a senha."""
+    return _pessoa_da_sessao(request, db)
 
 
 def fechar_entradas(db: Session, usuario: Usuario) -> None:

@@ -1,4 +1,5 @@
-"""Login (senha + código do celular para admin/gestor), primeiro acesso, sair e troca de senha."""
+"""Login (senha + código do celular para admin/gestor), primeiro acesso, troca obrigatória da senha provisória, sair e
+troca de senha."""
 
 import math
 import re
@@ -14,7 +15,7 @@ from ..banco import agora, ler_config, obter_db
 from ..modelos import Usuario
 from ..seguranca import (MINUTOS_DA_TRAVA, TENTATIVAS_ERRADAS, entrar, existe_usuario, ip_de, marcar_login,
                          problema_na_senha, registrar_log, registrar_tentativa_errada, resumir_senha, senha_confere,
-                         trava_de_entrada, usuario_logado, verificar_csrf, zerar_tentativas)
+                         trava_de_entrada, usuario_logado, usuario_para_trocar_senha, verificar_csrf, zerar_tentativas)
 from ..util import email_valido
 from ..web import avisar, tela, voltar
 
@@ -23,6 +24,14 @@ rotas = APIRouter()
 
 def _inicio(usuario: Usuario) -> str:
     return "/portal" if usuario.perfil == "parceiro" else "/"
+
+
+TROCAR_SENHA = "/trocar-senha"
+
+
+def _depois_de_entrar(usuario: Usuario) -> str:
+    """Para onde a pessoa vai depois da senha (e do código do celular): com a senha provisória, trocar a senha."""
+    return TROCAR_SENHA if usuario.senha_provisoria else _inicio(usuario)
 
 
 MINUTOS_PARA_O_CODIGO = 10
@@ -45,12 +54,14 @@ def _pendente(request: Request, db: Session) -> Usuario | None:
     return usuario
 
 
-def _concluir_login(request: Request, db: Session, usuario: Usuario, destino: str = ""):
+def _concluir_login(request: Request, db: Session, usuario: Usuario):
     entrar(request, usuario)
     marcar_login(db, usuario)
-    registrar_log(db, usuario, "login", "usuario", usuario.id, request=request)
+    registrar_log(db, usuario, "login", "usuario", usuario.id,
+                  "com a senha provisória: troca a senha antes de usar o sistema" if usuario.senha_provisoria else "",
+                  request)
     db.commit()
-    return voltar(destino or _inicio(usuario))
+    return voltar(_depois_de_entrar(usuario))
 
 
 # ---------------------------------------------------------------- trava da entrada (seguranca.trava_de_entrada)
@@ -171,7 +182,7 @@ def ativar_codigo(request: Request, codigo: str = Form(""), db: Session = Depend
     entrar(request, usuario)
     marcar_login(db, usuario)
     db.commit()
-    return tela(request, "dois_fatores_codigos.html", {"codigos": codigos, "destino": _inicio(usuario)})
+    return tela(request, "dois_fatores_codigos.html", {"codigos": codigos, "destino": _depois_de_entrar(usuario)})
 
 
 @rotas.get("/login/codigo")
@@ -224,6 +235,44 @@ def codigo_login(request: Request, codigo: str = Form(""), lembrar: str = Form("
                             max_age=dois_fatores.DIAS_APARELHO * 24 * 3600, httponly=True, samesite="lax",
                             secure=config.PRODUCAO)
     return resposta
+
+
+# ---------------------------------------------------------------- troca obrigatória da senha provisória
+# Pedido da Maria em 26/11/2026: quem entra pela primeira vez (ou depois que o administrador redefiniu a senha) troca
+# a senha que recebeu por uma só dela antes de abrir qualquer tela. A senha é provisória quando outra pessoa a escolheu
+# (Configurações > Usuários ou redefinir_senha.bat: Usuario.senha_provisoria); até a troca, seguranca.usuario_logado
+# manda toda tela para cá. A troca vem depois da senha e do código do celular (quem tem o código ligado precisa dele).
+
+@rotas.get(TROCAR_SENHA)
+def trocar_senha_provisoria_tela(request: Request, usuario: Usuario = Depends(usuario_para_trocar_senha)):
+    if not usuario.senha_provisoria:
+        return voltar(_inicio(usuario))
+    return tela(request, "trocar_senha.html", {"pessoa": usuario})
+
+
+@rotas.post(TROCAR_SENHA, dependencies=[Depends(verificar_csrf)])
+def trocar_senha_provisoria(request: Request, nova: str = Form(""), nova2: str = Form(""),
+                            usuario: Usuario = Depends(usuario_para_trocar_senha), db: Session = Depends(obter_db)):
+    if not usuario.senha_provisoria:
+        return voltar(_inicio(usuario))
+    if nova != nova2:
+        erro = "As duas senhas não são iguais. Digite a mesma senha nova nos dois campos."
+    elif problema := problema_na_senha(nova):
+        erro = problema
+    elif senha_confere(nova, usuario.senha_hash):
+        erro = "A senha nova precisa ser diferente da senha que você recebeu."
+    else:
+        erro = ""
+    if erro:
+        return tela(request, "trocar_senha.html", {"pessoa": usuario, "erro": erro}, status_code=400)
+    usuario.senha_hash = resumir_senha(nova)
+    usuario.senha_provisoria = False
+    usuario.versao_sessao = (usuario.versao_sessao or 1) + 1  # quem entrou com a senha recebida em outro lugar sai
+    registrar_log(db, usuario, "trocou_senha_provisoria", "usuario", usuario.id, request=request)
+    db.commit()
+    entrar(request, usuario)  # este navegador continua dentro, com a senha nova
+    avisar(request, "Pronto! Sua senha nova já está valendo. Use-a sempre que entrar no sistema.")
+    return voltar(_inicio(usuario))
 
 
 @rotas.get("/primeiro-acesso")
@@ -372,6 +421,7 @@ def trocar_senha(request: Request, atual: str = Form(...), nova: str = Form(...)
         avisar(request, problema, "erro")
     else:
         usuario.senha_hash = resumir_senha(nova)
+        usuario.senha_provisoria = False  # escolhida pela própria pessoa
         usuario.versao_sessao += 1
         registrar_log(db, usuario, "trocou_senha", "usuario", usuario.id, request=request)
         db.commit()

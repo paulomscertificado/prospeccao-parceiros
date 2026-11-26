@@ -42,11 +42,14 @@ Migrações: no MVP as tabelas são criadas com `create_all`. Ao mudar colunas e
 
 Configurações > **Usuários** (só administrador):
 - Preencha nome, e-mail, papel (perfil), equipe (opcional) e senha inicial → **Criar**. Passe a senha à pessoa por
-  um canal seguro; ela troca em **Minha conta**.
+  um canal seguro. A senha é provisória: logo depois do primeiro login, o sistema pede para a pessoa trocar por uma
+  senha só dela, e nenhuma outra tela abre antes disso. A **Nova senha** que você cria em **Editar** também é
+  provisória. Depois, a pessoa troca a senha quando quiser em **Minha conta**.
 - O que cada papel pode, papéis novos, exceções de uma pessoa e equipes: **Configurações > Pessoas e acesso** (`docs/permissoes.md`).
 - Perfil **Parceiro**: escolha também o parceiro (escritório) ligado ao login. Ele verá só o portal.
 - Desativar: desmarque "Ativo" e salve (a pessoa sai na hora).
-- Esqueceu a senha e não há outro admin: `redefinir_senha.bat`.
+- Esqueceu a senha e não há outro admin: `redefinir_senha.bat` (a senha nova também é provisória: troca no próximo
+  login).
 
 ## 8. Como importar leads
 

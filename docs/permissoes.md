@@ -121,7 +121,9 @@ conhecem não chega a eles sozinho: precisa de um ajuste de uma vez só, guardad
 5. Botões nas telas: `{% if pode('recurso.acao') %}` (e `ve_tudo_em('...')` para filtros "de todos"). É só conforto: a
    rota confere de novo.
 6. Menu: `web.PERMISSAO_DO_MENU`.
-7. O teste `test_toda_rota_da_equipe_confere_permissao` falha se uma rota ficar sem porteiro.
+7. O teste `test_toda_rota_da_equipe_confere_permissao` falha se uma rota ficar sem porteiro (`exige(...)` ou
+   `usuario_logado`; só a tela `/trocar-senha` usa `usuario_para_trocar_senha`, que deixa entrar quem está com a senha
+   provisória). Com a senha provisória, `usuario_logado` manda toda rota para `/trocar-senha` antes de olhar a permissão.
 
 ## Donos de cada registro (`dono_de`)
 

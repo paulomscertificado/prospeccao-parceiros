@@ -539,12 +539,16 @@ def salvar_usuario(request: Request, uid: int, nome: str = Form(...), email: str
     if perfil == "parceiro" and not util.para_int(parceiro_id):
         avisar(request, "Usuário do tipo Parceiro precisa estar ligado a um parceiro cadastrado.", "erro")
         return voltar(destino)
+    senha_provisoria = False
     if uid == 0 or senha:
         if problema := problema_na_senha(senha):
             avisar(request, problema, "erro")
             return voltar(destino)
         u.senha_hash = resumir_senha(senha)
         u.versao_sessao = (u.versao_sessao or 1) + 1
+        # a senha que o administrador escolhe para outra pessoa é provisória: no próximo login ela troca por uma só dela
+        # (pedido da Maria em 26/11/2026); quem troca a própria senha por aqui já escolheu a dele
+        senha_provisoria = u.senha_provisoria = uid != usuario.id
     u.nome, u.email, u.perfil, u.ativo = nome.strip(), email, perfil, ativo == "on"
     u.papel_id = None if papel.sistema else papel.id
     if equipe_id != "manter":
@@ -591,11 +595,19 @@ def salvar_usuario(request: Request, uid: int, nome: str = Form(...), email: str
     if uid == 0:
         db.add(u)
     db.flush()
-    registrar_log(db, usuario, "salvou_usuario", "usuario", u.id, f"{u.email} ({papel.nome})", request,
+    registrar_log(db, usuario, "salvou_usuario", "usuario", u.id, f"{u.email} ({papel.nome})"
+                  + ("; senha provisória: troca no próximo login" if senha_provisoria else ""), request,
                   mudancas=diferencas(antes, _cadastro_no_registro(u)))
     movidos = _remarcar_feriados(db, {u.id}) if mudou_local else 0
     db.commit()
-    avisar(request, "Usuário salvo." + (" Envie a senha para a pessoa por um canal seguro." if uid == 0 else "")
+    if uid == 0:
+        sobre_a_senha = (" Envie a senha para a pessoa por um canal seguro. No primeiro login, o sistema pede para ela "
+                         "trocar essa senha por uma só dela.")
+    elif senha_provisoria:
+        sobre_a_senha = " A senha nova é provisória: no próximo login, o sistema pede para a pessoa trocar."
+    else:
+        sobre_a_senha = ""
+    avisar(request, "Usuário salvo." + sobre_a_senha
            + (f" {movidos} toque(s) que caíam num feriado da cidade dela mudaram de dia." if movidos else ""))
     if aviso_cidade:
         avisar(request, aviso_cidade, "alerta")
