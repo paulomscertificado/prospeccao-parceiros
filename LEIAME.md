@@ -145,7 +145,8 @@ Menu > "Mostrar a Agenda de prospecção"). Para mostrar de novo: Configuraçõe
   só avisa quem cuida.
 - Se a pessoa pedir para sair, clique em **Pediu para sair / Registrar opt-out**: ela nunca mais entra em campanha.
   Quem responde **SAIR no WhatsApp** sai das campanhas de **todas as marcas** (o WhatsApp Leads bloqueia o número
-  para todos); o descadastro pelo link do e-mail vale para a marca que mandou.
+  para todos); o descadastro pelo link do e-mail vale para a marca que mandou. **Exceção, a Renovação** (desde
+  26/11/2026): o SAIR em resposta a um aviso de renovação para só os avisos **daquela renovação** (veja Renovação).
 - Cada lead guarda **de onde veio** (fonte) e a **base legal**. Pedido de exclusão: ficha do lead → **Excluir dados (LGPD)**.
 - O sistema **não inventa dados**: se a fonte não traz telefone ou e-mail, o lead fica sem.
 - **Cópia das conversas do WhatsApp (tela Conversas):** guarda todas as conversas dos números conectados, por um
@@ -639,9 +640,16 @@ renovação novo antes, para entrarem os clientes de janeiro).
 - **Renovação antes das Empresas novas:** as duas usam o mesmo número e o mesmo limite. No mesmo dia, a renovação sai
   primeiro (tem prazo). Nos dias cheios de renovação, as Empresas novas esperam.
 - **Os mesmos cuidados com o WhatsApp:** uma mensagem a cada 8 a 12 minutos, limite por hora, só no horário de
-  envio, e quem responde SAIR não recebe mais.
-- **Quando o cliente responde:** os avisos seguintes param e a resposta vai para **Oportunidades** e **Quem precisa de
-  mim hoje**. A IA não responde esses clientes: quem conversa é a equipe. Se ele disser que já renovou, descarte a
+  envio.
+- **SAIR só daquela renovação** (desde 26/11/2026): o 1º aviso termina com *"Se não quiser mais avisos sobre esta
+  renovação, é só responder SAIR. Avisaremos de novo só quando outro certificado estiver para vencer."* Quem responde
+  SAIR (ou toca em **Parar avisos** no número oficial) deixa de receber os avisos **dos certificados daquele aviso**
+  (eles ficam como "Avisos cancelados" na lista), mas continua recebendo os avisos dos certificados que vencerem depois.
+  No número QR, o WhatsApp Leads bloqueia o contato na hora do SAIR e o sistema tira o bloqueio em seguida. Quem pediu
+  SAIR antes de 26/11/2026 (com a frase antiga, que falava em parar os avisos) continua sem receber nada. O descadastro
+  pelo link do e-mail e o SAIR em resposta a outras mensagens (não a um aviso de renovação) continuam parando tudo.
+- **Quando o cliente responde:** os avisos seguintes **daquele certificado** param (os dos certificados de que ele
+  ainda não foi avisado continuam) e a resposta vai para **Oportunidades** e **Quem precisa de mim hoje**. A IA não responde esses clientes: quem conversa é a equipe. Se ele disser que já renovou, descarte a
   resposta com o motivo **Já renovou**: o certificado vira Renovado sozinho.
 - **Pelo número oficial (API da Meta):** dá para mandar os avisos pelo número oficial da empresa, com os botões Quero
   renovar, Já renovei e Parar avisos (veja **API oficial do WhatsApp (Meta)**). Ligue no quadro 4.
@@ -864,7 +872,8 @@ pessoa**.
 Como fica: os mesmos dias e horários de sempre, a arte do aviso em cima (quem tem vários certificados recebe a lista
 no texto) e sem o limite de 20 por dia do QR code (a Meta cobra por mensagem). Quando o cliente toca em um botão:
 **Quero renovar** vira uma oportunidade quente para a equipe; **Já renovei** marca o certificado como Renovado (com
-vários certificados, a equipe confere qual); **Parar avisos** funciona como o SAIR. A arte é desenhada no computador do
+vários certificados, a equipe confere qual); **Parar avisos** funciona como o SAIR dos avisos: para só os avisos
+daquela renovação, e os certificados que vencerem depois continuam recebendo aviso. A arte é desenhada no computador do
 WhatsApp Leads; se ele estiver desligado, o aviso sai só com o texto.
 
 **Calendário para quem quer renovar.** Na tela **Renovação**, quadro 4, ligue **Calendário para quem tocar em "Quero

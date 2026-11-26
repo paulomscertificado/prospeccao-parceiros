@@ -950,10 +950,11 @@ def tratar_botao(db, conta: ContaWhatsAppOficial, telefone: str, recebida: dict)
     """O cliente tocou num botão do aviso de vencimento (payload "renov:<ação>:<tarefa>"):
     - Quero renovar: oportunidade quente para a equipe (todos são avisados);
     - Já renovei: o certificado vira Renovado e os avisos param (com mais de um certificado, a equipe confere);
-    - Parar avisos: SAIR, em todas as ARs.
+    - Parar avisos: SAIR só daquela renovação (pedido da Maria em 26/11/2026, "SAIR só do certificado"): param os
+      avisos dos certificados daquele aviso; os que vencerem depois continuam recebendo aviso (renovacao.sair_dos_avisos).
     Devolve False quando o botão não é de um aviso deste sistema (aí segue como uma resposta comum)."""
     from . import config, renovacao, sdr
-    from .leads_servico import cancelar_tarefas_de_prospeccao, historico, mudar_status, registrar_opt_out
+    from .leads_servico import cancelar_tarefas_de_prospeccao, historico, mudar_status
     from .modelos import Tarefa
 
     partes = str(recebida.get("botao") or "").split(":")
@@ -966,15 +967,14 @@ def tratar_botao(db, conta: ContaWhatsAppOficial, telefone: str, recebida: dict)
         return False  # o botão não bate com quem mandou: segue como resposta comum
     acao = partes[1]
     texto = str(recebida.get("texto") or BOTOES_RENOVACAO[ACOES_DOS_BOTOES.index(acao)])
-    if acao == "parar":
-        for outro in sdr.leads_pelo_telefone(db, telefone):  # SAIR vale para todas as ARs
-            if not outro.opt_out:
-                registrar_opt_out(db, outro, None, "tocou em Parar avisos no aviso de vencimento (WhatsApp oficial)")
+    if acao == "parar":  # só daquela renovação (26/11/2026); quem já tinha saído de tudo continua fora
+        renovacao.sair_dos_avisos(db, lead, "tocou em Parar avisos no aviso de vencimento (WhatsApp oficial)", tarefa)
         return True
     enviada = sdr._registrar_entrada(db, lead, f"[botão] {texto}", "whatsapp", None, str(recebida.get("id") or ""))
     lead.ultimo_contato = agora()
     lead.automacao_pausada = True
-    cancelar_tarefas_de_prospeccao(db, lead.id, f"o cliente tocou em \"{texto}\" no aviso")
+    cancelar_tarefas_de_prospeccao(db, lead.id, f"o cliente tocou em \"{texto}\" no aviso",
+                                   ondas={(tarefa.campanha_id, tarefa.certificado_id)})  # a renovação deste aviso
     historico(db, lead.id, "resposta", f"Resposta pelo botão do aviso de vencimento: {texto}", None, "whatsapp")
     if acao == "renovei":
         ativos = renovacao.ativos_do_lead(db, lead)

@@ -166,14 +166,40 @@ def mudar_status(db: Session, lead: Lead, novo: str, usuario: Usuario | None, mo
     return True
 
 
-def cancelar_tarefas_de_prospeccao(db: Session, lead_id: int, motivo: str) -> int:
+AVISOS_DE_RENOVACAO = ("renov_aviso", "renov_lembrete", "renov_reforco", "renov_ultimo")  # = renovacao.ANGULOS
+
+
+def ondas_ja_avisadas(db: Session, lead_id: int) -> set[tuple]:
+    """As ondas de avisos de renovação (campanha + certificado guia) das quais o lead já recebeu algum aviso."""
+    return set(db.execute(select(Tarefa.campanha_id, Tarefa.certificado_id).where(
+        Tarefa.lead_id == lead_id, Tarefa.status == "feita", Tarefa.angulo.in_(AVISOS_DE_RENOVACAO))).all())
+
+
+def aviso_de_certificado_novo(t: Tarefa, avisadas: set[tuple]) -> bool:
+    """Aviso de renovação de um certificado do qual o cliente ainda não recebeu nenhum aviso (outra onda)."""
+    return t.angulo in AVISOS_DE_RENOVACAO and (t.campanha_id, t.certificado_id) not in avisadas
+
+
+def cancelar_tarefas_de_prospeccao(db: Session, lead_id: int, motivo: str, tudo: bool = False,
+                                   ondas: set[tuple] | None = None) -> int:
+    """Cancela os toques pendentes do lead (respondeu, mudou de etapa, foi assumido, opt-out). Avisos de renovação
+    (pedido da Maria em 26/11/2026: "você para de mandar os avisos referente àquela determinada empresa, mas não deixe
+    de avisar das novas que vem para frente"): param só os da onda de que o cliente já recebeu algum aviso (e os das
+    `ondas` informadas, ex.: a do aviso cujo botão ele tocou); os de um certificado de que ele ainda não foi avisado
+    (outra campanha ou outra onda) continuam. tudo=True (SAIR para tudo, exclusão de dados): cancela todos. Devolve
+    quantos cancelou."""
     pendentes = db.execute(select(Tarefa).where(
         Tarefa.lead_id == lead_id, Tarefa.status == "pendente", Tarefa.tipo == "prospeccao")).scalars().all()
+    avisadas = set() if tudo else ondas_ja_avisadas(db, lead_id) | set(ondas or ())
+    canceladas = 0
     for t in pendentes:
+        if not tudo and aviso_de_certificado_novo(t, avisadas):
+            continue
         t.status = "cancelada"
         t.resultado = f"Cancelada automaticamente: {motivo}"
         t.concluida_em = agora()
-    return len(pendentes)
+        canceladas += 1
+    return canceladas
 
 
 def converter_em_parceiro(db: Session, lead: Lead, usuario: Usuario | None) -> Parceiro:
@@ -201,7 +227,7 @@ def registrar_opt_out(db: Session, lead: Lead, usuario: Usuario | None, origem: 
         return
     lead.opt_out = True
     lead.opt_out_em = agora()
-    cancelar_tarefas_de_prospeccao(db, lead.id, "opt-out")
+    cancelar_tarefas_de_prospeccao(db, lead.id, "opt-out", tudo=True)
     historico(db, lead.id, "lgpd", f"Opt-out registrado ({origem}). O sistema não vai sugerir novos contatos.", usuario)
 
 

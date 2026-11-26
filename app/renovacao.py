@@ -227,13 +227,20 @@ HTML_EMAIL_COM_ARTE = (
     "<div style=\"font-size:12px;color:#777;margin:22px 0 0;text-align:center\">{{descadastro}}</div>"
     "</div></body></html>")
 
+# O SAIR dos avisos vale só para aquela renovação (pedido da Maria em 26/11/2026, "SAIR só do certificado": "você para
+# de mandar os avisos referente àquela determinada empresa, mas não deixe de avisar das novas que vem para frente"). A
+# frase diz isso ao cliente; a antiga, que ficou nos textos salvos das marcas, é trocada na leitura (mensagens).
+FRASE_DO_SAIR_ANTIGA = "(Se não quiser receber estes avisos, é só responder SAIR.)"
+FRASE_DO_SAIR = ("(Se não quiser mais avisos sobre esta renovação, é só responder SAIR. Avisaremos de novo só quando "
+                 "outro certificado estiver para vencer.)")
+
 # {vencimentos} vira a frase (ou a lista) dos certificados do contato com as datas; {data} é o primeiro vencimento.
 MENSAGENS_PADRAO = {
     "renov_aviso": {
         "assunto": "Vencimento do certificado digital ({data})",
         "whatsapp": ("Olá, {responsavel}! Tudo bem? Aqui é {vendedor}, da {minha_empresa}.\n\n{vencimentos}\n\n"
                      "Quer que eu já deixe tudo encaminhado para a renovação, para você não ficar sem certificado?\n\n"
-                     "Se você já renovou, pode desconsiderar esta mensagem.\n\n(Se não quiser receber estes avisos, é só responder SAIR.)"),
+                     "Se você já renovou, pode desconsiderar esta mensagem.\n\n" + FRASE_DO_SAIR),
         "email": ("Olá, {responsavel}! Tudo bem?\n\nAqui é {vendedor}, da {minha_empresa}.\n\n{vencimentos}\n\n"
                   "Quer que eu já deixe tudo encaminhado para a renovação, para você não ficar sem certificado? "
                   "É só responder este e-mail.\n\nSe você já renovou, pode desconsiderar esta mensagem."),
@@ -276,7 +283,12 @@ def mensagens(db) -> dict:
         salvas = json.loads(ler_config(db, "renov_mensagens") or "{}")
     except ValueError:
         salvas = {}
-    return {a: {**MENSAGENS_PADRAO[a], **(salvas.get(a) or {})} for a in MENSAGENS_PADRAO}
+    textos = {a: {**MENSAGENS_PADRAO[a], **(salvas.get(a) or {})} for a in MENSAGENS_PADRAO}
+    for campos in textos.values():  # a frase antiga do SAIR (para tudo) vira a de agora (só esta renovação)
+        for campo, texto in campos.items():
+            if isinstance(texto, str) and FRASE_DO_SAIR_ANTIGA in texto:
+                campos[campo] = texto.replace(FRASE_DO_SAIR_ANTIGA, FRASE_DO_SAIR)
+    return textos
 
 
 def dono(db) -> Usuario | None:
@@ -2083,6 +2095,81 @@ def certificados_do_aviso(db, tarefa: Tarefa) -> list[Certificado]:
         limite = guia.data_vencimento + timedelta(days=janela(db))
         certs = [c for c in certs if guia.data_vencimento <= c.data_vencimento <= limite]
     return sorted(certs, key=lambda c: (c.data_vencimento, c.cliente_nome or "", c.id or 0))
+
+
+# ---------------------------------------------------------------- SAIR de um aviso (só daquela renovação)
+
+def aviso_respondido(db, leads: list[Lead]) -> tuple[Lead, Tarefa] | None:
+    """O aviso de renovação a que o contato respondeu: a última mensagem enviada ao número (entre os leads dele, de
+    todas as ARs; respostas escritas pela equipe não contam), se ela foi um aviso de renovação. None = não foi."""
+    from .mensagens import ENVIADAS
+    from .modelos import Mensagem
+
+    if not leads:
+        return None
+    ultima = db.execute(select(Mensagem).where(
+        Mensagem.lead_id.in_([l.id for l in leads]), Mensagem.direcao == "saida", Mensagem.angulo != "resposta",
+        Mensagem.status.in_(ENVIADAS)).order_by(Mensagem.criado_em.desc(), Mensagem.id.desc()).limit(1)).scalars().first()
+    if ultima is None or ultima.angulo not in ANGULOS or not ultima.tarefa_id:
+        return None
+    tarefa = db.get(Tarefa, ultima.tarefa_id)
+    lead = next((l for l in leads if l.id == ultima.lead_id), None)
+    return (lead, tarefa) if tarefa is not None and lead is not None else None
+
+
+def sair_dos_avisos(db, lead: Lead | None, origem: str, tarefa: Tarefa | None = None) -> bool:
+    """SAIR em resposta a um aviso de renovação (pedido da Maria em 26/11/2026, "SAIR só do certificado": "você para de
+    mandar os avisos referente àquela determinada empresa, mas não deixe de avisar das novas que vem para frente"): os
+    avisos da onda daquele aviso (os certificados que ele lista) param, e esses certificados ficam "Avisos cancelados";
+    os certificados que vencerem depois continuam recebendo aviso. O lead NÃO fica com opt-out. `tarefa`: o aviso
+    respondido (botão da API oficial); sem ela, o da última mensagem enviada ao lead. Devolve False quando não é a
+    resposta a um aviso de renovação (ou o lead já tinha saído de tudo): aí vale o SAIR de sempre, para tudo."""
+    from .leads_servico import historico
+
+    if lead is None or lead.opt_out or lead.anonimizado:
+        return False
+    if tarefa is None:
+        achado = aviso_respondido(db, [lead])
+        if achado is None:
+            return False
+        tarefa = achado[1]
+    if tarefa.angulo not in ANGULOS or not tarefa.campanha_id or tarefa.lead_id != lead.id:
+        return False
+    certs = certificados_do_aviso(db, tarefa)
+    for c in certs:
+        c.status, c.fora_motivo = "Avisos cancelados", f"Pediu SAIR dos avisos desta renovação ({origem})"[:160]
+    agora_ = agora()
+    canceladas = 0
+    for t in db.execute(select(Tarefa).where(
+            Tarefa.campanha_id == tarefa.campanha_id, Tarefa.lead_id == lead.id,
+            Tarefa.certificado_id == tarefa.certificado_id, Tarefa.status.in_(("pendente", "rascunho")))).scalars():
+        t.status, t.concluida_em, t.resultado = "cancelada", agora_, "O cliente pediu SAIR dos avisos desta renovação"
+        canceladas += 1
+    if certs or canceladas:  # (a mesma resposta chega pelo bloqueio do WhatsApp Leads e pela mensagem: uma anotação)
+        lista = ", ".join(f"{c.cliente_nome or c.protocolo} ({tipo_curto(c.tipo)})" for c in certs[:5])
+        historico(db, lead.id, "lgpd", f"Pediu SAIR do aviso de renovação ({origem}): pararam os avisos desta renovação"
+                                       + (f" ({lista})" if lista else "") + ". Os certificados que vencerem depois "
+                                       "continuam recebendo aviso (SAIR só daquela renovação, desde 26/11/2026).", None)
+    return True
+
+
+def pedir_desbloqueio(db, telefone: str) -> bool:
+    """O WhatsApp Leads bloqueia o contato no SAIR (lá o SAIR vale para tudo). Quando ele saiu só de uma renovação, a
+    Prospecção pede para tirar o bloqueio (comando "desbloquear_contato"), para os avisos dos certificados novos
+    saírem pelo número QR. Um pedido por número a cada 24 h (o número fica na lista de bloqueados até o pedido ser
+    feito). Devolve True se pediu agora."""
+    from .modelos import ComandoWhatsApp
+
+    desde = agora() - timedelta(hours=24)
+    for (dados,) in db.execute(select(ComandoWhatsApp.dados).where(
+            ComandoWhatsApp.acao == "desbloquear_contato", ComandoWhatsApp.criado_em >= desde)).all():
+        try:
+            if json.loads(dados or "{}").get("telefone") == telefone:
+                return False
+        except ValueError:
+            continue
+    db.add(ComandoWhatsApp(acao="desbloquear_contato", dados=json.dumps({"telefone": telefone})))
+    return True
 
 
 def _dias_que_faltam(vencimento: date, hoje: date) -> str:

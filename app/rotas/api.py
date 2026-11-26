@@ -113,9 +113,16 @@ async def webhook_receber(request: Request):
                 if whatsapp_oficial.tratar_formulario(db, conta, telefone, r):
                     continue
             if mensagens.pede_opt_out(r["texto"]):
+                from .. import renovacao
                 from ..leads_servico import registrar_opt_out
 
-                for lead in sdr.leads_pelo_telefone(db, telefone):  # SAIR vale para todas as ARs
+                do_numero = sdr.leads_pelo_telefone(db, telefone)
+                # SAIR em resposta a um aviso de renovação: só daquela renovação (pedido da Maria em 26/11/2026)
+                respondido = None if any(l.opt_out for l in do_numero) else renovacao.aviso_respondido(db, do_numero)
+                if respondido is not None:
+                    renovacao.sair_dos_avisos(db, respondido[0], "respondeu SAIR no WhatsApp oficial", respondido[1])
+                    continue
+                for lead in do_numero:  # SAIR vale para todas as ARs
                     if not lead.opt_out:
                         registrar_opt_out(db, lead, None, "respondeu SAIR no WhatsApp oficial")
                 continue

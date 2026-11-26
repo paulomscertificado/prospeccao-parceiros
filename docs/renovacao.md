@@ -243,6 +243,27 @@ base vem da planilha". Código em `app/renovacao.py` (regras), `app/rotas/renova
    SDR (a Atendente IA de lá não responde). Cliente que diz que já renovou: descartar a oportunidade com o motivo
    **Já renovou** marca o certificado como Renovado (`rotas/sdr._ja_renovou` + `ativos_do_lead`; só com um certificado
    ativo no contato, senão avisa para marcar na tela; pedido da Maria em 16/11/2026).
+   **Resposta para só os avisos daquele certificado** (26/11/2026): `leads_servico.cancelar_tarefas_de_prospeccao`
+   cancela os avisos de renovação só das ondas (campanha + certificado guia) de que o cliente já recebeu algum aviso
+   (`ondas_ja_avisadas`; o botão tocado informa a onda dele em `ondas=`); os de um certificado de que ele ainda não foi
+   avisado continuam (`aviso_de_certificado_novo`; também nos rascunhos de `sdr._equipe_cuida`). `tudo=True` (opt-out
+   de verdade, exclusão de dados) cancela todos.
+   **SAIR só daquela renovação** (pedido da Maria em 26/11/2026, "SAIR só do certificado": "você para de mandar os
+   avisos referente àquela determinada empresa, mas não deixe de avisar das novas que vem para frente"; ela foi avisada
+   do risco: regra do WhatsApp, LGPD e denúncias contra o número oficial). `renovacao.aviso_respondido(db, leads)` = a
+   última mensagem enviada ao número (sem as respostas da equipe) era um aviso de renovação → `sair_dos_avisos(db,
+   lead, origem, tarefa)`: os certificados daquele aviso (`certificados_do_aviso`) ficam "Avisos cancelados" (com
+   `fora_motivo`), os avisos pendentes da onda são cancelados, uma anotação no histórico (só quando muda algo) e NADA
+   de opt-out. Vale no SAIR escrito (`sdr.processar_resposta`, classe OPT-OUT), no bloqueio do WhatsApp Leads
+   (`sdr.aplicar_novidades_whatsapp`, lista `bloqueados`: lá o SAIR bloqueia tudo na hora; a Prospecção pede
+   `pedir_desbloqueio` → comando `desbloquear_contato`, um por número a cada 24 h, `whatsapp-leads/app/integracao.py`),
+   no SAIR escrito para o número oficial (`rotas/api.py`) e no botão **Parar avisos** (`whatsapp_oficial.tratar_botao`).
+   Quem já tinha opt-out (SAIR de antes, com a frase "Se não quiser receber estes avisos") continua fora: nesses
+   números nada é desbloqueado. O SAIR que não responde a um aviso de renovação e o descadastro do e-mail continuam
+   parando tudo. A frase do 1º aviso: `FRASE_DO_SAIR` ("Se não quiser mais avisos sobre esta renovação, é só responder
+   SAIR. Avisaremos de novo só quando outro certificado estiver para vencer."); a antiga (`FRASE_DO_SAIR_ANTIGA`), que
+   ficou nos textos salvos das marcas, é trocada na leitura (`mensagens`). Testes: `testes/test_renovacao_sair.py` e
+   `test_sair_escrito_no_numero_oficial_para_so_aquela_renovacao`.
 16. **API oficial da Meta** (etapa 2, `docs/whatsapp-oficial.md`): com `renov_envio_oficial` ligado no quadro 4
    (`Campanha.envio_oficial`), o WhatsApp dos avisos sai pelo número oficial com o modelo aprovado
    (`whatsapp_oficial.processar_fila`), a arte desenhada pelo computador do WhatsApp Leads a pedido da nuvem e os botões

@@ -312,9 +312,12 @@ def test_botoes_do_aviso_resolvem_sozinhos(cliente, monkeypatch):
         assert op.classificacao == "JÁ RENOVOU" and op.temperatura == "morna" and "2 certificados" in op.resumo
         assert {c.status for c in db.execute(select(Certificado).where(Certificado.lead_id == leads["dois"])).scalars()} \
             == {"Ativo"}
-        assert db.get(Lead, leads["parar"]).opt_out  # Parar avisos = SAIR
+        # Parar avisos = SAIR só daquela renovação (pedido da Maria em 26/11/2026): os avisos dela param e o
+        # certificado fica "Avisos cancelados", sem opt-out (os certificados novos continuam recebendo aviso); o "Já
+        # renovei" do botão de outro contato não o marcou como Renovado
+        assert not db.get(Lead, leads["parar"]).opt_out and db.get(Tarefa, ids["parar"]).status == "cancelada"
         assert {c.status for c in db.execute(select(Certificado).where(Certificado.lead_id == leads["parar"])).scalars()} \
-            == {"Ativo"}  # o botão de outro contato não marcou o certificado dele
+            == {"Avisos cancelados"}
         for op in db.execute(select(Oportunidade).where(Oportunidade.lead_id.in_(list(leads.values())))).scalars():
             op.status = "descartada"  # não deixa cartões nas telas dos outros testes
         db.commit()
@@ -417,3 +420,39 @@ def test_api_oficial_da_renovacao_vale_por_marca(cliente):
         renovacao.aplicar_envio_oficial(db, True)
         assert da_ms.envio_oficial and not da_certy.envio_oficial
         db.rollback()
+
+
+def _texto(telefone: str, texto: str) -> dict:
+    return {"entry": [{"changes": [{"value": {
+        "metadata": {"phone_number_id": NUMERO_ID},
+        "contacts": [{"wa_id": telefone, "profile": {"name": "Cliente"}}],
+        "messages": [{"from": telefone, "id": f"wamid.texto{uuid.uuid4().hex[:10]}", "type": "text",
+                      "text": {"body": texto}}]}}]}]}
+
+
+def test_sair_escrito_no_numero_oficial_para_so_aquela_renovacao(cliente):
+    """Pedido da Maria (26/11/2026), "SAIR só do certificado": o cliente escreve SAIR depois de um aviso de renovação
+    pelo número oficial. Param os avisos daquela renovação; ele não fica com opt-out (os certificados novos continuam
+    recebendo aviso)."""
+    for chave in list(limite_pedidos._eventos):
+        limite_pedidos.zerar(chave)
+    with sessao() as db:
+        _conta(db)
+        aviso = _aviso(db, "SAIR ESCRITO API LTDA", "(81) 99446-0021")
+        aviso.status, aviso.concluida_em = "feita", agora()
+        seguinte = Tarefa(tipo="prospeccao", lead_id=aviso.lead_id, campanha_id=aviso.campanha_id,
+                          certificado_id=aviso.certificado_id, canal="whatsapp", data=date.today() + timedelta(days=3),
+                          hora="10:17", status="pendente", angulo="renov_ultimo", mensagem="Último aviso.",
+                          tenant_id=aviso.tenant_id)
+        db.add(seguinte)
+        db.add(Mensagem(lead_id=aviso.lead_id, tarefa_id=aviso.id, campanha_id=aviso.campanha_id, canal="whatsapp",
+                        direcao="saida", angulo=aviso.angulo, corpo="Olá! O certificado vence em breve.",
+                        status="enviada", modo="api", tenant_id=aviso.tenant_id))
+        db.commit()
+        lead_id, seguinte_id = aviso.lead_id, seguinte.id
+    assert _assinado(cliente, _texto("5581994460021", "SAIR")).status_code == 200
+    with sessao() as db:
+        assert not db.get(Lead, lead_id).opt_out
+        assert db.get(Tarefa, seguinte_id).status == "cancelada"
+        assert {c.status for c in db.execute(select(Certificado).where(Certificado.lead_id == lead_id)).scalars()} \
+            == {"Avisos cancelados"}

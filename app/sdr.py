@@ -568,8 +568,13 @@ def processar_resposta(db, lead: Lead, texto: str, canal: str, usuario: Usuario 
     analise["resposta_sugerida"] = resposta_sugerida(db, lead, analise)
     analise["oportunidade_id"] = None
     if classe == "OPT-OUT":
-        registrar_opt_out(db, lead, usuario, "pediu na resposta")
-        mudar_status(db, lead, "Perdido", usuario, "Opt-out")
+        from . import renovacao
+
+        # SAIR em resposta a um aviso de renovação: param só os avisos daquela renovação (pedido da Maria em
+        # 26/11/2026, "SAIR só do certificado"); os certificados que vencerem depois continuam recebendo aviso
+        if not renovacao.sair_dos_avisos(db, lead, "respondeu SAIR"):
+            registrar_opt_out(db, lead, usuario, "pediu na resposta")
+            mudar_status(db, lead, "Perdido", usuario, "Opt-out")
     elif classe == "SEM INTERESSE":
         mudar_status(db, lead, "Perdido", usuario, "Sem interesse")
     else:
@@ -761,7 +766,12 @@ def _equipe_cuida(db, lead: Lead, usuario: Usuario, motivo: str, resultado: str)
     Devolve (tarefas canceladas, oportunidades que saíram das Novas)."""
     lead.automacao_pausada = True
     canceladas = cancelar_tarefas_de_prospeccao(db, lead.id, motivo)
+    from .leads_servico import aviso_de_certificado_novo, ondas_ja_avisadas
+
+    avisadas = ondas_ja_avisadas(db, lead.id)
     for t in db.execute(select(Tarefa).where(Tarefa.lead_id == lead.id, Tarefa.status == "rascunho")).scalars():
+        if aviso_de_certificado_novo(t, avisadas):
+            continue  # aviso de renovação de um certificado novo (outra campanha): continua (26/11/2026)
         t.status, t.concluida_em, t.resultado = "cancelada", agora(), resultado
     if lead.etapa < 4 and not lead.perdido:
         mudar_status(db, lead, "Humano assumiu", usuario)
@@ -1027,10 +1037,21 @@ def aplicar_novidades_whatsapp(db, dados: dict) -> dict:
                 db.execute(update(Mensagem).where(Mensagem.id == mid)
                            .values(status=novo, erro=str(envio.get("erro") or "")[:500]))
                 resultado["status"] += 1
+    from . import renovacao
+
     for telefone in dados.get("bloqueados", []):
+        do_numero = leads_pelo_telefone(db, telefone)
+        # SAIR em resposta a um aviso de renovação (pedido da Maria em 26/11/2026, "SAIR só do certificado"): param só
+        # os avisos daquela renovação e o WhatsApp Leads tira o bloqueio, para os avisos dos certificados novos saírem.
+        # Quem já tinha saído de tudo (SAIR de antes) continua bloqueado.
+        respondido = None if any(l.opt_out for l in do_numero) else renovacao.aviso_respondido(db, do_numero)
+        if respondido is not None:
+            renovacao.sair_dos_avisos(db, respondido[0], "respondeu SAIR no WhatsApp", respondido[1])
+            renovacao.pedir_desbloqueio(db, telefone)
+            continue
         # SAIR no WhatsApp vale para todas as ARs: o WhatsApp Leads é um só e já bloqueia o número para todos os
         # números conectados (a lista de bloqueio dele não diz qual número recebeu o SAIR)
-        for lead in leads_pelo_telefone(db, telefone):
+        for lead in do_numero:
             if not lead.opt_out:
                 registrar_opt_out(db, lead, None, "respondeu SAIR no WhatsApp")
                 resultado["opt_out"] += 1
