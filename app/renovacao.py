@@ -73,6 +73,7 @@ PADRAO = {
     "renov_ultima_rodada": "",        # dia em que a campanha automática rodou (AAAA-MM-DD)
     "renov_ultimo_resultado": "",
     "renov_ultima_importacao": "",
+    "renov_pontos_fora": "",          # pontos de atendimento da planilha sem avisos (26/11/2026: o Gilberto Contábil)
     "renov_ultima_importacao_em": "",  # quando começou a última importação (AAAA-MM-DDTHH:MM:SS): "todos da planilha"
     "renov_arte": "1",                # a arte do aviso (a do site) vai junto no WhatsApp e no e-mail
     "renov_conexao": "",              # número de WhatsApp dos disparos ("" = automático, sempre um número de verdade)
@@ -479,6 +480,10 @@ def _campo(chave: str) -> str:
         return "tipo"
     if chave.startswith("parceiro") or chave in ("contador", "indicacao", "indicado por"):
         return "parceiro"
+    if chave.startswith("ponto"):  # o ponto de atendimento (ex.: MATRIZ, GILBERTO CONTABIL): pode ficar fora dos avisos
+        return "ponto"
+    if chave.startswith("unidade"):
+        return "unidade"
     return ""
 
 
@@ -582,6 +587,7 @@ def ler_planilha(nome_arquivo: str, conteudo: bytes) -> tuple[list[dict], list[s
                 "email_empresa": _texto(valor("email_empresa")).lower(), "telefone_empresa": _texto(valor("telefone_empresa")),
                 "email_pessoa": _texto(valor("email_pessoa")).lower(), "telefone_pessoa": _texto(valor("telefone_pessoa")),
                 "parceiro": _texto(valor("parceiro"))[:200],
+                "unidade": _texto(valor("unidade"))[:160], "ponto": _texto(valor("ponto"))[:120],
             })
     if not achou:
         raise ErroPlanilha("Não achei a coluna Vencimento na planilha. Confira se é o Relatório de renovação (com as "
@@ -616,6 +622,7 @@ def dados_do_registro(r: dict) -> dict:
         "tipo": r["tipo"], "data_vencimento": r["vencimento"], "responsavel": r["cliente"][:200],
         "whatsapp": util.formatar_telefone(zap) if zap else "", "telefone": util.formatar_telefone(fixo) if fixo else "",
         "email": email[:160], "parceiro_nome": parceiro,
+        "ponto": (r.get("ponto") or "")[:120], "unidade": (r.get("unidade") or "")[:160],
     }
 
 
@@ -737,8 +744,35 @@ def agrupar(certificados) -> tuple[list[Contato], list[Certificado]]:
     return sorted((Contato(k, v) for k, v in grupos.items()), key=lambda c: (c.vencimento, c.chave)), sem_contato
 
 
+def pontos_fora(db) -> list[str]:
+    """Os pontos de atendimento cujos clientes não recebem avisos (quadro 4, por marca; pedido da Maria em 26/11/2026:
+    na planilha da MS, 173 certificados eram do ponto Gilberto Contábil). O nome da coluna Ponto da planilha (vale
+    também o da coluna Unidade), separados por vírgula, ponto e vírgula ou um por linha."""
+    return [p.strip() for p in re.split(r"[\n;,]+", cfg(db, "renov_pontos_fora")) if p.strip()]
+
+
+def normalizar_pontos(texto: str) -> str:
+    """O que a tela grava: os nomes sem espaço sobrando, sem repetir (sem diferença de acento e maiúscula)."""
+    vistos, nomes = set(), []
+    for nome in re.split(r"[\n;,]+", texto or ""):
+        nome = " ".join(nome.split())[:120]
+        if _chave(nome) and _chave(nome) not in vistos:
+            vistos.add(_chave(nome))
+            nomes.append(nome)
+    return ", ".join(nomes)
+
+
+def chaves_dos_pontos_fora(db) -> frozenset:
+    return frozenset(k for k in (_chave(p) for p in pontos_fora(db)) if k)
+
+
+def no_ponto_fora(cert: Certificado, chaves: frozenset) -> bool:
+    """O certificado é de um ponto de atendimento (ou unidade) fora dos avisos? Sem acento e sem maiúscula."""
+    return bool(chaves) and bool({_chave(cert.ponto), _chave(cert.unidade)} & chaves)
+
+
 def a_avisar(db, hoje: date | None = None, ate: date | None = None, ar: int | None = None,
-             desde: datetime | None = None) -> list[Certificado]:
+             desde: datetime | None = None, com_pontos_fora: bool = False) -> list[Certificado]:
     """Certificados que podem entrar numa campanha: da planilha, ativos, fora de campanha e vencendo até o dia do 1º
     aviso (ex.: 30 ou 12 dias) ou até `ate` (campanha do piloto: até 31/12), de amanhã em diante (o que vence hoje já
     não dá tempo de avisar). `ar`: só os dessa AR (a rodada diária roda sem tela e enxerga todas as ARs: sem o filtro,
@@ -753,7 +787,9 @@ def a_avisar(db, hoje: date | None = None, ate: date | None = None, ar: int | No
         consulta = consulta.where(Certificado.tenant_id == ar)
     if desde is not None:  # só os da planilha importada a partir daí (a última: "todos da planilha")
         consulta = consulta.where(Certificado.importado_em >= desde)
-    return db.execute(consulta).scalars().all()
+    certificados = db.execute(consulta).scalars().all()
+    chaves = frozenset() if com_pontos_fora else chaves_dos_pontos_fora(db)
+    return [c for c in certificados if not no_ponto_fora(c, chaves)] if chaves else certificados
 
 
 def _formas_do_celular(numero: str) -> set[str]:
@@ -827,8 +863,13 @@ def contatos_para_campanha(db, hoje: date | None = None, marcar_saida: bool = Fa
     """Contatos que podem entrar numa campanha agora (do que vence primeiro ao último) e quantos certificados ficam de
     fora por motivo. marcar_saida=True grava nos certificados de quem pediu SAIR (vale até alguém reabrir). `ar`: só os
     certificados e os leads dessa AR (ver a_avisar)."""
-    contatos, sem_contato = agrupar(a_avisar(db, hoje, ate, ar, desde))
+    certificados = a_avisar(db, hoje, ate, ar, desde, com_pontos_fora=True)
+    chaves = chaves_dos_pontos_fora(db)
+    do_ponto = {id(c) for c in certificados if no_ponto_fora(c, chaves)}
+    contatos, sem_contato = agrupar([c for c in certificados if id(c) not in do_ponto])
     fora: dict[str, int] = {}
+    if do_ponto:  # quadro 4: "Pontos de atendimento que não recebem avisos"
+        fora["de ponto de atendimento fora dos avisos"] = len(do_ponto)
     if sem_contato:
         fora["sem WhatsApp e sem e-mail na planilha"] = len(sem_contato)
     leads = _leads_dos_contatos(db, contatos, ar)
@@ -2337,8 +2378,9 @@ def e_lead_de_renovacao(lead: Lead) -> bool:
     return (lead.origem or "") == ORIGEM_LEAD
 
 
-def situacao_na_tela(cert: Certificado, hoje: date | None = None, dias_da_janela: int = JANELA_DIAS) -> tuple[str, str]:
-    """(classe do selo, texto) para a lista da tela Renovação."""
+def situacao_na_tela(cert: Certificado, hoje: date | None = None, dias_da_janela: int = JANELA_DIAS,
+                     pontos: frozenset = frozenset()) -> tuple[str, str]:
+    """(classe do selo, texto) para a lista da tela Renovação. `pontos`: os pontos de atendimento fora dos avisos."""
     hoje = hoje or date.today()
     if cert.status in ("Renovado", "Não renovará", "Avisos cancelados"):
         return ("selo-ok" if cert.status == "Renovado" else "", SITUACOES[cert.status])
@@ -2348,6 +2390,8 @@ def situacao_na_tela(cert: Certificado, hoje: date | None = None, dias_da_janela
         return ("selo-azul", "Em campanha")
     if cert.fora_motivo:
         return ("selo-alerta", "Fora: " + cert.fora_motivo)
+    if no_ponto_fora(cert, pontos):
+        return ("", f"Ponto fora dos avisos ({cert.ponto or cert.unidade})")
     if not chave_do_contato(cert):
         return ("selo-erro", "Sem WhatsApp e sem e-mail")
     if cert.data_vencimento <= hoje:

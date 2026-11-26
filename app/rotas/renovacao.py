@@ -85,6 +85,7 @@ def tela_renovacao(request: Request, ver: str = "avisar", q: str = "", usuario: 
     # "Montar campanha" faz: antes contava as outras marcas e o botão ficava ligado sem ninguém para levar
     ar_monta = renovacao.ar_de_quem_monta(db, renovacao.dono(db) or usuario)
     contatos, fora = renovacao.contatos_para_campanha(db, hoje, ar=ar_monta)
+    pontos_fora = renovacao.chaves_dos_pontos_fora(db)  # quadro 4: pontos de atendimento sem avisos
     # ninguém nos próximos dias: quando entra o próximo (pedido da Maria em 26/11/2026: "ajuste melhor essa área")
     depois = [c for c in renovacao.a_avisar(db, hoje, renovacao.ATE_TODOS, ar_monta)
               if c.data_vencimento > hoje + timedelta(days=janela) and renovacao.chave_do_contato(c)]
@@ -134,7 +135,9 @@ def tela_renovacao(request: Request, ver: str = "avisar", q: str = "", usuario: 
         "total_lista": len(lista), "por_contato": por_contato, "hoje": hoje, "campanhas": campanhas,
         "contatos_por_campanha": contagem, "usuarios": usuarios, "dono": renovacao.dono(db),
         "limite_frios": ler_config_int(db, "limite_frios_whatsapp", 0), "situacoes": renovacao.SITUACOES,
-        "situacao": lambda c, h: renovacao.situacao_na_tela(c, h, janela),
+        "situacao": lambda c, h: renovacao.situacao_na_tela(c, h, janela, pontos_fora),
+        # os pontos de atendimento das planilhas da marca, para o campo do quadro 4 (26/11/2026)
+        "pontos_da_base": Counter(c.ponto for c in abertos if c.ponto and c.tenant_id == ar_monta).most_common(12),
         "chave_do_contato": renovacao.chave_do_contato,
         "tipo_curto": renovacao.tipo_curto,
         **_arte_da_marca(db, request, usuario),
@@ -321,6 +324,8 @@ async def configurar(request: Request, usuario: Usuario = Depends(exige("renovac
         gravar_config(db, "renov_feriados", ", ".join(validos))
     gravar_config(db, "renov_hora_inicio", hora_inicio)
     gravar_config(db, "renov_hora_fim", hora_fim)
+    if form.get("pontos_fora") is not None:  # pontos de atendimento sem avisos (pedido da Maria em 26/11/2026)
+        gravar_config(db, "renov_pontos_fora", renovacao.normalizar_pontos(str(form.get("pontos_fora"))))
     desde, hora = None, ""
     if automatica:  # o horário, o início e o máximo da campanha automática (nas outras marcas ficam como estão)
         desde = util.para_data(form.get("ativo_desde"))

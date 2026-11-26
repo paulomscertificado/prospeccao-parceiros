@@ -595,6 +595,13 @@ e Corpus Christi). Os da cidade ou do estado você escreve em **Outros feriados*
 `08/12/2026` só naquele ano. O aviso que cairia num feriado sai no dia útil antes. Ao salvar um feriado novo, os avisos
 já marcados para ele mudam de dia sozinhos (se não couber em outro dia antes do vencimento, aquele aviso é cancelado).
 
+**Pontos de atendimento sem avisos:** a planilha traz o **Ponto** de cada certificado (ex.: MATRIZ, CEASA, GILBERTO
+CONTABIL). Para um ponto cujos clientes não devem receber os avisos, escreva o nome dele no quadro 4, em **Pontos de
+atendimento que não recebem avisos** (separados por vírgula; embaixo do campo aparecem os pontos que vieram nas
+planilhas), e clique em **Salvar configuração**. Os clientes desse ponto continuam na lista de certificados, com a
+situação "Ponto fora dos avisos", mas não entram em nenhuma campanha, nem no "Montar com todos da planilha". Na MS, o
+ponto **GILBERTO CONTABIL** está fora dos avisos desde 26/11/2026.
+
 **Piloto de 13/11/2026 a 01/01/2027:** a campanha **"Renovação – piloto"** leva todos os clientes da planilha que vencem
 até 31/12, com os avisos já marcados (12, 6, 3 e 1 dia antes, a partir das 10h, WhatsApp com a arte pelo número do
 Paulo Lucas, e-mail ~2 h depois). A partir de 01/01/2027 a campanha automática do dia assume (importe o relatório de

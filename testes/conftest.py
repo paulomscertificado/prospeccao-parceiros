@@ -77,7 +77,8 @@ def csrf(cliente):
 # antes e os testes deles cuidam disso).
 RENOVACAO_DA_MARCA = ("renov_ativo", "renov_hora", "renov_maximo_dia", "renov_canais", "renov_arte", "renov_email_html",
                       "renov_dias", "renov_hora_inicio", "renov_hora_fim", "renov_feriados", "renov_ativo_desde",
-                      "renov_mensagens", "renov_ultima_rodada", "renov_ultimo_resultado", "renov_ultima_importacao")
+                      "renov_mensagens", "renov_ultima_rodada", "renov_ultimo_resultado", "renov_ultima_importacao",
+                      "renov_ultima_importacao_em", "renov_pontos_fora")
 
 
 @pytest.fixture(autouse=True)
