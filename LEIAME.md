@@ -45,7 +45,9 @@ no navegador, de qualquer lugar: não precisa do `iniciar.bat`. O passo a passo 
   O mesmo contato pode ter uma conversa em cada número (por exemplo, a 1ª mensagem saiu pelo número principal e a
   resposta chegou pelo WhatsApp de um vendedor). O **Ver conversa** das Oportunidades abre pelo número em que a
   conversa está (o da mensagem mais recente), e a conversa avisa no alto quando o contato também tem conversa por
-  outro número que você vê: clique no nome do número para abrir a conversa de lá.
+  outro número que você vê: clique no nome do número para abrir a conversa de lá. Quando o cliente conversou pelo
+  **número oficial (API da Meta)**, como nos avisos da Renovação, o **Ver conversa** abre a tela **API Oficial**, onde
+  essa conversa fica, e a tela Conversas também avisa no alto, com o link para lá (desde 27/11/2026).
   Nas mensagens que saíram, como no WhatsApp: **✓** saiu, **✓✓** o contato recebeu, **✓✓ azul** o contato leu.
   Clique numa mensagem que saiu para ver os **Dados da mensagem**: a hora em que foi **Entregue** e em que foi
   **Lida** ("-" enquanto não aconteceu; quem desligou a confirmação de leitura no WhatsApp nunca aparece como lida). O
@@ -371,7 +373,7 @@ ou descarta, o aviso some do sininho de todos. São 4 abas:
   (e por qual número a mensagem saiu), o contato do cliente, o que enviamos, o que o lead respondeu e o que a IA
   entendeu. Botões: **Marcar como atendido** (depois de responder o cliente: a resposta sai da lista e a automação do
   lead para; o responsável pelo lead continua o mesmo), **Iniciar WhatsApp**, **Ver conversa** (abre a conversa em
-  Conversas, pelo número em que ela está) e **Descartar**: para descartar é preciso **escolher o motivo** (sem interesse, já renovou, já tem
+  Conversas, pelo número em que ela está; se o cliente conversou pelo número oficial, abre a tela API Oficial) e **Descartar**: para descartar é preciso **escolher o motivo** (sem interesse, já renovou, já tem
   parceiro, resposta de robô, pessoa errada...). O motivo aparece na aba Descartadas e ensina o que ajustar nas
   campanhas.
   **Já renovou:** quando o cliente da Renovação diz que já renovou, descarte com esse motivo: o certificado dele vira

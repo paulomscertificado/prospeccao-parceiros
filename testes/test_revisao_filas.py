@@ -99,6 +99,9 @@ def test_aprovar_mantem_horario_escolhido_a_mao(cliente):
         db.add(lead)
         db.flush()
         amanha = date.today() + timedelta(days=1)
+        sem_envio = campanhas._feriados(db, camp)
+        while amanha.weekday() >= 5 or amanha in sem_envio:  # o próximo dia de envio (numa sexta, o sábado ia para a
+            amanha += timedelta(days=1)                       # segunda às 08:31 e o teste falhava sem motivo)
         mao = Tarefa(tipo="prospeccao", lead_id=lead.id, campanha_id=camp.id, canal="email", data=amanha,
                      hora="10:20", status="rascunho", mensagem="Olá")
         antiga = Tarefa(tipo="prospeccao", lead_id=lead.id, campanha_id=camp.id, canal="email",

@@ -168,6 +168,13 @@ sem `numero`, e a resposta inteira traz `outros_numeros` (`_outros_numeros`: os 
 conversa com o contato, o mais recente primeiro); a tela mostra o aviso `#c-outros` "Este contato também tem conversa
 pelo ..." com o nome que abre a de lá. Em 24/11/2026, 79 contatos tinham conversa em 2 números ou mais.
 Teste: `testes/test_conversa_numero_certo.py`.
+**Número oficial (API da Meta)** (27/11/2026, pedido da Maria: "quando eu clico em ver conversa não aparece nada pra
+mim"; a cliente tocou em "Quero renovar" no aviso que saiu pelo número oficial, e a conversa estava só em
+`mensagens_oficiais`): nas Oportunidades, o "Ver conversa" do lead cujo último WhatsApp saiu pelo número oficial
+(`Mensagem.conexao` "oficial:...", `rotas/sdr._conversa_pelo_oficial`, uma consulta para a tela toda) abre
+`/oficial?telefone=` para quem tem `oficial.ver`; os outros, `/conversas?telefone=` como antes. A API da conversa traz
+`no_oficial` (`conversas._conversou_pelo_oficial`: há mensagens em `mensagens_oficiais` com o telefone e a pessoa tem
+`oficial.ver`), e o aviso `#c-outros` ganha o link para a tela API Oficial. Teste: `testes/test_ver_conversa_oficial.py`.
 
 **Apagar para todos** (24/11/2026, pedido da Maria: "suba a opção de apagar mensagem no whatsapp lead"): nos "Dados da
 mensagem" (`_dados_mensagem.html`, `abrirDadosMensagem({..., apagada, apagada_por, apagar})`) o botão aparece quando a

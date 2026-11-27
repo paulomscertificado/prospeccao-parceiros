@@ -320,10 +320,15 @@ async function carregarConversa(rolar, forcar) {
   el('c-optout').style.display = d.lead && d.lead.opt_out ? '' : 'none';
   // o mesmo contato também conversou por outro número (dos que a pessoa vê): avisa e abre a conversa de lá num clique
   const outros = d.outros_numeros || [];
-  el('c-outros').style.display = outros.length ? '' : 'none';
-  el('c-outros').innerHTML = outros.length ? 'Este contato também tem conversa pelo ' + outros.map(n =>
+  let avisoOutros = outros.length ? 'Este contato também tem conversa pelo ' + outros.map(n =>
     `<a href="#" data-numero="${escapar(n)}"><b>${escapar(NOMES_NUMEROS[n] || n)}</b></a>`).join(' e pelo ')
     + '. Clique no número para ver essa conversa.' : '';
+  // e pelo número oficial (API da Meta), cuja conversa fica na tela API Oficial (27/11/2026)
+  if (d.no_oficial) avisoOutros += (avisoOutros ? ' ' : '') + 'Este contato conversou pelo '
+    + `<a href="/oficial?telefone=${encodeURIComponent(d.telefone)}"><b>número oficial (API da Meta)</b></a>: `
+    + 'essa conversa fica na tela API Oficial. Clique para ver.';
+  el('c-outros').style.display = avisoOutros ? '' : 'none';
+  el('c-outros').innerHTML = avisoOutros;
   marcaConversa = d.marca || '';
   const todas = d.mensagens.concat(d.enviando.map(m => ({ ...m, direcao: 'saida', enviando: true })));
   const nova = JSON.stringify(todas.map(m => [m.texto, m.status, m.hora, m.entregue || '', m.lida || '',

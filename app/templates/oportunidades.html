@@ -147,7 +147,7 @@
   <div class="grupo-btn" style="margin-top:10px">
     <form class="inline" method="post" action="/oportunidades/{{ o.id }}/atendida"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar_para" value="{{ voltar }}"><button class="btn btn-verde" title="Alguém da equipe já respondeu este cliente: a resposta sai desta lista e a automação do lead para">✓ MARCAR COMO ATENDIDO</button></form>
     {% if l.whatsapp %}<a class="btn" href="{{ l.whatsapp|whats }}" target="_blank" rel="noopener">INICIAR WHATSAPP</a>{% endif %}
-    {% if l.whatsapp and pode('conversas.ver') %}<a class="btn" href="/conversas?telefone={{ l.whatsapp|urlencode }}">Ver conversa</a>{% endif %}
+    {% if l.whatsapp and l.id in conversa_oficial and pode('oficial.ver') %}<a class="btn" href="/oficial?telefone={{ l.whatsapp|urlencode }}" title="O cliente conversou pelo número oficial (API da Meta): a conversa fica na tela API Oficial">Ver conversa</a>{% elif l.whatsapp and pode('conversas.ver') %}<a class="btn" href="/conversas?telefone={{ l.whatsapp|urlencode }}">Ver conversa</a>{% endif %}
     <form class="inline form-descarte" method="post" action="/oportunidades/{{ o.id }}/descartar" data-confirmar="Descartar esta oportunidade? Ela vai para a aba Descartadas.">
       <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar_para" value="{{ voltar }}">
       <select name="motivo" required aria-label="Motivo do descarte"><option value="">Motivo do descarte…</option>{% for m in config.MOTIVOS_DESCARTE %}<option>{{ m }}</option>{% endfor %}</select>
@@ -174,7 +174,7 @@
       <div class="pequeno motivo">{{ 'Atendida' if o.status == 'assumida' else 'Descartada' }} por {{ o.responsavel.nome if o.responsavel else 'alguém' }}{% if i.levou %} · {{ i.levou }} depois da resposta{% endif %}</div>
       {% if o.status == 'descartada' and o.motivo %}<div class="pequeno"><b>Motivo:</b> {{ o.motivo }}</div>{% endif %}</div>
     <div class="acoes-op">
-      {% if l.whatsapp and pode('conversas.ver') %}<a class="btn btn-pequeno" href="/conversas?telefone={{ l.whatsapp|urlencode }}">Ver conversa</a>{% endif %}
+      {% if l.whatsapp and l.id in conversa_oficial and pode('oficial.ver') %}<a class="btn btn-pequeno" href="/oficial?telefone={{ l.whatsapp|urlencode }}" title="O cliente conversou pelo número oficial (API da Meta): a conversa fica na tela API Oficial">Ver conversa</a>{% elif l.whatsapp and pode('conversas.ver') %}<a class="btn btn-pequeno" href="/conversas?telefone={{ l.whatsapp|urlencode }}">Ver conversa</a>{% endif %}
       {% if o.status == 'descartada' %}
       <form class="inline" method="post" action="/oportunidades/{{ o.id }}/reabrir">
         <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="voltar_para" value="{{ voltar }}">
@@ -217,7 +217,7 @@
       {% if o %}<div class="pequeno motivo" style="margin-top:3px">{{ 'oportunidade nova (esperando atendimento)' if o.status == 'nova' else ('oportunidade atendida' ~ (' por ' ~ o.responsavel.nome if o.responsavel else '') if o.status == 'assumida' else 'oportunidade descartada') }}</div>{% endif %}</div>
     <div class="acoes-op">
       {% if o and o.status == 'nova' %}<a class="btn btn-pequeno btn-verde" href="/oportunidades#op-{{ o.id }}">Ver oportunidade</a>{% endif %}
-      {% if m.canal == 'whatsapp' and l and l.whatsapp and pode('conversas.ver') %}<a class="btn btn-pequeno" href="/conversas?telefone={{ l.whatsapp|urlencode }}">Ver conversa</a>{% endif %}
+      {% if m.canal == 'whatsapp' and l and l.whatsapp and l.id in conversa_oficial and pode('oficial.ver') %}<a class="btn btn-pequeno" href="/oficial?telefone={{ l.whatsapp|urlencode }}" title="O cliente conversou pelo número oficial (API da Meta): a conversa fica na tela API Oficial">Ver conversa</a>{% elif m.canal == 'whatsapp' and l and l.whatsapp and pode('conversas.ver') %}<a class="btn btn-pequeno" href="/conversas?telefone={{ l.whatsapp|urlencode }}">Ver conversa</a>{% endif %}
     </div>
     <div class="texto-resposta largura-toda">{{ (m.corpo or '')[:1500] }}</div>
   </div>

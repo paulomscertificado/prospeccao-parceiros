@@ -89,6 +89,19 @@ def _tempo_curto(delta: timedelta) -> str:
     return f"{horas} h" if horas < 48 else f"{horas // 24} dias"
 
 
+def _conversa_pelo_oficial(db: Session, ids_leads: set) -> set[int]:
+    """Dos leads, os que conversam pelo número oficial (API da Meta): o último WhatsApp que saiu para eles foi por ele
+    (Mensagem.conexao "oficial:..."). A conversa deles fica na tela API Oficial. Uma consulta só para a tela toda."""
+    ids = {i for i in ids_leads if i}
+    if not ids:
+        return set()
+    ultima = (select(Mensagem.lead_id, func.max(Mensagem.id).label("ultima"))
+              .where(Mensagem.lead_id.in_(ids), Mensagem.direcao == "saida", Mensagem.canal == "whatsapp")
+              .group_by(Mensagem.lead_id).subquery())
+    return set(db.execute(select(Mensagem.lead_id).join(ultima, Mensagem.id == ultima.c.ultima)
+                          .where(Mensagem.conexao.like("oficial:%"))).scalars())
+
+
 def _grupos_por_dia(itens: list[dict], hoje: date) -> list[dict]:
     """Um grupo por dia, do mais recente: Hoje, Ontem, o dia da semana (últimos 7 dias) e depois a data.
     Os itens já chegam em ordem (do mais recente para o mais antigo); cada um traz "quando"."""
@@ -254,6 +267,11 @@ def oportunidades(request: Request, ver: str = "novas", periodo: str = "tudo", t
         contexto["abre_lead"] = {i["o"].lead_id for i in mostrados
                                  if i["o"].lead is not None and autorizacao.pode(usuario, "leads.ver", i["o"].lead)}
     contexto["grupos"] = _grupos_por_dia(mostrados, hoje)
+    # "Ver conversa" abre a tela certa (pedido da Maria em 27/11/2026: "quando eu clico em ver conversa não aparece
+    # nada pra mim"): quem conversa pelo número oficial (API da Meta) tem a conversa na tela API Oficial, não nas
+    # Conversas (números QR)
+    contexto["conversa_oficial"] = _conversa_pelo_oficial(
+        db, {m.lead_id for m in mensagens_por_id.values()} if ver == "respostas" else {i["o"].lead_id for i in mostrados})
 
     atuais = {"ver": ver, "periodo": periodo, "temperatura": temperatura, "canal": canal, "classe": classe,
               "busca": busca}

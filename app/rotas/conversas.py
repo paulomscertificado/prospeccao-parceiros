@@ -46,8 +46,8 @@ from .. import autorizacao, config, conexoes, sdr, util
 from ..banco import agora, gravar_config, ler_config, obter_db
 from ..integracoes import whatsapp_leads
 from ..leads_servico import historico, pode_ver
-from ..modelos import (AnexoWhatsApp, ArquivoEnvio, ComandoWhatsApp, ContatoWhatsApp, MensagemWhatsApp, PonteWhatsApp,
-                       Usuario)
+from ..modelos import (AnexoWhatsApp, ArquivoEnvio, ComandoWhatsApp, ContatoWhatsApp, MensagemOficial, MensagemWhatsApp,
+                       PonteWhatsApp, Usuario)
 from ..seguranca import exige, registrar_log, verificar_csrf
 from ..web import tela
 
@@ -149,6 +149,17 @@ def _numero_da_conversa(db: Session, chave: str, numeros: list[str]) -> str:
     return db.execute(select(MensagemWhatsApp.conexao)
                       .where(MensagemWhatsApp.telefone == chave, MensagemWhatsApp.conexao.in_(numeros))
                       .order_by(MensagemWhatsApp.criado_em.desc(), MensagemWhatsApp.id.desc()).limit(1)).scalar() or ""
+
+
+def _conversou_pelo_oficial(db: Session, usuario: Usuario, chave: str) -> bool:
+    """O contato também tem conversa no número oficial (API da Meta) da marca, e a pessoa abre a tela API Oficial: a
+    conversa aberta avisa e leva para lá (27/11/2026; os avisos da Renovação da MS saem pelo número oficial)."""
+    from .. import whatsapp_oficial
+
+    if not chave or not autorizacao.pode(usuario, "oficial.ver"):
+        return False
+    return db.execute(select(MensagemOficial.id).where(
+        MensagemOficial.telefone == whatsapp_oficial.chave_da_conversa(chave)).limit(1)).first() is not None
 
 
 def _outros_numeros(db: Session, chave: str, numeros: list[str], aberto: str) -> list[str]:
@@ -408,6 +419,9 @@ def conversa(telefone: str, numero: str = "", marca: str = "", usuario: Usuario 
         if lead and pode_ver(usuario, lead) else None,
         # o mesmo contato também conversou por outro número da pessoa: a tela avisa e abre a de lá (24/11/2026)
         "outros_numeros": _outros_numeros(db, chave, numeros, numero),
+        # e pelo número oficial (API da Meta), cuja conversa fica na tela API Oficial (27/11/2026, pedido da Maria: o
+        # "Ver conversa" de um "Quero renovar" abria aqui, vazio)
+        "no_oficial": _conversou_pelo_oficial(db, usuario, chave),
         "situacao": _situacao(db, numero),
         "marca": atual,
     })
