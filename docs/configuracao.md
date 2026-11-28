@@ -24,7 +24,8 @@ telefones e e-mails não são enviados. O texto do programa de parceria usado pe
 ### WhatsApp conectado pelo WhatsApp Leads (recomendado neste computador)
 Se o sistema **WhatsApp Leads** (pasta vizinha `whatsapp-leads`) estiver aberto e com o WhatsApp
 conectado, a Prospecção usa esse número **sem configurar nada** (o token é lido de
-`whatsapp-leads/dados/token_integracao.txt`). O status aparece no rodapé do menu ("WhatsApp conectado").
+`whatsapp-leads/dados/token_integracao.txt`). O status aparece no pontinho colorido ao lado de "WhatsApp" (Configurações > Comunicação, ou o grupo Operação
+do menu para quem não vê as Configurações).
 - **Enviar pelo WhatsApp conectado** (Agenda e ficha do lead): a mensagem entra na fila do WhatsApp Leads e
   sai com as pausas, o horário e o limite diário configurados lá. Sempre **um clique por mensagem**.
 - **Respostas** dos parceiros chegam sozinhas em até 1 minuto → IA SDR classifica → oportunidade.

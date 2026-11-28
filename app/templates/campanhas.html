@@ -4,18 +4,18 @@
 {% block conteudo %}
 <style>
   .filtro-pilulas { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 0 0 14px; }
-  .pilula { padding: 6px 14px; border-radius: 999px; border: 1px solid var(--borda); background: #fff; color: var(--texto);
-            font-size: .82rem; font-weight: 500; }
+  .pilula { padding: 8px 16px; border-radius: 999px; border: 1px solid var(--borda); background: #fff; color: var(--texto);
+            font-size: .82rem; font-weight: 600; }
   .pilula:hover { text-decoration: none; border-color: #b9c7d6; }
   .pilula.ativa { background: var(--azul); border-color: var(--azul); color: #fff; }
   .lista-campanhas { display: grid; gap: 10px; }
   .camp { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center; background: #fff;
-          border: 1px solid var(--borda); border-radius: 14px; padding: 14px 18px; box-shadow: var(--sombra);
+          border: 1px solid var(--borda); border-radius: 16px; padding: 16px 20px; box-shadow: var(--sombra);
           position: relative; transition: border-color .15s, box-shadow .15s; }
-  .camp:hover { border-color: #c5d3e2; box-shadow: 0 4px 14px rgba(13, 59, 102, .08); }
+  .camp:hover { border-color: #c5ccd6; box-shadow: 0 4px 14px rgba(16, 24, 40, .08); }
   .camp::before { content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 3px; border-radius: 0 3px 3px 0;
                   background: var(--cor-status, #cbd5e1); }
-  .camp .titulo { font-weight: 700; font-size: 1rem; color: var(--azul); }
+  .camp .titulo { font-weight: 800; font-size: 1.05rem; letter-spacing: -.01em; color: var(--azul); }
   .camp .titulo:hover { text-decoration: none; color: var(--azul-escuro); }
   .camp .linha-info { display: flex; gap: 8px 14px; flex-wrap: wrap; align-items: center; margin-top: 5px; font-size: .82rem; color: #5f6b7a; }
   .camp .linha-info svg { width: 14px; height: 14px; vertical-align: -2px; margin-right: 3px; color: #8a96a6; }
@@ -25,15 +25,16 @@
   .camp .etapa.erro { color: var(--erro); }
   .camp .lado { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; min-width: 210px; }
   .progresso { width: 210px; }
-  .progresso .barra { height: 6px; border-radius: 999px; background: #eef2f6; overflow: hidden; }
+  .progresso .barra { height: 8px; border-radius: 999px; background: #eef2f6; overflow: hidden; }
   .progresso .barra span { display: block; height: 100%; background: var(--verde-marca); border-radius: 999px; }
   .progresso .numeros { display: flex; justify-content: space-between; gap: 8px; font-size: .72rem; color: #6b7686; margin-top: 4px;
                         font-family: var(--fonte-mono); letter-spacing: .04em; }
   .camp .acoes-camp { display: flex; gap: 4px; }
-  .botao-icone { border: 1px solid var(--borda); background: #fff; color: #6b7686; border-radius: 8px; padding: 4px 9px;
-                 cursor: pointer; font: inherit; font-size: .78rem; }
-  .botao-icone:hover { color: var(--azul); border-color: #b9c7d6; }
-  .botao-icone.perigo:hover { color: var(--erro); border-color: #f2c4bf; }
+  .botao-icone { border: 1px solid #cfd6df; background: #fff; color: var(--azul); border-radius: 10px; padding: 6px 12px;
+                 cursor: pointer; font: inherit; font-size: .78rem; font-weight: 600; }
+  .botao-icone:hover { border-color: var(--azul); }
+  .botao-icone.perigo { color: var(--erro); border-color: #f2c4bf; }
+  .botao-icone.perigo:hover { border-color: var(--erro); }
   .vazio-campanhas { text-align: center; padding: 40px 16px; background: #fff; border: 1px dashed #cdd8e4; border-radius: 14px; color: #6b7686; }
   .vazio-campanhas p { margin: 0 0 8px; }
   .vazio-campanhas .btn { margin-top: 6px; }

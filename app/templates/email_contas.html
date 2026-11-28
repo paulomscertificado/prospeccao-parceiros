@@ -4,11 +4,13 @@
 <style>
   .contas { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
   .conta { margin: 0; display: flex; flex-direction: column; gap: 10px; }
-  .conta .topo-conta { display: flex; align-items: center; gap: 12px; }
+  .conta .topo-conta { display: flex; align-items: flex-start; gap: 12px; }
   .conta .icone-conta { width: 42px; height: 42px; border-radius: 12px; background: var(--azul); color: #fff; display: grid; place-items: center; flex-shrink: 0; }
   .conta .icone-conta svg { width: 20px; height: 20px; }
-  .conta .titulo { flex: 1; min-width: 0; }
-  .conta .titulo b { display: block; overflow-wrap: anywhere; }
+  .conta .titulo { flex: 1; min-width: 0; overflow-wrap: anywhere; }  /* o endereço quebra em vez de ir para baixo do selo */
+  .conta .titulo b { display: block; }
+  .conta .titulo .endereco { display: block; }
+  .conta .titulo .selo { margin-top: 6px; }
   .compartilhar { border-top: 1px dashed var(--borda); padding-top: 10px; }
   .compartilhar summary { cursor: pointer; font-weight: 600; color: var(--azul); font-size: .85rem; }
   .lista-pessoas { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 2px 10px; margin: 8px 0; }
@@ -110,8 +112,9 @@
   <div class="cartao conta">
     <div class="topo-conta"><div class="icone-conta" style="{{ 'background:var(--verde)' if conta.principal }}">{{ icone }}</div>
       <div class="titulo"><b>{{ conta.nome }}</b>
-        <span class="pequeno suave">{{ conta.endereco or 'ainda não configurado' }} · {{ 'principal da plataforma' if conta.principal else 'de ' ~ (conta.dono or '—') }}{% if conta.dominio_livre %} · domínio próprio{% endif %}</span></div>
-      <span class="selo {{ 'selo-ok' if conta.ativa else 'selo-alerta' }}">{{ 'Ligada' if conta.ativa else ('Pausada' if not conta.principal else 'Não configurado') }}</span></div>
+        <span class="pequeno suave endereco">{{ conta.endereco or 'ainda não configurado' }} · {{ 'principal da plataforma' if conta.principal else 'de ' ~ (conta.dono or '—') }}{% if conta.dominio_livre %} · domínio próprio{% endif %}</span>
+        {# o selo embaixo do endereço (27/11/2026: ao lado, o endereço ficava cortado embaixo dele) #}
+        <span class="selo {{ 'selo-ok' if conta.ativa else 'selo-alerta' }}">{{ 'Ligada' if conta.ativa else ('Pausada' if not conta.principal else 'Não configurado') }}</span></div></div>
     <div class="pequeno suave">{% if conta.compartilhada_todos %}Liberada para toda a equipe{% elif conta.compartilhada_com %}Liberada para {{ conta.compartilhada_com|length }} pessoa(s){% else %}Não compartilhada{% endif %}
       {% if conta.le_respostas %} · a IA lê as respostas desta caixa{% endif %}{% if conta.id == por_onde_id %} · <b>os seus disparos saem por esta conta</b>{% elif conta.usar %} · você pode usar{% endif %}</div>
     {% if conta.ultimo_erro %}<div class="aviso aviso-erro" style="margin:0">{{ conta.ultimo_erro }}</div>{% endif %}

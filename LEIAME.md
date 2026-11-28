@@ -18,6 +18,20 @@ ENCONTRAR → QUALIFICAR → PERSONALIZAR → CONTATAR → ACOMPANHAR → CONVER
 2. **Deixe a janela preta aberta** enquanto usa o sistema. Para desligar, feche essa janela.
 3. No primeiro acesso, crie a conta de **administrador** (seu nome, e-mail e senha).
 
+### O menu (em cima da tela)
+- **Primeira barra:** o logo da marca, os grupos (**Visão geral, Prospecção, Operação, Relacionamento, Análise e
+  Configurações**) e, à direita, **Avisos (N)** e o seu nome. O grupo da tela aberta fica numa pílula branca. Clicar
+  num grupo abre a primeira tela dele. O **número vermelho** num grupo soma as novidades das telas dele (por exemplo,
+  "Operação 2" quando chegam 2 mensagens em Conversas). Ele aparece mesmo quando você está em outro grupo.
+- **Segunda barra:** as telas do grupo aberto, com um traço embaixo da tela atual. Ela não aparece quando o grupo tem
+  uma tela só (Visão geral e Configurações) nem em Minha conta e Avisos.
+- **O seu nome:** clique nele para abrir **Minha conta**, **Sair** e os botões de som e avisos na tela. O Admin Master
+  vê também o link **Painel master** ao lado de Avisos.
+- Cada marca vê o menu com as **cores, a fonte e o logo dela** (Configurações > Marca).
+- Em tela menor, o texto ao lado do logo, os ícones dos grupos e o seu nome somem para tudo caber numa linha.
+- **No celular e no tablet**, o botão **☰** abre todos os grupos e telas, um embaixo do outro. O número vermelho ao lado
+  do ☰ soma todas as novidades.
+
 Quer conhecer o sistema com dados de exemplo? Depois de criar o administrador, dê dois cliques em
 **`popular_demo.bat`**. Ele cria leads, parceiros e vendas **fictícios**. Para apagar tudo depois:
 Configurações > LGPD e dados > **Apagar dados de demonstração**.
@@ -89,7 +103,7 @@ no navegador, de qualquer lugar: não precisa do `iniciar.bat`. O passo a passo 
   - com os avisos na tela ligados, aparece um **aviso no canto da tela do computador** quando o sistema está em outra
     aba ou minimizado. Clicar no aviso abre a conversa ou a oportunidade.
 
-  No rodapé do menu ficam dois botões: **🔊 Som ligado** (clique para desligar ou ligar de novo; ao ligar, ele toca o
+  No menu que abre ao clicar no seu nome (canto de cima, à direita) ficam dois botões: **🔊 Som ligado** (clique para desligar ou ligar de novo; ao ligar, ele toca o
   som) e **🔔 Ativar avisos na tela** (clique e escolha **Permitir** na pergunta do navegador). Se aparecer "Avisos
   bloqueados no navegador", libere no cadeado ao lado do endereço do site > Notificações > Permitir. O navegador só
   deixa tocar som depois de um clique na página. A conversa que está aberta na tela não avisa, como no WhatsApp.
@@ -362,7 +376,7 @@ ver os de hoje e os atrasados. Admin e gestor podem ver a fila de outra pessoa o
 
 **Oportunidades (menu 🔥):** os leads que responderam. O número vermelho ao lado de **Oportunidades** no menu é
 quantas oportunidades **novas** esperam atendimento na sua marca (as mesmas da aba **Novas**); os avisos do sininho
-ficam em **Avisos (N)**, no rodapé do menu. **A equipe toda vê todas as respostas**: ninguém precisa
+ficam em **Avisos (N)**, no canto de cima, à direita. **A equipe toda vê todas as respostas**: ninguém precisa
 "assumir" o lead, quem estiver livre atende o cliente na hora. Quando chega uma resposta nova, **todos da equipe
 recebem o aviso no sininho** (o aviso por e-mail continua indo só para o responsável pelo lead). Quando alguém atende
 ou descarta, o aviso some do sininho de todos. São 4 abas:
@@ -419,7 +433,8 @@ desconectado, as mensagens esperam e o sistema avisa).
 
 **WhatsApp:** deixe o **WhatsApp Leads** aberto e conectado. Na Agenda e na ficha do lead aparece o botão
 **Enviar pelo WhatsApp conectado** (sai pelo seu número, com as pausas e o limite do WhatsApp Leads), e as
-respostas dos parceiros chegam sozinhas na IA SDR. O rodapé do menu mostra se o WhatsApp está conectado.
+respostas dos parceiros chegam sozinhas na IA SDR. O pontinho colorido ao lado de **WhatsApp** (em Configurações >
+Comunicação, ou no grupo Operação do menu para quem não vê as Configurações) mostra se o WhatsApp está conectado.
 
 Configure as categorias em Configurações > **Categorias de parceiros** e o que a IA pode responder em
 **Base de conhecimento**. Detalhes técnicos: [`docs/ia-sdr.md`](docs/ia-sdr.md).
@@ -970,8 +985,8 @@ dela mudam de dia. O logo vai no menu colorido: de preferência a
 versão branca, em PNG com fundo transparente, até 300 KB. Se o logo veio num fundo branco ou cinza (JPG) e aparece
 como um retângulo no menu, marque **"Tirar o fundo liso do logo"** e salve (com o arquivo novo ou, sem arquivo, para o
 logo de agora): o fundo some e o logo fica direto na cor do menu. Logo escuro ou colorido pode sumir no menu sem o fundo:
-confira em "Como fica" e, se não gostar, envie o arquivo de novo sem marcar. Logo comprido (como o do Grupo Certy) fica
-sozinho no alto do menu, na largura dele. Botões e títulos usam a cor principal um pouco mais escura
+confira em "Como fica" (o menu de cima em miniatura) e, se não gostar, envie o arquivo de novo sem marcar. Logo comprido
+(como o do Grupo Certy) fica um pouco mais baixo no menu de cima, para caber. Botões e títulos usam a cor principal um pouco mais escura
 quando a original não dá leitura com letra branca. Depois de salvar, as outras pessoas veem a mudança em até 5 minutos.
 O admin master muda o **nome neutro da plataforma** (tela de entrada) em Configurações > Marca, fora das marcas.
 O e-mail de cada pessoa precisa ser do **domínio da marca** dela (Configurações > Marca); o e-mail principal, as
@@ -1054,8 +1069,8 @@ saem pelo WhatsApp ou pelo e-mail de outra pessoa: o **e-mail** sai só pelo do 
 **WhatsApp**, pelo número dela ou por um que outra pessoa **compartilhou** com ela. Ser administrador não muda isso.
 Sem e-mail ou número, os disparos dela esperam e ela recebe um aviso para cadastrar.
 
-**Cada pessoa com o seu WhatsApp:** em **WhatsApp > Meu WhatsApp** (Configurações > Comunicação, ou o menu lateral para
-quem não vê as Configurações), cada um conecta o próprio número pelo
+**Cada pessoa com o seu WhatsApp:** em **WhatsApp > Meu WhatsApp** (Configurações > Comunicação, ou o grupo Operação do menu
+para quem não vê as Configurações), cada um conecta o próprio número pelo
 QR code. A IA SDR manda os WhatsApps dos leads de cada pessoa pelo número dela (ou por um compartilhado com ela);
 sem número, as mensagens esperam e a pessoa recebe um aviso para conectar. Em **Conversas**, cada um vê só as conversas do
 próprio número e dos números compartilhados com ele. O número oficial da API da Meta aparece na mesma tela, no quadro
@@ -1065,8 +1080,8 @@ pessoas. O dono do número, o administrador e o gestor escolhem com quem compart
 conectam, pausam ou desligam. Quem não é o dono não pode se incluir, não pode liberar para toda a equipe e não mexe no
 número (ou no e-mail) de um administrador: isso só o dono ou o admin master.
 
-**Cada pessoa com o seu e-mail:** em **Contas de e-mail** (Configurações > Comunicação, ou o item **E-mail** do menu
-lateral para quem não vê as Configurações), cada um pode cadastrar o próprio e-mail @mscertificados.com.br
+**Cada pessoa com o seu e-mail:** em **Contas de e-mail** (Configurações > Comunicação, ou o item **E-mail** do grupo
+Operação do menu para quem não vê as Configurações), cada um pode cadastrar o próprio e-mail @mscertificados.com.br
 (com a senha de app do Google, 16 letras) e clicar em **Enviar e-mail de teste**. Os e-mails das campanhas dos leads
 de cada pessoa saem pelo e-mail dela, e as respostas chegam na caixa dela (a IA SDR lê todas as caixas marcadas).
 Sem e-mail próprio cadastrado, os e-mails dos leads dela saem por um **e-mail que compartilharam com ela** (o dono

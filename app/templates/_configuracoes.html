@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {# Moldura de todas as telas de Configurações: menu das seções à esquerda (no celular, uma faixa que rola) e o
    conteúdo à direita. Cada rota passa `secao` (qual item fica marcado). As telas de Permissões, Categorias e Base de
-   conhecimento também usam esta moldura: no menu lateral do sistema fica só "Configurações". #}
+   conhecimento também usam esta moldura: no menu de cima do sistema fica só "Configurações". #}
 {% block conteudo %}
 {% set pode_permissoes = pode('permissoes.gerenciar') %}
 {% set grupos_config = [

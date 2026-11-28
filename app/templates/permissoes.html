@@ -101,8 +101,7 @@
 {% endif %}
 
 {% elif aba == 'equipes' %}
-<div class="cartao" style="max-width:720px">
-  <h2>Equipes</h2>
+<div class="cartao" style="max-width:720px">{# o título "Equipes" já está no quadro de cima (27/11/2026: aparecia duas vezes) #}
   <p class="pequeno suave">Opcional. Servem para o alcance "Só a equipe" (ex.: um gestor de unidade que vê só os leads do time dele). Quem faz parte de cada equipe se escolhe em Configurações &gt; Usuários.</p>
   <table>
     <tr><th>Equipe</th><th class="num">Pessoas</th><th></th></tr>
@@ -122,7 +121,6 @@
 {% elif aba == 'modulos' %}
 <form class="cartao" method="post" action="/permissoes/modulos" style="max-width:720px">
   <input type="hidden" name="csrf" value="{{ csrf }}">
-  <h2>Módulos</h2>
   <p class="pequeno suave">Módulo desligado some do menu e fica bloqueado para todos, até para quem tem a permissão. O que já está rodando sozinho (ex.: uma campanha aprovada) continua: para parar, pause a campanha.</p>
   {% for codigo, (nome, chave) in modulos_info.items() %}
   <label class="marcar"><input type="checkbox" name="m__{{ codigo }}" {{ 'checked' if modulos[codigo] }}> {{ nome }}</label>

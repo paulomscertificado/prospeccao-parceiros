@@ -1,7 +1,8 @@
 // Avisos como no WhatsApp (pedido da Maria em 23/11/2026: "replique o funcionamento de notificações do WhatsApp para o
 // sistema, além de que adicione esse som para quando alguém responder em alguma conversa ou algum disparo de alguma
 // campanha"). Em qualquer tela do sistema:
-// - os números vermelhos do menu (Conversas, API Oficial, Oportunidades) e os Avisos do rodapé mudam sozinhos;
+// - os números vermelhos do menu (Conversas, API Oficial, Oportunidades, a soma de cada grupo do menu de cima e a do ☰
+//   no celular) e os Avisos mudam sozinhos;
 // - o título da aba ganha o número de novidades, como "(3) Leads";
 // - chegou mensagem ou resposta de campanha: toca o som (static/sons/notificacao.wav) e, com a permissão do
 //   navegador, aparece o aviso no canto da tela do computador (clicar abre a conversa ou a oportunidade).
@@ -44,10 +45,23 @@
     el.hidden = !valor;
   }
 
+  // O número de cada grupo do menu de cima (e o do ☰ no celular) é a soma dos números das telas dele (data-soma)
+  function somarGrupos() {
+    document.querySelectorAll('[data-soma]').forEach(el => {
+      const soma = el.dataset.soma.split(' ').reduce((total, id) => {
+        const c = document.getElementById(id);
+        return total + (c && !c.hidden ? Number(c.textContent) || 0 : 0);
+      }, 0);
+      el.textContent = soma;
+      el.hidden = !soma;
+    });
+  }
+
   function mostrarContadores(c) {
     contador('contador-conversas', c.conversas);
     contador('contador-oficial', c.oficial);
     contador('contador-oportunidades', c.oportunidades);
+    somarGrupos();
     const avisos = document.getElementById('link-avisos');
     if (avisos && typeof c.avisos === 'number') avisos.textContent = 'Avisos' + (c.avisos ? ' (' + c.avisos + ')' : '');
     const total = ['conversas', 'oficial', 'oportunidades'].reduce((soma, k) => soma + (c[k] || 0), 0);

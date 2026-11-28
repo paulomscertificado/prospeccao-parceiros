@@ -46,7 +46,7 @@ prospeccao-parceiros/
 │   │   ├── sdr.py         oportunidades, assumir lead, agenda, campanhas, inteligência, categorias, conhecimento
 │   │   ├── portal.py      portal do parceiro
 │   │   └── api.py         saúde e webhook do WhatsApp
-│   ├── templates/         telas HTML (base.html = menu lateral; _marca_menu.html = logo/nome no alto do menu)
+│   ├── templates/         telas HTML (base.html + _menu_cima.html = menu na barra de cima; _marca_menu.html = logo/nome no menu)
 │   └── static/            estilo.css (design system) e app.js (copiar mensagem, avisos)
 ├── testes/                testes automáticos (pytest)
 ├── iniciar.py / *.bat     abrir, instalar, testar, redefinir senha, demonstração, importar Receita

@@ -212,14 +212,16 @@ def test_tirar_o_fundo_liso_do_logo():
     assert marca.proporcao_do_logo(b"nao e imagem") is None
 
 
-def test_logo_largo_fica_sozinho_no_alto_do_menu_e_o_fundo_sai_pela_tela(certy):
+def test_logo_largo_fica_mais_baixo_no_menu_de_cima_e_o_fundo_sai_pela_tela(certy):
     c = _entrar(certy["email"])
     csrf = csrf_de(c.get("/configuracoes?aba=marca").text)
     jpg = _imagem(300, 61, (247, 247, 247), (255, 255, 255), (10, 8, 290, 52), "JPEG")
     try:
         c.post("/configuracoes/marca", data={"csrf": csrf}, files={"logo": ("logo.jpg", jpg, "image/jpeg")})
         pagina = c.get("/").text
-        assert 'class="marca marca-larga"' in pagina and "Parceiros · Prospecção B2B" in pagina
+        # no menu de cima (27/11/2026) o logo largo fica ao lado do traço e do rótulo, como os outros, só mais baixo
+        assert 'class="menu menu-cima logo-largo' in pagina and 'class="marca marca-larga"' in pagina
+        assert 'class="divisor"' in pagina and "Parceiros<br>Prospecção B2B" in pagina
         assert 'rel="icon"' not in pagina  # largo vira um risquinho na aba do navegador
         assert c.get(_endereco_do_logo(pagina)).headers["content-type"] == "image/jpeg"  # sem marcar: como veio
         # sem arquivo novo, "Tirar o fundo liso do logo" trata o logo de agora

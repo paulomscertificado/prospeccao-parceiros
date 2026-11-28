@@ -78,7 +78,33 @@
   });
   setTimeout(() => document.querySelectorAll('.avisos-da-acao .aviso-ok').forEach((el) => el.remove()), 15000);
 
-  // Menu no celular.
+  // A altura do que fica preso no alto da tela (o menu de cima; no celular, a barra do ☰), em --altura-topo: os avisos
+  // presos, o menu das Configurações e os links para um quadro da página (#...) ficam logo abaixo dele (estilo.css).
+  function medirOTopo() {
+    const celular = document.querySelector('.topo-celular');
+    const barra = document.querySelector('nav.menu');
+    let altura = 0;
+    if (celular && getComputedStyle(celular).display !== 'none') altura = celular.offsetHeight;
+    else if (barra && getComputedStyle(barra).position === 'sticky') altura = barra.offsetHeight;
+    document.documentElement.style.setProperty('--altura-topo', altura + 'px');
+  }
+  medirOTopo();
+  window.addEventListener('resize', medirOTopo);
+
+  // Menu no celular: o ☰ abre e fecha a gaveta; clicar fora dela fecha.
   const botaoMenu = document.getElementById('abrir-menu');
-  if (botaoMenu) botaoMenu.addEventListener('click', () => document.querySelector('.menu').classList.toggle('aberto'));
+  const menu = document.querySelector('nav.menu');
+  if (botaoMenu && menu) {
+    botaoMenu.addEventListener('click', (ev) => { ev.stopPropagation(); menu.classList.toggle('aberto'); });
+    document.addEventListener('click', (ev) => {
+      if (menu.classList.contains('aberto') && !menu.contains(ev.target)) menu.classList.remove('aberto');
+    });
+  }
+
+  // Menu da pessoa no canto de cima (Minha conta, Sair, som e avisos): fecha ao clicar fora dele ou com Esc.
+  const pessoa = document.querySelector('.cima-pessoa');
+  if (pessoa) {
+    document.addEventListener('click', (ev) => { if (pessoa.open && !pessoa.contains(ev.target)) pessoa.open = false; });
+    document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && pessoa.open) pessoa.open = false; });
+  }
 })();

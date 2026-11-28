@@ -3,7 +3,7 @@
 {% block conteudo %}
 <style>
   /* Mesmo visual da tela Conversas: lista à esquerda, conversa à direita */
-  .chat { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); height: calc(100vh - 170px); min-height: 480px;
+  .chat { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); height: calc(100vh - 170px - var(--altura-topo, 0px)); min-height: 480px;
           background: #fff; border: 1px solid var(--borda); border-radius: 14px; overflow: hidden; box-shadow: var(--sombra); }
   .chat-lista { display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--borda); min-height: 0; background: #fbfcfe; }
   .chat-lista .topo { padding: 14px; border-bottom: 1px solid var(--borda); }

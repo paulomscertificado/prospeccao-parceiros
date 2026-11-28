@@ -34,34 +34,17 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
   {% if marca.fonte_url %}<link rel="stylesheet" href="{{ marca.fonte_url }}">{% endif %}
-  <link rel="stylesheet" href="/static/estilo.css?v=18">
+  <link rel="stylesheet" href="/static/estilo.css?v=19">
   {# white label, Fase 5: cores e fonte da marca da AR (app/marca.py, tema; só #RRGGBB e fontes da lista) #}
   {% if marca.css %}<style>:root { {{ marca.css|safe }} }</style>{% endif %}
   {% if marca.logo_url and not marca.logo_largo %}<link rel="icon" href="{{ marca.logo_url }}">{% endif %}{# largo vira um risquinho na aba #}
 </head>
 <body>
 {% if usuario %}
-<div class="topo-celular"><button id="abrir-menu" aria-label="Abrir menu">☰</button>{% if marca.logo_url %}<img src="{{ marca.logo_url }}" alt="{{ marca.nome }}">{% else %}<b>{{ marca.titulo if marca.plataforma else marca.curto }}</b>{% endif %}<b>Parceiros</b></div>
+{# celular: o ☰ abre o menu (static/app.js); o número vermelho é a soma das novidades, como nos grupos de cima #}
+<div class="topo-celular"><button id="abrir-menu" aria-label="Abrir menu">☰{% set soma_celular = menu_grupos|sum(attribute='soma') %}{% set ids_celular = [] %}{% for g in menu_grupos %}{% set _ = ids_celular.extend(g.contadores) %}{% endfor %}{% if ids_celular %}<span class="contador" data-soma="{{ ids_celular|join(' ') }}"{% if not soma_celular %} hidden{% endif %}>{{ soma_celular }}</span>{% endif %}</button>{% if marca.logo_url %}<img src="{{ marca.logo_url }}" alt="{{ marca.nome }}">{% else %}<b>{{ marca.titulo if marca.plataforma else marca.curto }}</b>{% endif %}<b>Parceiros</b></div>
 <div class="estrutura">
-  <nav class="menu">
-    {% with m = marca %}{% include "_marca_menu.html" %}{% endwith %}
-    {% for link, nome, icone in menu %}
-      <a class="item {{ 'ativo' if (caminho == link or (link not in ['/', '/portal'] and caminho.startswith(link))
-            or (link == '/configuracoes' and caminho.startswith(('/permissoes', '/categorias', '/conhecimento', '/whatsapp', '/email')))) }}" href="{{ link }}">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ ICONES[icone] }}"/></svg>{{ nome }}{% if link == '/oportunidades' %}<span class="contador" id="contador-oportunidades" title="Oportunidades novas esperando atendimento"{% if not oportunidades_novas %} hidden{% endif %}>{{ oportunidades_novas }}</span>{% endif %}{% if link == '/oficial' %}<span class="contador" id="contador-oficial" title="Mensagens novas no número oficial"{% if not oficial_nao_lidas %} hidden{% endif %}>{{ oficial_nao_lidas }}</span>{% endif %}{% if link == '/conversas' %}<span class="contador" id="contador-conversas" title="Mensagens novas nas conversas"{% if not conversas_nao_lidas %} hidden{% endif %}>{{ conversas_nao_lidas }}</span>{% endif %}{% if link == '/whatsapp' %}<span class="ponto {{ 'verde' if wl.conectado else ('amarelo' if wl.disponivel else 'vermelho') }}" style="margin-left:auto" title="WhatsApp {{ 'conectado' if wl.conectado else ('aguardando QR code' if wl.estado_codigo == 'aguardando_qr' else ('desconectado' if wl.disponivel else 'desligado')) }}"></span>{% endif %}</a>
-    {% endfor %}
-    <div class="rodape">
-      <div><b>{{ usuario.nome }}</b></div>
-      <div class="suave" style="color:var(--menu-suave)">{{ usuario.perfil_nome }}</div>
-      {% if usuario.master %}<div style="margin-top:6px"><a href="/master">Painel master</a></div>{% endif %}
-      <div style="margin-top:6px"><a href="/notificacoes" id="link-avisos">Avisos{{ ' (' ~ avisos_novos ~ ')' if avisos_novos }}</a> · <a href="/minha-conta">Minha conta</a> · <a href="/sair">Sair</a></div>
-      {% if usuario.perfil != 'parceiro' %}{# avisos como no WhatsApp: som e aviso na tela do computador (static/notificacoes.js) #}
-      <div class="notif-config" id="notif-config" hidden>
-        <button type="button" id="notif-som" title="Toca um som quando chega mensagem ou resposta de campanha">Som ligado</button>
-        <button type="button" id="notif-tela" title="Mostra um aviso no canto da tela do computador, mesmo com o sistema em outra aba">Ativar avisos na tela</button>
-      </div>{% endif %}
-    </div>
-  </nav>
+  {% include "_menu_cima.html" %}
   <main class="conteudo">
     {% if ar_entrada_nome %}<form method="post" action="/master/sair" class="aviso aviso-alerta" style="display:flex;gap:12px;align-items:center">
       <input type="hidden" name="csrf" value="{{ csrf }}"><span>Você está dentro da <b>{{ ar_entrada_nome }}</b>: vê e mexe só no que é dela{% if ar_entrada_ate %} (até as {{ hora_de(ar_entrada_ate) }}){% endif %}.</span>
@@ -73,8 +56,8 @@
 {% else %}
   {% block publico %}{% endblock %}
 {% endif %}
-<script src="/static/app.js?v=2"></script>
-{% if usuario and usuario.perfil != 'parceiro' %}<script src="/static/notificacoes.js?v=1"></script>{% endif %}
+<script src="/static/app.js?v=3"></script>
+{% if usuario and usuario.perfil != 'parceiro' %}<script src="/static/notificacoes.js?v=2"></script>{% endif %}
 {% block scripts %}{% endblock %}
 </body>
 </html>

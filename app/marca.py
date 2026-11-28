@@ -102,15 +102,25 @@ def _legivel(rgb) -> tuple:
     return rgb
 
 
+def _contraste(a, b) -> float:
+    claro, escuro = sorted((_luz(a), _luz(b)), reverse=True)
+    return (claro + 0.05) / (escuro + 0.05)
+
+
+BARRA_DE_BAIXO_PADRAO = (10, 47, 87)  # --azul-escuro do estilo.css: a segunda barra do menu de cima sem cor da marca
+
+
 def tema(cor: str = "", detalhe: str = "", fundo: str = "", fonte: str = "") -> str:
     """Variáveis do estilo.css que trocam as cores e a fonte do sistema pelas da marca (vazio = as do sistema).
     Botões e textos usam a cor escurecida até o branco ficar legível; os detalhes usam a cor original."""
     v = {}
+    barra_de_baixo = BARRA_DE_BAIXO_PADRAO
     if COR.match(cor or ""):
         original = _rgb(cor)
         base = _legivel(original)
+        barra_de_baixo = _misturar(base, (0, 0, 0), 0.22)
         v["--azul"] = _hex(base)
-        v["--azul-escuro"] = _hex(_misturar(base, (0, 0, 0), 0.22))
+        v["--azul-escuro"] = _hex(barra_de_baixo)
         v["--azul-medio"] = _hex(_misturar(base, (255, 255, 255), 0.08))
         v["--azul-claro"] = _hex(_misturar(original, (255, 255, 255), 0.88))
         v["--roxo"], v["--roxo-escuro"], v["--roxo-claro"] = v["--azul-medio"], v["--azul-escuro"], v["--azul-claro"]
@@ -119,6 +129,7 @@ def tema(cor: str = "", detalhe: str = "", fundo: str = "", fonte: str = "") -> 
         v["--menu-suave"] = "rgba(255,255,255,.78)"
         v["--menu-rotulo"] = "rgba(255,255,255,.75)"
         v["--menu-ativo"] = "rgba(255,255,255,.16)"
+        v["--menu-sub"] = "rgba(255,255,255,.8)"
         v["--texto-sobre-azul"] = "rgba(255,255,255,.82)"
         v["--destaque-rotulo"] = "rgba(255,255,255,.88)"
     detalhe = detalhe if COR.match(detalhe or "") else (cor if COR.match(cor or "") else "")
@@ -129,6 +140,12 @@ def tema(cor: str = "", detalhe: str = "", fundo: str = "", fonte: str = "") -> 
         v["--cta"] = _hex(acao)
         v["--cta-escuro"] = _hex(_misturar(acao, (0, 0, 0), 0.12))
         v["--cta-claro"] = _hex(_misturar(d, (255, 255, 255), 0.88))
+        # menu de cima (27/11/2026): o traço da tela aberta é o detalhe, ou branco quando ele quase some na barra; a
+        # inicial da pessoa vai em cima do detalhe, escura ou branca (o que der mais leitura)
+        v["--menu-destaque"] = _hex(d) if _contraste(d, barra_de_baixo) >= 3 else "#ffffff"
+        escura = _misturar(d, (0, 0, 0), 0.78)
+        v["--sobre-destaque"] = (_hex(escura) if _contraste(escura, d) >= _contraste((255, 255, 255), d)
+                                 else "#ffffff")
     if COR.match(fundo or ""):
         v["--fundo"] = fundo.lower()
     if fonte in FONTES and fonte != "Inter":

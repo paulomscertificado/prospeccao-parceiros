@@ -124,9 +124,9 @@
 </form>
 <div>
   <div class="cartao"><h2>Como fica</h2>
-    <div class="menu" style="position:static;height:auto;width:100%;border-radius:12px;padding:16px 12px">
-      {% include "_marca_menu.html" %}
-      <a class="item ativo" href="#" onclick="return false">Dashboard</a><a class="item" href="#" onclick="return false">Leads</a></div>
+    <div class="previa-cima" aria-hidden="true">{# o menu de cima em miniatura (estilo.css, .previa-cima) #}
+      <div class="previa-linha">{% include "_marca_menu.html" %}<span class="previa-grupo">Prospecção</span></div>
+      <div class="previa-sub"><span class="previa-item ativo">Leads</span><span class="previa-item">Cadências</span></div></div>
     <p style="margin-top:12px"><span class="etiqueta">{{ m.curto }}</span></p>
     <p><button type="button" class="btn btn-primario">Botão principal</button> <button type="button" class="btn btn-verde">Aprovar</button></p>
     <p class="suave pequeno">A tela inteira já está com a marca salva. Depois de salvar, as outras pessoas veem a

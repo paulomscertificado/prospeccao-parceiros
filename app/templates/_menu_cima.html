@@ -1,0 +1,58 @@
+{# Menu na barra de cima (novo visual, 27/11/2026, pedido da Maria: "altere a visualização do sistema para como está
+   mostrando as imagens"). O mesmo para todas as marcas: cores, logo, nome e fonte vêm da marca da AR (app/marca.py,
+   tema). Os grupos e as telas de cada um vêm de web.menu_em_grupos (os mesmos itens, permissões e módulos de antes):
+   - em cima: o logo, os grupos (clicar abre a primeira tela do grupo), com o número vermelho das novidades das telas
+     de cada grupo, e à direita o Painel master (só o Admin Master), os Avisos e a pessoa (Minha conta, Sair, som e
+     avisos na tela);
+   - embaixo: as telas do grupo da tela aberta, com o traço na tela atual. Grupo de uma tela só (Visão geral,
+     Configurações) e telas fora dos grupos (Minha conta, Avisos, Painel master) ficam sem a segunda barra;
+   - os números vermelhos têm os ids de antes (o static/notificacoes.js os atualiza sem recarregar, e também a soma
+     de cada grupo, data-soma);
+   - no celular, o botão ☰ (static/app.js abre e fecha o .menu) mostra todos os grupos e telas empilhados. #}
+{%- macro contador(link) -%}
+  {%- if link == '/oportunidades' %}<span class="contador" id="contador-oportunidades" title="Oportunidades novas esperando atendimento"{% if not oportunidades_novas %} hidden{% endif %}>{{ oportunidades_novas }}</span>{% endif -%}
+  {%- if link == '/oficial' %}<span class="contador" id="contador-oficial" title="Mensagens novas no número oficial"{% if not oficial_nao_lidas %} hidden{% endif %}>{{ oficial_nao_lidas }}</span>{% endif -%}
+  {%- if link == '/conversas' %}<span class="contador" id="contador-conversas" title="Mensagens novas nas conversas"{% if not conversas_nao_lidas %} hidden{% endif %}>{{ conversas_nao_lidas }}</span>{% endif -%}
+  {%- if link == '/whatsapp' %}<span class="ponto {{ 'verde' if wl.conectado else ('amarelo' if wl.disponivel else 'vermelho') }}" title="WhatsApp {{ 'conectado' if wl.conectado else ('aguardando QR code' if wl.estado_codigo == 'aguardando_qr' else ('desconectado' if wl.disponivel else 'desligado')) }}"></span>{% endif -%}
+{%- endmacro -%}
+{%- set com_segunda_barra = menu_grupos|selectattr('segunda_barra')|list -%}
+<nav class="menu menu-cima{{ ' logo-largo' if marca.logo_largo }}{{ ' plataforma' if marca.plataforma }}{{ ' com-master' if usuario.master }}" aria-label="Menu principal">
+  <div class="cima-linha">
+    <a class="cima-marca" href="{{ '/portal' if usuario.perfil == 'parceiro' else '/' }}" aria-label="Início">{% with m = marca %}{% include "_marca_menu.html" %}{% endwith %}</a>
+    <div class="cima-grupos">
+      {%- for g in menu_grupos %}
+      <a class="cima-grupo{{ ' ativo' if g.aberto }}" href="{{ g.link }}"{% if g.aberto %} aria-current="true"{% endif %}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ ICONES[g.icone] }}"/></svg>{{ g.titulo }}
+        {%- if g.contadores %}<span class="contador" data-soma="{{ g.contadores|join(' ') }}" title="Novidades em {{ g.titulo }}"{% if not g.soma %} hidden{% endif %}>{{ g.soma }}</span>{% endif %}</a>
+      {%- endfor %}
+    </div>
+    <div class="cima-direita">
+      {% if usuario.master %}<a class="cima-link cima-link-master" href="/master">Painel master</a>{% endif %}
+      <a class="cima-link" href="/notificacoes" id="link-avisos">Avisos{{ ' (' ~ avisos_novos ~ ')' if avisos_novos }}</a>
+      <details class="cima-pessoa">
+        <summary title="Minha conta e sair"><span class="cima-avatar" aria-hidden="true">{{ (usuario.nome or '?')[:1]|upper }}</span><span class="cima-nome"><b>{{ usuario.nome }}</b><small>{{ usuario.perfil_nome }}</small></span></summary>
+        <div class="cima-caixa">
+          {% if usuario.master %}<a class="cima-so-estreita" href="/master">Painel master</a>{% endif %}{# só quando o link de cima some (estilo.css) #}
+          <a href="/minha-conta">Minha conta</a>
+          <a href="/sair">Sair</a>
+          {% if usuario.perfil != 'parceiro' %}{# avisos como no WhatsApp: som e aviso na tela do computador (static/notificacoes.js) #}
+          <div class="notif-config" id="notif-config" hidden>
+            <button type="button" id="notif-som" title="Toca um som quando chega mensagem ou resposta de campanha">Som ligado</button>
+            <button type="button" id="notif-tela" title="Mostra um aviso no canto da tela do computador, mesmo com o sistema em outra aba">Ativar avisos na tela</button>
+          </div>{% endif %}
+        </div>
+      </details>
+    </div>
+  </div>
+  <div class="cima-sub{{ ' com-telas' if com_segunda_barra }}">
+    {%- for g in menu_grupos %}
+    <div class="cima-telas{{ ' aberto' if g.segunda_barra }}">
+      <span class="cima-telas-titulo">{{ g.titulo }}</span>
+      {%- for link, nome, icone in g.itens %}
+      <a class="item{{ ' ativo' if link == menu_marcado }}" href="{{ link }}"{% if link == menu_marcado %} aria-current="page"{% endif %}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ ICONES[icone] }}"/></svg>{{ nome }}{{ contador(link) }}</a>
+      {%- endfor %}
+    </div>
+    {%- endfor %}
+  </div>
+</nav>

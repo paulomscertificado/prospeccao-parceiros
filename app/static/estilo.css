@@ -36,6 +36,9 @@
   --menu-ativo: rgba(60, 199, 122, .12);
   --texto-sobre-azul: #c9d9ea;
   --destaque-rotulo: #3cc77a;  /* rótulo do indicador em destaque */
+  --menu-sub: #b9cbdd;         /* telas da segunda barra do menu de cima */
+  --menu-destaque: #3cc77a;    /* traço da tela aberta no menu de cima (o detalhe da marca, ou branco se não aparece) */
+  --sobre-destaque: #06301b;   /* letra em cima da cor dos detalhes (a inicial da pessoa no menu de cima) */
 }
 
 * { box-sizing: border-box; }
@@ -55,31 +58,92 @@ p { margin: 0 0 10px; }
 .oculto { display: none !important; }
 hr { border: 0; border-top: 1px solid var(--borda); margin: 16px 0; }
 
-/* ---------- Estrutura ---------- */
-.estrutura { display: flex; min-height: 100vh; }
-.menu { width: 232px; flex-shrink: 0; background: var(--azul-escuro); color: var(--menu-texto); display: flex; flex-direction: column;
-        padding: 16px 12px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
-.marca { display: flex; align-items: center; gap: 10px; padding: 4px 8px 18px; color: #fff; }
-.marca .logo { width: 34px; height: 34px; border-radius: 8px; background: #fff; color: var(--azul); font-weight: 800;
-               display: grid; place-items: center; font-size: .95rem; }
-.marca b { display: block; font-size: .95rem; }
-.marca small { display: block; font-size: .72rem; opacity: .7; }
-.menu a.item { color: inherit; padding: 8px 10px; border-radius: 8px; display: flex; align-items: center; gap: 10px;
-               margin-bottom: 1px; font-size: .9rem; }
-.menu a.item svg { width: 18px; height: 18px; opacity: .85; flex-shrink: 0; }
-.menu a.item:hover { background: rgba(255, 255, 255, .08); text-decoration: none; }
-.menu a.item.ativo { background: rgba(255, 255, 255, .14); color: #fff; font-weight: 600; }
-.menu .rodape { margin-top: auto; padding: 12px 8px 0; font-size: .82rem; border-top: 1px solid rgba(255,255,255,.1); }
-.menu .rodape a { color: #fff; }
-/* Som e aviso na tela do computador (static/notificacoes.js, 23/11/2026) */
-.notif-config { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-top: 8px; }
-.notif-config button { font: inherit; font-size: .76rem; color: #fff; background: rgba(255, 255, 255, .08);
-  border: 1px solid rgba(255, 255, 255, .16); border-radius: 999px; padding: 3px 10px; cursor: pointer; }
-.notif-config button:hover:not([disabled]) { background: rgba(255, 255, 255, .16); }
+/* ---------- Estrutura: menu na barra de cima (templates/_menu_cima.html; novo visual de 27/11/2026) ----------
+   Em cima: logo, grupos e a pessoa. Embaixo: as telas do grupo aberto, com o traço na tela atual. As cores são as
+   variáveis da marca de cada AR (app/marca.py, tema): --azul na barra de cima, --azul-escuro na de baixo,
+   --menu-destaque no traço e --verde-marca na inicial da pessoa. Nenhuma cor de marca fica escrita aqui. */
+.estrutura { min-height: 100vh; }
+.menu { position: sticky; top: 0; z-index: 45; color: var(--menu-texto);
+  background:
+    radial-gradient(circle at 96% -140%, transparent 0 230px, rgba(255, 255, 255, .07) 231px 232px, transparent 233px),
+    radial-gradient(circle at 96% -140%, transparent 0 310px, rgba(255, 255, 255, .05) 311px 312px, transparent 313px),
+    var(--azul); }
+.cima-linha { display: flex; align-items: center; gap: 8px 22px; min-height: 64px; padding: 8px 28px; }
+.cima-marca { flex-shrink: 0; color: #fff; }
+.cima-marca:hover { text-decoration: none; }
+.cima-grupos { display: flex; flex-wrap: wrap; gap: 4px; flex: 1 1 auto; min-width: 0; }
+.cima-grupo { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px; border-radius: 10px;
+  color: var(--menu-texto); font-size: .9rem; font-weight: 500; white-space: nowrap; }
+.cima-grupo svg { width: 17px; height: 17px; opacity: .85; flex-shrink: 0; }
+.cima-grupo:hover { background: rgba(255, 255, 255, .08); text-decoration: none; }
+.cima-grupo.ativo { background: #fff; color: var(--azul); font-weight: 700; }
+.cima-grupo.ativo svg { color: var(--cta); opacity: 1; }
+.cima-direita { display: flex; align-items: center; gap: 18px; margin-left: auto; flex-shrink: 0; }
+.cima-link { color: var(--menu-texto); font-size: .86rem; white-space: nowrap; }
+.cima-link:hover { color: #fff; }
+.cima-pessoa { position: relative; }
+.cima-pessoa > summary { display: flex; align-items: center; gap: 10px; padding: 4px 8px 4px 4px; border-radius: 10px;
+  cursor: pointer; list-style: none; }
+.cima-pessoa > summary::-webkit-details-marker { display: none; }
+.cima-pessoa > summary:hover, .cima-pessoa[open] > summary { background: rgba(255, 255, 255, .08); }
+.cima-avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--verde-marca); color: var(--sobre-destaque);
+  display: grid; place-items: center; flex-shrink: 0; font-weight: 800; font-size: .85rem; }
+.cima-nome { display: flex; flex-direction: column; line-height: 1.25; }
+.cima-nome b { color: #fff; font-size: .85rem; white-space: nowrap; }
+.cima-nome small { color: var(--menu-suave); font-size: .72rem; white-space: nowrap; }
+.cima-caixa { position: absolute; right: 0; top: calc(100% + 8px); z-index: 60; min-width: 230px; padding: 8px;
+  display: flex; flex-direction: column; background: var(--cartao); border: 1px solid var(--borda); border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(16, 24, 40, .18); }
+.cima-caixa > a { padding: 9px 10px; border-radius: 8px; color: var(--azul); font-weight: 600; }
+.cima-caixa > a:hover { background: var(--azul-claro); text-decoration: none; }
+/* Som e aviso na tela do computador (static/notificacoes.js, 23/11/2026), no menu da pessoa */
+.notif-config { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-top: 6px; padding: 8px 6px 2px; border-top: 1px solid var(--borda); }
+.notif-config button { font: inherit; font-size: .76rem; color: var(--azul); background: var(--azul-claro);
+  border: 1px solid var(--borda); border-radius: 999px; padding: 3px 10px; cursor: pointer; }
+.notif-config button:hover:not([disabled]) { border-color: var(--azul); }
 .notif-config button[disabled] { cursor: default; opacity: .75; }
 .notif-config button.desligado { opacity: .6; }
-.conteudo { flex: 1; min-width: 0; padding: 22px 28px 40px; }
+/* A segunda barra: as telas do grupo aberto (sem ela quando o grupo tem uma tela só ou a tela não é de grupo) */
+.cima-sub { display: none; padding: 0 28px; background: var(--azul-escuro); border-top: 1px solid rgba(255, 255, 255, .1); }
+.cima-sub.com-telas { display: block; }
+.cima-telas { display: none; flex-wrap: wrap; gap: 2px; }
+.cima-telas.aberto { display: flex; }
+.cima-telas-titulo { display: none; }
+.menu a.item { display: inline-flex; align-items: center; gap: 8px; min-height: 46px; padding: 0 12px; font-size: .88rem;
+  color: var(--menu-sub); border-bottom: 3px solid transparent; white-space: nowrap; }
+.menu a.item svg { width: 16px; height: 16px; opacity: .85; flex-shrink: 0; }
+.menu a.item:hover { color: #fff; text-decoration: none; }
+.menu a.item.ativo { color: #fff; font-weight: 700; border-bottom-color: var(--menu-destaque); }
+.menu a.item.ativo svg { color: var(--menu-destaque); opacity: 1; }
+.menu .contador, .menu a.item .ponto { margin-left: 2px; }
+.conteudo { min-width: 0; max-width: 1360px; margin: 0 auto; padding: 28px 28px 48px; }
 .topo-celular { display: none; }
+/* Tela mais estreita (notebook): saem o rótulo ao lado do logo, depois os ícones dos grupos e o nome da pessoa, para
+   tudo caber numa linha (sugestão aceita pela Maria em 27/11/2026). O logo largo (ex.: Grupo Certy) pede mais espaço. */
+/* a plataforma (Admin Master fora das marcas) já mostra o nome "Prospecção de Parceiros": o rótulo repetiria */
+.menu-cima.plataforma .cima-marca .divisor, .menu-cima.plataforma .cima-marca .rotulo-marca { display: none; }
+@media (max-width: 1540px) {
+  .menu-cima.logo-largo .cima-marca .divisor, .menu-cima.logo-largo .cima-marca .rotulo-marca,
+  .menu-cima.com-master .cima-marca .divisor, .menu-cima.com-master .cima-marca .rotulo-marca { display: none; }
+}
+@media (max-width: 1420px) { .menu-cima .cima-marca .divisor, .menu-cima .cima-marca .rotulo-marca { display: none; } }
+@media (max-width: 1600px) { .menu-cima.com-master .cima-grupo svg { display: none; } .menu-cima.com-master .cima-grupo { padding: 0 11px; } }
+.cima-caixa > a.cima-so-estreita { display: none; }  /* o Painel master no menu do nome: só quando o link de cima some */
+@media (max-width: 1100px) and (min-width: 981px) { .cima-caixa > a.cima-so-estreita { display: block; } }
+@media (max-width: 1300px) {
+  .cima-linha { gap: 8px 14px; padding: 8px 20px; }
+  .cima-sub { padding: 0 20px; }
+  .cima-grupo { padding: 0 11px; }
+  .cima-grupo svg { display: none; }
+}
+@media (max-width: 1180px) {
+  .cima-nome { display: none; }
+  .cima-direita { gap: 12px; }
+  .cima-grupo { padding: 0 9px; font-size: .86rem; }
+  .menu a.item { padding: 0 9px; gap: 6px; }
+}
+@media (max-width: 1100px) { .menu-cima .cima-link-master { display: none; } }  /* fica no menu do nome */
+@media print { .menu, .topo-celular { display: none !important; } .conteudo { max-width: none; padding: 0; } }
 .cabecalho { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
 .cabecalho .acoes { display: flex; gap: 8px; flex-wrap: wrap; }
 
@@ -172,7 +236,9 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #9cc1e6; border-c
 /* Avisos de uma ação (salvar, testar, enviar...): presos no alto da tela, para aparecerem mesmo quando a página pula
    para um quadro mais embaixo (#âncora); o × fecha e os de sucesso somem sozinhos (app.js). Pedido da Maria em
    19/11/2026: o erro do teste da API oficial ficava fora da vista. */
-.avisos-da-acao { position: sticky; top: 8px; z-index: 40; }
+.avisos-da-acao { position: sticky; top: calc(var(--altura-topo, 0px) + 8px); z-index: 40; }
+/* o menu de cima fica preso no alto: link para um quadro da página (#...) para logo abaixo dele (static/app.js mede) */
+html { scroll-padding-top: calc(var(--altura-topo, 0px) + 8px); }
 .avisos-da-acao .aviso { position: relative; padding-right: 40px; box-shadow: 0 4px 14px rgba(15, 23, 42, .12); }
 .fechar-aviso { position: absolute; top: 6px; right: 8px; border: 0; background: none; color: inherit; font-size: 20px;
                 line-height: 1; cursor: pointer; opacity: .7; padding: 2px 6px; }
@@ -194,7 +260,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #9cc1e6; border-c
 
 /* ---------- Kanban ---------- */
 .kanban { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 12px; align-items: flex-start; }
-.coluna { flex: 0 0 250px; background: #eaeef3; border-radius: var(--raio); padding: 10px; max-height: calc(100vh - 170px); display: flex; flex-direction: column; }
+.coluna { flex: 0 0 250px; background: #eaeef3; border-radius: var(--raio); padding: 10px; max-height: calc(100vh - 170px - var(--altura-topo, 0px)); display: flex; flex-direction: column; }
 .coluna h3 { display: flex; justify-content: space-between; font-size: .82rem; text-transform: uppercase; letter-spacing: .03em; color: #344054; }
 .coluna .lista { overflow-y: auto; min-height: 60px; flex: 1; }
 .coluna.sobre { outline: 2px dashed var(--azul); background: var(--azul-claro); }
@@ -238,12 +304,33 @@ dialog::backdrop { background: rgba(10, 30, 50, .45); }
 @media (max-width: 960px) {
   .grade-2, .grade-3, .grade-lead { grid-template-columns: 1fr; }
 }
-@media (max-width: 760px) {
-  .estrutura { display: block; }
-  .menu { position: fixed; z-index: 50; left: 0; top: 0; transform: translateX(-100%); transition: transform .2s; }
-  .menu.aberto { transform: none; box-shadow: 0 0 40px rgba(0,0,0,.3); }
+/* Celular e tablet: o menu de cima vira a gaveta do botão ☰ (static/app.js), com todos os grupos empilhados */
+@media (max-width: 980px) {
   .topo-celular { display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: var(--azul-escuro); color: #fff; position: sticky; top: 0; z-index: 40; }
-  .topo-celular button { background: none; border: 0; color: #fff; font-size: 1.4rem; cursor: pointer; }
+  .topo-celular button { display: inline-flex; align-items: center; gap: 6px; background: none; border: 0; color: #fff; font-size: 1.4rem; cursor: pointer; }
+  .topo-celular button .contador { margin-left: 0; font-size: .7rem; }
+  .menu { position: fixed; left: 0; top: 0; z-index: 50; width: 290px; max-width: 86vw; height: 100vh; overflow-y: auto;
+    transform: translateX(-100%); transition: transform .2s; background: var(--azul-escuro); }
+  .menu.aberto { transform: none; box-shadow: 0 0 40px rgba(0, 0, 0, .3); }
+  .cima-linha { flex-direction: column; align-items: stretch; gap: 10px; min-height: 0; padding: 16px 12px 8px; }
+  .cima-grupos { display: none; }
+  .menu-cima .cima-marca .divisor, .menu-cima .cima-marca .rotulo-marca,
+  .menu-cima.logo-largo .cima-marca .divisor, .menu-cima.logo-largo .cima-marca .rotulo-marca { display: block; }
+  .cima-direita { flex-wrap: wrap; gap: 8px 16px; margin: 0; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, .15); }
+  .cima-nome { display: flex; }
+  .menu-cima .cima-link-master { display: inline; }
+  .cima-pessoa { flex-basis: 100%; }
+  .cima-caixa { position: static; margin-top: 8px; box-shadow: none; }
+  .cima-sub, .cima-sub.com-telas { display: block; padding: 0 12px 16px; border: 0; background: none; }
+  .cima-telas, .cima-telas.aberto { display: flex; flex-direction: column; gap: 1px; margin-top: 10px; }
+  .cima-telas-titulo { display: block; padding: 8px 10px 4px; font-family: var(--fonte-mono); font-size: .62rem;
+    letter-spacing: .14em; text-transform: uppercase; color: var(--menu-rotulo); }
+  .menu a.item { min-height: 40px; padding: 0 10px; border-bottom: 0; border-radius: 8px; white-space: normal; }
+  .menu a.item .contador, .menu a.item .ponto { margin-left: auto; }
+  .menu a.item.ativo { background: var(--menu-ativo); box-shadow: inset 3px 0 0 var(--menu-destaque); }
+  .conteudo { padding: 20px 20px 40px; }
+}
+@media (max-width: 760px) {
   .conteudo { padding: 16px; }
   .grade { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .kpi .valor { font-size: 1.25rem; }
@@ -301,31 +388,35 @@ h2 { font-weight: 700; letter-spacing: -.01em; }
             border: 1px solid #c9d8e6; border-radius: 999px; padding: 3px 11px; background: #fff; }
 .etiqueta::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--verde-marca); }
 
-/* Menu lateral: azul-marinho do portfólio, logotipo e item ativo com traço verde */
-.menu { background: linear-gradient(180deg, var(--azul) 0%, var(--azul-escuro) 100%); color: var(--menu-texto); }
-.marca { gap: 12px; padding: 6px 8px 20px; }
+/* Logo (ou nome) da marca no menu de cima, na tela de entrada e na prévia de Configurações > Marca:
+   logo, traço e o rótulo "Parceiros / Prospecção B2B" lado a lado */
+.marca { display: flex; align-items: center; gap: 12px; color: #fff; }
 .marca .logo-img { height: 34px; width: auto; max-width: 150px; object-fit: contain; display: block; }
 .marca .logo-texto { color: #fff; font-weight: 800; font-size: 1.05rem; letter-spacing: -.01em; line-height: 1.15;
-                     max-width: 130px; }
-.marca .divisor { width: 1px; align-self: stretch; background: rgba(219, 230, 240, .25); }
+                     max-width: 160px; }
+.marca .divisor { width: 1px; align-self: stretch; background: rgba(255, 255, 255, .25); }
 .marca .rotulo-marca { font-family: var(--fonte-mono); font-size: .62rem; letter-spacing: .14em; line-height: 1.5;
-                       text-transform: uppercase; color: var(--menu-rotulo); }
-/* Logo largo (ex.: Grupo Certy, marca.LOGO_LARGO): sozinho na linha de cima, na largura do menu; rótulo embaixo */
-.marca.marca-larga { flex-direction: column; align-items: flex-start; gap: 9px; }
-.marca.marca-larga .logo-img { height: auto; max-height: 44px; max-width: 100%; }
-.marca.marca-larga .rotulo-marca { letter-spacing: .1em; white-space: nowrap; }
-.menu a.item:hover { background: rgba(255, 255, 255, .06); }
-.menu a.item.ativo { background: var(--menu-ativo); color: #fff; box-shadow: inset 3px 0 0 var(--verde-marca); }
-.menu a.item.ativo svg { color: var(--verde-marca); opacity: 1; }
-.menu .rodape { border-top-color: rgba(219, 230, 240, .15); }
+                       text-transform: uppercase; color: var(--menu-rotulo); white-space: nowrap; }
+/* Logo largo (ex.: Grupo Certy, marca.LOGO_LARGO): mais baixo, para caber na barra sem ficar enorme */
+.marca.marca-larga .logo-img { height: auto; max-height: 30px; max-width: 180px; }
 .topo-celular img { height: 22px; }
+/* Configurações > Marca, "Como fica": o menu de cima em miniatura, com as cores salvas da marca */
+.previa-cima { border-radius: 12px; overflow: hidden; color: var(--menu-texto); background: var(--azul); }
+.previa-linha { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 16px; padding: 12px 14px; }
+.previa-grupo { padding: 7px 12px; border-radius: 10px; background: #fff; color: var(--azul); font-weight: 700; font-size: .86rem; }
+.previa-sub { display: flex; gap: 4px; padding: 0 14px; background: var(--azul-escuro); }
+.previa-item { padding: 11px 8px 8px; font-size: .84rem; color: var(--menu-sub); border-bottom: 3px solid transparent; }
+.previa-item.ativo { color: #fff; font-weight: 700; border-bottom-color: var(--menu-destaque); }
 
-/* Indicadores e cartões */
-.kpi { border-radius: 12px; }
+/* Indicadores e cartões (novo visual de 27/11/2026: cantos mais arredondados, selos e botões mais firmes) */
+.kpi { border-radius: 14px; }
 .kpi .valor { font-weight: 800; letter-spacing: -.02em; }
 .kpi.destaque { background: var(--azul); border-color: var(--azul); }
 .kpi.destaque .rotulo { color: var(--destaque-rotulo); }
-.cartao { border-radius: 12px; }
+.cartao { border-radius: 14px; }
+.btn { border-radius: 10px; }
+.faixa { border-radius: 16px; }
+.selo { padding: 3px 10px; font-weight: 700; }
 .btn-verde:hover { background: var(--cta-escuro); }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--foco); border-color: var(--cta); }
 
@@ -387,7 +478,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--foco); bord
 
 /* ---------- Configurações: menu das seções à esquerda (_configuracoes.html) ---------- */
 .config-grade { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 20px; align-items: start; }
-.config-menu { position: sticky; top: 16px; display: flex; flex-direction: column; gap: 2px; background: var(--cartao);
+.config-menu { position: sticky; top: calc(var(--altura-topo, 0px) + 16px); max-height: calc(100vh - var(--altura-topo, 0px) - 32px);
+               overflow-y: auto; display: flex; flex-direction: column; gap: 2px; background: var(--cartao);
                border: 1px solid var(--borda); border-radius: 12px; padding: 10px; box-shadow: var(--sombra); }
 .config-grupo { font-family: var(--fonte-mono); font-size: .62rem; letter-spacing: .12em; text-transform: uppercase;
                 color: var(--suave); padding: 12px 10px 4px; }

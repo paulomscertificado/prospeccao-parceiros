@@ -53,7 +53,7 @@ PERMISSAO_DO_MENU = {
     "/portal": "portal.usar", "/portal/indicar": "portal.usar", "/portal/clientes": "portal.usar",
     "/portal/vencimentos": "portal.usar",
 }
-DENTRO_DAS_CONFIGURACOES = {"/permissoes", "/whatsapp", "/email"}  # no menu lateral só para quem não vê as Configurações
+DENTRO_DAS_CONFIGURACOES = {"/permissoes", "/whatsapp", "/email"}  # no menu de cima só para quem não vê as Configurações
 MENU_EQUIPE = [
     ("/", "Dashboard", "grafico"),
     ("/campanhas", "IA SDR (campanhas)", "megafone"),
@@ -88,6 +88,61 @@ MENU_PARCEIRO = [
     ("/portal/clientes", "Minha carteira", "predio"),
     ("/portal/vencimentos", "Vencimentos", "relogio"),
 ]
+# Menu na barra de cima (novo visual, 27/11/2026, pedido da Maria; templates/_menu_cima.html): os grupos de cima e as
+# telas de cada um. Dentro do grupo, as telas seguem a ordem do menu acima; tela fora dos grupos vai para "Outros".
+GRUPOS_DO_MENU = [
+    ("Visão geral", "grafico", ("/",)),
+    ("Prospecção", "megafone", ("/campanhas", "/empresas-novas", "/renovacao", "/prospeccao", "/assertiva", "/leads",
+                                "/cadencias")),
+    ("Operação", "enviar", ("/envios", "/fila", "/agenda", "/conversas", "/oficial", "/whatsapp", "/email")),
+    ("Relacionamento", "aperto", ("/oportunidades", "/parceiros", "/clientes", "/vencimentos", "/vendas", "/comissoes")),
+    ("Análise", "documento", ("/relatorios", "/inteligencia", "/ia")),
+    ("Portal", "grafico", ("/portal", "/portal/indicar", "/portal/clientes", "/portal/vencimentos")),
+    ("Configurações", "engrenagem", ("/permissoes", "/configuracoes")),
+]
+# telas sem item próprio no menu: qual item fica marcado (se a pessoa tiver esse item)
+TELA_DE_OUTRO_ITEM = {"/permissoes": "/configuracoes", "/whatsapp": "/configuracoes", "/email": "/configuracoes",
+                      "/categorias": "/configuracoes", "/conhecimento": "/configuracoes", "/visuais": "/campanhas",
+                      "/templates": "/cadencias"}
+# os números vermelhos do menu: o id que o static/notificacoes.js atualiza e a variável da tela
+CONTADORES_DO_MENU = {"/oportunidades": ("contador-oportunidades", "oportunidades_novas"),
+                      "/oficial": ("contador-oficial", "oficial_nao_lidas"),
+                      "/conversas": ("contador-conversas", "conversas_nao_lidas")}
+
+
+def item_marcado(menu: list, caminho: str) -> str:
+    """O item do menu da tela aberta: o mesmo endereço, o começo mais longo ("/leads/12" é Leads) ou, para telas sem
+    item próprio, o item onde ficam (WhatsApp de quem vê as Configurações é Configurações)."""
+    links = [m[0] for m in menu]
+    if caminho in links:
+        return caminho
+    comecos = [link for link in links if link not in ("/", "/portal") and caminho.startswith(link)]
+    if comecos:
+        return max(comecos, key=len)
+    for comeco, link in TELA_DE_OUTRO_ITEM.items():
+        if caminho.startswith(comeco) and link in links:
+            return link
+    return ""
+
+
+def menu_em_grupos(menu: list, caminho: str, numeros: dict) -> list:
+    """Os grupos da barra de cima com as telas que a pessoa vê. Cada grupo diz se está aberto (a tela aberta é dele),
+    se mostra a segunda barra (só com 2 telas ou mais: Visão geral e Configurações têm uma) e o número vermelho dele
+    (a soma dos números das telas dele, para ver a mensagem nova estando em outro grupo; sugestão aceita em 27/11)."""
+    marcado = item_marcado(menu, caminho)
+    todos = {link for _titulo, _icone, links in GRUPOS_DO_MENU for link in links}
+    grupos = []
+    for titulo, icone, links in GRUPOS_DO_MENU + [("Outros", "grafico", None)]:
+        itens = [m for m in menu if (m[0] in links if links is not None else m[0] not in todos)]
+        if not itens:
+            continue
+        contadores = [CONTADORES_DO_MENU[m[0]][0] for m in itens if m[0] in CONTADORES_DO_MENU]
+        aberto = any(m[0] == marcado for m in itens)
+        grupos.append({"titulo": titulo, "icone": icone, "link": itens[0][0], "itens": itens, "aberto": aberto,
+                       "segunda_barra": aberto and len(itens) > 1, "contadores": contadores,
+                       "soma": sum(int(numeros.get(CONTADORES_DO_MENU[m[0]][1]) or 0)
+                                   for m in itens if m[0] in CONTADORES_DO_MENU)})
+    return grupos
 
 
 def avisar(request: Request, texto: str, tipo: str = "ok") -> None:
@@ -149,7 +204,7 @@ def tela(request: Request, nome: str, contexto: dict | None = None, status_code:
         "wl": wl,
         "csrf": token_csrf(request),
         "avisos": request.session.pop("avisos", []),
-        # Permissões, WhatsApp e E-mail ficam dentro de Configurações; no menu lateral só para quem não vê as Configurações
+        # Permissões, WhatsApp e E-mail ficam dentro de Configurações; no menu de cima só para quem não vê as Configurações
         "menu": [m for m in menu if PERMISSAO_DO_MENU[m[0]] in permissoes
                  and not (m[0] in DENTRO_DAS_CONFIGURACOES and "configuracoes.ver" in permissoes)
                  and (m[0] != "/oficial" or tem_api_oficial)] if usuario else [],
@@ -168,6 +223,10 @@ def tela(request: Request, nome: str, contexto: dict | None = None, status_code:
         "com_marca": lambda texto: marca.aplicar(texto, usuario, marca_tela["ar"]) if marca_tela["ar"] else texto,
     }
     dados.update(contexto or {})
+    # a barra de cima (templates/_menu_cima.html): depois do contexto, que pode trocar o "caminho" (a campanha de
+    # renovação marca Renovação, rotas/sdr.py)
+    dados["menu_marcado"] = item_marcado(dados["menu"], dados["caminho"])
+    dados["menu_grupos"] = menu_em_grupos(dados["menu"], dados["caminho"], dados)
     return modelos_html.TemplateResponse(request, nome, dados, status_code=status_code)
 
 

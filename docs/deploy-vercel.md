@@ -280,7 +280,7 @@ oficial da AR, com `oficial.ver`) e **resposta** (aviso do sininho da pessoa com
 os números (`#contador-conversas`, `#contador-oficial`, `#contador-oportunidades`, `#link-avisos`), põe "(N)" no
 título da aba (Conversas + API Oficial + Oportunidades), toca `static/sons/notificacao.wav` (o som que a Maria
 mandou, 0,7 s) uma vez por pergunta e, com a permissão do navegador (`Notification`, botão "Ativar avisos na tela" no
-rodapé do menu) e o sistema fora da frente, mostra até 3 avisos na tela do computador (`tag` por conversa; o clique
+menu que abre no nome da pessoa, no canto de cima) e o sistema fora da frente, mostra até 3 avisos na tela do computador (`tag` por conversa; o clique
 abre o `link`, só endereço do próprio sistema). Som ligado/desligado fica no navegador (`ms_novidades_som`). Com
 várias abas, a primeira que vê a novidade avisa (as outras comparam com o guardado). Conversa aberta na tela à vista não
 avisa (`window.conversaAberta` das telas Conversas e API Oficial); essas telas se atualizam na hora com o evento
