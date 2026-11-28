@@ -120,8 +120,10 @@ hr { border: 0; border-top: 1px solid var(--borda); margin: 16px 0; }
 .topo-celular { display: none; }
 /* Tela mais estreita (notebook): saem o rótulo ao lado do logo, depois os ícones dos grupos e o nome da pessoa, para
    tudo caber numa linha (sugestão aceita pela Maria em 27/11/2026). O logo largo (ex.: Grupo Certy) pede mais espaço. */
-/* a plataforma (Admin Master fora das marcas) já mostra o nome "Prospecção de Parceiros": o rótulo repetiria */
-.menu-cima.plataforma .cima-marca .divisor, .menu-cima.plataforma .cima-marca .rotulo-marca { display: none; }
+/* a plataforma (Admin Master fora das marcas) sem logo mostra o nome em texto (ex.: "Prospecção de Parceiros"): o
+   rótulo repetiria. Com o logo da plataforma (Configurações > Marca, 28/11/2026), o rótulo fica, como nas marcas. */
+.menu-cima.plataforma.sem-logo .cima-marca .divisor, .menu-cima.plataforma.sem-logo .cima-marca .rotulo-marca,
+.previa-cima.plataforma.sem-logo .marca .divisor, .previa-cima.plataforma.sem-logo .marca .rotulo-marca { display: none; }
 @media (max-width: 1540px) {
   .menu-cima.logo-largo .cima-marca .divisor, .menu-cima.logo-largo .cima-marca .rotulo-marca,
   .menu-cima.com-master .cima-marca .divisor, .menu-cima.com-master .cima-marca .rotulo-marca { display: none; }

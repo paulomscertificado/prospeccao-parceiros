@@ -27,7 +27,8 @@ ENCONTRAR → QUALIFICAR → PERSONALIZAR → CONTATAR → ACOMPANHAR → CONVER
   uma tela só (Visão geral e Configurações) nem em Minha conta e Avisos.
 - **O seu nome:** clique nele para abrir **Minha conta**, **Sair** e os botões de som e avisos na tela. O Admin Master
   vê também o link **Painel master** ao lado de Avisos.
-- Cada marca vê o menu com as **cores, a fonte e o logo dela** (Configurações > Marca).
+- Cada marca vê o menu com as **cores, a fonte e o logo dela** (Configurações > Marca). O Admin Master, fora das
+  marcas, vê o **logo da plataforma** (o símbolo MS), que ele troca em Configurações > Marca.
 - Em tela menor, o texto ao lado do logo, os ícones dos grupos e o seu nome somem para tudo caber numa linha.
 - **No celular e no tablet**, o botão **☰** abre todos os grupos e telas, um embaixo do outro. O número vermelho ao lado
   do ☰ soma todas as novidades.
@@ -989,6 +990,10 @@ confira em "Como fica" (o menu de cima em miniatura) e, se não gostar, envie o 
 (como o do Grupo Certy) fica um pouco mais baixo no menu de cima, para caber. Botões e títulos usam a cor principal um pouco mais escura
 quando a original não dá leitura com letra branca. Depois de salvar, as outras pessoas veem a mudança em até 5 minutos.
 O admin master muda o **nome neutro da plataforma** (tela de entrada) em Configurações > Marca, fora das marcas.
+Ali também fica o **logo da plataforma**: ele aparece no alto das telas do admin master fora das marcas, no lugar
+do nome em texto (a tela de entrada continua só com o nome). Envie a versão branca, em PNG com fundo transparente;
+"Tirar o logo" volta o nome em texto. Para a MS foi usado o **símbolo MS** sem o "Certificação Digital": o manual
+da marca pede só o símbolo quando o logo fica com menos de 120 px de largura, como na barra de cima.
 O e-mail de cada pessoa precisa ser do **domínio da marca** dela (Configurações > Marca); o e-mail principal, as
 chaves (CNPJá), a base da Receita e as listas importadas são da plataforma: só o admin master muda.
 A arte do aviso de vencimento (Renovação) é a do site da MS: só a AR MS manda; as outras marcas mandam só o texto.

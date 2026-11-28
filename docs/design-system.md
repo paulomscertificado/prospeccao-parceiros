@@ -12,6 +12,12 @@ dos detalhes como veio; `--cta` (botões de ação e escolhas marcadas) = cor do
 segunda barra; `--sobre-destaque` = a letra em cima da cor dos detalhes, escura ou branca). O verde de
 "deu certo" (selos OK, avisos de sucesso) não muda. Sem marca própria = as cores de sempre. Logo da AR em
 `/marca/logo/<ar>/<assinatura>?v=<versão>`; sem logo, o nome curto em texto. A tela de entrada é neutra.
+Logo da plataforma (28/11/2026, pedido da Maria: "quero a logo marca da MS bem bonita aqui"): o Admin Master fora
+das ARs vê o logo da linha `marca.AR_DA_PLATAFORMA` (0) de `marcas_ar` (Configurações > Marca, fora das ARs;
+`marca.salvar_logo_da_plataforma`), em `/marca/logo/0/...`; sem ele, o nome `plataforma_nome` em texto, sem o
+rótulo ao lado (`.menu-cima.plataforma.sem-logo`). Com o logo, o rótulo volta, como nas marcas. A tela de entrada
+não usa o logo da plataforma (nem como ícone da aba). Na barra, o logo tem 34 px de altura: pelo manual da marca
+da MS (logo completo só a partir de 120 px de largura), a plataforma usa o símbolo MS branco, sem a assinatura.
 Logo no menu (`templates/_marca_menu.html`): logo, traço e "Parceiros / Prospecção B2B" lado a lado; o logo largo
 (largura/altura >= 1,8, ex.: Grupo Certy, `.marca-larga`) fica com até 30 px de altura e 180 px de largura. O logo vai
 sobre a cor do menu: branco e com fundo transparente (Configurações > Marca > "Tirar o fundo liso do logo"). A prévia

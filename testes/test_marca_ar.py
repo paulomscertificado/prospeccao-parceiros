@@ -268,7 +268,7 @@ def test_o_que_e_da_plataforma_so_o_admin_master_muda(certy, cliente):
         assert "só o Admin Master muda" in r.text, caminho
     # fora das ARs, o Admin Master muda o nome neutro da plataforma (tela de entrada)
     pagina = cliente.get("/configuracoes?aba=marca").text
-    assert "Nome e suporte da plataforma" in pagina
+    assert "Nome, logo e suporte da plataforma" in pagina
     cliente.post("/configuracoes/marca", data={"csrf": csrf_de(pagina), "plataforma_nome": "Plataforma Teste"})
     try:
         assert "Plataforma Teste" in TestClient(app).get("/login").text

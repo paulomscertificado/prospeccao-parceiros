@@ -16,7 +16,7 @@
   {%- if link == '/whatsapp' %}<span class="ponto {{ 'verde' if wl.conectado else ('amarelo' if wl.disponivel else 'vermelho') }}" title="WhatsApp {{ 'conectado' if wl.conectado else ('aguardando QR code' if wl.estado_codigo == 'aguardando_qr' else ('desconectado' if wl.disponivel else 'desligado')) }}"></span>{% endif -%}
 {%- endmacro -%}
 {%- set com_segunda_barra = menu_grupos|selectattr('segunda_barra')|list -%}
-<nav class="menu menu-cima{{ ' logo-largo' if marca.logo_largo }}{{ ' plataforma' if marca.plataforma }}{{ ' com-master' if usuario.master }}" aria-label="Menu principal">
+<nav class="menu menu-cima{{ ' logo-largo' if marca.logo_largo }}{{ ' plataforma' if marca.plataforma }}{{ ' sem-logo' if not marca.logo_url }}{{ ' com-master' if usuario.master }}" aria-label="Menu principal">
   <div class="cima-linha">
     <a class="cima-marca" href="{{ '/portal' if usuario.perfil == 'parceiro' else '/' }}" aria-label="Início">{% with m = marca %}{% include "_marca_menu.html" %}{% endwith %}</a>
     <div class="cima-grupos">

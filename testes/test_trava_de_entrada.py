@@ -92,11 +92,11 @@ def test_contato_do_suporte_na_tela_de_entrada_e_na_trava(cliente):
     with TestClient(app) as master:  # o Admin Master, fora das ARs: nome e suporte da plataforma
         _entrar(master, "admin@teste.com.br", SENHA_DO_MASTER)
         tela = master.get("/configuracoes?aba=marca").text
-        assert 'name="plataforma_suporte"' in tela and "Nome e suporte da plataforma" in tela
+        assert 'name="plataforma_suporte"' in tela and "Nome, logo e suporte da plataforma" in tela
         nome = re.search(r'name="plataforma_nome" maxlength="60" value="([^"]*)"', tela).group(1)
         r = master.post("/configuracoes/marca", data={"csrf": csrf_de(tela), "plataforma_nome": nome,
                                                       "plataforma_suporte": "  WhatsApp (81) 3333-0000  "})
-        assert "Nome e suporte da plataforma salvos" in r.text
+        assert "Nome, logo e suporte da plataforma salvos" in r.text
     try:
         with TestClient(app) as c:
             entrada = " ".join(c.get("/login").text.split())

@@ -260,16 +260,29 @@ async def salvar_marca(request: Request, usuario: Usuario = Depends(exige("confi
         nome = re.sub(r"\s+", " ", str(form.get("plataforma_nome") or "")).strip()[:60]
         # contato do suporte: na tela de entrada e na mensagem da trava de senha errada (26/11/2026, pedido da Maria)
         suporte = re.sub(r"\s+", " ", str(form.get("plataforma_suporte") or "")).strip()[:120]
+        # logo da plataforma: no alto das telas do Admin Master fora das ARs (28/11/2026, pedido da Maria)
+        arquivo = form.get("logo")
+        novo_logo = await arquivo.read() if arquivo is not None and getattr(arquivo, "filename", "") else None
+        tirar_fundo = form.get("tirar_fundo") == "1"
         antes = {"plataforma_nome": ler_config(db, "plataforma_nome"),
-                 "plataforma_suporte": ler_config(db, "plataforma_suporte")}
+                 "plataforma_suporte": ler_config(db, "plataforma_suporte"),
+                 "logo": _marca_no_registro(db, marca.AR_DA_PLATAFORMA)["logo"]}
         depois = {"plataforma_nome": nome or marca.PLATAFORMA, "plataforma_suporte": suporte}
         for chave, valor in depois.items():
             gravar_config(db, chave, valor)
-        registrar_log(db, usuario, "salvou_nome_da_plataforma", "configuracao", None, nome, request,
-                      mudancas=diferencas(antes, depois))
+        problemas = marca.salvar_logo_da_plataforma(db, novo_logo, tirar_logo=form.get("tirar_logo") == "1",
+                                                    tirar_fundo=tirar_fundo)
+        db.flush()
+        depois["logo"] = _marca_no_registro(db, marca.AR_DA_PLATAFORMA)["logo"]
+        feito = (["logo novo"] if novo_logo else []) + (["tirou o fundo do logo"] if tirar_fundo else [])
+        registrar_log(db, usuario, "salvou_nome_da_plataforma", "configuracao", None,
+                      "; ".join([nome] + feito + problemas)[:250], request, mudancas=diferencas(antes, depois))
         db.commit()
         marca.esquecer()
-        avisar(request, "Nome e suporte da plataforma salvos.")
+        for problema in problemas:
+            avisar(request, problema, "erro")
+        if not problemas:
+            avisar(request, "Nome, logo e suporte da plataforma salvos.")
         return voltar(destino)
     arquivo = form.get("logo")
     novo_logo = await arquivo.read() if arquivo is not None and getattr(arquivo, "filename", "") else None

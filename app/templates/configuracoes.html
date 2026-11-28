@@ -42,11 +42,11 @@
 {% elif aba == 'marca' %}
 {% set m = marca_ar %}{% set l = marca_linha %}
 {% if m.plataforma %}
-<form class="cartao" method="post" action="/configuracoes/marca" style="max-width:640px">
+<form class="cartao" method="post" action="/configuracoes/marca" enctype="multipart/form-data" style="max-width:640px">
   <input type="hidden" name="csrf" value="{{ csrf }}">
-  <h2>Nome e suporte da plataforma</h2>
-  <p class="suave">Aparece na tela de entrada e para o Admin Master fora das empresas. É neutro: nenhuma empresa vê o
-    nome de outra.</p>
+  <h2>Nome, logo e suporte da plataforma</h2>
+  <p class="suave">O nome aparece na tela de entrada e para o Admin Master fora das empresas. É neutro: nenhuma empresa
+    vê o nome de outra.</p>
   <div class="campo"><label for="p-nome">Nome</label>
     <input id="p-nome" type="text" name="plataforma_nome" maxlength="60" value="{{ m.nome }}"></div>
   <div class="campo"><label for="p-suporte">Contato do suporte</label>
@@ -54,7 +54,15 @@
            placeholder="Ex.: WhatsApp (81) 99999-0000 ou o e-mail do suporte">
     <p class="ajuda">Aparece na tela de entrada e na mensagem de quando a entrada fica travada por senha errada (5 erros
       seguidos travam por 15 minutos). Em branco, a mensagem diz só "fale com o suporte da plataforma".</p></div>
-  <button class="btn btn-primario">Salvar</button>
+  <h3>Logo</h3>
+  <p class="pequeno suave">Aparece no alto das telas do Admin Master fora das empresas, no lugar do nome em texto. Para
+    fundo colorido (o menu): de preferência a versão branca, em PNG com fundo transparente. {{ tipos_logo }}, até 300 KB.</p>
+  <div class="previa-cima plataforma{{ ' sem-logo' if not m.logo_url }}" aria-hidden="true" style="margin:8px 0 10px">{# como fica no alto da tela (estilo.css, .previa-cima) #}
+    <div class="previa-linha">{% include "_marca_menu.html" %}<span class="previa-grupo">Visão geral</span></div></div>
+  <input type="file" name="logo" accept="image/png,image/jpeg,image/webp" aria-label="Arquivo do logo da plataforma">
+  <label class="marcar" style="margin-top:6px"><input type="checkbox" name="tirar_fundo" value="1"> Tirar o fundo liso do logo (fica transparente)</label>
+  {% if m.logo_url %}<label class="marcar" style="margin-top:6px"><input type="checkbox" name="tirar_logo" value="1"> Tirar o logo (volta o nome em texto)</label>{% endif %}
+  <button class="btn btn-primario" style="margin-top:12px">Salvar</button>
   <p class="ajuda">A marca de cada empresa (nome, logo, cores e fonte) muda dentro dela: no
     <a href="/master">Painel master</a>, clique em "Entrar na AR" e depois em Configurações &gt; Marca.</p>
 </form>

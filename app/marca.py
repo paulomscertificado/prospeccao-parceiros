@@ -3,6 +3,8 @@
 Telas (`da_tela`): quem é de uma AR vê o nome, o logo, as cores e a fonte dela (tabela marcas_ar, tela Configurações >
 Marca). Antes de entrar, e o Admin Master fora das ARs, veem a plataforma: neutra, sem o nome de nenhuma AR (decisão
 de 14/11/2026: um endereço só para todas; o nome neutro é a configuração `plataforma_nome`, que só o master muda).
+A plataforma também pode ter um logo (28/11/2026, `salvar_logo_da_plataforma`): ele aparece no alto das telas do
+Admin Master fora das ARs, no lugar do nome em texto.
 
 Mensagens (`da_pessoa`, `aplicar`): saem em nome da "empresa que eu represento" da pessoa (Minha conta) ou, sem ela,
 da marca da AR dela (Admin Master e quem não tem AR: a AR MS, ars.PADRAO). Os modelos do sistema foram escritos com o
@@ -38,6 +40,10 @@ FONTES = ("Inter", "Montserrat", "Poppins", "Roboto", "Open Sans", "Lato", "Nuni
 TIPOS_LOGO = {"image/png": "PNG", "image/jpeg": "JPG", "image/webp": "WebP"}  # SVG não: pode levar código
 LIMITE_LOGO = 300_000  # 300 KB: o logo aparece em toda tela
 LOGO_LARGO = 1.8  # largura/altura: daqui para cima o logo fica sozinho na linha de cima do menu (Grupo Certy: 4,9)
+# O logo da plataforma (Admin Master fora das ARs) fica na linha 0 de marcas_ar: nenhuma AR tem o id 0 (os ids das
+# ARs começam em 1), então as rotinas de cada AR (exportar, apagar, isolamento) nunca a pegam. Só o logo dela vale:
+# o nome da plataforma continua na configuração `plataforma_nome`.
+AR_DA_PLATAFORMA = 0
 ALTURA_LOGO_TRATADO = 240  # px: o menu mostra até 44 px de altura; mais que isso só pesa (tráfego do Supabase)
 MAXIMO_PIXELS = 25_000_000  # imagem maior que isso (em pixels) nem é aberta para tirar o fundo
 RUIDO_DO_FUNDO = 3  # tons de diferença do fundo que ainda contam como fundo (manchinhas do JPG)
@@ -319,16 +325,23 @@ def da_plataforma(db=None) -> dict:
     guardada = _guardadas.get("plataforma")
     if guardada and guardada[0] > time.monotonic():
         return guardada[1]
-    nome, suporte = PLATAFORMA, ""
+    nome, suporte, logo_tipo, proporcao, versao = PLATAFORMA, "", "", 0.0, None
     if db is not None:
         from .banco import ler_config
 
         nome = (ler_config(db, "plataforma_nome") or "").strip() or PLATAFORMA
         suporte = (ler_config(db, "plataforma_suporte") or "").strip()
+        linha = db.execute(select(MarcaAR.logo_tipo, MarcaAR.logo_proporcao, MarcaAR.atualizado_em)
+                           .where(MarcaAR.tenant_id == AR_DA_PLATAFORMA)).first()  # o logo (os bytes) não vem junto
+        if linha is not None:
+            logo_tipo, proporcao, versao = linha.logo_tipo or "", float(linha.logo_proporcao or 0), linha.atualizado_em
+    logo_url = endereco_do_logo(AR_DA_PLATAFORMA, int(versao.timestamp())) if logo_tipo and versao else ""
     m = _com_frase({"ar": None, "slug": "", "e_ms": False, "plataforma": True, "nome": nome, "suporte": suporte,
                     "curto": "sua empresa",
                     "artigo": "a", "site": "", "descricao": "", "dominio_email": "", "cor": "", "cor_detalhe": "",
-                    "cor_fundo": "", "fonte": "", "titulo": nome, "logo_url": "", "logo_largo": False, "css": "",
+                    "cor_fundo": "", "fonte": "", "titulo": nome, "logo_url": logo_url,
+                    "logo_largo": bool(logo_url and proporcao >= LOGO_LARGO),
+                    "logo_proporcao": proporcao if logo_url else 0.0, "css": "",
                     "fonte_url": "", "uf": "", "cidade": ""})
     if db is not None:
         _guardadas["plataforma"] = (time.monotonic() + VALIDADE, m)
@@ -554,6 +567,39 @@ def salvar(db, ar: int, dados: dict, novo_logo: bytes | None = None, tirar_logo:
 
     linha.atualizado_em = agora()  # muda o endereço do logo: o navegador busca o novo
     esquecer(ar)
+    return problemas
+
+
+def salvar_logo_da_plataforma(db, novo_logo: bytes | None = None, tirar_logo: bool = False,
+                              tirar_fundo: bool = False) -> list[str]:
+    """O logo da plataforma: Admin Master fora das ARs, Configurações > Marca (28/11/2026, pedido da Maria: "quero a
+    logo marca da MS bem bonita aqui", no alto da tela onde aparecia o nome da plataforma em texto). Os mesmos cuidados
+    do logo das ARs (tipo, tamanho, tirar o fundo liso). Sem nada para mudar, não grava. Devolve os problemas (vazio =
+    deu certo)."""
+    from .banco import agora
+
+    linha = db.get(MarcaAR, AR_DA_PLATAFORMA)
+    problemas = []
+    if novo_logo:
+        problema = problema_no_logo(novo_logo)
+        if problema:
+            return [problema]
+        if linha is None:
+            linha = MarcaAR(tenant_id=AR_DA_PLATAFORMA)
+            db.add(linha)
+        problemas += _gravar_logo(linha, novo_logo, tirar_fundo)
+    elif tirar_logo:
+        if linha is None or not linha.logo_tipo:
+            return []
+        linha.logo, linha.logo_tipo, linha.logo_proporcao = None, "", None
+    elif tirar_fundo:
+        if linha is None or not (linha.logo_tipo and linha.logo):
+            return ["Não há logo para tirar o fundo: escolha o arquivo do logo."]
+        problemas += _gravar_logo(linha, linha.logo, True)
+    else:
+        return []
+    linha.atualizado_em = agora()  # muda o endereço do logo: o navegador busca o novo
+    esquecer(AR_DA_PLATAFORMA)  # e a plataforma guardada na memória
     return problemas
 
 

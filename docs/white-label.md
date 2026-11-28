@@ -201,7 +201,9 @@ nas telas, artigo ("a MS", "o Grupo Certy"), apresentação, site, domínio do e
 detalhes, fundo), fonte (lista `FONTES`) e logo (PNG/JPG/WebP até 300 KB; SVG não, pode levar código). As telas
 recebem `marca` (`web.tela`): `{{ marca.curto }}`, `{{ marca.frase('com') }}` ("com a MS", "com o Grupo Certy"),
 `{{ marca.logo_url }}`, `{{ marca.logo_largo }}`, `{{ marca.css }}`. Antes de entrar e para o Admin Master fora das ARs: a plataforma
-(`plataforma_nome`, "sua empresa" nas frases). A marca fica na memória 5 minutos (tráfego do Supabase); o logo, no
+(`plataforma_nome`, "sua empresa" nas frases). A plataforma tem um logo próprio desde 28/11/2026, só no alto das
+telas do Admin Master fora das ARs (linha `marca.AR_DA_PLATAFORMA` = 0 de `marcas_ar`: nenhuma AR tem o id 0, então
+exportar, apagar e o isolamento de cada AR nunca a pegam; `marca.salvar_logo_da_plataforma`). A marca fica na memória 5 minutos (tráfego do Supabase); o logo, no
 navegador, por uma semana (o endereço muda com a versão).
 **Logo no menu** (16/11/2026, o JPG do Grupo Certy: logo branco num fundo cinza-claro, cortado no menu): o bloco do
 alto do menu é `templates/_marca_menu.html` (menu e prévia "Como fica"). Logo largo (`marcas_ar.logo_proporcao` =
